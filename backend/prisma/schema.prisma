@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
+model User {
+  id                    String       @id @default(uuid()) @db.Uuid
+  email                 String       @unique @db.VarChar(320)
+  passwordHash          String?      @db.VarChar(255)
+  name                  String?      @db.VarChar(120)
+  phone                 String?      @db.VarChar(32)
+  role                  UserRole     @default(CUSTOMER)
+  authProvider          AuthProvider @default(EMAIL)
+  googleId              String?      @unique @db.VarChar(255)
+  emailVerified         Boolean      @default(false)
+  refreshTokenHash      String?      @db.VarChar(255)
+  refreshTokenExpiresAt DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  passwordResetOtps     PasswordResetOtp[]
+
+  @@index([role])
+  @@index([refreshTokenExpiresAt])
+}
+
+model PasswordResetOtp {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String    @db.VarChar(320)
+  otpHash   String    @db.VarChar(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([email, usedAt, expiresAt])
+}
+
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(120)
+  slug        String    @unique @db.VarChar(160)
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@index([isActive])
+}
+
+model Product {
+  id          String           @id @default(uuid()) @db.Uuid
+  categoryId  String           @db.Uuid
+  category    Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name        String           @db.VarChar(160)
+  slug        String           @unique @db.VarChar(180)
+  description String?
+  basePrice   Int
+  imageUrls   String[]         @default([])
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  variants    ProductVariant[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([basePrice])
+}
+
+model ProductVariant {
+  id            String   @id @default(uuid()) @db.Uuid
+  productId     String   @db.Uuid
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sku           String?  @unique @db.VarChar(80)
+  size          String   @db.VarChar(32)
+  color         String   @db.VarChar(64)
+  stock         Int      @default(0)
+  priceOverride Int?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([productId, size, color])
+  @@index([productId])
+  @@index([isActive])
+}

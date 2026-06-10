@@ -1,0 +1,1025 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import type { CreateCategoryDto } from './dto/create-category.dto';
+import type { CreateProductVariantDto } from './dto/create-product-variant.dto';
+import type { CreateProductDto } from './dto/create-product.dto';
+import type {
+  ProductQueryDto,
+  ProductSort,
+} from './dto/product-query.dto';
+import type { UpdateCategoryDto } from './dto/update-category.dto';
+import type { UpdateProductVariantDto } from './dto/update-product-variant.dto';
+import type { UpdateProductDto } from './dto/update-product.dto';
+
+const DEFAULT_PRODUCT_LIMIT = 20;
+const MAX_PRODUCT_LIMIT = 50;
+
+const categorySelect: Prisma.CategorySelect = {
+  id: true,
+  name: true,
+  slug: true,
+  description: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const categorySummarySelect: Prisma.CategorySelect = {
+  id: true,
+  name: true,
+  slug: true,
+};
+
+const variantSelect: Prisma.ProductVariantSelect = {
+  id: true,
+  productId: true,
+  sku: true,
+  size: true,
+  color: true,
+  stock: true,
+  priceOverride: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const variantOrderBy: Prisma.ProductVariantOrderByWithRelationInput[] = [
+  { size: 'asc' },
+  { color: 'asc' },
+];
+
+const productSelect: Prisma.ProductSelect = {
+  id: true,
+  categoryId: true,
+  name: true,
+  slug: true,
+  description: true,
+  basePrice: true,
+  imageUrls: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  category: {
+    select: categorySummarySelect,
+  },
+  variants: {
+    select: variantSelect,
+    orderBy: variantOrderBy,
+  },
+};
+
+const publicProductSelect: Prisma.ProductSelect = {
+  ...productSelect,
+  variants: {
+    where: {
+      isActive: true,
+    },
+    select: variantSelect,
+    orderBy: variantOrderBy,
+  },
+};
+
+@Injectable()
+export class CatalogService {
+  constructor(private readonly prismaService: PrismaService) {}
+
+  async listCategories() {
+    const categories = await this.prismaService.category.findMany({
+      where: {
+        isActive: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+      select: categorySelect,
+    });
+
+    return { categories };
+  }
+
+  async getPublicCategory(id: string) {
+    const category = await this.prismaService.category.findFirst({
+      where: {
+        id,
+        isActive: true,
+      },
+      select: categorySelect,
+    });
+
+    if (!category) {
+      throw this.categoryNotFoundException();
+    }
+
+    return { category };
+  }
+
+  async createCategory(dto: CreateCategoryDto) {
+    const slug = this.normalizeSlug(dto.slug);
+    await this.assertCategorySlugAvailable(slug);
+
+    try {
+      const category = await this.prismaService.category.create({
+        data: {
+          name: this.normalizeRequiredText(dto.name, 'name'),
+          slug,
+          description: this.normalizeOptionalText(dto.description),
+          isActive: this.normalizeOptionalBoolean(dto.isActive, true, 'isActive'),
+        },
+        select: categorySelect,
+      });
+
+      return { category };
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw this.categorySlugExistsException();
+      }
+
+      throw error;
+    }
+  }
+
+  async updateCategory(id: string, dto: UpdateCategoryDto) {
+    await this.getCategoryForAdmin(id);
+
+    const data: Prisma.CategoryUpdateInput = {};
+
+    if ('name' in dto) {
+      data.name = this.normalizeRequiredText(dto.name, 'name');
+    }
+
+    if ('slug' in dto) {
+      const slug = this.normalizeSlug(dto.slug);
+      await this.assertCategorySlugAvailable(slug, id);
+      data.slug = slug;
+    }
+
+    if ('description' in dto) {
+      data.description = this.normalizeOptionalText(dto.description);
+    }
+
+    if ('isActive' in dto) {
+      data.isActive = this.normalizeOptionalBoolean(
+        dto.isActive,
+        undefined,
+        'isActive',
+      );
+    }
+
+    this.assertUpdateHasFields(data, 'CATEGORY_UPDATE_EMPTY');
+
+    try {
+      const category = await this.prismaService.category.update({
+        where: {
+          id,
+        },
+        data,
+        select: categorySelect,
+      });
+
+      return { category };
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw this.categorySlugExistsException();
+      }
+
+      throw error;
+    }
+  }
+
+  async deactivateCategory(id: string) {
+    await this.getCategoryForAdmin(id);
+
+    const category = await this.prismaService.category.update({
+      where: {
+        id,
+      },
+      data: {
+        isActive: false,
+      },
+      select: categorySelect,
+    });
+
+    return { category };
+  }
+
+  async listProducts(query: ProductQueryDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? DEFAULT_PRODUCT_LIMIT, MAX_PRODUCT_LIMIT);
+    const where = this.buildPublicProductWhere(query);
+
+    if (
+      query.minPrice !== undefined &&
+      query.maxPrice !== undefined &&
+      query.minPrice > query.maxPrice
+    ) {
+      throw new BadRequestException({
+        code: 'INVALID_PRICE_RANGE',
+        message: 'minPrice must be less than or equal to maxPrice.',
+      });
+    }
+
+    const [total, products] = await this.prismaService.$transaction([
+      this.prismaService.product.count({ where }),
+      this.prismaService.product.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: this.getProductOrderBy(query.sort),
+        select: publicProductSelect,
+      }),
+    ]);
+
+    return {
+      products,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getPublicProduct(id: string) {
+    const product = await this.prismaService.product.findFirst({
+      where: {
+        id,
+        isActive: true,
+        category: {
+          isActive: true,
+        },
+      },
+      select: publicProductSelect,
+    });
+
+    if (!product) {
+      throw this.productNotFoundException();
+    }
+
+    return { product };
+  }
+
+  async getPublicProductVariants(id: string) {
+    const product = await this.prismaService.product.findFirst({
+      where: {
+        id,
+        isActive: true,
+        category: {
+          isActive: true,
+        },
+      },
+      select: {
+        id: true,
+        variants: {
+          where: {
+            isActive: true,
+          },
+          orderBy: [{ size: 'asc' }, { color: 'asc' }],
+          select: variantSelect,
+        },
+      },
+    });
+
+    if (!product) {
+      throw this.productNotFoundException();
+    }
+
+    return { variants: product.variants };
+  }
+
+  async createProduct(dto: CreateProductDto) {
+    const slug = this.normalizeSlug(dto.slug);
+    await this.assertActiveCategoryExists(dto.categoryId);
+    await this.assertProductSlugAvailable(slug);
+
+    try {
+      const product = await this.prismaService.product.create({
+        data: {
+          categoryId: dto.categoryId,
+          name: this.normalizeRequiredText(dto.name, 'name'),
+          slug,
+          description: this.normalizeOptionalText(dto.description),
+          basePrice: dto.basePrice,
+          imageUrls: this.normalizeImageUrls(dto.imageUrls),
+          isActive: this.normalizeOptionalBoolean(dto.isActive, true, 'isActive'),
+        },
+        select: productSelect,
+      });
+
+      return { product };
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw this.productSlugExistsException();
+      }
+
+      throw error;
+    }
+  }
+
+  async updateProduct(id: string, dto: UpdateProductDto) {
+    await this.getProductForAdmin(id);
+
+    const data: Prisma.ProductUncheckedUpdateInput = {};
+
+    if ('categoryId' in dto) {
+      const categoryId = this.normalizeRequiredId(dto.categoryId, 'categoryId');
+      await this.assertActiveCategoryExists(categoryId);
+      data.categoryId = categoryId;
+    }
+
+    if ('name' in dto) {
+      data.name = this.normalizeRequiredText(dto.name, 'name');
+    }
+
+    if ('slug' in dto) {
+      const slug = this.normalizeSlug(dto.slug);
+      await this.assertProductSlugAvailable(slug, id);
+      data.slug = slug;
+    }
+
+    if ('description' in dto) {
+      data.description = this.normalizeOptionalText(dto.description);
+    }
+
+    if ('basePrice' in dto) {
+      data.basePrice = this.normalizeRequiredNumber(dto.basePrice, 'basePrice');
+    }
+
+    if ('imageUrls' in dto) {
+      data.imageUrls = this.normalizeImageUrls(dto.imageUrls);
+    }
+
+    if ('isActive' in dto) {
+      data.isActive = this.normalizeOptionalBoolean(
+        dto.isActive,
+        undefined,
+        'isActive',
+      );
+    }
+
+    this.assertUpdateHasFields(data, 'PRODUCT_UPDATE_EMPTY');
+
+    try {
+      const product = await this.prismaService.product.update({
+        where: {
+          id,
+        },
+        data,
+        select: productSelect,
+      });
+
+      return { product };
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw this.productSlugExistsException();
+      }
+
+      throw error;
+    }
+  }
+
+  async deactivateProduct(id: string) {
+    await this.getProductForAdmin(id);
+
+    const product = await this.prismaService.product.update({
+      where: {
+        id,
+      },
+      data: {
+        isActive: false,
+      },
+      select: productSelect,
+    });
+
+    return { product };
+  }
+
+  async createProductVariant(productId: string, dto: CreateProductVariantDto) {
+    await this.getProductForAdmin(productId);
+
+    const sku = this.normalizeOptionalSku(dto.sku);
+    const size = this.normalizeSize(dto.size);
+    const color = this.normalizeColor(dto.color);
+
+    await this.assertSkuAvailable(sku);
+    await this.assertVariantOptionAvailable(productId, size, color);
+
+    try {
+      const variant = await this.prismaService.productVariant.create({
+        data: {
+          productId,
+          sku,
+          size,
+          color,
+          stock: dto.stock,
+          priceOverride: dto.priceOverride ?? null,
+          isActive: this.normalizeOptionalBoolean(dto.isActive, true, 'isActive'),
+        },
+        select: variantSelect,
+      });
+
+      return { variant };
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw this.variantUniqueConflictException(error);
+      }
+
+      throw error;
+    }
+  }
+
+  async updateProductVariant(id: string, dto: UpdateProductVariantDto) {
+    const currentVariant = await this.getProductVariantForAdmin(id);
+    const data: Prisma.ProductVariantUpdateInput = {};
+
+    if ('sku' in dto) {
+      const sku = this.normalizeOptionalSku(dto.sku);
+      await this.assertSkuAvailable(sku, id);
+      data.sku = sku;
+    }
+
+    const nextSize =
+      'size' in dto ? this.normalizeSize(dto.size) : currentVariant.size;
+    const nextColor =
+      'color' in dto ? this.normalizeColor(dto.color) : currentVariant.color;
+
+    if (nextSize !== currentVariant.size || nextColor !== currentVariant.color) {
+      await this.assertVariantOptionAvailable(
+        currentVariant.productId,
+        nextSize,
+        nextColor,
+        id,
+      );
+    }
+
+    if ('size' in dto) {
+      data.size = nextSize;
+    }
+
+    if ('color' in dto) {
+      data.color = nextColor;
+    }
+
+    if ('stock' in dto) {
+      data.stock = this.normalizeRequiredNumber(dto.stock, 'stock');
+    }
+
+    if ('priceOverride' in dto) {
+      data.priceOverride = dto.priceOverride ?? null;
+    }
+
+    if ('isActive' in dto) {
+      data.isActive = this.normalizeOptionalBoolean(
+        dto.isActive,
+        undefined,
+        'isActive',
+      );
+    }
+
+    this.assertUpdateHasFields(data, 'PRODUCT_VARIANT_UPDATE_EMPTY');
+
+    try {
+      const variant = await this.prismaService.productVariant.update({
+        where: {
+          id,
+        },
+        data,
+        select: variantSelect,
+      });
+
+      return { variant };
+    } catch (error) {
+      if (this.isUniqueConstraintError(error)) {
+        throw this.variantUniqueConflictException(error);
+      }
+
+      throw error;
+    }
+  }
+
+  async deactivateProductVariant(id: string) {
+    await this.getProductVariantForAdmin(id);
+
+    const variant = await this.prismaService.productVariant.update({
+      where: {
+        id,
+      },
+      data: {
+        isActive: false,
+      },
+      select: variantSelect,
+    });
+
+    return { variant };
+  }
+
+  private buildPublicProductWhere(query: ProductQueryDto): Prisma.ProductWhereInput {
+    const where: Prisma.ProductWhereInput = {
+      isActive: true,
+      category: {
+        isActive: true,
+      },
+    };
+    const search = this.normalizeOptionalQueryText(query.search);
+
+    if (search) {
+      const searchFilters: Prisma.ProductWhereInput[] = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+      const slugSearch = this.normalizeSlugForSearch(search);
+
+      if (slugSearch) {
+        searchFilters.push({
+          slug: {
+            contains: slugSearch,
+            mode: 'insensitive',
+          },
+        });
+      }
+
+      where.OR = searchFilters;
+    }
+
+    if (query.categoryId) {
+      where.categoryId = query.categoryId;
+    }
+
+    if (query.categorySlug) {
+      where.category = {
+        isActive: true,
+        slug: this.normalizeSlug(query.categorySlug),
+      };
+    }
+
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+      where.basePrice = {
+        ...(query.minPrice !== undefined ? { gte: query.minPrice } : {}),
+        ...(query.maxPrice !== undefined ? { lte: query.maxPrice } : {}),
+      };
+    }
+
+    const size = this.normalizeOptionalQueryText(query.size);
+    const color = this.normalizeOptionalQueryText(query.color);
+
+    if (size || color) {
+      where.variants = {
+        some: {
+          isActive: true,
+          ...(size
+            ? {
+                size: {
+                  equals: this.normalizeSize(size),
+                  mode: 'insensitive',
+                },
+              }
+            : {}),
+          ...(color
+            ? {
+                color: {
+                  equals: this.normalizeColor(color),
+                  mode: 'insensitive',
+                },
+              }
+            : {}),
+        },
+      };
+    }
+
+    return where;
+  }
+
+  private getProductOrderBy(
+    sort: ProductSort = 'newest',
+  ): Prisma.ProductOrderByWithRelationInput[] {
+    if (sort === 'price_asc') {
+      return [{ basePrice: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }];
+    }
+
+    if (sort === 'price_desc') {
+      return [{ basePrice: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }];
+    }
+
+    return [{ createdAt: 'desc' }, { id: 'asc' }];
+  }
+
+  private async getCategoryForAdmin(id: string) {
+    const category = await this.prismaService.category.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        slug: true,
+      },
+    });
+
+    if (!category) {
+      throw this.categoryNotFoundException();
+    }
+
+    return category;
+  }
+
+  private async getProductForAdmin(id: string) {
+    const product = await this.prismaService.product.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        slug: true,
+      },
+    });
+
+    if (!product) {
+      throw this.productNotFoundException();
+    }
+
+    return product;
+  }
+
+  private async getProductVariantForAdmin(id: string) {
+    const variant = await this.prismaService.productVariant.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        id: true,
+        productId: true,
+        sku: true,
+        size: true,
+        color: true,
+      },
+    });
+
+    if (!variant) {
+      throw this.productVariantNotFoundException();
+    }
+
+    return variant;
+  }
+
+  private async assertActiveCategoryExists(categoryId: string) {
+    const category = await this.prismaService.category.findUnique({
+      where: {
+        id: categoryId,
+      },
+      select: {
+        id: true,
+        isActive: true,
+      },
+    });
+
+    if (!category) {
+      throw this.categoryNotFoundException();
+    }
+
+    if (!category.isActive) {
+      throw new BadRequestException({
+        code: 'CATEGORY_INACTIVE',
+        message: 'Product category must be active.',
+      });
+    }
+  }
+
+  private async assertCategorySlugAvailable(slug: string, excludeId?: string) {
+    const category = await this.prismaService.category.findUnique({
+      where: {
+        slug,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (category && category.id !== excludeId) {
+      throw this.categorySlugExistsException();
+    }
+  }
+
+  private async assertProductSlugAvailable(slug: string, excludeId?: string) {
+    const product = await this.prismaService.product.findUnique({
+      where: {
+        slug,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (product && product.id !== excludeId) {
+      throw this.productSlugExistsException();
+    }
+  }
+
+  private async assertSkuAvailable(sku: string | null, excludeId?: string) {
+    if (!sku) {
+      return;
+    }
+
+    const variant = await this.prismaService.productVariant.findUnique({
+      where: {
+        sku,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (variant && variant.id !== excludeId) {
+      throw this.skuExistsException();
+    }
+  }
+
+  private async assertVariantOptionAvailable(
+    productId: string,
+    size: string,
+    color: string,
+    excludeId?: string,
+  ) {
+    const variant = await this.prismaService.productVariant.findFirst({
+      where: {
+        productId,
+        size,
+        color,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (variant && variant.id !== excludeId) {
+      throw this.variantOptionExistsException();
+    }
+  }
+
+  private normalizeRequiredText(
+    value: string | null | undefined,
+    fieldName: string,
+  ): string {
+    if (typeof value !== 'string') {
+      throw this.invalidFieldException(fieldName);
+    }
+
+    const normalized = value.trim().replace(/\s+/g, ' ');
+
+    if (!normalized) {
+      throw this.invalidFieldException(fieldName);
+    }
+
+    return normalized;
+  }
+
+  private normalizeOptionalText(value: string | null | undefined): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw this.invalidFieldException('description');
+    }
+
+    const normalized = value.trim().replace(/\s+/g, ' ');
+
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private normalizeSlug(value: string | null | undefined): string {
+    if (typeof value !== 'string') {
+      throw this.invalidFieldException('slug');
+    }
+
+    const slug = value
+      .trim()
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    if (!slug) {
+      throw this.invalidFieldException('slug');
+    }
+
+    return slug;
+  }
+
+  private normalizeSlugForSearch(value: string): string | undefined {
+    const slug = value
+      .trim()
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    return slug.length > 0 ? slug : undefined;
+  }
+
+  private normalizeImageUrls(value: string[] | null | undefined): string[] {
+    if (value === undefined) {
+      return [];
+    }
+
+    if (!Array.isArray(value)) {
+      throw this.invalidFieldException('imageUrls');
+    }
+
+    return value.map((imageUrl) => {
+      if (typeof imageUrl !== 'string') {
+        throw this.invalidFieldException('imageUrls');
+      }
+
+      const normalized = imageUrl.trim();
+
+      if (!normalized) {
+        throw this.invalidFieldException('imageUrls');
+      }
+
+      return normalized;
+    });
+  }
+
+  private normalizeOptionalSku(value: string | null | undefined): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw this.invalidFieldException('sku');
+    }
+
+    const normalized = value.trim().replace(/\s+/g, '').toUpperCase();
+
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private normalizeSize(value: string | null | undefined): string {
+    return this.normalizeRequiredText(value, 'size').toUpperCase();
+  }
+
+  private normalizeColor(value: string | null | undefined): string {
+    return this.normalizeRequiredText(value, 'color');
+  }
+
+  private normalizeOptionalQueryText(value: string | undefined): string | undefined {
+    const normalized = value?.trim().replace(/\s+/g, ' ');
+
+    return normalized ? normalized : undefined;
+  }
+
+  private normalizeRequiredId(
+    value: string | null | undefined,
+    fieldName: string,
+  ): string {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw this.invalidFieldException(fieldName);
+    }
+
+    return value.trim();
+  }
+
+  private normalizeRequiredNumber(
+    value: number | null | undefined,
+    fieldName: string,
+  ): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw this.invalidFieldException(fieldName);
+    }
+
+    return value;
+  }
+
+  private normalizeOptionalBoolean(
+    value: boolean | null | undefined,
+    defaultValue: boolean | undefined,
+    fieldName: string,
+  ): boolean {
+    if (value === undefined) {
+      if (defaultValue === undefined) {
+        throw this.invalidFieldException(fieldName);
+      }
+
+      return defaultValue;
+    }
+
+    if (typeof value !== 'boolean') {
+      throw this.invalidFieldException(fieldName);
+    }
+
+    return value;
+  }
+
+  private assertUpdateHasFields(data: object, code: string) {
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException({
+        code,
+        message: 'Provide at least one field to update.',
+      });
+    }
+  }
+
+  private invalidFieldException(fieldName: string) {
+    return new BadRequestException({
+      code: 'INVALID_CATALOG_FIELD',
+      message: `${fieldName} is invalid.`,
+    });
+  }
+
+  private categoryNotFoundException() {
+    return new NotFoundException({
+      code: 'CATEGORY_NOT_FOUND',
+      message: 'Category was not found.',
+    });
+  }
+
+  private productNotFoundException() {
+    return new NotFoundException({
+      code: 'PRODUCT_NOT_FOUND',
+      message: 'Product was not found.',
+    });
+  }
+
+  private productVariantNotFoundException() {
+    return new NotFoundException({
+      code: 'PRODUCT_VARIANT_NOT_FOUND',
+      message: 'Product variant was not found.',
+    });
+  }
+
+  private categorySlugExistsException() {
+    return new ConflictException({
+      code: 'CATEGORY_SLUG_EXISTS',
+      message: 'A category with this slug already exists.',
+    });
+  }
+
+  private productSlugExistsException() {
+    return new ConflictException({
+      code: 'PRODUCT_SLUG_EXISTS',
+      message: 'A product with this slug already exists.',
+    });
+  }
+
+  private skuExistsException() {
+    return new ConflictException({
+      code: 'PRODUCT_VARIANT_SKU_EXISTS',
+      message: 'A product variant with this SKU already exists.',
+    });
+  }
+
+  private variantOptionExistsException() {
+    return new ConflictException({
+      code: 'PRODUCT_VARIANT_OPTION_EXISTS',
+      message: 'A variant with this size and color already exists for this product.',
+    });
+  }
+
+  private variantUniqueConflictException(error: unknown) {
+    const target = this.getUniqueConstraintTarget(error);
+
+    if (target.includes('sku')) {
+      return this.skuExistsException();
+    }
+
+    return this.variantOptionExistsException();
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    );
+  }
+
+  private getUniqueConstraintTarget(error: unknown): string {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+      return '';
+    }
+
+    const target = error.meta?.target;
+
+    if (Array.isArray(target)) {
+      return target.join(',');
+    }
+
+    return typeof target === 'string' ? target : '';
+  }
+}
