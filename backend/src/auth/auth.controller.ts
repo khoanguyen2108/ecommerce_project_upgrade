@@ -10,8 +10,32 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
+import {
+  authTokenDataExample,
+  currentUserDataExample,
+  envelopeResponse,
+  errorEnvelopeResponse,
+  logoutDataExample,
+  passwordResetCompleteDataExample,
+  passwordResetRequestDataExample,
+  passwordResetVerifiedDataExample,
+  updatedUserDataExample,
+} from '../common/swagger/api-examples';
+import { SWAGGER_BEARER_AUTH_NAME } from '../common/swagger/api-docs.constants';
 import {
   AUTH_ACCESS_TOKEN_COOKIE,
   AUTH_REFRESH_TOKEN_COOKIE,
@@ -66,9 +90,28 @@ interface CookieOptions {
 }
 
 @Controller('auth')
+@ApiTags('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @ApiOperation({ summary: 'Register with email and password' })
+  @ApiCreatedResponse(
+    envelopeResponse('Customer account created and tokens issued.', authTokenDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Request validation failed.',
+      'BAD_REQUEST',
+      'email must be an email',
+    ),
+  )
+  @ApiConflictResponse(
+    errorEnvelopeResponse(
+      'Email is already registered.',
+      'EMAIL_ALREADY_REGISTERED',
+      'An account with this email already exists.',
+    ),
+  )
   @Post('register')
   @Throttle({
     default: {
@@ -80,6 +123,24 @@ export class AuthController {
     return this.authService.register(dto);
   }
 
+  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiOkResponse(
+    envelopeResponse('Credentials accepted and tokens issued.', authTokenDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Request validation failed.',
+      'BAD_REQUEST',
+      'email must be an email',
+    ),
+  )
+  @ApiUnauthorizedResponse(
+    errorEnvelopeResponse(
+      'Credentials are invalid.',
+      'INVALID_CREDENTIALS',
+      'Invalid email or password.',
+    ),
+  )
   @Post('login')
   @HttpCode(200)
   @Throttle({
@@ -92,6 +153,18 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
+  @ApiOperation({ summary: 'Logout the current user' })
+  @ApiOkResponse(
+    envelopeResponse('Refresh token was revoked.', logoutDataExample),
+  )
+  @ApiUnauthorizedResponse(
+    errorEnvelopeResponse(
+      'Authentication is required.',
+      'AUTH_REQUIRED',
+      'Authentication is required.',
+    ),
+  )
   @Post('logout')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
@@ -99,18 +172,67 @@ export class AuthController {
     return this.authService.logout(user.id);
   }
 
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
+  @ApiOperation({ summary: 'Get the current authenticated user' })
+  @ApiOkResponse(
+    envelopeResponse('Current user profile returned.', currentUserDataExample),
+  )
+  @ApiUnauthorizedResponse(
+    errorEnvelopeResponse(
+      'Authentication is required.',
+      'AUTH_REQUIRED',
+      'Authentication is required.',
+    ),
+  )
   @Get('me')
   @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.getMe(user);
   }
 
+  @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
+  @ApiOperation({ summary: 'Update the current authenticated user profile' })
+  @ApiOkResponse(
+    envelopeResponse('Current user profile updated.', updatedUserDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'No profile fields were provided or validation failed.',
+      'PROFILE_UPDATE_EMPTY',
+      'Provide at least one profile field to update.',
+    ),
+  )
+  @ApiUnauthorizedResponse(
+    errorEnvelopeResponse(
+      'Authentication is required.',
+      'AUTH_REQUIRED',
+      'Authentication is required.',
+    ),
+  )
   @Patch('me')
   @UseGuards(JwtAuthGuard)
   updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateMeDto) {
     return this.authService.updateMe(user.id, dto);
   }
 
+  @ApiOperation({ summary: 'Refresh access and refresh tokens' })
+  @ApiOkResponse(
+    envelopeResponse('Refresh token accepted and new tokens issued.', authTokenDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Request validation failed.',
+      'BAD_REQUEST',
+      'refreshToken must be longer than or equal to 32 characters',
+    ),
+  )
+  @ApiUnauthorizedResponse(
+    errorEnvelopeResponse(
+      'Refresh token is invalid or expired.',
+      'REFRESH_TOKEN_INVALID',
+      'Refresh token is invalid or expired.',
+    ),
+  )
   @Post('refresh')
   @HttpCode(200)
   @Throttle({
@@ -123,6 +245,11 @@ export class AuthController {
     return this.authService.refresh(dto);
   }
 
+  @ApiOperation({ summary: 'Start Google OAuth login' })
+  @ApiFoundResponse({
+    description:
+      'Redirects to Google OAuth consent. No client ID or secret is exposed.',
+  })
   @Get('google')
   @Throttle({
     default: {
@@ -149,6 +276,26 @@ export class AuthController {
     }
   }
 
+  @ApiOperation({ summary: 'Handle Google OAuth callback' })
+  @ApiQuery({
+    description: 'Authorization code returned by Google.',
+    name: 'code',
+    required: false,
+  })
+  @ApiQuery({
+    description: 'OAuth state value matched against the HTTP-only state cookie.',
+    name: 'state',
+    required: false,
+  })
+  @ApiQuery({
+    description: 'Provider error value when Google rejects the OAuth request.',
+    name: 'error',
+    required: false,
+  })
+  @ApiFoundResponse({
+    description:
+      'Redirects to the configured frontend success or failure URL. Successful callbacks may set HTTP-only auth cookies.',
+  })
   @Get('google/callback')
   @Throttle({
     default: {
@@ -210,6 +357,24 @@ export class AuthController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Request a forgot-password OTP',
+    description:
+      'Response is intentionally generic and must not reveal whether the email exists.',
+  })
+  @ApiOkResponse(
+    envelopeResponse(
+      'Password reset OTP request accepted.',
+      passwordResetRequestDataExample,
+    ),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Request validation failed.',
+      'BAD_REQUEST',
+      'email must be an email',
+    ),
+  )
   @Post('forgot-password/request-otp')
   @HttpCode(200)
   @Throttle({
@@ -222,6 +387,27 @@ export class AuthController {
     return this.authService.requestPasswordResetOtp(dto);
   }
 
+  @ApiOperation({ summary: 'Verify a forgot-password OTP' })
+  @ApiOkResponse(
+    envelopeResponse(
+      'Password reset OTP verified.',
+      passwordResetVerifiedDataExample,
+    ),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Request validation failed.',
+      'BAD_REQUEST',
+      'otp must match /^\\d{6}$/ regular expression',
+    ),
+  )
+  @ApiUnauthorizedResponse(
+    errorEnvelopeResponse(
+      'Password reset OTP is invalid or expired.',
+      'PASSWORD_RESET_OTP_INVALID',
+      'Password reset code is invalid or expired.',
+    ),
+  )
   @Post('forgot-password/verify-otp')
   @HttpCode(200)
   @Throttle({
@@ -234,6 +420,24 @@ export class AuthController {
     return this.authService.verifyPasswordResetOtp(dto);
   }
 
+  @ApiOperation({ summary: 'Reset password with a verified OTP' })
+  @ApiOkResponse(
+    envelopeResponse('Password reset completed.', passwordResetCompleteDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Request validation failed.',
+      'BAD_REQUEST',
+      'newPassword must be longer than or equal to 8 characters',
+    ),
+  )
+  @ApiUnauthorizedResponse(
+    errorEnvelopeResponse(
+      'Password reset OTP is invalid or expired.',
+      'PASSWORD_RESET_OTP_INVALID',
+      'Password reset code is invalid or expired.',
+    ),
+  )
   @Post('forgot-password/reset')
   @HttpCode(200)
   @Throttle({

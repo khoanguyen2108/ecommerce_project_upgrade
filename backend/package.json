@@ -20,6 +20,7 @@
     "@nestjs/core": "^11.1.26",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "^11.1.26",
+    "@nestjs/swagger": "^11.4.4",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
@@ -31,7 +32,8 @@
     "nodemailer": "^8.0.10",
     "pg": "^8.21.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.23",

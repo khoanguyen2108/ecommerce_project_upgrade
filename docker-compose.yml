@@ -8,8 +8,8 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/belikeme?schema=public}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-belikeme}?schema=public
+      REDIS_URL: redis://redis:6379
     ports:
       - "${BACKEND_PORT:-3001}:3000"
     depends_on:

@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
+import { setupSwagger } from './swagger';
 
 async function bootstrap() {
   const corsOrigin = process.env.CORS_ORIGIN?.trim();
@@ -26,6 +27,7 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new ApiExceptionFilter());
   app.useGlobalInterceptors(new ApiResponseInterceptor());
+  setupSwagger(app);
 
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);
