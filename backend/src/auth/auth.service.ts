@@ -4,45 +4,45 @@ import {
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
-import * as bcrypt from 'bcryptjs';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService, type JwtSignOptions } from "@nestjs/jwt";
+import * as bcrypt from "bcryptjs";
 import {
   createHash,
   createHmac,
   randomBytes,
   randomInt,
   timingSafeEqual,
-} from 'node:crypto';
-import { EmailService } from '../email/email.service';
+} from "node:crypto";
+import { EmailService } from "../email/email.service";
 import {
   AuthProvider,
   type UserRole,
   UserRole as UserRoleValue,
-} from '../generated/prisma/enums';
-import { Prisma } from '../generated/prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import type { ForgotPasswordRequestOtpDto } from './dto/forgot-password-request-otp.dto';
-import type { ForgotPasswordResetDto } from './dto/forgot-password-reset.dto';
-import type { ForgotPasswordVerifyOtpDto } from './dto/forgot-password-verify-otp.dto';
-import type { LoginDto } from './dto/login.dto';
-import type { RefreshTokenDto } from './dto/refresh-token.dto';
-import type { RegisterDto } from './dto/register.dto';
-import type { UpdateMeDto } from './dto/update-me.dto';
+} from "../generated/prisma/enums";
+import { Prisma } from "../generated/prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import type { ForgotPasswordRequestOtpDto } from "./dto/forgot-password-request-otp.dto";
+import type { ForgotPasswordResetDto } from "./dto/forgot-password-reset.dto";
+import type { ForgotPasswordVerifyOtpDto } from "./dto/forgot-password-verify-otp.dto";
+import type { LoginDto } from "./dto/login.dto";
+import type { RefreshTokenDto } from "./dto/refresh-token.dto";
+import type { RegisterDto } from "./dto/register.dto";
+import type { UpdateMeDto } from "./dto/update-me.dto";
 import type {
   AccessTokenPayload,
   AuthenticatedUser,
-} from './types/authenticated-user';
+} from "./types/authenticated-user";
 
 const PASSWORD_HASH_ROUNDS = 12;
 const REFRESH_TOKEN_BYTES = 48;
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const DEFAULT_ACCESS_TOKEN_EXPIRES_IN: JwtSignOptions['expiresIn'] = '15m';
-const GOOGLE_AUTHORIZATION_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GOOGLE_TOKEN_INFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
-const GOOGLE_OAUTH_SCOPE = 'openid email profile';
+const DEFAULT_ACCESS_TOKEN_EXPIRES_IN: JwtSignOptions["expiresIn"] = "15m";
+const GOOGLE_AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo";
+const GOOGLE_OAUTH_SCOPE = "openid email profile";
 const OAUTH_STATE_BYTES = 32;
 const PASSWORD_RESET_OTP_TTL_MS = 60 * 1000;
 const PASSWORD_RESET_OTP_DIGITS = 6;
@@ -50,7 +50,7 @@ const PASSWORD_RESET_MAX_ATTEMPTS = 5;
 const DEFAULT_ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS = 15 * 60;
 
 const passwordResetRequestMessage =
-  'If an account exists for that email, a password reset code has been sent.';
+  "If an account exists for that email, a password reset code has been sent.";
 
 const publicUserSelect = {
   id: true,
@@ -121,11 +121,11 @@ type PasswordResetOtpRecord = {
 };
 
 type PasswordResetOtpClient = {
-  passwordResetOtp: PrismaService['passwordResetOtp'];
+  passwordResetOtp: PrismaService["passwordResetOtp"];
 };
 
 type PasswordResetClient = PasswordResetOtpClient & {
-  user: PrismaService['user'];
+  user: PrismaService["user"];
 };
 
 interface GoogleTokenResponse {
@@ -157,8 +157,8 @@ export interface AuthTokenResponse {
   user: PublicUserResponse;
   accessToken: string;
   refreshToken: string;
-  tokenType: 'Bearer';
-  expiresIn: JwtSignOptions['expiresIn'];
+  tokenType: "Bearer";
+  expiresIn: JwtSignOptions["expiresIn"];
 }
 
 export interface GoogleAuthorizationResponse {
@@ -173,7 +173,7 @@ export interface PasswordResetResponse {
 
 @Injectable()
 export class AuthService {
-  private readonly accessTokenExpiresIn: JwtSignOptions['expiresIn'];
+  private readonly accessTokenExpiresIn: JwtSignOptions["expiresIn"];
 
   constructor(
     private readonly configService: ConfigService,
@@ -182,7 +182,7 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {
     this.accessTokenExpiresIn =
-      this.configService.get<JwtSignOptions['expiresIn']>('JWT_EXPIRES_IN') ??
+      this.configService.get<JwtSignOptions["expiresIn"]>("JWT_EXPIRES_IN") ??
       DEFAULT_ACCESS_TOKEN_EXPIRES_IN;
   }
 
@@ -215,8 +215,8 @@ export class AuthService {
       !(await bcrypt.compare(dto.password, user.passwordHash))
     ) {
       throw new UnauthorizedException({
-        code: 'INVALID_CREDENTIALS',
-        message: 'Invalid email or password.',
+        code: "INVALID_CREDENTIALS",
+        message: "Invalid email or password.",
       });
     }
 
@@ -245,18 +245,18 @@ export class AuthService {
   ): Promise<{ user: PublicUserResponse }> {
     const data: { name?: string | null; phone?: string | null } = {};
 
-    if ('name' in dto) {
+    if ("name" in dto) {
       data.name = this.normalizeOptionalText(dto.name);
     }
 
-    if ('phone' in dto) {
+    if ("phone" in dto) {
       data.phone = this.normalizeOptionalText(dto.phone);
     }
 
     if (Object.keys(data).length === 0) {
       throw new BadRequestException({
-        code: 'PROFILE_UPDATE_EMPTY',
-        message: 'Provide at least one profile field to update.',
+        code: "PROFILE_UPDATE_EMPTY",
+        message: "Provide at least one profile field to update.",
       });
     }
 
@@ -281,8 +281,8 @@ export class AuthService {
       user.refreshTokenExpiresAt.getTime() <= Date.now()
     ) {
       throw new UnauthorizedException({
-        code: 'REFRESH_TOKEN_INVALID',
-        message: 'Refresh token is invalid or expired.',
+        code: "REFRESH_TOKEN_INVALID",
+        message: "Refresh token is invalid or expired.",
       });
     }
 
@@ -290,16 +290,16 @@ export class AuthService {
   }
 
   getGoogleAuthorizationUrl(): GoogleAuthorizationResponse {
-    const clientId = this.getRequiredConfig('GOOGLE_CLIENT_ID');
-    const callbackUrl = this.getRequiredConfig('GOOGLE_CALLBACK_URL');
+    const clientId = this.getRequiredConfig("GOOGLE_CLIENT_ID");
+    const callbackUrl = this.getRequiredConfig("GOOGLE_CALLBACK_URL");
     const state = this.createOAuthState();
     const authorizationUrl = new URL(GOOGLE_AUTHORIZATION_URL);
 
-    authorizationUrl.searchParams.set('client_id', clientId);
-    authorizationUrl.searchParams.set('redirect_uri', callbackUrl);
-    authorizationUrl.searchParams.set('response_type', 'code');
-    authorizationUrl.searchParams.set('scope', GOOGLE_OAUTH_SCOPE);
-    authorizationUrl.searchParams.set('state', state);
+    authorizationUrl.searchParams.set("client_id", clientId);
+    authorizationUrl.searchParams.set("redirect_uri", callbackUrl);
+    authorizationUrl.searchParams.set("response_type", "code");
+    authorizationUrl.searchParams.set("scope", GOOGLE_OAUTH_SCOPE);
+    authorizationUrl.searchParams.set("state", state);
 
     return {
       authorizationUrl: authorizationUrl.toString(),
@@ -317,20 +317,20 @@ export class AuthService {
 
   buildOAuthSuccessRedirectUrl(): string {
     return this.buildRedirectUrl(
-      this.getRequiredConfig('FRONTEND_AUTH_SUCCESS_URL'),
+      this.getRequiredConfig("FRONTEND_AUTH_SUCCESS_URL"),
       {
-        provider: 'google',
-        status: 'success',
+        provider: "google",
+        status: "success",
       },
     );
   }
 
-  buildOAuthFailureRedirectUrl(reason = 'oauth_failed'): string {
+  buildOAuthFailureRedirectUrl(reason = "oauth_failed"): string {
     return this.buildRedirectUrl(
-      this.getRequiredConfig('FRONTEND_AUTH_FAILURE_URL'),
+      this.getRequiredConfig("FRONTEND_AUTH_FAILURE_URL"),
       {
-        provider: 'google',
-        status: 'failed',
+        provider: "google",
+        status: "failed",
         reason,
       },
     );
@@ -394,11 +394,16 @@ export class AuthService {
     const email = this.normalizeEmail(dto.email);
     const otpSecret = this.getJwtSecret();
 
-    await this.getValidPasswordResetOtp(this.prismaService, email, dto.otp, otpSecret);
+    await this.getValidPasswordResetOtp(
+      this.prismaService,
+      email,
+      dto.otp,
+      otpSecret,
+    );
 
     return {
       success: true,
-      message: 'Password reset code verified.',
+      message: "Password reset code verified.",
     };
   }
 
@@ -407,7 +412,10 @@ export class AuthService {
   ): Promise<PasswordResetResponse> {
     const email = this.normalizeEmail(dto.email);
     const otpSecret = this.getJwtSecret();
-    const passwordHash = await bcrypt.hash(dto.newPassword, PASSWORD_HASH_ROUNDS);
+    const passwordHash = await bcrypt.hash(
+      dto.newPassword,
+      PASSWORD_HASH_ROUNDS,
+    );
 
     await this.prismaService.$transaction(async (tx) => {
       const otpRecord = await this.getValidPasswordResetOtp(
@@ -443,7 +451,7 @@ export class AuthService {
 
     return {
       success: true,
-      message: 'Password has been reset.',
+      message: "Password has been reset.",
     };
   }
 
@@ -470,8 +478,8 @@ export class AuthService {
 
       if (updateResult.count !== 1) {
         throw new UnauthorizedException({
-          code: 'REFRESH_TOKEN_INVALID',
-          message: 'Refresh token is invalid or expired.',
+          code: "REFRESH_TOKEN_INVALID",
+          message: "Refresh token is invalid or expired.",
         });
       }
     } else {
@@ -488,7 +496,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
-      type: 'access',
+      type: "access",
     };
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: jwtSecret,
@@ -499,7 +507,7 @@ export class AuthService {
       user: this.mapPublicUser(user),
       accessToken,
       refreshToken,
-      tokenType: 'Bearer',
+      tokenType: "Bearer",
       expiresIn: this.accessTokenExpiresIn,
     };
   }
@@ -521,7 +529,9 @@ export class AuthService {
     return email.trim().toLowerCase();
   }
 
-  private normalizeOptionalText(value: string | null | undefined): string | null {
+  private normalizeOptionalText(
+    value: string | null | undefined,
+  ): string | null {
     if (value === null || value === undefined) {
       return null;
     }
@@ -531,21 +541,21 @@ export class AuthService {
   }
 
   private createRefreshToken(): string {
-    return randomBytes(REFRESH_TOKEN_BYTES).toString('base64url');
+    return randomBytes(REFRESH_TOKEN_BYTES).toString("base64url");
   }
 
   private hashRefreshToken(refreshToken: string): string {
-    return createHash('sha256').update(refreshToken).digest('hex');
+    return createHash("sha256").update(refreshToken).digest("hex");
   }
 
   private createOAuthState(): string {
-    return randomBytes(OAUTH_STATE_BYTES).toString('base64url');
+    return randomBytes(OAUTH_STATE_BYTES).toString("base64url");
   }
 
   private createPasswordResetOtp(): string {
     return randomInt(0, 10 ** PASSWORD_RESET_OTP_DIGITS)
       .toString()
-      .padStart(PASSWORD_RESET_OTP_DIGITS, '0');
+      .padStart(PASSWORD_RESET_OTP_DIGITS, "0");
   }
 
   private hashPasswordResetOtp(
@@ -553,18 +563,18 @@ export class AuthService {
     otp: string,
     otpSecret: string,
   ): string {
-    return createHmac('sha256', otpSecret)
+    return createHmac("sha256", otpSecret)
       .update(`${email}:${otp}`)
-      .digest('hex');
+      .digest("hex");
   }
 
   private getJwtSecret(): string {
-    const jwtSecret = this.configService.get<string>('JWT_SECRET')?.trim();
+    const jwtSecret = this.configService.get<string>("JWT_SECRET")?.trim();
 
     if (!jwtSecret) {
       throw new InternalServerErrorException({
-        code: 'AUTH_CONFIGURATION_ERROR',
-        message: 'Authentication is not configured.',
+        code: "AUTH_CONFIGURATION_ERROR",
+        message: "Authentication is not configured.",
       });
     }
 
@@ -576,8 +586,8 @@ export class AuthService {
 
     if (!value) {
       throw new InternalServerErrorException({
-        code: 'AUTH_CONFIGURATION_ERROR',
-        message: 'Authentication is not configured.',
+        code: "AUTH_CONFIGURATION_ERROR",
+        message: "Authentication is not configured.",
       });
     }
 
@@ -613,16 +623,16 @@ export class AuthService {
   private async exchangeGoogleCodeForIdToken(code: string): Promise<string> {
     const body = new URLSearchParams({
       code,
-      client_id: this.getRequiredConfig('GOOGLE_CLIENT_ID'),
-      client_secret: this.getRequiredConfig('GOOGLE_CLIENT_SECRET'),
-      redirect_uri: this.getRequiredConfig('GOOGLE_CALLBACK_URL'),
-      grant_type: 'authorization_code',
+      client_id: this.getRequiredConfig("GOOGLE_CLIENT_ID"),
+      client_secret: this.getRequiredConfig("GOOGLE_CLIENT_SECRET"),
+      redirect_uri: this.getRequiredConfig("GOOGLE_CALLBACK_URL"),
+      grant_type: "authorization_code",
     });
 
     const response = await fetch(GOOGLE_TOKEN_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'content-type': 'application/x-www-form-urlencoded',
+        "content-type": "application/x-www-form-urlencoded",
       },
       body,
     });
@@ -644,7 +654,7 @@ export class AuthService {
     idToken: string,
   ): Promise<GoogleProfile> {
     const tokenInfoUrl = new URL(GOOGLE_TOKEN_INFO_URL);
-    tokenInfoUrl.searchParams.set('id_token', idToken);
+    tokenInfoUrl.searchParams.set("id_token", idToken);
 
     const response = await fetch(tokenInfoUrl);
 
@@ -653,9 +663,9 @@ export class AuthService {
     }
 
     const tokenInfo = (await response.json()) as GoogleTokenInfoResponse;
-    const clientId = this.getRequiredConfig('GOOGLE_CLIENT_ID');
+    const clientId = this.getRequiredConfig("GOOGLE_CLIENT_ID");
     const emailVerified =
-      tokenInfo.email_verified === true || tokenInfo.email_verified === 'true';
+      tokenInfo.email_verified === true || tokenInfo.email_verified === "true";
     const expiresAt = tokenInfo.exp ? Number(tokenInfo.exp) * 1000 : 0;
 
     if (
@@ -769,7 +779,7 @@ export class AuthService {
         usedAt: null,
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       select: passwordResetOtpSelect,
     });
@@ -801,8 +811,8 @@ export class AuthService {
   }
 
   private isHashMatch(candidateHash: string, storedHash: string): boolean {
-    const candidateBuffer = Buffer.from(candidateHash, 'hex');
-    const storedBuffer = Buffer.from(storedHash, 'hex');
+    const candidateBuffer = Buffer.from(candidateHash, "hex");
+    const storedBuffer = Buffer.from(storedHash, "hex");
 
     if (candidateBuffer.length !== storedBuffer.length) {
       return false;
@@ -821,12 +831,12 @@ export class AuthService {
     return redirectUrl.toString();
   }
 
-  private parseExpiresInSeconds(value: JwtSignOptions['expiresIn']): number {
-    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+  private parseExpiresInSeconds(value: JwtSignOptions["expiresIn"]): number {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
       return Math.floor(value);
     }
 
-    if (typeof value !== 'string') {
+    if (typeof value !== "string") {
       return DEFAULT_ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS;
     }
 
@@ -837,7 +847,7 @@ export class AuthService {
     }
 
     const amount = Number(match[1]);
-    const unit = match[2] ?? 's';
+    const unit = match[2] ?? "s";
     const multipliers: Record<string, number> = {
       s: 1,
       m: 60,
@@ -858,28 +868,28 @@ export class AuthService {
   private isUniqueConstraintError(error: unknown): boolean {
     return (
       error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
+      error.code === "P2002"
     );
   }
 
   private emailAlreadyRegisteredException(): ConflictException {
     return new ConflictException({
-      code: 'EMAIL_ALREADY_REGISTERED',
-      message: 'An account with this email already exists.',
+      code: "EMAIL_ALREADY_REGISTERED",
+      message: "An account with this email already exists.",
     });
   }
 
   private googleOAuthException(): UnauthorizedException {
     return new UnauthorizedException({
-      code: 'GOOGLE_OAUTH_FAILED',
-      message: 'Google login could not be completed.',
+      code: "GOOGLE_OAUTH_FAILED",
+      message: "Google login could not be completed.",
     });
   }
 
   private invalidPasswordResetOtpException(): UnauthorizedException {
     return new UnauthorizedException({
-      code: 'PASSWORD_RESET_OTP_INVALID',
-      message: 'Password reset code is invalid or expired.',
+      code: "PASSWORD_RESET_OTP_INVALID",
+      message: "Password reset code is invalid or expired.",
     });
   }
 }
