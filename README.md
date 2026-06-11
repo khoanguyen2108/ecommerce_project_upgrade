@@ -2,7 +2,7 @@
 
 Belikeme is a fullstack e-commerce MVP for a clothing store. This checkout
 contains the NestJS backend API, Prisma migrations, Docker Compose services for
-PostgreSQL and Redis, and a placeholder `front/` folder.
+PostgreSQL and Redis, and a Next.js storefront in `front/`.
 
 The recommended local setup is Docker-first for the backend stack:
 
@@ -10,8 +10,7 @@ The recommended local setup is Docker-first for the backend stack:
 - PostgreSQL runs in Docker.
 - Redis runs in Docker.
 - Prisma migrations run automatically when the backend container starts.
-- Frontend stays separate and runs with npm from `front/` when a frontend
-  package exists.
+- Frontend stays separate and runs with npm from `front/`.
 
 ## Tech Stack
 
@@ -19,8 +18,7 @@ The recommended local setup is Docker-first for the backend stack:
 - Database: PostgreSQL with Prisma migrations.
 - Cache: Redis through `ioredis`.
 - Local services: Docker Compose.
-- Frontend: expected under `front/`, but this checkout does not currently
-  include `front/package.json`.
+- Frontend: Next.js storefront under `front/`.
 
 ## Prerequisites
 
@@ -183,27 +181,38 @@ DATABASE_URL=postgresql://belikeme:belikeme_password@localhost:5435/belikeme?sch
 REDIS_URL=redis://localhost:6380
 ```
 
-The future frontend URL is:
+The local frontend URL is:
 
 ```env
-CORS_ORIGIN=http://localhost:5174
+CORS_ORIGIN=http://localhost:5175
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
-NEXT_PUBLIC_APP_URL=http://localhost:5174
+NEXT_PUBLIC_APP_URL=http://localhost:5175
+FRONTEND_AUTH_SUCCESS_URL=http://localhost:5175/auth/success
+FRONTEND_AUTH_FAILURE_URL=http://localhost:5175/auth/failure
 ```
 
 ## Frontend Setup
 
 Keep frontend development outside Docker.
 
-This checkout currently has a `front/` folder but no `front/package.json`, so
-there is no frontend install or dev command to run yet. When the frontend
-package is added, the expected flow is:
+The backend API remains available at `http://localhost:3001`. The frontend dev
+server runs separately at `http://localhost:5175` by default:
 
 ```bash
 cd front
 npm install
 npm run dev
 ```
+
+If port `5175` is also busy, run:
+
+```bash
+npm run dev -- -p 5176
+```
+
+If the frontend port changes, update `CORS_ORIGIN`,
+`FRONTEND_AUTH_SUCCESS_URL`, `FRONTEND_AUTH_FAILURE_URL`, and
+`NEXT_PUBLIC_APP_URL` to match the new frontend origin.
 
 Only put browser-safe values in `NEXT_PUBLIC_*` variables. Do not put backend
 secrets in frontend environment variables.

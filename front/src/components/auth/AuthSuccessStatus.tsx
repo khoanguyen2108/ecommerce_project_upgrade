@@ -1,0 +1,86 @@
+"use client";
+
+import { CheckCircle2, LoaderCircle } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getCurrentUser } from "@/features/auth/api";
+import { persistAuthenticatedUser } from "@/features/auth/session";
+
+type Status = "checking" | "confirmed" | "unconfirmed";
+
+export function AuthSuccessStatus() {
+  const router = useRouter();
+  const [status, setStatus] = useState<Status>("checking");
+
+  useEffect(() => {
+    let isMounted = true;
+    let redirectTimer: number | undefined;
+
+    async function confirmSession() {
+      try {
+        const response = await getCurrentUser();
+
+        if (!isMounted) {
+          return;
+        }
+
+        persistAuthenticatedUser(response.user);
+        setStatus("confirmed");
+        redirectTimer = window.setTimeout(() => router.replace("/"), 1400);
+      } catch {
+        if (isMounted) {
+          setStatus("unconfirmed");
+        }
+      }
+    }
+
+    void confirmSession();
+
+    return () => {
+      isMounted = false;
+
+      if (redirectTimer) {
+        window.clearTimeout(redirectTimer);
+      }
+    };
+  }, [router]);
+
+  if (status === "checking") {
+    return (
+      <div className="status-panel" role="status">
+        <LoaderCircle className="spin" size={28} />
+        <h1>Checking your session</h1>
+        <p>We are confirming your sign-in with Belikeme.</p>
+      </div>
+    );
+  }
+
+  if (status === "confirmed") {
+    return (
+      <div className="status-panel" role="status">
+        <CheckCircle2 size={30} />
+        <h1>Signed in successfully</h1>
+        <p>Redirecting you back to the store.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="status-panel" role="status">
+      <h1>Sign-in needs one more step</h1>
+      <p>
+        Google sign-in finished, but this browser could not confirm the session
+        yet. You can return home or sign in with email.
+      </p>
+      <div className="status-panel__actions">
+        <Link className="button button--primary" href="/login">
+          Back to login
+        </Link>
+        <Link className="button button--secondary" href="/">
+          Return home
+        </Link>
+      </div>
+    </div>
+  );
+}
