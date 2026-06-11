@@ -1,11 +1,16 @@
-import { Heart, ShoppingBag, User } from "lucide-react";
+"use client";
+
+import { Heart, LogOut, ShoppingBag, User } from "lucide-react";
 import Link from "next/link";
+import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
 interface SiteHeaderProps {
   active?: "shop" | "account";
 }
 
 export function SiteHeader({ active }: SiteHeaderProps) {
+  const { isAuthenticated, isLoading, logout } = useAuthSession();
+
   return (
     <header className="site-header">
       <div className="site-header__inner">
@@ -14,7 +19,10 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         </Link>
 
         <nav aria-label="Primary navigation" className="site-nav">
-          <Link className={active === "shop" ? "is-active" : undefined} href="/">
+          <Link
+            className={active === "shop" ? "is-active" : undefined}
+            href="/products"
+          >
             Shop
           </Link>
           <Link href="/#categories">Categories</Link>
@@ -26,7 +34,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           <button
             aria-label="Wishlist preview"
             className="icon-button"
-            title="Wishlist will be available with the catalog flow"
+            title="Wishlist is coming soon."
             type="button"
           >
             <Heart size={20} strokeWidth={1.8} />
@@ -34,19 +42,32 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           <button
             aria-label="Cart preview"
             className="icon-button"
-            title="Cart will be available with the catalog flow"
+            title="Cart is coming soon."
             type="button"
           >
             <ShoppingBag size={20} strokeWidth={1.8} />
           </button>
-          <Link
-            aria-label="Account"
-            className={`icon-button ${active === "account" ? "is-active" : ""}`}
-            href="/login"
-            title="Account"
-          >
-            <User size={20} strokeWidth={1.8} />
-          </Link>
+          {isAuthenticated ? (
+            <button
+              aria-label="Sign out"
+              className="icon-button"
+              disabled={isLoading}
+              onClick={() => void logout()}
+              title="Sign out"
+              type="button"
+            >
+              <LogOut size={20} strokeWidth={1.8} />
+            </button>
+          ) : (
+            <Link
+              aria-label="Account"
+              className={`icon-button ${active === "account" ? "is-active" : ""}`}
+              href="/login"
+              title="Account"
+            >
+              <User size={20} strokeWidth={1.8} />
+            </Link>
+          )}
         </div>
       </div>
     </header>

@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/features/auth/api";
-import { persistAuthenticatedUser } from "@/features/auth/session";
+import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
 type Status = "checking" | "confirmed" | "unconfirmed";
 
 export function AuthSuccessStatus() {
   const router = useRouter();
+  const { setAuthenticatedUser } = useAuthSession();
   const [status, setStatus] = useState<Status>("checking");
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export function AuthSuccessStatus() {
           return;
         }
 
-        persistAuthenticatedUser(response.user);
+        setAuthenticatedUser(response.user);
         setStatus("confirmed");
         redirectTimer = window.setTimeout(() => router.replace("/"), 1400);
       } catch {
@@ -44,7 +45,7 @@ export function AuthSuccessStatus() {
         window.clearTimeout(redirectTimer);
       }
     };
-  }, [router]);
+  }, [router, setAuthenticatedUser]);
 
   if (status === "checking") {
     return (

@@ -1,4 +1,4 @@
-export interface ApiResponse<T> {
+export interface ApiEnvelope<T> {
   data: T | null;
   meta: {
     requestId?: string;
@@ -10,3 +10,13 @@ export interface ApiError {
   code: string;
   message: string;
 }
+
+export interface ApiErrorResponse {
+  data: null;
+  meta: {
+    requestId?: string;
+  };
+  error: ApiError;
+}
+
+export type ApiResponse<T> = ApiEnvelope<T>;

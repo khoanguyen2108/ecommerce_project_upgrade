@@ -4,8 +4,9 @@ import { AlertCircle, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { getGoogleLoginUrl, registerCustomer } from "@/features/auth/api";
-import { ApiClientError } from "@/lib/api/client";
+import { registerUser, startGoogleLogin } from "@/features/auth/api";
+import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { ApiClientError } from "@/lib/errors/api-error";
 import { FieldError } from "@/components/ui/FieldError";
 import { GoogleMark } from "@/components/ui/GoogleMark";
 
@@ -18,6 +19,7 @@ interface RegisterFieldErrors {
 
 export function RegisterForm() {
   const router = useRouter();
+  const { setAuthenticatedSession } = useAuthSession();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,12 +49,13 @@ export function RegisterForm() {
     setIsSubmitting(true);
 
     try {
-      await registerCustomer({
+      const response = await registerUser({
         email: email.trim(),
         name: name.trim(),
         password,
       });
-      router.push("/login?registered=1");
+      setAuthenticatedSession(response);
+      router.push("/");
     } catch (error) {
       setFormError(getSafeErrorMessage(error));
     } finally {
@@ -61,7 +64,11 @@ export function RegisterForm() {
   }
 
   function handleGoogleLogin() {
-    window.location.assign(getGoogleLoginUrl());
+    try {
+      startGoogleLogin();
+    } catch (error) {
+      setFormError(getSafeErrorMessage(error));
+    }
   }
 
   return (

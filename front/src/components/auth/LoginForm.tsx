@@ -4,9 +4,9 @@ import { AlertCircle, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { getGoogleLoginUrl, loginWithEmail } from "@/features/auth/api";
-import { persistEmailAuthSession } from "@/features/auth/session";
-import { ApiClientError } from "@/lib/api/client";
+import { startGoogleLogin, loginUser } from "@/features/auth/api";
+import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { ApiClientError } from "@/lib/errors/api-error";
 import { FieldError } from "@/components/ui/FieldError";
 import { GoogleMark } from "@/components/ui/GoogleMark";
 
@@ -21,6 +21,7 @@ interface LoginFieldErrors {
 
 export function LoginForm({ registered }: LoginFormProps) {
   const router = useRouter();
+  const { setAuthenticatedSession } = useAuthSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -42,11 +43,11 @@ export function LoginForm({ registered }: LoginFormProps) {
     setIsSubmitting(true);
 
     try {
-      const response = await loginWithEmail({
+      const response = await loginUser({
         email: email.trim(),
         password,
       });
-      persistEmailAuthSession(response);
+      setAuthenticatedSession(response);
       router.push("/");
     } catch (error) {
       setFormError(getSafeErrorMessage(error));
@@ -56,7 +57,11 @@ export function LoginForm({ registered }: LoginFormProps) {
   }
 
   function handleGoogleLogin() {
-    window.location.assign(getGoogleLoginUrl());
+    try {
+      startGoogleLogin();
+    } catch (error) {
+      setFormError(getSafeErrorMessage(error));
+    }
   }
 
   return (

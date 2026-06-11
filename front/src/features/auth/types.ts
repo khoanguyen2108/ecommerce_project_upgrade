@@ -23,7 +23,7 @@ export interface RegisterRequest {
   password: string;
 }
 
-export interface LoginResponse {
+export interface AuthResponse {
   user: User;
   accessToken: string;
   refreshToken?: string;
@@ -31,8 +31,18 @@ export interface LoginResponse {
   expiresIn: string | number;
 }
 
-export type RegisterResponse = LoginResponse;
+export type LoginResponse = AuthResponse;
+export type RegisterResponse = AuthResponse;
 
 export interface CurrentUserResponse {
+  user: User;
+}
+
+export interface UpdateMeRequest {
+  name?: string | null;
+  phone?: string | null;
+}
+
+export interface UpdateMeResponse {
   user: User;
 }

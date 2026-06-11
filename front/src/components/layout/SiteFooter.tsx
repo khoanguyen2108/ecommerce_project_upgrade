@@ -16,7 +16,7 @@ export function SiteFooter() {
             <h2>Support</h2>
             <Link href="/#delivery">Shipping and returns</Link>
             <Link href="/login">Account help</Link>
-            <Link href="/#new-arrivals">New arrivals</Link>
+            <Link href="/products">New arrivals</Link>
           </div>
           <div>
             <h2>Store</h2>

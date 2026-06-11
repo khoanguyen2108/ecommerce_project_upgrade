@@ -1,9 +1,9 @@
-import type { LoginResponse, User } from "@/features/auth/types";
+import type { AuthResponse, User } from "@/features/auth/types";
 
 const ACCESS_TOKEN_KEY = "belikeme.accessToken";
 const USER_KEY = "belikeme.user";
 
-export function persistEmailAuthSession(response: LoginResponse): void {
+export function persistEmailAuthSession(response: AuthResponse): void {
   if (!isBrowser()) {
     return;
   }
@@ -29,6 +29,25 @@ export function getStoredAccessToken(): string | undefined {
   }
 
   return window.localStorage.getItem(ACCESS_TOKEN_KEY) || undefined;
+}
+
+export function getStoredUser(): User | undefined {
+  if (!isBrowser()) {
+    return undefined;
+  }
+
+  const value = window.localStorage.getItem(USER_KEY);
+
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(value) as User;
+  } catch {
+    window.localStorage.removeItem(USER_KEY);
+    return undefined;
+  }
 }
 
 export function clearAuthSession(): void {

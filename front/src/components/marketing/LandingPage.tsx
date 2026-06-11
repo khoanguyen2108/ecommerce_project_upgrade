@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Headphones,
   RotateCcw,
@@ -7,9 +9,80 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { categories, newArrivals } from "@/features/marketing/storefront-data";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ProductCard } from "@/components/catalog/ProductCard";
+import { getCategories, getProducts } from "@/features/catalog/api";
+import type { Category, Product } from "@/features/catalog/types";
+import { ApiClientError } from "@/lib/errors/api-error";
+
+interface LandingCatalogState {
+  categories: Category[];
+  products: Product[];
+  error?: string;
+  isLoading: boolean;
+}
 
 export function LandingPage() {
+  const [catalog, setCatalog] = useState<LandingCatalogState>({
+    categories: [],
+    products: [],
+    isLoading: true,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCatalog() {
+      try {
+        const [categories, productsResponse] = await Promise.all([
+          getCategories(),
+          getProducts({ limit: 8, sort: "newest" }),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setCatalog({
+          categories,
+          products: productsResponse.products,
+          isLoading: false,
+        });
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setCatalog({
+          categories: [],
+          products: [],
+          error: getCatalogErrorMessage(error),
+          isLoading: false,
+        });
+      }
+    }
+
+    void loadCatalog();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const categoryImageMap = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const product of catalog.products) {
+      const imageUrl = product.imageUrls[0];
+
+      if (imageUrl && !map.has(product.category.slug)) {
+        map.set(product.category.slug, imageUrl);
+      }
+    }
+
+    return map;
+  }, [catalog.products]);
+
   return (
     <main>
       <section className="hero-section" aria-labelledby="hero-heading">
@@ -46,21 +119,22 @@ export function LandingPage() {
           <h2>Featured categories</h2>
         </div>
         <div className="category-grid">
-          {categories.map((category) => (
-            <Link className="category-tile" href={category.href} key={category.name}>
-              <Image
-                alt={`${category.name} category`}
-                className="category-tile__image"
-                fill
-                sizes="(min-width: 900px) 33vw, 100vw"
-                src={category.imageUrl}
-              />
-              <div className="category-tile__label">
-                <h3>{category.name}</h3>
-                <p>{category.description}</p>
-              </div>
-            </Link>
-          ))}
+          {catalog.isLoading ? <CatalogSkeleton count={3} /> : null}
+          {!catalog.isLoading && catalog.error ? (
+            <CatalogStateMessage message={catalog.error} />
+          ) : null}
+          {!catalog.isLoading && !catalog.error && catalog.categories.length === 0 ? (
+            <CatalogStateMessage message="No categories are available yet." />
+          ) : null}
+          {!catalog.isLoading && !catalog.error
+            ? catalog.categories.slice(0, 3).map((category) => (
+                <CategoryTile
+                  category={category}
+                  imageUrl={categoryImageMap.get(category.slug)}
+                  key={category.id}
+                />
+              ))
+            : null}
         </div>
       </section>
 
@@ -70,31 +144,23 @@ export function LandingPage() {
             <p className="eyebrow">Just landed</p>
             <h2>New arrivals</h2>
           </div>
-          <Link className="text-link" href="#new-arrivals">
+          <Link className="text-link" href="/products">
             View all
           </Link>
         </div>
         <div className="product-grid">
-          {newArrivals.map((product) => (
-            <article className="product-card" key={product.name}>
-              <div className="product-card__image-wrap">
-                <Image
-                  alt={product.name}
-                  className="product-card__image"
-                  fill
-                  sizes="(min-width: 1100px) 25vw, (min-width: 640px) 50vw, 100vw"
-                  src={product.imageUrl}
-                />
-              </div>
-              <div className="product-card__body">
-                <h3>{product.name}</h3>
-                <p className="product-card__price">{product.price}</p>
-                <p className="product-card__meta">
-                  {product.colors.join(" / ")} - {product.sizes.join(", ")}
-                </p>
-              </div>
-            </article>
-          ))}
+          {catalog.isLoading ? <CatalogSkeleton count={4} /> : null}
+          {!catalog.isLoading && catalog.error ? (
+            <CatalogStateMessage message={catalog.error} />
+          ) : null}
+          {!catalog.isLoading && !catalog.error && catalog.products.length === 0 ? (
+            <CatalogStateMessage message="No products are available yet." />
+          ) : null}
+          {!catalog.isLoading && !catalog.error
+            ? catalog.products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))
+            : null}
         </div>
       </section>
 
@@ -112,8 +178,8 @@ export function LandingPage() {
           />
           <TrustItem
             icon={<ShieldCheck size={24} />}
-            title="Secure payment"
-            text="Payment handoff is handled by backend-verified flows."
+            title="Checkout coming soon"
+            text="Cart and payment will open after the backend APIs are ready."
           />
           <TrustItem
             icon={<Headphones size={24} />}
@@ -132,7 +198,7 @@ export function LandingPage() {
             making the outfit feel overworked.
           </p>
         </div>
-        <Link className="button button--light" href="#new-arrivals">
+        <Link className="button button--light" href="/products">
           Shop the edit
         </Link>
       </section>
@@ -141,7 +207,7 @@ export function LandingPage() {
 }
 
 interface TrustItemProps {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   text: string;
 }
@@ -154,4 +220,53 @@ function TrustItem({ icon, title, text }: TrustItemProps) {
       <p>{text}</p>
     </article>
   );
+}
+
+function CategoryTile({
+  category,
+  imageUrl,
+}: {
+  category: Category;
+  imageUrl?: string;
+}) {
+  return (
+    <Link className="category-tile" href={`/products?categorySlug=${category.slug}`}>
+      {imageUrl ? (
+        <img
+          alt={`${category.name} category`}
+          className="category-tile__image"
+          loading="lazy"
+          src={imageUrl}
+        />
+      ) : (
+        <div className="category-tile__fallback" aria-hidden="true" />
+      )}
+      <div className="category-tile__label">
+        <h3>{category.name}</h3>
+        <p>{category.description || "Explore this Belikeme category."}</p>
+      </div>
+    </Link>
+  );
+}
+
+function CatalogSkeleton({ count }: { count: number }) {
+  return Array.from({ length: count }, (_, index) => (
+    <div aria-hidden="true" className="catalog-skeleton" key={index} />
+  ));
+}
+
+function CatalogStateMessage({ message }: { message: string }) {
+  return (
+    <div className="catalog-state" role="status">
+      {message}
+    </div>
+  );
+}
+
+function getCatalogErrorMessage(error: unknown): string {
+  if (error instanceof ApiClientError) {
+    return error.message;
+  }
+
+  return "The catalog could not be loaded right now. Please try again soon.";
 }

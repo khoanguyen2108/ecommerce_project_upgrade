@@ -1,30 +1,25 @@
 import { API_BASE_URL } from "@/config/env";
 import { getStoredAccessToken } from "@/features/auth/session";
-import type { ApiResponse } from "@/lib/api/types";
+import type { ApiEnvelope } from "@/lib/api/types";
+import { ApiClientError } from "@/lib/errors/api-error";
 
 interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   auth?: boolean;
   body?: unknown;
-}
-
-export class ApiClientError extends Error {
-  code: string;
-  requestId?: string;
-  status?: number;
-
-  constructor(message: string, code: string, status?: number, requestId?: string) {
-    super(message);
-    this.name = "ApiClientError";
-    this.code = code;
-    this.status = status;
-    this.requestId = requestId;
-  }
+  onMeta?: (meta: ApiEnvelope<unknown>["meta"]) => void;
 }
 
 export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new ApiClientError(
+      "Belikeme API is not configured. Set NEXT_PUBLIC_API_BASE_URL and try again.",
+      "API_BASE_URL_MISSING",
+    );
+  }
+
   const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
   const headers = new Headers(options.headers);
 
@@ -48,7 +43,7 @@ export async function apiRequest<T>(
     response = await fetch(url, {
       ...options,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      credentials: "include",
+      credentials: options.credentials ?? "include",
       headers,
     });
   } catch {
@@ -60,6 +55,10 @@ export async function apiRequest<T>(
 
   const envelope = await parseEnvelope<T>(response);
   const requestId = envelope?.meta?.requestId;
+
+  if (envelope?.meta) {
+    options.onMeta?.(envelope.meta);
+  }
 
   if (!response.ok || envelope?.error) {
     const isServerError = response.status >= 500;
@@ -89,7 +88,7 @@ export async function apiRequest<T>(
 
 async function parseEnvelope<T>(
   response: Response,
-): Promise<ApiResponse<T> | undefined> {
+): Promise<ApiEnvelope<T> | undefined> {
   const text = await response.text();
 
   if (!text) {
@@ -97,7 +96,7 @@ async function parseEnvelope<T>(
   }
 
   try {
-    return JSON.parse(text) as ApiResponse<T>;
+    return JSON.parse(text) as ApiEnvelope<T>;
   } catch {
     throw new ApiClientError(
       "The server response could not be read. Please try again.",
@@ -106,3 +105,5 @@ async function parseEnvelope<T>(
     );
   }
 }
+
+export { ApiClientError };
