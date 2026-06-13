@@ -30,6 +30,51 @@ export class ProductsController {
     return this.catalogService.listProducts(query);
   }
 
+  @ApiOperation({ summary: 'List active variants for an active product by slug' })
+  @ApiParam({
+    description: 'Product slug.',
+    example: 'relaxed-oxford-shirt',
+    name: 'slug',
+  })
+  @ApiOkResponse(
+    envelopeResponse(
+      'Active product variants returned.',
+      productVariantsDataExample,
+    ),
+  )
+  @ApiNotFoundResponse(
+    errorEnvelopeResponse(
+      'Product was not found.',
+      'PRODUCT_NOT_FOUND',
+      'Product was not found.',
+    ),
+  )
+  @Get('slug/:slug/variants')
+  getProductVariantsBySlug(@Param('slug') slug: string) {
+    return this.catalogService.getPublicProductVariantsBySlug(slug);
+  }
+
+  @ApiOperation({ summary: 'Get an active public product by slug' })
+  @ApiParam({
+    description: 'Product slug.',
+    example: 'relaxed-oxford-shirt',
+    name: 'slug',
+  })
+  @ApiOkResponse(
+    envelopeResponse('Active product returned.', productDataExample),
+  )
+  @ApiNotFoundResponse(
+    errorEnvelopeResponse(
+      'Product was not found.',
+      'PRODUCT_NOT_FOUND',
+      'Product was not found.',
+    ),
+  )
+  @Get('slug/:slug')
+  getProductBySlug(@Param('slug') slug: string) {
+    return this.catalogService.getPublicProductBySlug(slug);
+  }
+
   @ApiOperation({ summary: 'List active variants for an active product' })
   @ApiParam({
     description: 'Product UUID.',

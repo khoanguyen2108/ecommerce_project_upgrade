@@ -23,6 +23,26 @@ export interface RegisterRequest {
   password: string;
 }
 
+export interface RequestPasswordResetOtpRequest {
+  email: string;
+}
+
+export interface VerifyPasswordResetOtpRequest {
+  email: string;
+  otp: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  newPassword: string;
+}
+
+export interface PasswordResetActionResponse {
+  success: true;
+  message: string;
+}
+
 export interface AuthResponse {
   user: User;
   accessToken: string;
@@ -33,6 +53,9 @@ export interface AuthResponse {
 
 export type LoginResponse = AuthResponse;
 export type RegisterResponse = AuthResponse;
+export type RequestPasswordResetOtpResponse = PasswordResetActionResponse;
+export type VerifyPasswordResetOtpResponse = PasswordResetActionResponse;
+export type ResetPasswordResponse = PasswordResetActionResponse;
 
 export interface CurrentUserResponse {
   user: User;

@@ -8,8 +8,14 @@ import type {
   LoginResponse,
   RegisterRequest,
   RegisterResponse,
+  RequestPasswordResetOtpRequest,
+  RequestPasswordResetOtpResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
   UpdateMeRequest,
   UpdateMeResponse,
+  VerifyPasswordResetOtpRequest,
+  VerifyPasswordResetOtpResponse,
 } from "@/features/auth/types";
 
 export function loginUser(payload: LoginRequest): Promise<LoginResponse> {
@@ -62,6 +68,48 @@ export function refreshToken(refreshTokenValue: string): Promise<AuthResponse> {
   return apiRequest<AuthResponse>("/auth/refresh", {
     body: {
       refreshToken: refreshTokenValue,
+    },
+    method: "POST",
+  });
+}
+
+export function requestPasswordResetOtp(
+  payload: RequestPasswordResetOtpRequest,
+): Promise<RequestPasswordResetOtpResponse> {
+  return apiRequest<RequestPasswordResetOtpResponse>(
+    "/auth/forgot-password/request-otp",
+    {
+      body: {
+        email: payload.email,
+      },
+      method: "POST",
+    },
+  );
+}
+
+export function verifyPasswordResetOtp(
+  payload: VerifyPasswordResetOtpRequest,
+): Promise<VerifyPasswordResetOtpResponse> {
+  return apiRequest<VerifyPasswordResetOtpResponse>(
+    "/auth/forgot-password/verify-otp",
+    {
+      body: {
+        email: payload.email,
+        otp: payload.otp,
+      },
+      method: "POST",
+    },
+  );
+}
+
+export function resetPassword(
+  payload: ResetPasswordRequest,
+): Promise<ResetPasswordResponse> {
+  return apiRequest<ResetPasswordResponse>("/auth/forgot-password/reset", {
+    body: {
+      email: payload.email,
+      newPassword: payload.newPassword,
+      otp: payload.otp,
     },
     method: "POST",
   });

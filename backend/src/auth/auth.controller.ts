@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -50,7 +51,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { AuthService } from './auth.service';
+import { AuthService, type AuthTokenResponse } from './auth.service';
 import type { AuthenticatedUser } from './types/authenticated-user';
 
 const secondsToMilliseconds = (seconds: number) => seconds * 1000;
@@ -94,7 +95,11 @@ interface CookieOptions {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @ApiOperation({ summary: 'Register with email and password' })
+  @ApiOperation({
+    summary: 'Register with email and password',
+    description:
+      'Returns access and refresh tokens in the JSON response and sets matching HTTP-only auth cookies for browser sessions.',
+  })
   @ApiCreatedResponse(
     envelopeResponse('Customer account created and tokens issued.', authTokenDataExample),
   )
@@ -119,11 +124,22 @@ export class AuthController {
       limit: getAuthRateLimitMax,
     },
   })
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const tokenResponse = await this.authService.register(dto);
+
+    this.setAuthCookies(response, tokenResponse);
+
+    return tokenResponse;
   }
 
-  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiOperation({
+    summary: 'Login with email and password',
+    description:
+      'Returns access and refresh tokens in the JSON response and sets matching HTTP-only auth cookies for browser sessions.',
+  })
   @ApiOkResponse(
     envelopeResponse('Credentials accepted and tokens issued.', authTokenDataExample),
   )
@@ -149,12 +165,23 @@ export class AuthController {
       limit: getAuthRateLimitMax,
     },
   })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const tokenResponse = await this.authService.login(dto);
+
+    this.setAuthCookies(response, tokenResponse);
+
+    return tokenResponse;
   }
 
   @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
-  @ApiOperation({ summary: 'Logout the current user' })
+  @ApiOperation({
+    summary: 'Logout the current user',
+    description:
+      'Revokes the stored refresh token state and clears Belikeme auth cookies for browser sessions.',
+  })
   @ApiOkResponse(
     envelopeResponse('Refresh token was revoked.', logoutDataExample),
   )
@@ -168,8 +195,15 @@ export class AuthController {
   @Post('logout')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
-  logout(@CurrentUser() user: AuthenticatedUser) {
-    return this.authService.logout(user.id);
+  async logout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const logoutResponse = await this.authService.logout(user.id);
+
+    this.clearAuthCookies(response);
+
+    return logoutResponse;
   }
 
   @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
@@ -215,7 +249,11 @@ export class AuthController {
     return this.authService.updateMe(user.id, dto);
   }
 
-  @ApiOperation({ summary: 'Refresh access and refresh tokens' })
+  @ApiOperation({
+    summary: 'Refresh access and refresh tokens',
+    description:
+      'Accepts a refreshToken in the JSON body for API clients. Browser sessions may omit the body token when the belikeme_refresh_token HTTP-only cookie is present. Successful refresh rotates the refresh token, returns the existing JSON token response, and sets updated auth cookies.',
+  })
   @ApiOkResponse(
     envelopeResponse('Refresh token accepted and new tokens issued.', authTokenDataExample),
   )
@@ -241,8 +279,26 @@ export class AuthController {
       limit: getRefreshRateLimitMax,
     },
   })
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refresh(dto);
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const refreshToken =
+      dto?.refreshToken ?? this.getCookie(request, AUTH_REFRESH_TOKEN_COOKIE);
+
+    if (!refreshToken) {
+      throw new BadRequestException({
+        code: 'BAD_REQUEST',
+        message: 'refreshToken must be longer than or equal to 32 characters',
+      });
+    }
+
+    const tokenResponse = await this.authService.refresh(refreshToken);
+
+    this.setAuthCookies(response, tokenResponse);
+
+    return tokenResponse;
   }
 
   @ApiOperation({ summary: 'Start Google OAuth login' })
@@ -328,25 +384,7 @@ export class AuthController {
       const tokenResponse =
         await this.authService.loginWithGoogleCallback(code);
 
-      this.appendCookie(response, AUTH_ACCESS_TOKEN_COOKIE, tokenResponse.accessToken, {
-        httpOnly: true,
-        maxAgeSeconds: this.authService.getAccessTokenCookieMaxAgeSeconds(),
-        path: '/',
-        sameSite: 'Lax',
-        secure: this.shouldUseSecureCookies(),
-      });
-      this.appendCookie(
-        response,
-        AUTH_REFRESH_TOKEN_COOKIE,
-        tokenResponse.refreshToken,
-        {
-          httpOnly: true,
-          maxAgeSeconds: this.authService.getRefreshTokenCookieMaxAgeSeconds(),
-          path: '/',
-          sameSite: 'Lax',
-          secure: this.shouldUseSecureCookies(),
-        },
-      );
+      this.setAuthCookies(response, tokenResponse);
 
       return response.redirect(
         302,
@@ -459,6 +497,37 @@ export class AuthController {
     } catch {
       return response.status(503).send('Google login is not configured.');
     }
+  }
+
+  private setAuthCookies(
+    response: Response,
+    tokenResponse: AuthTokenResponse,
+  ) {
+    this.appendCookie(response, AUTH_ACCESS_TOKEN_COOKIE, tokenResponse.accessToken, {
+      httpOnly: true,
+      maxAgeSeconds: this.authService.getAccessTokenCookieMaxAgeSeconds(),
+      path: '/',
+      sameSite: 'Lax',
+      secure: this.shouldUseSecureCookies(),
+    });
+    this.appendCookie(
+      response,
+      AUTH_REFRESH_TOKEN_COOKIE,
+      tokenResponse.refreshToken,
+      {
+        httpOnly: true,
+        maxAgeSeconds: this.authService.getRefreshTokenCookieMaxAgeSeconds(),
+        path: '/',
+        sameSite: 'Lax',
+        secure: this.shouldUseSecureCookies(),
+      },
+    );
+  }
+
+  private clearAuthCookies(response: Response) {
+    this.clearCookie(response, AUTH_ACCESS_TOKEN_COOKIE);
+    this.clearCookie(response, AUTH_REFRESH_TOKEN_COOKIE);
+    this.clearCookie(response, GOOGLE_OAUTH_STATE_COOKIE);
   }
 
   private appendCookie(

@@ -19,7 +19,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   return (
     <>
       <SiteHeader active="shop" />
-      <ProductDetailPage productId={id} />
+      <ProductDetailPage productRef={id} />
       <SiteFooter />
     </>
   );

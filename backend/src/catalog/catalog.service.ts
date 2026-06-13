@@ -119,6 +119,22 @@ export class CatalogService {
     return { category };
   }
 
+  async getPublicCategoryBySlug(slug: string) {
+    const category = await this.prismaService.category.findFirst({
+      where: {
+        slug: this.normalizeSlug(slug),
+        isActive: true,
+      },
+      select: categorySelect,
+    });
+
+    if (!category) {
+      throw this.categoryNotFoundException();
+    }
+
+    return { category };
+  }
+
   async createCategory(dto: CreateCategoryDto) {
     const slug = this.normalizeSlug(dto.slug);
     await this.assertCategorySlugAvailable(slug);
@@ -265,6 +281,25 @@ export class CatalogService {
     return { product };
   }
 
+  async getPublicProductBySlug(slug: string) {
+    const product = await this.prismaService.product.findFirst({
+      where: {
+        slug: this.normalizeSlug(slug),
+        isActive: true,
+        category: {
+          isActive: true,
+        },
+      },
+      select: publicProductSelect,
+    });
+
+    if (!product) {
+      throw this.productNotFoundException();
+    }
+
+    return { product };
+  }
+
   async getPublicProductVariants(id: string) {
     const product = await this.prismaService.product.findFirst({
       where: {
@@ -281,6 +316,34 @@ export class CatalogService {
             isActive: true,
           },
           orderBy: [{ size: 'asc' }, { color: 'asc' }],
+          select: variantSelect,
+        },
+      },
+    });
+
+    if (!product) {
+      throw this.productNotFoundException();
+    }
+
+    return { variants: product.variants };
+  }
+
+  async getPublicProductVariantsBySlug(slug: string) {
+    const product = await this.prismaService.product.findFirst({
+      where: {
+        slug: this.normalizeSlug(slug),
+        isActive: true,
+        category: {
+          isActive: true,
+        },
+      },
+      select: {
+        id: true,
+        variants: {
+          where: {
+            isActive: true,
+          },
+          orderBy: variantOrderBy,
           select: variantSelect,
         },
       },

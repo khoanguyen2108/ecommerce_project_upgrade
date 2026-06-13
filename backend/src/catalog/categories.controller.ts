@@ -28,6 +28,27 @@ export class CategoriesController {
     return this.catalogService.listCategories();
   }
 
+  @ApiOperation({ summary: 'Get an active public category by slug' })
+  @ApiParam({
+    description: 'Category slug.',
+    example: 'men',
+    name: 'slug',
+  })
+  @ApiOkResponse(
+    envelopeResponse('Active category returned.', categoryDataExample),
+  )
+  @ApiNotFoundResponse(
+    errorEnvelopeResponse(
+      'Category was not found.',
+      'CATEGORY_NOT_FOUND',
+      'Category was not found.',
+    ),
+  )
+  @Get('slug/:slug')
+  getCategoryBySlug(@Param('slug') slug: string) {
+    return this.catalogService.getPublicCategoryBySlug(slug);
+  }
+
   @ApiOperation({ summary: 'Get an active public category by ID' })
   @ApiParam({
     description: 'Category UUID.',

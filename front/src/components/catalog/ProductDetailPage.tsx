@@ -3,13 +3,18 @@
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { getProductById, getProductVariants } from "@/features/catalog/api";
+import {
+  getProductById,
+  getProductBySlug,
+  getProductVariants,
+  getProductVariantsBySlug,
+} from "@/features/catalog/api";
 import { formatPrice } from "@/features/catalog/format";
 import type { Product, ProductVariant } from "@/features/catalog/types";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface ProductDetailPageProps {
-  productId: string;
+  productRef: string;
 }
 
 interface ProductDetailState {
@@ -19,7 +24,7 @@ interface ProductDetailState {
   variants: ProductVariant[];
 }
 
-export function ProductDetailPage({ productId }: ProductDetailPageProps) {
+export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   const [state, setState] = useState<ProductDetailState>({
     isLoading: true,
     variants: [],
@@ -37,9 +42,12 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
       }));
 
       try {
+        const isUuidRef = isUuid(productRef);
         const [product, variants] = await Promise.all([
-          getProductById(productId),
-          getProductVariants(productId),
+          isUuidRef ? getProductById(productRef) : getProductBySlug(productRef),
+          isUuidRef
+            ? getProductVariants(productRef)
+            : getProductVariantsBySlug(productRef),
         ]);
 
         if (!isMounted) {
@@ -70,7 +78,7 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [productId]);
+  }, [productRef]);
 
   const totalStock = useMemo(
     () => state.variants.reduce((sum, variant) => sum + variant.stock, 0),
@@ -209,4 +217,10 @@ function getCatalogErrorMessage(error: unknown): string {
   }
 
   return "This product could not be loaded right now. Please try again soon.";
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }

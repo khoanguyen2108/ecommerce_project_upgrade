@@ -27,7 +27,6 @@ import type { ForgotPasswordRequestOtpDto } from "./dto/forgot-password-request-
 import type { ForgotPasswordResetDto } from "./dto/forgot-password-reset.dto";
 import type { ForgotPasswordVerifyOtpDto } from "./dto/forgot-password-verify-otp.dto";
 import type { LoginDto } from "./dto/login.dto";
-import type { RefreshTokenDto } from "./dto/refresh-token.dto";
 import type { RegisterDto } from "./dto/register.dto";
 import type { UpdateMeDto } from "./dto/update-me.dto";
 import type {
@@ -269,8 +268,8 @@ export class AuthService {
     return { user: this.mapPublicUser(user) };
   }
 
-  async refresh(dto: RefreshTokenDto): Promise<AuthTokenResponse> {
-    const refreshTokenHash = this.hashRefreshToken(dto.refreshToken);
+  async refresh(refreshToken: string): Promise<AuthTokenResponse> {
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
     const user = await this.prismaService.user.findFirst({
       where: { refreshTokenHash },
       select: credentialUserSelect,

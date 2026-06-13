@@ -11,7 +11,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <article className="product-card">
-      <Link href={`/products/${product.id}`} aria-label={`View ${product.name}`}>
+      <Link href={`/products/${product.slug}`} aria-label={`View ${product.name}`}>
         <div className="product-card__image-wrap">
           {imageUrl ? (
             <img

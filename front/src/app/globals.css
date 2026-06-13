@@ -955,6 +955,14 @@ img {
   margin: var(--space-3) 0 0;
 }
 
+.auth-step {
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  margin: 0 0 var(--space-3);
+  text-transform: uppercase;
+}
+
 .auth-form {
   display: grid;
   gap: var(--space-6);
@@ -1038,6 +1046,12 @@ img {
   margin: 0;
 }
 
+.form-helper {
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+  margin: 0;
+}
+
 .form-alert,
 .form-success {
   align-items: flex-start;
@@ -1094,6 +1108,28 @@ img {
   border-bottom: 1px solid var(--color-text);
   color: var(--color-text);
   font-weight: 700;
+}
+
+.auth-inline-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: space-between;
+}
+
+.text-link:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.auth-status-icon {
+  color: var(--color-success);
+  margin-bottom: var(--space-4);
+}
+
+.auth-card__primary-link {
+  margin-top: var(--space-8);
 }
 
 .status-panel {

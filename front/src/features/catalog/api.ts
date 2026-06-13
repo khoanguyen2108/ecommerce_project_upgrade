@@ -15,6 +15,17 @@ export async function getCategories(): Promise<Category[]> {
   return response.categories;
 }
 
+export async function getCategoryBySlug(slug: string): Promise<Category> {
+  const response = await apiRequest<{ category: Category }>(
+    `/categories/slug/${encodeURIComponent(slug)}`,
+    {
+      method: "GET",
+    },
+  );
+
+  return response.category;
+}
+
 export function getProducts(query: ProductQuery = {}): Promise<ProductListResponse> {
   const searchParams = new URLSearchParams();
 
@@ -46,9 +57,33 @@ export async function getProductById(id: string): Promise<Product> {
   return response.product;
 }
 
+export async function getProductBySlug(slug: string): Promise<Product> {
+  const response = await apiRequest<{ product: Product }>(
+    `/products/slug/${encodeURIComponent(slug)}`,
+    {
+      method: "GET",
+    },
+  );
+
+  return response.product;
+}
+
 export async function getProductVariants(id: string): Promise<ProductVariant[]> {
   const response = await apiRequest<{ variants: ProductVariant[] }>(
     `/products/${id}/variants`,
+    {
+      method: "GET",
+    },
+  );
+
+  return response.variants;
+}
+
+export async function getProductVariantsBySlug(
+  slug: string,
+): Promise<ProductVariant[]> {
+  const response = await apiRequest<{ variants: ProductVariant[] }>(
+    `/products/slug/${encodeURIComponent(slug)}/variants`,
     {
       method: "GET",
     },

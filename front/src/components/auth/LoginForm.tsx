@@ -104,15 +104,9 @@ export function LoginForm({ registered }: LoginFormProps) {
         <div className="form-field">
           <div className="form-field__label-row">
             <label htmlFor="password">Password</label>
-            <button
-              aria-disabled="true"
-              className="inline-placeholder"
-              disabled
-              title="Password reset will be added in a later account flow"
-              type="button"
-            >
+            <Link className="text-link" href="/forgot-password">
               Forgot?
-            </button>
+            </Link>
           </div>
           <div className="password-field">
             <input
