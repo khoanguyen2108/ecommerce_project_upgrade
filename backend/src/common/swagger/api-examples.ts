@@ -53,6 +53,25 @@ export const publicUserExample = {
   updatedAt: '2026-06-10T10:30:00.000Z',
 };
 
+export const adminUserExample = {
+  ...publicUserExample,
+  isActive: true,
+};
+
+export const adminUserDataExample = {
+  user: adminUserExample,
+};
+
+export const adminUserListDataExample = {
+  users: [adminUserExample],
+  pagination: {
+    page: 1,
+    limit: 20,
+    total: 1,
+    totalPages: 1,
+  },
+};
+
 export const authTokenDataExample = {
   user: publicUserExample,
   accessToken: 'access_token_placeholder',
@@ -120,6 +139,16 @@ export const categoryListDataExample = {
   categories: [categoryExample],
 };
 
+export const adminCategoryListDataExample = {
+  categories: [categoryExample],
+  pagination: {
+    page: 1,
+    limit: 20,
+    total: 1,
+    totalPages: 1,
+  },
+};
+
 const productCategoryExample = {
   id: categoryExample.id,
   name: categoryExample.name,
@@ -166,6 +195,16 @@ export const productListDataExample = {
 
 export const productVariantsDataExample = {
   variants: [productVariantExample],
+};
+
+export const productVariantListDataExample = {
+  variants: [productVariantExample],
+  pagination: {
+    page: 1,
+    limit: 20,
+    total: 1,
+    totalPages: 1,
+  },
 };
 
 export const categoryDataExample = {

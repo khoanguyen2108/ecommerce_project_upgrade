@@ -21,6 +21,7 @@ const authUserSelect = {
   phone: true,
   role: true,
   authProvider: true,
+  isActive: true,
 } as const;
 
 @Injectable()
@@ -60,6 +61,13 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException({
         code: 'INVALID_TOKEN',
         message: 'Authentication token is invalid or expired.',
+      });
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException({
+        code: 'ACCOUNT_INACTIVE',
+        message: 'Account is inactive.',
       });
     }
 

@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AdminUsersModule } from './admin-users/admin-users.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { HealthModule } from './health/health.module';
@@ -42,6 +43,7 @@ const getPositiveNumber = (
     PrismaModule,
     RedisModule,
     AuthModule,
+    AdminUsersModule,
     CatalogModule,
     HealthModule,
   ],

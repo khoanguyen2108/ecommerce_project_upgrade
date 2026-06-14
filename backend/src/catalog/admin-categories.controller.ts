@@ -2,13 +2,16 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -24,12 +27,14 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { SWAGGER_BEARER_AUTH_NAME } from '../common/swagger/api-docs.constants';
 import {
+  adminCategoryListDataExample,
   categoryDataExample,
   envelopeResponse,
   errorEnvelopeResponse,
 } from '../common/swagger/api-examples';
 import { UserRole } from '../generated/prisma/enums';
 import { CatalogService } from './catalog.service';
+import { AdminCategoryQueryDto } from './dto/admin-category-query.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
@@ -54,6 +59,40 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 @Roles(UserRole.ADMIN)
 export class AdminCategoriesController {
   constructor(private readonly catalogService: CatalogService) {}
+
+  @ApiOperation({ summary: 'List categories as an admin' })
+  @ApiOkResponse(
+    envelopeResponse('Categories returned.', adminCategoryListDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Query validation failed.',
+      'BAD_REQUEST',
+      'isActive must be a boolean value',
+    ),
+  )
+  @Get()
+  listCategories(@Query() query: AdminCategoryQueryDto) {
+    return this.catalogService.listAdminCategories(query);
+  }
+
+  @ApiOperation({ summary: 'Get a category as an admin' })
+  @ApiParam({
+    description: 'Category UUID.',
+    name: 'id',
+  })
+  @ApiOkResponse(envelopeResponse('Category returned.', categoryDataExample))
+  @ApiNotFoundResponse(
+    errorEnvelopeResponse(
+      'Category was not found.',
+      'CATEGORY_NOT_FOUND',
+      'Category was not found.',
+    ),
+  )
+  @Get(':id')
+  getCategory(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.catalogService.getAdminCategory(id);
+  }
 
   @ApiOperation({ summary: 'Create a category as an admin' })
   @ApiCreatedResponse(

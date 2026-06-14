@@ -9,6 +9,7 @@ datasource db {
 
 enum UserRole {
   CUSTOMER
+  STAFF
   ADMIN
 }
 
@@ -25,6 +26,7 @@ model User {
   phone                 String?      @db.VarChar(32)
   role                  UserRole     @default(CUSTOMER)
   authProvider          AuthProvider @default(EMAIL)
+  isActive              Boolean      @default(true)
   googleId              String?      @unique @db.VarChar(255)
   emailVerified         Boolean      @default(false)
   refreshTokenHash      String?      @db.VarChar(255)
@@ -34,6 +36,8 @@ model User {
   passwordResetOtps     PasswordResetOtp[]
 
   @@index([role])
+  @@index([isActive])
+  @@index([createdAt])
   @@index([refreshTokenExpiresAt])
 }
 

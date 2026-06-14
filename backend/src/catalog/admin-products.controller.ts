@@ -2,13 +2,16 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -27,10 +30,14 @@ import {
   envelopeResponse,
   errorEnvelopeResponse,
   productDataExample,
+  productListDataExample,
   productVariantDataExample,
+  productVariantListDataExample,
 } from '../common/swagger/api-examples';
 import { UserRole } from '../generated/prisma/enums';
 import { CatalogService } from './catalog.service';
+import { AdminProductQueryDto } from './dto/admin-product-query.dto';
+import { AdminProductVariantQueryDto } from './dto/admin-product-variant-query.dto';
 import { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -56,6 +63,77 @@ import { UpdateProductDto } from './dto/update-product.dto';
 @Roles(UserRole.ADMIN)
 export class AdminProductsController {
   constructor(private readonly catalogService: CatalogService) {}
+
+  @ApiOperation({ summary: 'List products as an admin' })
+  @ApiOkResponse(
+    envelopeResponse('Products returned.', productListDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Query validation failed.',
+      'BAD_REQUEST',
+      'minPrice must be less than or equal to maxPrice.',
+    ),
+  )
+  @Get()
+  listProducts(@Query() query: AdminProductQueryDto) {
+    return this.catalogService.listAdminProducts(query);
+  }
+
+  @ApiOperation({
+    summary: 'Get a product as an admin',
+    description:
+      'Includes the product category and all variants, including inactive variants.',
+  })
+  @ApiParam({
+    description: 'Product UUID.',
+    name: 'id',
+  })
+  @ApiOkResponse(envelopeResponse('Product returned.', productDataExample))
+  @ApiNotFoundResponse(
+    errorEnvelopeResponse(
+      'Product was not found.',
+      'PRODUCT_NOT_FOUND',
+      'Product was not found.',
+    ),
+  )
+  @Get(':id')
+  getProduct(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.catalogService.getAdminProduct(id);
+  }
+
+  @ApiOperation({
+    summary: 'List product variants as an admin',
+    description: 'Returns variants for a product, including inactive variants.',
+  })
+  @ApiParam({
+    description: 'Product UUID.',
+    name: 'id',
+  })
+  @ApiOkResponse(
+    envelopeResponse('Product variants returned.', productVariantListDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Query validation failed.',
+      'BAD_REQUEST',
+      'stockStatus must be one of the following values: in_stock, low_stock, out_of_stock',
+    ),
+  )
+  @ApiNotFoundResponse(
+    errorEnvelopeResponse(
+      'Product was not found.',
+      'PRODUCT_NOT_FOUND',
+      'Product was not found.',
+    ),
+  )
+  @Get(':id/variants')
+  listProductVariants(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Query() query: AdminProductVariantQueryDto,
+  ) {
+    return this.catalogService.listAdminProductVariants(id, query);
+  }
 
   @ApiOperation({ summary: 'Create a product as an admin' })
   @ApiCreatedResponse(

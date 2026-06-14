@@ -6,6 +6,21 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import type {
+  AdminCategoryOrder,
+  AdminCategoryQueryDto,
+  AdminCategorySort,
+} from './dto/admin-category-query.dto';
+import type {
+  AdminProductOrder,
+  AdminProductQueryDto,
+  AdminProductSort,
+} from './dto/admin-product-query.dto';
+import type {
+  AdminProductVariantQueryDto,
+  AdminVariantOrder,
+  AdminVariantSort,
+} from './dto/admin-product-variant-query.dto';
 import type { CreateCategoryDto } from './dto/create-category.dto';
 import type { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import type { CreateProductDto } from './dto/create-product.dto';
@@ -19,6 +34,9 @@ import type { UpdateProductDto } from './dto/update-product.dto';
 
 const DEFAULT_PRODUCT_LIMIT = 20;
 const MAX_PRODUCT_LIMIT = 50;
+const DEFAULT_ADMIN_LIST_LIMIT = 20;
+const MAX_ADMIN_LIST_LIMIT = 100;
+const LOW_STOCK_THRESHOLD = 5;
 
 const categorySelect: Prisma.CategorySelect = {
   id: true,
@@ -103,11 +121,56 @@ export class CatalogService {
     return { categories };
   }
 
+  async listAdminCategories(query: AdminCategoryQueryDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(
+      query.limit ?? DEFAULT_ADMIN_LIST_LIMIT,
+      MAX_ADMIN_LIST_LIMIT,
+    );
+    const where = this.buildAdminCategoryWhere(query);
+
+    const [total, categories] = await this.prismaService.$transaction([
+      this.prismaService.category.count({ where }),
+      this.prismaService.category.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: this.getCategoryOrderBy(query.sort, query.order),
+        select: categorySelect,
+      }),
+    ]);
+
+    return {
+      categories,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
+  }
+
   async getPublicCategory(id: string) {
     const category = await this.prismaService.category.findFirst({
       where: {
         id,
         isActive: true,
+      },
+      select: categorySelect,
+    });
+
+    if (!category) {
+      throw this.categoryNotFoundException();
+    }
+
+    return { category };
+  }
+
+  async getAdminCategory(id: string) {
+    const category = await this.prismaService.category.findUnique({
+      where: {
+        id,
       },
       select: categorySelect,
     });
@@ -262,6 +325,38 @@ export class CatalogService {
     };
   }
 
+  async listAdminProducts(query: AdminProductQueryDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(
+      query.limit ?? DEFAULT_ADMIN_LIST_LIMIT,
+      MAX_ADMIN_LIST_LIMIT,
+    );
+
+    this.assertPriceRangeIsValid(query.minPrice, query.maxPrice);
+
+    const where = this.buildAdminProductWhere(query);
+    const [total, products] = await this.prismaService.$transaction([
+      this.prismaService.product.count({ where }),
+      this.prismaService.product.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: this.getAdminProductOrderBy(query.sort, query.order),
+        select: productSelect,
+      }),
+    ]);
+
+    return {
+      products,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
+  }
+
   async getPublicProduct(id: string) {
     const product = await this.prismaService.product.findFirst({
       where: {
@@ -272,6 +367,21 @@ export class CatalogService {
         },
       },
       select: publicProductSelect,
+    });
+
+    if (!product) {
+      throw this.productNotFoundException();
+    }
+
+    return { product };
+  }
+
+  async getAdminProduct(id: string) {
+    const product = await this.prismaService.product.findUnique({
+      where: {
+        id,
+      },
+      select: productSelect,
     });
 
     if (!product) {
@@ -326,6 +436,56 @@ export class CatalogService {
     }
 
     return { variants: product.variants };
+  }
+
+  async listAdminProductVariants(
+    productId: string,
+    query: AdminProductVariantQueryDto,
+  ) {
+    await this.getProductForAdmin(productId);
+
+    const page = query.page ?? 1;
+    const limit = Math.min(
+      query.limit ?? DEFAULT_ADMIN_LIST_LIMIT,
+      MAX_ADMIN_LIST_LIMIT,
+    );
+    const where = this.buildAdminVariantWhere(productId, query);
+
+    const [total, variants] = await this.prismaService.$transaction([
+      this.prismaService.productVariant.count({ where }),
+      this.prismaService.productVariant.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: this.getAdminVariantOrderBy(query.sort, query.order),
+        select: variantSelect,
+      }),
+    ]);
+
+    return {
+      variants,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getAdminProductVariant(id: string) {
+    const variant = await this.prismaService.productVariant.findUnique({
+      where: {
+        id,
+      },
+      select: variantSelect,
+    });
+
+    if (!variant) {
+      throw this.productVariantNotFoundException();
+    }
+
+    return { variant };
   }
 
   async getPublicProductVariantsBySlug(slug: string) {
@@ -582,6 +742,154 @@ export class CatalogService {
     return { variant };
   }
 
+  private buildAdminCategoryWhere(
+    query: AdminCategoryQueryDto,
+  ): Prisma.CategoryWhereInput {
+    const where: Prisma.CategoryWhereInput = {};
+    const search = this.normalizeOptionalQueryText(query.search);
+
+    if (search) {
+      where.OR = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          slug: {
+            contains: this.normalizeSlugForSearch(search) ?? search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+
+    if (query.isActive !== undefined) {
+      where.isActive = query.isActive;
+    }
+
+    return where;
+  }
+
+  private buildAdminProductWhere(
+    query: AdminProductQueryDto,
+  ): Prisma.ProductWhereInput {
+    const where: Prisma.ProductWhereInput = {};
+    const search = this.normalizeOptionalQueryText(query.search);
+
+    if (search) {
+      const slugSearch = this.normalizeSlugForSearch(search);
+
+      where.OR = [
+        {
+          name: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          slug: {
+            contains: slugSearch ?? search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+
+    if (query.categoryId) {
+      where.categoryId = query.categoryId;
+    }
+
+    if (query.categorySlug) {
+      where.category = {
+        slug: this.normalizeSlug(query.categorySlug),
+      };
+    }
+
+    if (query.isActive !== undefined) {
+      where.isActive = query.isActive;
+    }
+
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+      where.basePrice = {
+        ...(query.minPrice !== undefined ? { gte: query.minPrice } : {}),
+        ...(query.maxPrice !== undefined ? { lte: query.maxPrice } : {}),
+      };
+    }
+
+    return where;
+  }
+
+  private buildAdminVariantWhere(
+    productId: string,
+    query: AdminProductVariantQueryDto,
+  ): Prisma.ProductVariantWhereInput {
+    const where: Prisma.ProductVariantWhereInput = {
+      productId,
+    };
+
+    const sku = this.normalizeOptionalQueryText(query.sku);
+    const size = this.normalizeOptionalQueryText(query.size);
+    const color = this.normalizeOptionalQueryText(query.color);
+
+    if (sku) {
+      where.sku = {
+        contains: sku.replace(/\s+/g, '').toUpperCase(),
+        mode: 'insensitive',
+      };
+    }
+
+    if (size) {
+      where.size = {
+        equals: this.normalizeSize(size),
+        mode: 'insensitive',
+      };
+    }
+
+    if (color) {
+      where.color = {
+        contains: this.normalizeColor(color),
+        mode: 'insensitive',
+      };
+    }
+
+    if (query.isActive !== undefined) {
+      where.isActive = query.isActive;
+    }
+
+    if (query.stockStatus === 'in_stock') {
+      where.stock = {
+        gt: 0,
+      };
+    }
+
+    if (query.stockStatus === 'low_stock') {
+      where.stock = {
+        gt: 0,
+        lte: LOW_STOCK_THRESHOLD,
+      };
+    }
+
+    if (query.stockStatus === 'out_of_stock') {
+      where.stock = 0;
+    }
+
+    return where;
+  }
+
   private buildPublicProductWhere(query: ProductQueryDto): Prisma.ProductWhereInput {
     const where: Prisma.ProductWhereInput = {
       isActive: true,
@@ -668,6 +976,27 @@ export class CatalogService {
     return where;
   }
 
+  private getCategoryOrderBy(
+    sort: AdminCategorySort = 'createdAt',
+    order: AdminCategoryOrder = 'desc',
+  ): Prisma.CategoryOrderByWithRelationInput[] {
+    return [{ [sort]: order }, { id: 'asc' }];
+  }
+
+  private getAdminProductOrderBy(
+    sort: AdminProductSort = 'createdAt',
+    order: AdminProductOrder = 'desc',
+  ): Prisma.ProductOrderByWithRelationInput[] {
+    return [{ [sort]: order }, { id: 'asc' }];
+  }
+
+  private getAdminVariantOrderBy(
+    sort: AdminVariantSort = 'createdAt',
+    order: AdminVariantOrder = 'desc',
+  ): Prisma.ProductVariantOrderByWithRelationInput[] {
+    return [{ [sort]: order }, { id: 'asc' }];
+  }
+
   private getProductOrderBy(
     sort: ProductSort = 'newest',
   ): Prisma.ProductOrderByWithRelationInput[] {
@@ -680,6 +1009,22 @@ export class CatalogService {
     }
 
     return [{ createdAt: 'desc' }, { id: 'asc' }];
+  }
+
+  private assertPriceRangeIsValid(
+    minPrice: number | undefined,
+    maxPrice: number | undefined,
+  ) {
+    if (
+      minPrice !== undefined &&
+      maxPrice !== undefined &&
+      minPrice > maxPrice
+    ) {
+      throw new BadRequestException({
+        code: 'INVALID_PRICE_RANGE',
+        message: 'minPrice must be less than or equal to maxPrice.',
+      });
+    }
   }
 
   private async getCategoryForAdmin(id: string) {

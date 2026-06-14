@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -51,6 +52,26 @@ import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
 @Roles(UserRole.ADMIN)
 export class AdminProductVariantsController {
   constructor(private readonly catalogService: CatalogService) {}
+
+  @ApiOperation({ summary: 'Get a product variant as an admin' })
+  @ApiParam({
+    description: 'Product variant UUID.',
+    name: 'id',
+  })
+  @ApiOkResponse(
+    envelopeResponse('Product variant returned.', productVariantDataExample),
+  )
+  @ApiNotFoundResponse(
+    errorEnvelopeResponse(
+      'Product variant was not found.',
+      'PRODUCT_VARIANT_NOT_FOUND',
+      'Product variant was not found.',
+    ),
+  )
+  @Get(':id')
+  getProductVariant(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.catalogService.getAdminProductVariant(id);
+  }
 
   @ApiOperation({ summary: 'Update a product variant as an admin' })
   @ApiParam({

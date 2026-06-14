@@ -58,6 +58,7 @@ const publicUserSelect = {
   phone: true,
   role: true,
   authProvider: true,
+  isActive: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -93,6 +94,7 @@ type PublicUserRecord = {
   phone: string | null;
   role: UserRole;
   authProvider: AuthProvider;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -458,6 +460,10 @@ export class AuthService {
     user: PublicUserRecord,
     previousRefreshTokenHash?: string,
   ): Promise<AuthTokenResponse> {
+    if (!user.isActive) {
+      throw this.accountInactiveException();
+    }
+
     const jwtSecret = this.getJwtSecret();
     const refreshToken = this.createRefreshToken();
     const refreshTokenHash = this.hashRefreshToken(refreshToken);
@@ -761,6 +767,7 @@ export class AuthService {
       phone: user.phone,
       role: user.role,
       authProvider: user.authProvider,
+      isActive: user.isActive,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
@@ -889,6 +896,13 @@ export class AuthService {
     return new UnauthorizedException({
       code: "PASSWORD_RESET_OTP_INVALID",
       message: "Password reset code is invalid or expired.",
+    });
+  }
+
+  private accountInactiveException(): UnauthorizedException {
+    return new UnauthorizedException({
+      code: "ACCOUNT_INACTIVE",
+      message: "Account is inactive.",
     });
   }
 }
