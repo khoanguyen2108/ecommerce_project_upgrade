@@ -18,6 +18,25 @@ enum AuthProvider {
   GOOGLE
 }
 
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentProvider {
+  PAYOS
+}
+
 model User {
   id                    String       @id @default(uuid()) @db.Uuid
   email                 String       @unique @db.VarChar(320)
@@ -34,6 +53,7 @@ model User {
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
   passwordResetOtps     PasswordResetOtp[]
+  orders                Order[]
 
   @@index([role])
   @@index([isActive])
@@ -84,6 +104,7 @@ model Product {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   variants    ProductVariant[]
+  orderItems  OrderItem[]
 
   @@index([categoryId])
   @@index([isActive])
@@ -102,8 +123,99 @@ model ProductVariant {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  orderItems    OrderItem[]
 
   @@unique([productId, size, color])
   @@index([productId])
   @@index([isActive])
+}
+
+model Order {
+  id             String      @id @default(uuid()) @db.Uuid
+  userId         String      @db.Uuid
+  user           User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status         OrderStatus @default(PENDING_PAYMENT)
+  subtotalAmount Int
+  totalAmount    Int
+  currency       String      @default("VND") @db.VarChar(3)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  paidAt         DateTime?
+  cancelledAt    DateTime?
+  expiresAt      DateTime?
+  items          OrderItem[]
+  payments       Payment[]
+  webhookEvents  PaymentWebhookEvent[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id          String         @id @default(uuid()) @db.Uuid
+  orderId     String         @db.Uuid
+  order       Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String         @db.Uuid
+  product     Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variantId   String         @db.Uuid
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  productName String         @db.VarChar(160)
+  sku         String?        @db.VarChar(80)
+  size        String         @db.VarChar(32)
+  color       String         @db.VarChar(64)
+  unitPrice   Int
+  quantity    Int
+  lineTotal   Int
+  createdAt   DateTime       @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+model Payment {
+  id                           String                @id @default(uuid()) @db.Uuid
+  orderId                      String                @db.Uuid
+  order                        Order                 @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  provider                     PaymentProvider       @default(PAYOS)
+  status                       PaymentStatus         @default(PENDING)
+  amount                       Int
+  currency                     String                @default("VND") @db.VarChar(3)
+  providerOrderCode            Int                   @unique @default(autoincrement())
+  checkoutUrl                  String?
+  providerPaymentLinkId        String?               @unique @db.VarChar(120)
+  providerTransactionReference String?               @db.VarChar(120)
+  failureReason                String?               @db.VarChar(160)
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+  paidAt                       DateTime?
+  cancelledAt                  DateTime?
+  webhookEvents                PaymentWebhookEvent[]
+
+  @@unique([orderId, provider])
+  @@index([orderId])
+  @@index([provider, status])
+  @@index([createdAt])
+}
+
+model PaymentWebhookEvent {
+  id               String          @id @default(uuid()) @db.Uuid
+  provider         PaymentProvider
+  eventKey         String          @db.VarChar(160)
+  signatureHash    String?         @db.VarChar(64)
+  paymentId        String?         @db.Uuid
+  payment          Payment?        @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  orderId          String?         @db.Uuid
+  order            Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  receivedAt       DateTime        @default(now())
+  processedAt      DateTime?
+  processingStatus String          @default("RECEIVED") @db.VarChar(32)
+  metadata         Json?
+
+  @@unique([provider, eventKey])
+  @@index([paymentId])
+  @@index([orderId])
+  @@index([receivedAt])
+  @@index([processingStatus])
 }

@@ -6,6 +6,8 @@ import { AdminUsersModule } from './admin-users/admin-users.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { HealthModule } from './health/health.module';
+import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { RequestLoggingMiddleware } from './common/middleware/request-logging.middleware';
@@ -45,6 +47,8 @@ const getPositiveNumber = (
     AuthModule,
     AdminUsersModule,
     CatalogModule,
+    OrdersModule,
+    PaymentsModule,
     HealthModule,
   ],
   providers: [

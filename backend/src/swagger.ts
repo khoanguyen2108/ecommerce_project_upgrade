@@ -29,6 +29,8 @@ export const setupSwagger = (app: INestApplication) => {
     .addTag('admin-categories')
     .addTag('admin-products')
     .addTag('product-variants')
+    .addTag('orders')
+    .addTag('payments')
     .addBearerAuth(
       {
         type: 'http',

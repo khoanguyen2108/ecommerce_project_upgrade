@@ -218,3 +218,102 @@ export const productDataExample = {
 export const productVariantDataExample = {
   variant: productVariantExample,
 };
+
+export const orderItemExample = {
+  id: '4eb1a5f0-21dd-4553-9f55-7f9d5afcaa74',
+  orderId: '7b2cb6b6-0501-4d7b-8e30-98db06a7f605',
+  productId: productExample.id,
+  variantId: productVariantExample.id,
+  productName: productExample.name,
+  sku: productVariantExample.sku,
+  size: productVariantExample.size,
+  color: productVariantExample.color,
+  unitPrice: 249000,
+  quantity: 1,
+  lineTotal: 249000,
+  createdAt: '2026-06-14T10:30:00.000Z',
+};
+
+export const paymentExample = {
+  id: '1b3d98f7-e285-4d30-8298-668a6b0cd5b8',
+  orderId: orderItemExample.orderId,
+  provider: 'PAYOS',
+  status: 'PENDING',
+  amount: 249000,
+  currency: 'VND',
+  providerOrderCode: 100001,
+  checkoutUrl: 'https://pay.payos.vn/web/124c33293c43417ab7879e14c8d9eb18',
+  providerPaymentLinkId: '124c33293c43417ab7879e14c8d9eb18',
+  providerTransactionReference: null,
+  failureReason: null,
+  createdAt: '2026-06-14T10:30:00.000Z',
+  updatedAt: '2026-06-14T10:30:00.000Z',
+  paidAt: null,
+  cancelledAt: null,
+};
+
+export const orderExample = {
+  id: orderItemExample.orderId,
+  userId: publicUserExample.id,
+  status: 'PENDING_PAYMENT',
+  subtotalAmount: 249000,
+  totalAmount: 249000,
+  currency: 'VND',
+  createdAt: '2026-06-14T10:30:00.000Z',
+  updatedAt: '2026-06-14T10:30:00.000Z',
+  paidAt: null,
+  cancelledAt: null,
+  expiresAt: null,
+  items: [orderItemExample],
+  payments: [paymentExample],
+};
+
+export const orderDataExample = {
+  order: orderExample,
+};
+
+export const orderListDataExample = {
+  orders: [orderExample],
+  pagination: {
+    page: 1,
+    limit: 20,
+    total: 1,
+    totalPages: 1,
+  },
+};
+
+export const payosPaymentDataExample = {
+  checkoutUrl: paymentExample.checkoutUrl,
+  payment: paymentExample,
+};
+
+export const payosWebhookDataExample = {
+  received: true,
+  duplicate: false,
+  processed: true,
+  payment: {
+    ...paymentExample,
+    status: 'PAID',
+    paidAt: '2026-06-14T10:35:00.000Z',
+  },
+};
+
+export const payosStatusDataExample = {
+  source: 'return',
+  displayOnly: true,
+  message:
+    'Payment return and cancel pages are display-only. Final status is set only by verified payOS webhook.',
+  order: {
+    id: orderExample.id,
+    userId: orderExample.userId,
+    status: orderExample.status,
+    totalAmount: orderExample.totalAmount,
+    currency: orderExample.currency,
+    createdAt: orderExample.createdAt,
+    updatedAt: orderExample.updatedAt,
+    paidAt: null,
+    cancelledAt: null,
+    expiresAt: null,
+  },
+  payment: paymentExample,
+};
