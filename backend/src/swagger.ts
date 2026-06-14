@@ -26,6 +26,7 @@ export const setupSwagger = (app: INestApplication) => {
     .addTag('categories')
     .addTag('products')
     .addTag('admin-users')
+    .addTag('admin-stats')
     .addTag('admin-categories')
     .addTag('admin-products')
     .addTag('product-variants')

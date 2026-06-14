@@ -317,3 +317,93 @@ export const payosStatusDataExample = {
   },
   payment: paymentExample,
 };
+
+export const adminStatsOverviewDataExample = {
+  overview: {
+    totalRevenue: 249000,
+    paidOrdersCount: 1,
+    pendingOrdersCount: 2,
+    cancelledOrdersCount: 0,
+    expiredOrdersCount: 0,
+    averagePaidOrderValue: 249000,
+    totalCustomers: 24,
+    totalProducts: 12,
+    lowStockVariantsCount: 3,
+    filters: {
+      from: '2026-06-01T00:00:00.000Z',
+      to: '2026-06-30T23:59:59.999Z',
+    },
+  },
+};
+
+export const adminStatsRevenueDataExample = {
+  revenue: {
+    groupBy: 'day',
+    totalRevenue: 249000,
+    paidOrdersCount: 1,
+    buckets: [
+      {
+        periodStart: '2026-06-14T00:00:00.000Z',
+        periodEnd: '2026-06-14T23:59:59.999Z',
+        revenue: 249000,
+        paidOrdersCount: 1,
+      },
+    ],
+    filters: {
+      from: '2026-06-01T00:00:00.000Z',
+      to: '2026-06-30T23:59:59.999Z',
+    },
+  },
+};
+
+export const adminTopProductsDataExample = {
+  topProducts: [
+    {
+      productId: productExample.id,
+      variantId: productVariantExample.id,
+      productName: productExample.name,
+      quantitySold: 4,
+      revenue: 996000,
+    },
+  ],
+  limit: 10,
+  filters: {
+    from: '2026-06-01T00:00:00.000Z',
+    to: '2026-06-30T23:59:59.999Z',
+  },
+};
+
+export const adminOrderStatsDataExample = {
+  orders: {
+    total: 3,
+    byStatus: {
+      PENDING_PAYMENT: 2,
+      PAID: 1,
+      CANCELLED: 0,
+      EXPIRED: 0,
+    },
+    counts: [
+      {
+        status: 'PENDING_PAYMENT',
+        count: 2,
+      },
+      {
+        status: 'PAID',
+        count: 1,
+      },
+      {
+        status: 'CANCELLED',
+        count: 0,
+      },
+      {
+        status: 'EXPIRED',
+        count: 0,
+      },
+    ],
+    filters: {
+      from: '2026-06-01T00:00:00.000Z',
+      to: '2026-06-30T23:59:59.999Z',
+      status: null,
+    },
+  },
+};
