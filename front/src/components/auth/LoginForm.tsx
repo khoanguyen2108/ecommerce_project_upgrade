@@ -11,6 +11,7 @@ import { FieldError } from "@/components/ui/FieldError";
 import { GoogleMark } from "@/components/ui/GoogleMark";
 
 interface LoginFormProps {
+  nextPath?: string;
   registered?: boolean;
 }
 
@@ -19,7 +20,7 @@ interface LoginFieldErrors {
   password?: string;
 }
 
-export function LoginForm({ registered }: LoginFormProps) {
+export function LoginForm({ nextPath, registered }: LoginFormProps) {
   const router = useRouter();
   const { setAuthenticatedSession } = useAuthSession();
   const [email, setEmail] = useState("");
@@ -48,7 +49,7 @@ export function LoginForm({ registered }: LoginFormProps) {
         password,
       });
       setAuthenticatedSession(response);
-      router.push("/");
+      router.push(nextPath || "/");
     } catch (error) {
       setFormError(getSafeErrorMessage(error));
     } finally {

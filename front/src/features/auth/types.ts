@@ -1,4 +1,4 @@
-export type UserRole = "CUSTOMER" | "ADMIN";
+export type UserRole = "CUSTOMER" | "STAFF" | "ADMIN";
 export type AuthProvider = "EMAIL" | "GOOGLE";
 
 export interface User {

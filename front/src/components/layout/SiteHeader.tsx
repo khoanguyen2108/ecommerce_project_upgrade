@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, LogOut, ShoppingBag, User } from "lucide-react";
+import { Heart, LogOut, ShieldCheck, ShoppingBag, User } from "lucide-react";
 import Link from "next/link";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
@@ -9,7 +9,7 @@ interface SiteHeaderProps {
 }
 
 export function SiteHeader({ active }: SiteHeaderProps) {
-  const { isAuthenticated, isLoading, logout } = useAuthSession();
+  const { currentUser, isAuthenticated, isLoading, logout } = useAuthSession();
 
   return (
     <header className="site-header">
@@ -47,6 +47,16 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           >
             <ShoppingBag size={20} strokeWidth={1.8} />
           </button>
+          {!isLoading && currentUser?.role === "ADMIN" ? (
+            <Link
+              aria-label="Admin"
+              className="icon-button"
+              href="/admin"
+              title="Admin"
+            >
+              <ShieldCheck size={20} strokeWidth={1.8} />
+            </Link>
+          ) : null}
           {isAuthenticated ? (
             <button
               aria-label="Sign out"
