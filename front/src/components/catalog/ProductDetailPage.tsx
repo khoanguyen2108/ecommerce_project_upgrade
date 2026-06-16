@@ -3,6 +3,8 @@
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { RecentlyViewedProducts } from "@/components/recently-viewed/RecentlyViewedProducts";
+import { WishlistButton } from "@/components/wishlist/WishlistButton";
 import {
   getProductById,
   getProductBySlug,
@@ -11,6 +13,11 @@ import {
 } from "@/features/catalog/api";
 import { formatPrice } from "@/features/catalog/format";
 import type { Product, ProductVariant } from "@/features/catalog/types";
+import {
+  productToRecentlyViewedProduct,
+  useRecentlyViewed,
+} from "@/features/recently-viewed/useRecentlyViewed";
+import { productToWishlistItem } from "@/features/wishlist/useWishlist";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface ProductDetailPageProps {
@@ -30,6 +37,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     variants: [],
   });
   const [activeImage, setActiveImage] = useState<string>();
+  const { addProduct: addRecentlyViewedProduct } = useRecentlyViewed();
 
   useEffect(() => {
     let isMounted = true;
@@ -80,6 +88,14 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     };
   }, [productRef]);
 
+  useEffect(() => {
+    if (!state.product) {
+      return;
+    }
+
+    addRecentlyViewedProduct(productToRecentlyViewedProduct(state.product));
+  }, [addRecentlyViewedProduct, state.product]);
+
   const totalStock = useMemo(
     () => state.variants.reduce((sum, variant) => sum + variant.stock, 0),
     [state.variants],
@@ -118,6 +134,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   }
 
   const product = state.product;
+  const wishlistItem = productToWishlistItem(product);
 
   return (
     <main className="product-detail-page">
@@ -151,7 +168,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
         <div className="product-detail-copy">
           <Link
             className="product-detail-copy__category"
-            href={`/products?categorySlug=${product.category.slug}`}
+            href={`/categories/${product.category.slug}`}
           >
             {product.category.name}
           </Link>
@@ -202,11 +219,19 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             )}
           </section>
 
-          <button className="button button--primary button--full" disabled type="button">
-            Cart is coming soon.
-          </button>
+          <div className="product-detail-actions">
+            <WishlistButton item={wishlistItem} />
+            <button
+              className="button button--primary button--full"
+              disabled
+              type="button"
+            >
+              Cart is coming soon.
+            </button>
+          </div>
         </div>
       </section>
+      <RecentlyViewedProducts excludeProductId={product.id} />
     </main>
   );
 }

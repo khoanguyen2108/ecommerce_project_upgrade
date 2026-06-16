@@ -230,7 +230,7 @@ function CategoryTile({
   imageUrl?: string;
 }) {
   return (
-    <Link className="category-tile" href={`/products?categorySlug=${category.slug}`}>
+    <Link className="category-tile" href={`/categories/${category.slug}`}>
       {imageUrl ? (
         <img
           alt={`${category.name} category`}

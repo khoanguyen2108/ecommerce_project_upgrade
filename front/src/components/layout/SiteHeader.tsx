@@ -10,13 +10,21 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { useWishlist } from "@/features/wishlist/useWishlist";
 
 interface SiteHeaderProps {
-  active?: "shop" | "account" | "orders";
+  active?: "shop" | "account" | "orders" | "wishlist";
 }
 
 export function SiteHeader({ active }: SiteHeaderProps) {
   const { currentUser, isAuthenticated, isLoading, logout } = useAuthSession();
+  const { count: wishlistCount, isLoaded: isWishlistLoaded } = useWishlist();
+  const wishlistLabel =
+    isWishlistLoaded && wishlistCount > 0
+      ? `Wishlist, ${wishlistCount} saved ${
+          wishlistCount === 1 ? "item" : "items"
+        }`
+      : "Wishlist";
 
   return (
     <header className="site-header">
@@ -38,14 +46,17 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         </nav>
 
         <div className="site-actions">
-          <button
-            aria-label="Wishlist preview"
-            className="icon-button"
-            title="Wishlist is coming soon."
-            type="button"
+          <Link
+            aria-label={wishlistLabel}
+            className={`icon-button ${active === "wishlist" ? "is-active" : ""}`}
+            href="/wishlist"
+            title="Wishlist"
           >
             <Heart size={20} strokeWidth={1.8} />
-          </button>
+            {isWishlistLoaded && wishlistCount > 0 ? (
+              <span className="icon-button__badge">{wishlistCount}</span>
+            ) : null}
+          </Link>
           <button
             aria-label="Cart preview"
             className="icon-button"
@@ -62,6 +73,16 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               title="Admin"
             >
               <ShieldCheck size={20} strokeWidth={1.8} />
+            </Link>
+          ) : null}
+          {isAuthenticated ? (
+            <Link
+              aria-label="Profile"
+              className={`icon-button ${active === "account" ? "is-active" : ""}`}
+              href="/profile"
+              title="Profile"
+            >
+              <User size={20} strokeWidth={1.8} />
             </Link>
           ) : null}
           {isAuthenticated ? (

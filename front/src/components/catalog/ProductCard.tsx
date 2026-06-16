@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { WishlistButton } from "@/components/wishlist/WishlistButton";
 import { formatPrice, getVariantSummary } from "@/features/catalog/format";
 import type { Product } from "@/features/catalog/types";
+import { productToWishlistItem } from "@/features/wishlist/useWishlist";
 
 interface ProductCardProps {
   product: Product;
@@ -8,9 +12,15 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const imageUrl = product.imageUrls[0];
+  const wishlistItem = productToWishlistItem(product);
 
   return (
     <article className="product-card">
+      <WishlistButton
+        className="product-card__wishlist"
+        item={wishlistItem}
+        variant="icon"
+      />
       <Link href={`/products/${product.slug}`} aria-label={`View ${product.name}`}>
         <div className="product-card__image-wrap">
           {imageUrl ? (
