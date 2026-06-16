@@ -39,11 +39,14 @@ export function registerUser(payload: RegisterRequest): Promise<RegisterResponse
   });
 }
 
-export function getCurrentUser(): Promise<CurrentUserResponse> {
+export function getCurrentUser(
+  options: Pick<RequestInit, "signal"> = {},
+): Promise<CurrentUserResponse> {
   return apiRequest<CurrentUserResponse>("/auth/me", {
     auth: true,
     credentials: "include",
     method: "GET",
+    signal: options.signal,
   });
 }
 

@@ -1,11 +1,18 @@
 "use client";
 
-import { Heart, LogOut, ShieldCheck, ShoppingBag, User } from "lucide-react";
+import {
+  Heart,
+  LogOut,
+  ReceiptText,
+  ShieldCheck,
+  ShoppingBag,
+  User,
+} from "lucide-react";
 import Link from "next/link";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
 interface SiteHeaderProps {
-  active?: "shop" | "account";
+  active?: "shop" | "account" | "orders";
 }
 
 export function SiteHeader({ active }: SiteHeaderProps) {
@@ -55,6 +62,16 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               title="Admin"
             >
               <ShieldCheck size={20} strokeWidth={1.8} />
+            </Link>
+          ) : null}
+          {isAuthenticated ? (
+            <Link
+              aria-label="Orders"
+              className={`icon-button ${active === "orders" ? "is-active" : ""}`}
+              href="/orders"
+              title="Orders"
+            >
+              <ReceiptText size={20} strokeWidth={1.8} />
             </Link>
           ) : null}
           {isAuthenticated ? (

@@ -2056,6 +2056,446 @@ img {
   width: min(220px, 100%);
 }
 
+.account-state-page {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: calc(100svh - var(--header-height));
+  padding: clamp(56px, 8vw, 96px) 20px;
+}
+
+.account-state,
+.payment-status-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-4);
+  justify-items: center;
+  margin: 0 auto;
+  max-width: 560px;
+  padding: clamp(40px, 6vw, 64px);
+  text-align: center;
+  width: 100%;
+}
+
+.account-state__icon,
+.payment-status-panel__icon {
+  color: var(--color-olive);
+}
+
+.payment-status-panel__icon--error {
+  color: var(--color-danger);
+}
+
+.account-state h1,
+.customer-hero h1,
+.customer-section__header h2,
+.payment-status-panel h1 {
+  font-family: Montserrat, Inter, sans-serif;
+  font-weight: 760;
+  letter-spacing: 0;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.account-state h1,
+.payment-status-panel h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+}
+
+.account-state p,
+.payment-status-panel p {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.account-state__actions,
+.customer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+.customer-page {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0 auto;
+  max-width: var(--container);
+  padding: clamp(40px, 6vw, 80px) clamp(20px, 4vw, 64px);
+}
+
+.customer-hero {
+  align-items: end;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: var(--space-6);
+  justify-content: space-between;
+  padding-bottom: var(--space-8);
+}
+
+.customer-hero > div {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.customer-hero h1 {
+  font-size: clamp(2.4rem, 5vw, 4.6rem);
+  overflow-wrap: anywhere;
+}
+
+.customer-hero p:not(.eyebrow) {
+  color: var(--color-text-muted);
+  margin: var(--space-3) 0 0;
+  max-width: 680px;
+}
+
+.customer-hero--compact {
+  align-items: center;
+}
+
+.customer-resource,
+.customer-section {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.customer-toolbar {
+  align-items: end;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+  padding: var(--space-4);
+}
+
+.customer-toolbar label {
+  display: grid;
+  gap: var(--space-2);
+  min-width: min(280px, 100%);
+}
+
+.customer-toolbar label span {
+  color: var(--color-text);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.customer-toolbar select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  color: var(--color-text);
+  min-height: 44px;
+  outline: none;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.customer-toolbar select:focus {
+  border-color: var(--color-border-strong);
+  box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+
+.customer-toolbar__actions {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+.customer-toolbar__actions .button,
+.customer-hero .button {
+  min-height: 44px;
+  padding: 10px 14px;
+}
+
+.customer-feedback,
+.payment-read-note {
+  align-items: flex-start;
+  border: 1px solid;
+  display: flex;
+  gap: var(--space-2);
+  padding: 12px 14px;
+}
+
+.customer-feedback--error {
+  background: #fff1ef;
+  border-color: #f0b4ad;
+  color: var(--color-danger);
+}
+
+.customer-feedback small,
+.payment-status-panel small {
+  color: inherit;
+  opacity: 0.78;
+}
+
+.customer-feedback small {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.order-table-wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  overflow-x: auto;
+  width: 100%;
+}
+
+.order-table {
+  border-collapse: collapse;
+  min-width: 860px;
+  width: 100%;
+}
+
+.order-table--items {
+  min-width: 760px;
+}
+
+.order-table th,
+.order-table td {
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.88rem;
+  padding: 13px 14px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.order-table th {
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.order-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.order-table__state {
+  color: var(--color-text-muted);
+  height: 160px;
+  text-align: center;
+}
+
+.order-table__muted {
+  color: var(--color-text-muted);
+}
+
+.order-id {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+
+.order-icon-button {
+  border: 1px solid var(--color-border);
+}
+
+.order-icon-button:hover {
+  border-color: var(--color-border-strong);
+}
+
+.order-status-badge,
+.payment-status-badge {
+  border: 1px solid var(--color-border);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.order-status-badge--pending-payment,
+.payment-status-badge--pending {
+  background: #fff8e6;
+  border-color: #e5c66b;
+  color: #7a5600;
+}
+
+.order-status-badge--paid,
+.payment-status-badge--paid,
+.payment-read-note--paid {
+  background: #edf7ef;
+  border-color: #aed7bb;
+  color: var(--color-success);
+}
+
+.order-status-badge--cancelled,
+.payment-status-badge--cancelled,
+.payment-status-badge--failed {
+  background: #fff1ef;
+  border-color: #f0b4ad;
+  color: var(--color-danger);
+}
+
+.order-status-badge--expired,
+.payment-status-badge--expired {
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+
+.customer-pagination {
+  align-items: center;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: var(--space-4);
+  justify-content: center;
+  padding-top: var(--space-6);
+}
+
+.customer-pagination span {
+  color: var(--color-text-muted);
+  font-weight: 700;
+  min-width: 220px;
+  text-align: center;
+}
+
+.customer-skeleton-line {
+  background: var(--color-surface-muted);
+  display: block;
+  height: 18px;
+  width: min(140px, 100%);
+}
+
+.customer-skeleton-line--wide {
+  height: 22px;
+  width: min(360px, 100%);
+}
+
+.order-detail-loading {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+
+.order-detail-grid,
+.payment-status-grid {
+  align-items: start;
+  display: grid;
+  gap: var(--space-6);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.order-summary-panel,
+.payment-status-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-5, 20px);
+  min-width: 0;
+  padding: var(--space-6);
+}
+
+.order-summary-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.order-summary-list div {
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(120px, 0.36fr) minmax(0, 1fr);
+  padding-top: var(--space-3);
+}
+
+.order-summary-list dt {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.order-summary-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.order-summary-empty {
+  align-items: center;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  display: flex;
+  justify-content: center;
+  min-height: 124px;
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.payment-summary-list {
+  display: grid;
+  gap: var(--space-5, 20px);
+}
+
+.payment-summary-item {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.payment-summary-item + .payment-summary-item {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-5, 20px);
+}
+
+.payment-summary-item__header {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+.customer-section__header {
+  align-items: end;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+  padding-bottom: var(--space-4);
+}
+
+.customer-section__header h2 {
+  font-size: clamp(1.45rem, 3vw, 2.25rem);
+}
+
+.customer-section__header span {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.payment-page {
+  min-height: calc(100svh - var(--header-height));
+}
+
+.payment-status-grid {
+  max-width: 1080px;
+  width: 100%;
+}
+
+.payment-read-note {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  max-width: 1080px;
+  width: 100%;
+}
+
 .spin {
   animation: spin 900ms linear infinite;
   color: var(--color-olive);
@@ -2075,6 +2515,21 @@ img {
 
   .site-nav {
     display: none;
+  }
+
+  .customer-hero,
+  .customer-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .customer-toolbar__actions {
+    justify-content: flex-start;
+  }
+
+  .order-detail-grid,
+  .payment-status-grid {
+    grid-template-columns: 1fr;
   }
 
   .admin-shell {
@@ -2182,6 +2637,74 @@ img {
   .icon-button {
     height: 36px;
     width: 34px;
+  }
+
+  .account-state-page {
+    align-items: flex-start;
+    padding: var(--space-8) 16px;
+  }
+
+  .account-state,
+  .payment-status-panel {
+    padding: var(--space-8) var(--space-6);
+  }
+
+  .account-state__actions,
+  .customer-actions,
+  .customer-toolbar__actions,
+  .customer-toolbar__actions .button,
+  .customer-hero .button {
+    width: 100%;
+  }
+
+  .customer-page {
+    padding-top: var(--space-8);
+  }
+
+  .customer-hero,
+  .customer-section__header,
+  .payment-summary-item__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .customer-toolbar {
+    padding: var(--space-4);
+  }
+
+  .customer-toolbar label,
+  .customer-toolbar select {
+    width: 100%;
+  }
+
+  .customer-feedback,
+  .payment-read-note {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .customer-feedback small {
+    margin-left: 0;
+    white-space: normal;
+  }
+
+  .customer-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .customer-pagination span {
+    min-width: 0;
+    order: -1;
+  }
+
+  .order-summary-panel,
+  .payment-status-card {
+    padding: var(--space-4);
+  }
+
+  .order-summary-list div {
+    grid-template-columns: 1fr;
   }
 
   .admin-guard-page {

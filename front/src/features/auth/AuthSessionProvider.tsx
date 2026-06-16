@@ -64,13 +64,15 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
 
     setAccessToken(getStoredAccessToken());
     setCurrentUser(getStoredUser());
 
     async function hydrateSession() {
       try {
-        const response = await getCurrentUser();
+        const response = await getCurrentUser({ signal: controller.signal });
 
         if (!isMounted) {
           return;
@@ -88,6 +90,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
           setCurrentUser(undefined);
         }
       } finally {
+        window.clearTimeout(timeoutId);
+
         if (isMounted) {
           setIsLoading(false);
         }
@@ -98,6 +102,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
     return () => {
       isMounted = false;
+      controller.abort();
+      window.clearTimeout(timeoutId);
     };
   }, []);
 
