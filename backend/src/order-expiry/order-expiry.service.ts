@@ -5,6 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OrderEmailService } from '../email/order-email.service';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -29,6 +30,7 @@ export class OrderExpiryService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly orderEmailService: OrderEmailService,
     private readonly prismaService: PrismaService,
   ) {
     this.pendingExpiresMinutes = this.getPositiveConfigNumber(
@@ -140,6 +142,7 @@ export class OrderExpiryService implements OnModuleInit, OnModuleDestroy {
       const batchResult = await this.prismaService.$transaction(async (tx) => {
         let batchExpiredOrders = 0;
         let batchExpiredPayments = 0;
+        const expiredOrderIds: string[] = [];
 
         for (const candidate of candidates) {
           const orderUpdate = await tx.order.updateMany({
@@ -173,16 +176,22 @@ export class OrderExpiryService implements OnModuleInit, OnModuleDestroy {
 
           batchExpiredOrders += 1;
           batchExpiredPayments += paymentUpdate.count;
+          expiredOrderIds.push(candidate.id);
         }
 
         return {
           expiredOrders: batchExpiredOrders,
           expiredPayments: batchExpiredPayments,
+          expiredOrderIds,
         };
       });
 
       expiredOrders += batchResult.expiredOrders;
       expiredPayments += batchResult.expiredPayments;
+
+      for (const orderId of batchResult.expiredOrderIds) {
+        void this.orderEmailService.sendOrderExpiredEmail(orderId);
+      }
 
       if (candidates.length < ORDER_EXPIRY_BATCH_SIZE) {
         break;

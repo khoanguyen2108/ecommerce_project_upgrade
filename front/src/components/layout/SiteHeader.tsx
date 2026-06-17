@@ -13,7 +13,7 @@ import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { useWishlist } from "@/features/wishlist/useWishlist";
 
 interface SiteHeaderProps {
-  active?: "shop" | "account" | "orders" | "wishlist";
+  active?: "shop" | "account" | "cart" | "orders" | "wishlist";
 }
 
 export function SiteHeader({ active }: SiteHeaderProps) {
@@ -57,14 +57,14 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               <span className="icon-button__badge">{wishlistCount}</span>
             ) : null}
           </Link>
-          <button
-            aria-label="Cart preview"
-            className="icon-button"
-            title="Cart is coming soon."
-            type="button"
+          <Link
+            aria-label="Cart"
+            className={`icon-button ${active === "cart" ? "is-active" : ""}`}
+            href="/cart"
+            title="Cart"
           >
             <ShoppingBag size={20} strokeWidth={1.8} />
-          </button>
+          </Link>
           {!isLoading && currentUser?.role === "ADMIN" ? (
             <Link
               aria-label="Admin"

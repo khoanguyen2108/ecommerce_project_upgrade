@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user';
+import { OrderEmailService } from '../email/order-email.service';
 import { Prisma } from '../generated/prisma/client';
 import { OrderStatus, UserRole } from '../generated/prisma/enums';
 import { OrderExpiryService } from '../order-expiry/order-expiry.service';
@@ -104,6 +105,7 @@ type VariantSnapshot = Prisma.ProductVariantGetPayload<{
 @Injectable()
 export class OrdersService {
   constructor(
+    private readonly orderEmailService: OrderEmailService,
     private readonly orderExpiryService: OrderExpiryService,
     private readonly prismaService: PrismaService,
   ) {}
@@ -183,6 +185,8 @@ export class OrdersService {
         select: orderSelect,
       });
     });
+
+    void this.orderEmailService.sendOrderCreatedEmail(order.id);
 
     return { order };
   }

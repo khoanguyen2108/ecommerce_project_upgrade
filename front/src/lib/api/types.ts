@@ -8,6 +8,7 @@ export interface ApiEnvelope<T> {
 
 export interface ApiError {
   code: string;
+  details?: unknown;
   message: string;
 }
 

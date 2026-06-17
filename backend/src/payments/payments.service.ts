@@ -14,6 +14,7 @@ import {
 } from '@payos/node';
 import { createHash } from 'node:crypto';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user';
+import { OrderEmailService } from '../email/order-email.service';
 import { Prisma } from '../generated/prisma/client';
 import {
   OrderStatus,
@@ -139,10 +140,20 @@ type PayosWebhookClassification = Exclude<
   typeof PaymentStatus.PENDING
 >;
 
+export interface PayosWebhookResult {
+  duplicate: boolean;
+  payment?: PaymentRecord;
+  processed?: boolean;
+  reason?: string;
+  received: boolean;
+  status?: string;
+}
+
 @Injectable()
 export class PaymentsService {
   constructor(
     private readonly configService: ConfigService,
+    private readonly orderEmailService: OrderEmailService,
     private readonly prismaService: PrismaService,
   ) {}
 
@@ -213,7 +224,7 @@ export class PaymentsService {
     };
   }
 
-  async handlePayosWebhook(body: unknown) {
+  async handlePayosWebhook(body: unknown): Promise<PayosWebhookResult> {
     const credentials = this.getPayosCredentials();
     const webhook = this.assertWebhookPayload(body);
     const verifiedData = await this.verifyPayosWebhook(credentials, webhook);
@@ -222,7 +233,7 @@ export class PaymentsService {
     const metadata = this.sanitizeWebhookMetadata(webhook, verifiedData);
 
     try {
-      return await this.prismaService.$transaction(async (tx) => {
+      const result = await this.prismaService.$transaction(async (tx) => {
         const existingEvent = await tx.paymentWebhookEvent.findUnique({
           where: {
             provider_eventKey: {
@@ -339,6 +350,10 @@ export class PaymentsService {
           classification,
         );
       });
+
+      this.queuePayosWebhookEmail(result);
+
+      return result;
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         return {
@@ -776,6 +791,34 @@ export class PaymentsService {
     }
 
     return order;
+  }
+
+  private queuePayosWebhookEmail(result: PayosWebhookResult) {
+    if (result.duplicate || result.processed !== true || !result.payment) {
+      return;
+    }
+
+    const { payment, reason } = result;
+
+    if (payment.status === PaymentStatus.PAID) {
+      void this.orderEmailService.sendPaymentSuccessEmail(
+        payment.orderId,
+        payment.id,
+      );
+      return;
+    }
+
+    if (
+      payment.status === PaymentStatus.CANCELLED ||
+      payment.status === PaymentStatus.EXPIRED ||
+      payment.status === PaymentStatus.FAILED
+    ) {
+      void this.orderEmailService.sendPaymentFailedEmail(
+        payment.orderId,
+        payment.id,
+        reason ?? payment.failureReason ?? undefined,
+      );
+    }
   }
 
   private assertOrderPayable(order: OrderForPayment, now: Date) {

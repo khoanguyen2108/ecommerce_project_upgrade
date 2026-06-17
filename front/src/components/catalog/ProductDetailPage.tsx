@@ -1,10 +1,17 @@
 "use client";
 
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, ShoppingBag } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { RecentlyViewedProducts } from "@/components/recently-viewed/RecentlyViewedProducts";
 import { WishlistButton } from "@/components/wishlist/WishlistButton";
+import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { addCartItem } from "@/features/cart/api";
+import {
+  getCartErrorMessage,
+  getCartRequestId,
+} from "@/features/cart/errors";
 import {
   getProductById,
   getProductBySlug,
@@ -31,12 +38,24 @@ interface ProductDetailState {
   variants: ProductVariant[];
 }
 
+interface CartFeedback {
+  kind: "error" | "success";
+  message: string;
+  requestId?: string;
+}
+
 export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuthSession();
   const [state, setState] = useState<ProductDetailState>({
     isLoading: true,
     variants: [],
   });
   const [activeImage, setActiveImage] = useState<string>();
+  const [selectedVariantId, setSelectedVariantId] = useState<string>();
+  const [quantity, setQuantity] = useState(1);
+  const [cartFeedback, setCartFeedback] = useState<CartFeedback>();
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
   const { addProduct: addRecentlyViewedProduct } = useRecentlyViewed();
 
   useEffect(() => {
@@ -68,6 +87,9 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           variants,
         });
         setActiveImage(product.imageUrls[0]);
+        setSelectedVariantId(undefined);
+        setQuantity(1);
+        setCartFeedback(undefined);
       } catch (error) {
         if (!isMounted) {
           return;
@@ -97,9 +119,95 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   }, [addRecentlyViewedProduct, state.product]);
 
   const totalStock = useMemo(
-    () => state.variants.reduce((sum, variant) => sum + variant.stock, 0),
+    () =>
+      state.variants.reduce(
+        (sum, variant) =>
+          sum + (isVariantSelectable(variant) ? variant.stock : 0),
+        0,
+      ),
     [state.variants],
   );
+
+  const selectedVariant = useMemo(
+    () => state.variants.find((variant) => variant.id === selectedVariantId),
+    [selectedVariantId, state.variants],
+  );
+  const selectedMaxQuantity = selectedVariant
+    ? Math.max(1, Math.min(99, selectedVariant.stock))
+    : 99;
+
+  useEffect(() => {
+    if (!selectedVariant || selectedVariant.stock <= 0) {
+      return;
+    }
+
+    if (quantity > selectedMaxQuantity) {
+      setQuantity(selectedMaxQuantity);
+    }
+  }, [quantity, selectedMaxQuantity, selectedVariant]);
+
+  function handleVariantSelect(variant: ProductVariant) {
+    if (!isVariantSelectable(variant)) {
+      return;
+    }
+
+    const nextMaxQuantity = Math.max(1, Math.min(99, variant.stock));
+    setSelectedVariantId(variant.id);
+    setQuantity((current) => Math.max(1, Math.min(current, nextMaxQuantity)));
+    setCartFeedback(undefined);
+  }
+
+  function handleQuantityChange(value: number) {
+    if (!Number.isFinite(value)) {
+      setQuantity(1);
+      return;
+    }
+
+    setQuantity(Math.max(1, Math.min(selectedMaxQuantity, Math.trunc(value))));
+  }
+
+  async function handleAddToCart() {
+    if (!state.product) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      router.push(
+        `/login?next=${encodeURIComponent(getProductReturnPath(state.product))}`,
+      );
+      return;
+    }
+
+    if (!selectedVariant || !isVariantSelectable(selectedVariant)) {
+      setCartFeedback({
+        kind: "error",
+        message: "Choose an in-stock size and color before adding to cart.",
+      });
+      return;
+    }
+
+    setIsAddingToCart(true);
+    setCartFeedback(undefined);
+
+    try {
+      const response = await addCartItem({
+        quantity,
+        variantId: selectedVariant.id,
+      });
+      setCartFeedback({
+        kind: "success",
+        message: `${state.product.name} was added. Cart now has ${response.cart.totalQuantity} total quantity.`,
+      });
+    } catch (error) {
+      setCartFeedback({
+        kind: "error",
+        message: getCartErrorMessage(error, "This item could not be added to cart."),
+        requestId: getCartRequestId(error),
+      });
+    } finally {
+      setIsAddingToCart(false);
+    }
+  }
 
   if (state.isLoading) {
     return (
@@ -135,6 +243,13 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
 
   const product = state.product;
   const wishlistItem = productToWishlistItem(product);
+  const displayPrice = selectedVariant
+    ? getVariantUnitPrice(product, selectedVariant)
+    : product.basePrice;
+  const addToCartDisabled =
+    isAuthLoading ||
+    isAddingToCart ||
+    (isAuthenticated && !isVariantSelectable(selectedVariant));
 
   return (
     <main className="product-detail-page">
@@ -173,7 +288,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             {product.category.name}
           </Link>
           <h1 id="product-heading">{product.name}</h1>
-          <p className="product-detail-copy__price">{formatPrice(product.basePrice)}</p>
+          <p className="product-detail-copy__price">{formatPrice(displayPrice)}</p>
           {product.description ? (
             <p className="product-detail-copy__description">{product.description}</p>
           ) : (
@@ -193,25 +308,30 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             {state.variants.length > 0 ? (
               <div className="variant-grid">
                 {state.variants.map((variant) => (
-                  <div
-                    className={
-                      variant.stock > 0
-                        ? "variant-option"
-                        : "variant-option variant-option--sold-out"
-                    }
+                  <button
+                    aria-pressed={variant.id === selectedVariantId}
+                    className={getVariantOptionClassName(
+                      variant,
+                      variant.id === selectedVariantId,
+                    )}
+                    disabled={!isVariantSelectable(variant)}
                     key={variant.id}
+                    onClick={() => handleVariantSelect(variant)}
+                    type="button"
                   >
                     <span>{variant.size}</span>
                     <strong>{variant.color}</strong>
                     <small>
-                      {variant.stock > 0
-                        ? `${variant.stock} in stock`
-                        : "Sold out"}
+                      {variant.isActive
+                        ? variant.stock > 0
+                          ? `${variant.stock} in stock`
+                          : "Sold out"
+                        : "Unavailable"}
                     </small>
-                    {variant.priceOverride ? (
+                    {variant.priceOverride !== null ? (
                       <small>{formatPrice(variant.priceOverride)}</small>
                     ) : null}
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -219,15 +339,71 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             )}
           </section>
 
+          <section className="quantity-panel" aria-labelledby="quantity-heading">
+            <div>
+              <h2 id="quantity-heading">Quantity</h2>
+              {selectedVariant ? (
+                <p>
+                  {selectedVariant.stock > 0
+                    ? `Up to ${selectedMaxQuantity} available.`
+                    : "This selection is sold out."}
+                </p>
+              ) : (
+                <p>Choose a size and color to set quantity.</p>
+              )}
+            </div>
+            <input
+              aria-label="Cart quantity"
+              disabled={!selectedVariant || !isVariantSelectable(selectedVariant)}
+              max={selectedMaxQuantity}
+              min={1}
+              onChange={(event) => handleQuantityChange(Number(event.target.value))}
+              type="number"
+              value={quantity}
+            />
+          </section>
+
+          {cartFeedback ? (
+            <div
+              className={`customer-feedback customer-feedback--${cartFeedback.kind}`}
+              role={cartFeedback.kind === "error" ? "alert" : "status"}
+            >
+              {cartFeedback.kind === "success" ? (
+                <CheckCircle2 aria-hidden="true" size={19} />
+              ) : (
+                <AlertCircle aria-hidden="true" size={19} />
+              )}
+              <span>{cartFeedback.message}</span>
+              {cartFeedback.requestId ? (
+                <small>Request {cartFeedback.requestId}</small>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="product-detail-actions">
             <WishlistButton item={wishlistItem} />
             <button
               className="button button--primary button--full"
-              disabled
+              disabled={addToCartDisabled}
+              onClick={handleAddToCart}
               type="button"
             >
-              Cart is coming soon.
+              {isAddingToCart ? (
+                <Loader2 aria-hidden="true" className="spin" size={17} />
+              ) : (
+                <ShoppingBag aria-hidden="true" size={17} />
+              )}
+              {getAddToCartLabel({
+                isAddingToCart,
+                isAuthenticated,
+                selectedVariant,
+              })}
             </button>
+            {cartFeedback?.kind === "success" ? (
+              <Link className="button button--secondary button--full" href="/cart">
+                View cart
+              </Link>
+            ) : null}
           </div>
         </div>
       </section>
@@ -248,4 +424,59 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function isVariantSelectable(
+  variant: ProductVariant | undefined,
+): variant is ProductVariant {
+  return Boolean(variant?.isActive && variant.stock > 0);
+}
+
+function getVariantUnitPrice(product: Product, variant: ProductVariant): number {
+  return variant.priceOverride ?? product.basePrice;
+}
+
+function getVariantOptionClassName(
+  variant: ProductVariant,
+  isSelected: boolean,
+): string {
+  const classNames = ["variant-option"];
+
+  if (!isVariantSelectable(variant)) {
+    classNames.push("variant-option--sold-out");
+  }
+
+  if (isSelected) {
+    classNames.push("is-selected");
+  }
+
+  return classNames.join(" ");
+}
+
+function getProductReturnPath(product: Product): string {
+  return `/products/${encodeURIComponent(product.slug)}`;
+}
+
+function getAddToCartLabel({
+  isAddingToCart,
+  isAuthenticated,
+  selectedVariant,
+}: {
+  isAddingToCart: boolean;
+  isAuthenticated: boolean;
+  selectedVariant?: ProductVariant;
+}): string {
+  if (isAddingToCart) {
+    return "Adding...";
+  }
+
+  if (!isAuthenticated) {
+    return "Sign in to add to cart";
+  }
+
+  if (!selectedVariant) {
+    return "Select size and color";
+  }
+
+  return "Add to cart";
 }

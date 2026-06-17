@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { OrderEmailService } from '../email/order-email.service';
 import { Prisma } from '../generated/prisma/client';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
@@ -142,7 +143,10 @@ type AdminOrderTransition = 'cancel' | 'expire';
 
 @Injectable()
 export class AdminOrdersService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly orderEmailService: OrderEmailService,
+    private readonly prismaService: PrismaService,
+  ) {}
 
   async listOrders(query: AdminOrderQueryDto) {
     const page = query.page ?? 1;
@@ -280,6 +284,12 @@ export class AdminOrdersService {
 
     if (!order) {
       throw this.orderNotFoundException();
+    }
+
+    if (transition === 'cancel') {
+      void this.orderEmailService.sendOrderCancelledEmail(order.id);
+    } else {
+      void this.orderEmailService.sendOrderExpiredEmail(order.id);
     }
 
     return {

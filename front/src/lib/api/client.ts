@@ -72,6 +72,7 @@ export async function apiRequest<T>(
       envelope?.error?.code || String(response.status),
       response.status,
       requestId,
+      envelope?.error?.details,
     );
   }
 

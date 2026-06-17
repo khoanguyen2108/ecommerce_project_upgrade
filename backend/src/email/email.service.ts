@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createTransport, type Transporter } from 'nodemailer';
+import {
+  createTransport,
+  type SendMailOptions,
+  type Transporter,
+} from 'nodemailer';
 
 const SMTP_PROVIDER = 'smtp';
 const SMTP_SECURE_PORT = 465;
@@ -38,17 +42,26 @@ export class EmailService {
     });
   }
 
-  async sendPasswordResetOtp(to: string, otp: string): Promise<boolean> {
-    if (!this.transporter || !this.from) {
-      this.logger.warn(
-        'Password reset email was not sent because SMTP email is not configured.',
-      );
-      return false;
-    }
+  isConfigured(): boolean {
+    return Boolean(this.transporter && this.from);
+  }
 
-    try {
-      await this.transporter.sendMail({
-        from: this.from,
+  async sendTransactionalEmail(options: {
+    html?: string;
+    subject: string;
+    text: string;
+    to: string;
+  }): Promise<boolean> {
+    return this.sendMail(
+      options,
+      'Transactional email was not sent because SMTP email is not configured.',
+      'Transactional email could not be sent.',
+    );
+  }
+
+  async sendPasswordResetOtp(to: string, otp: string): Promise<boolean> {
+    return this.sendMail(
+      {
         to,
         subject: 'Your password reset OTP',
         text: [
@@ -57,11 +70,31 @@ export class EmailService {
           'Do not share this code.',
           'If you did not request it, ignore this email.',
         ].join('\n'),
+      },
+      'Password reset email was not sent because SMTP email is not configured.',
+      'Password reset email could not be sent.',
+    );
+  }
+
+  private async sendMail(
+    options: Omit<SendMailOptions, 'from'>,
+    notConfiguredMessage: string,
+    failedMessage: string,
+  ): Promise<boolean> {
+    if (!this.transporter || !this.from) {
+      this.logger.warn(notConfiguredMessage);
+      return false;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        ...options,
       });
 
       return true;
     } catch {
-      this.logger.warn('Password reset email could not be sent.');
+      this.logger.warn(failedMessage);
       return false;
     }
   }
