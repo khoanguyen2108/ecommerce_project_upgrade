@@ -93,6 +93,7 @@ const orderForPaymentSelect = {
   status: true,
   totalAmount: true,
   currency: true,
+  expiresAt: true,
   items: {
     orderBy: {
       createdAt: 'asc',
@@ -149,27 +150,10 @@ export class PaymentsService {
     user: AuthenticatedUser,
     dto: CreatePayosPaymentDto,
   ) {
-    const config = this.getPayosCheckoutConfig();
     const order = await this.getOrderForPayment(user, dto.orderId);
 
-    if (order.status !== OrderStatus.PENDING_PAYMENT) {
-      throw new BadRequestException({
-        code: 'ORDER_NOT_PENDING_PAYMENT',
-        message: 'Order is not pending payment.',
-      });
-    }
-
-    if (
-      order.currency !== DEFAULT_CURRENCY ||
-      !Number.isSafeInteger(order.totalAmount) ||
-      order.totalAmount <= 0
-    ) {
-      throw new BadRequestException({
-        code: 'ORDER_TOTAL_INVALID',
-        message: 'Order total is invalid.',
-      });
-    }
-
+    this.assertOrderPayable(order, new Date());
+    const config = this.getPayosCheckoutConfig();
     const payment = await this.getOrCreatePendingPayosPayment(order);
 
     if (payment.checkoutUrl) {
@@ -184,16 +168,44 @@ export class PaymentsService {
       order,
       payment,
     );
-    const updatedPayment = await this.prismaService.payment.update({
+    const updateResult = await this.prismaService.payment.updateMany({
       where: {
         id: payment.id,
+        status: PaymentStatus.PENDING,
+        order: {
+          status: OrderStatus.PENDING_PAYMENT,
+          OR: [
+            {
+              expiresAt: null,
+            },
+            {
+              expiresAt: {
+                gt: new Date(),
+              },
+            },
+          ],
+        },
       },
       data: {
         checkoutUrl: paymentLink.checkoutUrl,
         providerPaymentLinkId: paymentLink.paymentLinkId,
       },
+    });
+
+    if (updateResult.count !== 1) {
+      await this.assertPaymentCanStillReceiveCheckoutLink(payment.id);
+    }
+
+    const updatedPayment = await this.prismaService.payment.findUnique({
+      where: {
+        id: payment.id,
+      },
       select: paymentSelect,
     });
+
+    if (!updatedPayment) {
+      throw this.paymentNotFoundException();
+    }
 
     return {
       checkoutUrl: updatedPayment.checkoutUrl,
@@ -289,7 +301,24 @@ export class PaymentsService {
             duplicate: false,
             processed: false,
             payment: this.toSafePayment(payment),
-            reason: 'ALREADY_FINALIZED',
+            reason: 'PAYOS_WEBHOOK_IGNORED_TERMINAL_STATE',
+          };
+        }
+
+        if (
+          payment.status !== PaymentStatus.PENDING ||
+          payment.order.status !== OrderStatus.PENDING_PAYMENT
+        ) {
+          await this.markWebhookEventProcessed(tx, event.id, {
+            processingStatus: WEBHOOK_STATUS_IGNORED,
+          });
+
+          return {
+            received: true,
+            duplicate: false,
+            processed: false,
+            payment: this.toSafePayment(payment),
+            reason: 'PAYOS_WEBHOOK_IGNORED_TERMINAL_STATE',
           };
         }
 
@@ -353,6 +382,7 @@ export class PaymentsService {
       displayOnly: true,
       message:
         'Payment return and cancel pages are display-only. Final status is set only by verified payOS webhook.',
+      statusMessage: this.getDisplayStatusMessage(payment, source),
       order: payment.order,
       payment: this.toSafePayment(payment),
     };
@@ -377,6 +407,10 @@ export class PaymentsService {
         verifiedData,
       );
 
+      if (!failedPayment) {
+        return this.ignoreWebhookForTerminalState(tx, eventId, payment);
+      }
+
       await this.markWebhookEventProcessed(tx, eventId, {
         processingStatus: WEBHOOK_STATUS_PROCESSED,
       });
@@ -397,6 +431,10 @@ export class PaymentsService {
         'ORDER_ITEMS_MISSING',
         verifiedData,
       );
+
+      if (!failedPayment) {
+        return this.ignoreWebhookForTerminalState(tx, eventId, payment);
+      }
 
       await this.markWebhookEventProcessed(tx, eventId, {
         processingStatus: WEBHOOK_STATUS_PROCESSED,
@@ -419,6 +457,10 @@ export class PaymentsService {
         verifiedData,
       );
 
+      if (!failedPayment) {
+        return this.ignoreWebhookForTerminalState(tx, eventId, payment);
+      }
+
       await this.markWebhookEventProcessed(tx, eventId, {
         processingStatus: WEBHOOK_STATUS_PROCESSED,
       });
@@ -430,6 +472,46 @@ export class PaymentsService {
         payment: failedPayment,
         reason: 'INSUFFICIENT_STOCK_AT_PAYMENT',
       };
+    }
+
+    const paidAt = new Date();
+    const orderUpdate = await tx.order.updateMany({
+      where: {
+        id: payment.orderId,
+        status: OrderStatus.PENDING_PAYMENT,
+      },
+      data: {
+        status: OrderStatus.PAID,
+        paidAt,
+      },
+    });
+
+    if (orderUpdate.count !== 1) {
+      return this.ignoreWebhookForTerminalState(tx, eventId, payment);
+    }
+
+    const paymentUpdate = await tx.payment.updateMany({
+      where: {
+        id: payment.id,
+        status: PaymentStatus.PENDING,
+      },
+      data: {
+        status: PaymentStatus.PAID,
+        providerPaymentLinkId:
+          verifiedData.paymentLinkId || payment.providerPaymentLinkId,
+        providerTransactionReference: this.truncateProviderReference(
+          verifiedData.reference,
+        ),
+        failureReason: null,
+        paidAt,
+      },
+    });
+
+    if (paymentUpdate.count !== 1) {
+      throw new ServiceUnavailableException({
+        code: 'PAYMENT_FINALIZATION_RETRY',
+        message: 'Payment finalization should be retried.',
+      });
     }
 
     for (const item of payment.order.items) {
@@ -455,34 +537,16 @@ export class PaymentsService {
       }
     }
 
-    const paidAt = new Date();
-    const [updatedPayment] = await Promise.all([
-      tx.payment.update({
-        where: {
-          id: payment.id,
-        },
-        data: {
-          status: PaymentStatus.PAID,
-          providerPaymentLinkId:
-            verifiedData.paymentLinkId || payment.providerPaymentLinkId,
-          providerTransactionReference: this.truncateProviderReference(
-            verifiedData.reference,
-          ),
-          failureReason: null,
-          paidAt,
-        },
-        select: paymentSelect,
-      }),
-      tx.order.update({
-        where: {
-          id: payment.orderId,
-        },
-        data: {
-          status: OrderStatus.PAID,
-          paidAt,
-        },
-      }),
-    ]);
+    const updatedPayment = await tx.payment.findUnique({
+      where: {
+        id: payment.id,
+      },
+      select: paymentSelect,
+    });
+
+    if (!updatedPayment) {
+      throw this.paymentNotFoundException();
+    }
 
     await this.markWebhookEventProcessed(tx, eventId, {
       processingStatus: WEBHOOK_STATUS_PROCESSED,
@@ -508,9 +572,25 @@ export class PaymentsService {
       status === PaymentStatus.EXPIRED
         ? OrderStatus.EXPIRED
         : OrderStatus.CANCELLED;
-    const updatedPayment = await tx.payment.update({
+    const orderUpdate = await tx.order.updateMany({
+      where: {
+        id: payment.orderId,
+        status: OrderStatus.PENDING_PAYMENT,
+      },
+      data: {
+        status: orderStatus,
+        cancelledAt: finalizedAt,
+      },
+    });
+
+    if (orderUpdate.count !== 1) {
+      return this.ignoreWebhookForTerminalState(tx, eventId, payment);
+    }
+
+    const paymentUpdate = await tx.payment.updateMany({
       where: {
         id: payment.id,
+        status: PaymentStatus.PENDING,
       },
       data: {
         status,
@@ -522,18 +602,26 @@ export class PaymentsService {
         failureReason: `PAYOS_${status}`,
         cancelledAt: finalizedAt,
       },
+    });
+
+    if (paymentUpdate.count !== 1) {
+      throw new ServiceUnavailableException({
+        code: 'PAYMENT_FINALIZATION_RETRY',
+        message: 'Payment finalization should be retried.',
+      });
+    }
+
+    const updatedPayment = await tx.payment.findUnique({
+      where: {
+        id: payment.id,
+      },
       select: paymentSelect,
     });
 
-    await tx.order.update({
-      where: {
-        id: payment.orderId,
-      },
-      data: {
-        status: orderStatus,
-        cancelledAt: finalizedAt,
-      },
-    });
+    if (!updatedPayment) {
+      throw this.paymentNotFoundException();
+    }
+
     await this.markWebhookEventProcessed(tx, eventId, {
       processingStatus: WEBHOOK_STATUS_PROCESSED,
     });
@@ -551,35 +639,57 @@ export class PaymentsService {
     payment: PaymentWebhookRecord,
     failureReason: string,
     verifiedData: WebhookData,
-  ): Promise<PaymentRecord> {
+  ): Promise<PaymentRecord | null> {
     const cancelledAt = new Date();
-    const [updatedPayment] = await Promise.all([
-      tx.payment.update({
-        where: {
-          id: payment.id,
-        },
-        data: {
-          status: PaymentStatus.FAILED,
-          providerPaymentLinkId:
-            verifiedData.paymentLinkId || payment.providerPaymentLinkId,
-          providerTransactionReference: this.truncateProviderReference(
-            verifiedData.reference,
-          ),
-          failureReason,
-          cancelledAt,
-        },
-        select: paymentSelect,
-      }),
-      tx.order.update({
-        where: {
-          id: payment.orderId,
-        },
-        data: {
-          status: OrderStatus.CANCELLED,
-          cancelledAt,
-        },
-      }),
-    ]);
+    const orderUpdate = await tx.order.updateMany({
+      where: {
+        id: payment.orderId,
+        status: OrderStatus.PENDING_PAYMENT,
+      },
+      data: {
+        status: OrderStatus.CANCELLED,
+        cancelledAt,
+      },
+    });
+
+    if (orderUpdate.count !== 1) {
+      return null;
+    }
+
+    const paymentUpdate = await tx.payment.updateMany({
+      where: {
+        id: payment.id,
+        status: PaymentStatus.PENDING,
+      },
+      data: {
+        status: PaymentStatus.FAILED,
+        providerPaymentLinkId:
+          verifiedData.paymentLinkId || payment.providerPaymentLinkId,
+        providerTransactionReference: this.truncateProviderReference(
+          verifiedData.reference,
+        ),
+        failureReason,
+        cancelledAt,
+      },
+    });
+
+    if (paymentUpdate.count !== 1) {
+      throw new ServiceUnavailableException({
+        code: 'PAYMENT_FINALIZATION_RETRY',
+        message: 'Payment finalization should be retried.',
+      });
+    }
+
+    const updatedPayment = await tx.payment.findUnique({
+      where: {
+        id: payment.id,
+      },
+      select: paymentSelect,
+    });
+
+    if (!updatedPayment) {
+      throw this.paymentNotFoundException();
+    }
 
     return updatedPayment;
   }
@@ -628,6 +738,24 @@ export class PaymentsService {
     });
   }
 
+  private async ignoreWebhookForTerminalState(
+    tx: Prisma.TransactionClient,
+    eventId: string,
+    payment: PaymentWebhookRecord,
+  ) {
+    await this.markWebhookEventProcessed(tx, eventId, {
+      processingStatus: WEBHOOK_STATUS_IGNORED,
+    });
+
+    return {
+      received: true,
+      duplicate: false,
+      processed: false,
+      payment: this.toSafePayment(payment),
+      reason: 'PAYOS_WEBHOOK_IGNORED_TERMINAL_STATE',
+    };
+  }
+
   private async getOrderForPayment(
     user: AuthenticatedUser,
     orderId: string,
@@ -648,6 +776,96 @@ export class PaymentsService {
     }
 
     return order;
+  }
+
+  private assertOrderPayable(order: OrderForPayment, now: Date) {
+    if (order.status === OrderStatus.EXPIRED) {
+      throw new BadRequestException({
+        code: 'PAYOS_ORDER_EXPIRED',
+        message: 'Order has expired.',
+      });
+    }
+
+    if (order.status !== OrderStatus.PENDING_PAYMENT) {
+      throw new BadRequestException({
+        code: 'ORDER_NOT_PENDING_PAYMENT',
+        message: 'Order is not pending payment.',
+      });
+    }
+
+    if (this.isOrderExpired(order, now)) {
+      throw new BadRequestException({
+        code: 'PAYOS_ORDER_EXPIRED',
+        message: 'Order has expired.',
+      });
+    }
+
+    if (!Number.isSafeInteger(order.totalAmount) || order.totalAmount <= 0) {
+      throw new BadRequestException({
+        code: 'ORDER_TOTAL_INVALID',
+        message: 'Order total is invalid.',
+      });
+    }
+
+    if (order.currency !== DEFAULT_CURRENCY) {
+      throw new BadRequestException({
+        code: 'PAYMENT_CURRENCY_MISMATCH',
+        message: 'Order currency is not supported by payOS.',
+      });
+    }
+  }
+
+  private isOrderExpired(
+    order: Pick<OrderForPayment, 'expiresAt'>,
+    now: Date,
+  ): boolean {
+    return Boolean(order.expiresAt && order.expiresAt.getTime() <= now.getTime());
+  }
+
+  private async assertPaymentCanStillReceiveCheckoutLink(paymentId: string) {
+    const latestPayment = await this.prismaService.payment.findUnique({
+      where: {
+        id: paymentId,
+      },
+      select: paymentDisplaySelect,
+    });
+
+    if (!latestPayment) {
+      throw this.paymentNotFoundException();
+    }
+
+    if (latestPayment.order.status === OrderStatus.EXPIRED) {
+      throw new BadRequestException({
+        code: 'PAYOS_ORDER_EXPIRED',
+        message: 'Order has expired.',
+      });
+    }
+
+    if (latestPayment.order.status !== OrderStatus.PENDING_PAYMENT) {
+      throw new BadRequestException({
+        code: 'ORDER_NOT_PENDING_PAYMENT',
+        message: 'Order is not pending payment.',
+      });
+    }
+
+    if (this.isOrderExpired(latestPayment.order, new Date())) {
+      throw new BadRequestException({
+        code: 'PAYOS_ORDER_EXPIRED',
+        message: 'Order has expired.',
+      });
+    }
+
+    if (latestPayment.status !== PaymentStatus.PENDING) {
+      throw new BadRequestException({
+        code: 'PAYMENT_NOT_PENDING',
+        message: 'Payment is not pending.',
+      });
+    }
+
+    throw new ServiceUnavailableException({
+      code: 'PAYOS_CHECKOUT_LINK_RACE',
+      message: 'payOS checkout link creation should be retried.',
+    });
   }
 
   private async getOrCreatePendingPayosPayment(
@@ -671,13 +889,17 @@ export class PaymentsService {
         });
       }
 
-      if (
-        existingPayment.amount !== order.totalAmount ||
-        existingPayment.currency !== order.currency
-      ) {
+      if (existingPayment.amount !== order.totalAmount) {
         throw new BadRequestException({
           code: 'PAYMENT_AMOUNT_MISMATCH',
           message: 'Payment amount does not match the order total.',
+        });
+      }
+
+      if (existingPayment.currency !== order.currency) {
+        throw new BadRequestException({
+          code: 'PAYMENT_CURRENCY_MISMATCH',
+          message: 'Payment currency does not match the order currency.',
         });
       }
 
@@ -760,6 +982,10 @@ export class PaymentsService {
     payment: PaymentWebhookRecord,
     verifiedData: WebhookData,
   ): string | undefined {
+    if (verifiedData.orderCode !== payment.providerOrderCode) {
+      return 'PAYOS_ORDER_CODE_MISMATCH';
+    }
+
     if (verifiedData.amount !== payment.amount) {
       return 'PAYOS_AMOUNT_MISMATCH';
     }
@@ -778,6 +1004,10 @@ export class PaymentsService {
 
     if (payment.order.totalAmount !== payment.amount) {
       return 'ORDER_PAYMENT_AMOUNT_MISMATCH';
+    }
+
+    if (payment.order.currency !== payment.currency) {
+      return 'ORDER_PAYMENT_CURRENCY_MISMATCH';
     }
 
     return undefined;
@@ -806,6 +1036,40 @@ export class PaymentsService {
     }
 
     return PaymentStatus.FAILED;
+  }
+
+  private getDisplayStatusMessage(
+    payment: PaymentDisplayRecord,
+    source: 'return' | 'cancel',
+  ): string {
+    if (payment.status === PaymentStatus.PAID) {
+      return 'Payment is marked paid by a verified payOS webhook.';
+    }
+
+    if (payment.status === PaymentStatus.CANCELLED) {
+      return 'Payment is cancelled.';
+    }
+
+    if (payment.status === PaymentStatus.EXPIRED) {
+      return 'Payment is expired.';
+    }
+
+    if (payment.status === PaymentStatus.FAILED) {
+      return 'Payment failed provider or backend validation.';
+    }
+
+    if (
+      payment.order.status === OrderStatus.EXPIRED ||
+      this.isOrderExpired(payment.order, new Date())
+    ) {
+      return 'Order is expired. This display endpoint does not refresh provider state.';
+    }
+
+    if (source === 'cancel') {
+      return 'Payment is still pending locally unless a verified payOS webhook updates it.';
+    }
+
+    return 'Payment is pending until a verified payOS webhook updates it.';
   }
 
   private canReadPayment(

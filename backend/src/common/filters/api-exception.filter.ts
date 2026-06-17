@@ -13,6 +13,7 @@ type HttpExceptionResponse =
   | string
   | {
       code?: string;
+      details?: unknown;
       error?: string;
       message?: string | string[];
       statusCode?: number;
@@ -49,15 +50,26 @@ export class ApiExceptionFilter implements ExceptionFilter {
         ? (exception.getResponse() as HttpExceptionResponse)
         : undefined;
 
+    const errorBody: {
+      code: string;
+      details?: unknown;
+      message: string;
+    } = {
+      code: this.getErrorCode(status, exceptionResponse),
+      message: this.getErrorMessage(status, exceptionResponse),
+    };
+    const errorDetails = this.getErrorDetails(exceptionResponse);
+
+    if (errorDetails !== undefined) {
+      errorBody.details = errorDetails;
+    }
+
     response.status(status).json({
       data: null,
       meta: {
         requestId: request.requestId,
       },
-      error: {
-        code: this.getErrorCode(status, exceptionResponse),
-        message: this.getErrorMessage(status, exceptionResponse),
-      },
+      error: errorBody,
     });
   }
 
@@ -91,5 +103,15 @@ export class ApiExceptionFilter implements ExceptionFilter {
     }
 
     return 'Request failed.';
+  }
+
+  private getErrorDetails(
+    exceptionResponse?: HttpExceptionResponse,
+  ): unknown {
+    if (typeof exceptionResponse === 'object' && exceptionResponse?.details) {
+      return exceptionResponse.details;
+    }
+
+    return undefined;
   }
 }

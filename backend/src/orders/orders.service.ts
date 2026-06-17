@@ -6,6 +6,7 @@ import {
 import type { AuthenticatedUser } from '../auth/types/authenticated-user';
 import { Prisma } from '../generated/prisma/client';
 import { OrderStatus, UserRole } from '../generated/prisma/enums';
+import { OrderExpiryService } from '../order-expiry/order-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
 import type { OrderQueryDto } from './dto/order-query.dto';
@@ -102,7 +103,10 @@ type VariantSnapshot = Prisma.ProductVariantGetPayload<{
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly orderExpiryService: OrderExpiryService,
+    private readonly prismaService: PrismaService,
+  ) {}
 
   async createOrder(user: AuthenticatedUser, dto: CreateOrderDto) {
     const itemIntents = this.mergeItemIntents(dto.items);
@@ -171,6 +175,7 @@ export class OrdersService {
           subtotalAmount,
           totalAmount: subtotalAmount,
           currency: DEFAULT_CURRENCY,
+          expiresAt: this.orderExpiryService.getPendingOrderExpiresAt(),
           items: {
             create: items,
           },

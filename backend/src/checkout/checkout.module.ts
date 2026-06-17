@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { OrderExpiryModule } from '../order-expiry/order-expiry.module';
-import { OrdersController } from './orders.controller';
-import { OrdersService } from './orders.service';
+import { CheckoutController } from './checkout.controller';
+import { CheckoutService } from './checkout.service';
 
 @Module({
   imports: [AuthModule, OrderExpiryModule],
-  controllers: [OrdersController],
-  providers: [OrdersService],
+  controllers: [CheckoutController],
+  providers: [CheckoutService],
 })
-export class OrdersModule {}
+export class CheckoutModule {}

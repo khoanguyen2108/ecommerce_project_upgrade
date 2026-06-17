@@ -2,11 +2,16 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AdminPaymentsModule } from './admin-payments/admin-payments.module';
+import { AdminOrdersModule } from './admin-orders/admin-orders.module';
 import { AdminStatsModule } from './admin-stats/admin-stats.module';
 import { AdminUsersModule } from './admin-users/admin-users.module';
 import { AuthModule } from './auth/auth.module';
+import { CartModule } from './cart/cart.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { CheckoutModule } from './checkout/checkout.module';
 import { HealthModule } from './health/health.module';
+import { OrderExpiryModule } from './order-expiry/order-expiry.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -46,9 +51,14 @@ const getPositiveNumber = (
     PrismaModule,
     RedisModule,
     AuthModule,
+    AdminOrdersModule,
+    AdminPaymentsModule,
     AdminUsersModule,
     AdminStatsModule,
     CatalogModule,
+    CartModule,
+    CheckoutModule,
+    OrderExpiryModule,
     OrdersModule,
     PaymentsModule,
     HealthModule,

@@ -219,6 +219,76 @@ export const productVariantDataExample = {
   variant: productVariantExample,
 };
 
+export const cartItemExample = {
+  id: '54da8e6c-eed6-4732-bd95-761e60ed9b39',
+  variantId: productVariantExample.id,
+  quantity: 2,
+  currentUnitPrice: 249000,
+  currentLineTotal: 498000,
+  availableStock: productVariantExample.stock,
+  product: {
+    id: productExample.id,
+    name: productExample.name,
+    slug: productExample.slug,
+    imageUrls: productExample.imageUrls,
+    firstImageUrl: productExample.imageUrls[0],
+    category: productCategoryExample,
+  },
+  variant: {
+    sku: productVariantExample.sku,
+    size: productVariantExample.size,
+    color: productVariantExample.color,
+    priceOverride: productVariantExample.priceOverride,
+    stock: productVariantExample.stock,
+  },
+  createdAt: '2026-06-17T10:30:00.000Z',
+  updatedAt: '2026-06-17T10:30:00.000Z',
+};
+
+export const cartExample = {
+  id: '1e0a13f7-beca-493d-8f1e-a03b1b911a34',
+  userId: publicUserExample.id,
+  items: [cartItemExample],
+  totalQuantity: 2,
+  estimatedSubtotal: 498000,
+  createdAt: '2026-06-17T10:30:00.000Z',
+  updatedAt: '2026-06-17T10:30:00.000Z',
+};
+
+export const cartDataExample = {
+  cart: cartExample,
+};
+
+export const checkoutSummaryDataExample = {
+  summary: {
+    items: [
+      {
+        cartItemId: cartItemExample.id,
+        variantId: productVariantExample.id,
+        productId: productExample.id,
+        productName: productExample.name,
+        productSlug: productExample.slug,
+        imageUrl: productExample.imageUrls[0],
+        imageUrls: productExample.imageUrls,
+        categoryName: categoryExample.name,
+        categorySlug: categoryExample.slug,
+        sku: productVariantExample.sku,
+        size: productVariantExample.size,
+        color: productVariantExample.color,
+        quantity: 2,
+        availableStock: productVariantExample.stock,
+        currentUnitPrice: 249000,
+        currentLineTotal: 498000,
+      },
+    ],
+    totalQuantity: 2,
+    subtotalAmount: 498000,
+    totalAmount: 498000,
+    currency: 'VND',
+    warnings: [],
+  },
+};
+
 export const orderItemExample = {
   id: '4eb1a5f0-21dd-4553-9f55-7f9d5afcaa74',
   orderId: '7b2cb6b6-0501-4d7b-8e30-98db06a7f605',
@@ -263,7 +333,7 @@ export const orderExample = {
   updatedAt: '2026-06-14T10:30:00.000Z',
   paidAt: null,
   cancelledAt: null,
-  expiresAt: null,
+  expiresAt: '2026-06-14T11:00:00.000Z',
   items: [orderItemExample],
   payments: [paymentExample],
 };
@@ -279,6 +349,126 @@ export const orderListDataExample = {
     limit: 20,
     total: 1,
     totalPages: 1,
+  },
+};
+
+const adminOrderUserSummaryExample = {
+  id: publicUserExample.id,
+  email: publicUserExample.email,
+  name: publicUserExample.name,
+  phone: publicUserExample.phone,
+};
+
+const adminWebhookEventSummaryExample = {
+  id: 'a8ff4d13-3828-43af-b410-c1fbf469fa8e',
+  provider: 'PAYOS',
+  paymentId: paymentExample.id,
+  orderId: orderExample.id,
+  receivedAt: '2026-06-14T10:36:00.000Z',
+  processedAt: '2026-06-14T10:36:01.000Z',
+  processingStatus: 'PROCESSED',
+};
+
+export const adminOrderSummaryExample = {
+  id: orderExample.id,
+  user: adminOrderUserSummaryExample,
+  status: orderExample.status,
+  subtotalAmount: orderExample.subtotalAmount,
+  totalAmount: orderExample.totalAmount,
+  currency: orderExample.currency,
+  itemCount: 1,
+  latestPayment: paymentExample,
+  createdAt: orderExample.createdAt,
+  updatedAt: orderExample.updatedAt,
+  paidAt: orderExample.paidAt,
+  cancelledAt: orderExample.cancelledAt,
+  expiresAt: orderExample.expiresAt,
+};
+
+export const adminOrderDetailExample = {
+  ...adminOrderSummaryExample,
+  items: [orderItemExample],
+  payments: [paymentExample],
+  webhookEvents: [adminWebhookEventSummaryExample],
+};
+
+export const adminOrderDataExample = {
+  order: adminOrderDetailExample,
+};
+
+export const adminOrderListDataExample = {
+  orders: [adminOrderSummaryExample],
+  pagination: {
+    page: 1,
+    limit: 20,
+    total: 1,
+    totalPages: 1,
+  },
+};
+
+export const adminPaymentSummaryExample = {
+  id: paymentExample.id,
+  provider: paymentExample.provider,
+  status: paymentExample.status,
+  amount: paymentExample.amount,
+  currency: paymentExample.currency,
+  providerOrderCode: paymentExample.providerOrderCode,
+  providerPaymentLinkId: paymentExample.providerPaymentLinkId,
+  providerTransactionReference: paymentExample.providerTransactionReference,
+  failureReason: paymentExample.failureReason,
+  order: {
+    id: orderExample.id,
+    userId: orderExample.userId,
+    status: orderExample.status,
+    subtotalAmount: orderExample.subtotalAmount,
+    totalAmount: orderExample.totalAmount,
+    currency: orderExample.currency,
+    itemCount: 1,
+    createdAt: orderExample.createdAt,
+    updatedAt: orderExample.updatedAt,
+    paidAt: orderExample.paidAt,
+    cancelledAt: orderExample.cancelledAt,
+    expiresAt: orderExample.expiresAt,
+  },
+  user: adminOrderUserSummaryExample,
+  createdAt: paymentExample.createdAt,
+  updatedAt: paymentExample.updatedAt,
+  paidAt: paymentExample.paidAt,
+  cancelledAt: paymentExample.cancelledAt,
+};
+
+export const adminPaymentDetailExample = {
+  ...adminPaymentSummaryExample,
+  orderId: paymentExample.orderId,
+  checkoutUrl: paymentExample.checkoutUrl,
+  webhookEvents: [adminWebhookEventSummaryExample],
+};
+
+export const adminPaymentDataExample = {
+  payment: adminPaymentDetailExample,
+};
+
+export const adminPaymentListDataExample = {
+  payments: [adminPaymentSummaryExample],
+  pagination: {
+    page: 1,
+    limit: 20,
+    total: 1,
+    totalPages: 1,
+  },
+};
+
+export const adminPayosReadinessDataExample = {
+  readiness: {
+    payosClientIdConfigured: true,
+    payosApiKeyConfigured: true,
+    payosChecksumKeyConfigured: true,
+    returnUrlConfigured: true,
+    cancelUrlConfigured: true,
+    webhookUrlConfigured: true,
+    backendUrlConfigured: true,
+    environmentReady: true,
+    warnings: [],
   },
 };
 
@@ -303,6 +493,7 @@ export const payosStatusDataExample = {
   displayOnly: true,
   message:
     'Payment return and cancel pages are display-only. Final status is set only by verified payOS webhook.',
+  statusMessage: 'Payment is pending until a verified payOS webhook updates it.',
   order: {
     id: orderExample.id,
     userId: orderExample.userId,
@@ -313,7 +504,7 @@ export const payosStatusDataExample = {
     updatedAt: orderExample.updatedAt,
     paidAt: null,
     cancelledAt: null,
-    expiresAt: null,
+    expiresAt: orderExample.expiresAt,
   },
   payment: paymentExample,
 };
