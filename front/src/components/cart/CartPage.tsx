@@ -2,119 +2,24 @@
 
 import { AlertCircle, PackageOpen, RefreshCw, ShoppingBag, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { CartItemRow } from "@/components/cart/CartItemRow";
+import { useCart } from "@/components/cart/CartProvider";
 import { formatPrice } from "@/features/catalog/format";
-import {
-  clearCart,
-  getCart,
-  removeCartItem,
-  updateCartItem,
-} from "@/features/cart/api";
-import {
-  getCartErrorMessage,
-  getCartRequestId,
-} from "@/features/cart/errors";
-import type { Cart } from "@/features/cart/types";
-
-type CartAction =
-  | { id: string; type: "item" }
-  | { type: "clear" }
-  | { type: "refresh" };
 
 export function CartPage() {
-  const [cart, setCart] = useState<Cart>();
-  const [error, setError] = useState<string>();
-  const [requestId, setRequestId] = useState<string>();
-  const [isLoading, setIsLoading] = useState(true);
-  const [action, setAction] = useState<CartAction>();
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadCart() {
-      setIsLoading(true);
-      setError(undefined);
-      setRequestId(undefined);
-
-      try {
-        const response = await getCart();
-
-        if (isMounted) {
-          setCart(response.cart);
-        }
-      } catch (loadError) {
-        if (isMounted) {
-          setCart(undefined);
-          setError(getCartErrorMessage(loadError, "Cart could not be loaded."));
-          setRequestId(getCartRequestId(loadError));
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-          setAction(undefined);
-        }
-      }
-    }
-
-    void loadCart();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshKey]);
-
-  async function handleUpdate(itemId: string, quantity: number) {
-    setAction({ id: itemId, type: "item" });
-    setError(undefined);
-    setRequestId(undefined);
-
-    try {
-      const response = await updateCartItem(itemId, { quantity });
-      setCart(response.cart);
-    } catch (updateError) {
-      setError(getCartErrorMessage(updateError, "Cart item could not be updated."));
-      setRequestId(getCartRequestId(updateError));
-    } finally {
-      setAction(undefined);
-    }
-  }
-
-  async function handleRemove(itemId: string) {
-    setAction({ id: itemId, type: "item" });
-    setError(undefined);
-    setRequestId(undefined);
-
-    try {
-      const response = await removeCartItem(itemId);
-      setCart(response.cart);
-    } catch (removeError) {
-      setError(getCartErrorMessage(removeError, "Cart item could not be removed."));
-      setRequestId(getCartRequestId(removeError));
-    } finally {
-      setAction(undefined);
-    }
-  }
-
-  async function handleClear() {
-    setAction({ type: "clear" });
-    setError(undefined);
-    setRequestId(undefined);
-
-    try {
-      const response = await clearCart();
-      setCart(response.cart);
-    } catch (clearError) {
-      setError(getCartErrorMessage(clearError, "Cart could not be cleared."));
-      setRequestId(getCartRequestId(clearError));
-    } finally {
-      setAction(undefined);
-    }
-  }
+  const {
+    cart,
+    clearCart,
+    error,
+    isLoading,
+    isSaving,
+    refreshCart,
+    removeItem,
+    requestId,
+    updateQuantity,
+  } = useCart();
 
   const hasItems = Boolean(cart && cart.items.length > 0);
-  const isActionBusy = Boolean(action);
 
   return (
     <main className="customer-page cart-page">
@@ -127,24 +32,21 @@ export function CartPage() {
         <div className="customer-toolbar__actions">
           <button
             className="button button--secondary"
-            disabled={isLoading || isActionBusy}
-            onClick={() => {
-              setAction({ type: "refresh" });
-              setRefreshKey((current) => current + 1);
-            }}
+            disabled={isLoading || isSaving}
+            onClick={() => void refreshCart().catch(() => undefined)}
             type="button"
           >
             <RefreshCw
               aria-hidden="true"
-              className={isLoading || action?.type === "refresh" ? "spin" : undefined}
+              className={isLoading ? "spin" : undefined}
               size={17}
             />
             Refresh
           </button>
           <button
             className="button button--secondary"
-            disabled={!hasItems || isLoading || isActionBusy}
-            onClick={handleClear}
+            disabled={!hasItems || isLoading || isSaving}
+            onClick={() => void clearCart().catch(() => undefined)}
             type="button"
           >
             <Trash2 aria-hidden="true" size={17} />
@@ -161,7 +63,7 @@ export function CartPage() {
         </div>
       ) : null}
 
-      {isLoading && !cart ? <CartSkeleton /> : null}
+      {!cart && (isLoading || !error) ? <CartSkeleton /> : null}
 
       {!isLoading && cart && cart.items.length === 0 ? <CartEmptyState /> : null}
 
@@ -180,13 +82,14 @@ export function CartPage() {
               {cart.items.map((item) => (
                 <CartItemRow
                   isBusy={
-                    isActionBusy &&
-                    (action?.type === "item" ? action.id === item.id : true)
+                    isSaving
                   }
                   item={item}
                   key={item.id}
-                  onRemove={handleRemove}
-                  onUpdate={handleUpdate}
+                  onRemove={(id) => void removeItem(id).catch(() => undefined)}
+                  onUpdate={(id, quantity) =>
+                    void updateQuantity(id, quantity).catch(() => undefined)
+                  }
                 />
               ))}
             </div>

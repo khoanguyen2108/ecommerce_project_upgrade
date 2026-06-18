@@ -9,6 +9,7 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
+import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { useWishlist } from "@/features/wishlist/useWishlist";
 
@@ -24,6 +25,7 @@ interface SiteHeaderProps {
 
 export function SiteHeader({ active }: SiteHeaderProps) {
   const { currentUser, isAuthenticated, isLoading, logout } = useAuthSession();
+  const { cartCount, openCart } = useCart();
   const { count: wishlistCount, isLoaded: isWishlistLoaded } = useWishlist();
   const wishlistLabel =
     isWishlistLoaded && wishlistCount > 0
@@ -31,6 +33,10 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           wishlistCount === 1 ? "item" : "items"
         }`
       : "Wishlist";
+  const cartLabel =
+    cartCount > 0
+      ? `Cart, ${cartCount} ${cartCount === 1 ? "item" : "items"}`
+      : "Cart";
 
   return (
     <header className="site-header">
@@ -68,14 +74,29 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               <span className="icon-button__badge">{wishlistCount}</span>
             ) : null}
           </Link>
-          <Link
-            aria-label="Cart"
-            className={`icon-button ${active === "cart" ? "is-active" : ""}`}
-            href="/cart"
-            title="Cart"
-          >
-            <ShoppingBag size={20} strokeWidth={1.8} />
-          </Link>
+          {isAuthenticated ? (
+            <button
+              aria-label={cartLabel}
+              className={`icon-button ${active === "cart" ? "is-active" : ""}`}
+              onClick={openCart}
+              title="Cart"
+              type="button"
+            >
+              <ShoppingBag size={20} strokeWidth={1.8} />
+              {cartCount > 0 ? (
+                <span className="icon-button__badge">{cartCount}</span>
+              ) : null}
+            </button>
+          ) : (
+            <Link
+              aria-label="Cart"
+              className={`icon-button ${active === "cart" ? "is-active" : ""}`}
+              href="/cart"
+              title="Cart"
+            >
+              <ShoppingBag size={20} strokeWidth={1.8} />
+            </Link>
+          )}
           {!isLoading && currentUser?.role === "ADMIN" ? (
             <Link
               aria-label="Admin"

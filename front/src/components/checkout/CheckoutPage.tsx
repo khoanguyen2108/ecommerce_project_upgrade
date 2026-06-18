@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle2, Info, Loader2, RefreshCw } from "lucide-reac
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
+import { useCart } from "@/components/cart/CartProvider";
 import { OrderStatusBadge } from "@/components/orders/OrdersPage";
 import {
   formatCurrency,
@@ -22,6 +23,7 @@ import type { CheckoutSummary as CheckoutSummaryModel } from "@/features/checkou
 import type { Order } from "@/features/orders/types";
 
 export function CheckoutPage() {
+  const { refreshCart } = useCart();
   const [summary, setSummary] = useState<CheckoutSummaryModel>();
   const [createdOrder, setCreatedOrder] = useState<Order>();
   const [isLoading, setIsLoading] = useState(true);
@@ -82,6 +84,7 @@ export function CheckoutPage() {
       const response = await createCheckoutOrder();
       setCreatedOrder(response.order);
       setSummary(undefined);
+      void refreshCart().catch(() => undefined);
     } catch (submitError) {
       setError(
         getCheckoutErrorMessage(

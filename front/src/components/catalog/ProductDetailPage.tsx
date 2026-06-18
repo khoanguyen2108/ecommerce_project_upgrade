@@ -1,13 +1,13 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Loader2, ShoppingBag } from "lucide-react";
+import { AlertCircle, Loader2, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { RecentlyViewedProducts } from "@/components/recently-viewed/RecentlyViewedProducts";
 import { WishlistButton } from "@/components/wishlist/WishlistButton";
+import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
-import { addCartItem } from "@/features/cart/api";
 import {
   getCartErrorMessage,
   getCartRequestId,
@@ -47,6 +47,7 @@ interface CartFeedback {
 export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthSession();
+  const { addItemAndOpenDrawer } = useCart();
   const [state, setState] = useState<ProductDetailState>({
     isLoading: true,
     variants: [],
@@ -190,14 +191,13 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     setCartFeedback(undefined);
 
     try {
-      const response = await addCartItem({
-        quantity,
-        variantId: selectedVariant.id,
-      });
-      setCartFeedback({
-        kind: "success",
-        message: `${state.product.name} was added. Cart now has ${response.cart.totalQuantity} total quantity.`,
-      });
+      await addItemAndOpenDrawer(
+        {
+          quantity,
+          variantId: selectedVariant.id,
+        },
+        state.product.name,
+      );
     } catch (error) {
       setCartFeedback({
         kind: "error",
@@ -368,11 +368,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
               className={`customer-feedback customer-feedback--${cartFeedback.kind}`}
               role={cartFeedback.kind === "error" ? "alert" : "status"}
             >
-              {cartFeedback.kind === "success" ? (
-                <CheckCircle2 aria-hidden="true" size={19} />
-              ) : (
-                <AlertCircle aria-hidden="true" size={19} />
-              )}
+              <AlertCircle aria-hidden="true" size={19} />
               <span>{cartFeedback.message}</span>
               {cartFeedback.requestId ? (
                 <small>Request {cartFeedback.requestId}</small>
@@ -399,11 +395,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                 selectedVariant,
               })}
             </button>
-            {cartFeedback?.kind === "success" ? (
-              <Link className="button button--secondary button--full" href="/cart">
-                View cart
-              </Link>
-            ) : null}
           </div>
         </div>
       </section>
