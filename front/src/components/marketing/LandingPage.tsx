@@ -12,26 +12,19 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { getProducts } from "@/features/catalog/api";
 import type { Product } from "@/features/catalog/types";
-import { getLandingPage } from "@/features/landing/api";
-import type {
-  FeaturedCategory,
-  LandingHero,
-} from "@/features/landing/types";
+import { getFeaturedCategories } from "@/features/landing/api";
+import type { FeaturedCategory } from "@/features/landing/types";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface LandingCatalogState {
   featuredCategories: FeaturedCategory[];
-  hero: LandingHero;
   products: Product[];
   error?: string;
   isLoading: boolean;
 }
 
-const FALLBACK_HERO_IMAGE =
-  "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1800&q=85";
-
-const FALLBACK_HERO: LandingHero = {
-  heroImageUrl: null,
+const LANDING_HERO_IMAGE_SRC = "/images/landing/hero.jpg";
+const LANDING_HERO_COPY = {
   heroEyebrow: "New season essentials",
   heroTitle: "Elevate your everyday wardrobe",
   heroSubtitle:
@@ -41,7 +34,6 @@ const FALLBACK_HERO: LandingHero = {
 export function LandingPage() {
   const [catalog, setCatalog] = useState<LandingCatalogState>({
     featuredCategories: [],
-    hero: FALLBACK_HERO,
     products: [],
     isLoading: true,
   });
@@ -51,8 +43,8 @@ export function LandingPage() {
 
     async function loadCatalog() {
       try {
-        const [landingPage, productsResponse] = await Promise.all([
-          getLandingPage(),
+        const [featuredCategories, productsResponse] = await Promise.all([
+          getFeaturedCategories(),
           getProducts({ limit: 8, sort: "newest" }),
         ]);
 
@@ -61,8 +53,7 @@ export function LandingPage() {
         }
 
         setCatalog({
-          featuredCategories: landingPage.featuredCategories,
-          hero: landingPage.hero,
+          featuredCategories,
           products: productsResponse.products,
           isLoading: false,
         });
@@ -73,7 +64,6 @@ export function LandingPage() {
 
         setCatalog({
           featuredCategories: [],
-          hero: FALLBACK_HERO,
           products: [],
           error: getCatalogErrorMessage(error),
           isLoading: false,
@@ -92,21 +82,21 @@ export function LandingPage() {
     <main>
       <section className="hero-section" aria-labelledby="hero-heading">
         <img
-          alt="Models wearing minimalist neutral clothing in a fashion campaign"
+          alt="Black and white abstract graffiti collage"
           className="hero-section__image"
-          src={catalog.hero.heroImageUrl || FALLBACK_HERO_IMAGE}
+          src={LANDING_HERO_IMAGE_SRC}
         />
         <div className="hero-section__shade" />
         <div className="hero-section__content">
-          <p className="eyebrow">{catalog.hero.heroEyebrow}</p>
-          <h1 id="hero-heading">{catalog.hero.heroTitle}</h1>
-          <p>{catalog.hero.heroSubtitle}</p>
+          <p className="eyebrow">{LANDING_HERO_COPY.heroEyebrow}</p>
+          <h1 id="hero-heading">{LANDING_HERO_COPY.heroTitle}</h1>
+          <p>{LANDING_HERO_COPY.heroSubtitle}</p>
           <div className="hero-section__actions">
             <Link className="button button--primary" href="#new-arrivals">
-              Explore products <ArrowRight size={18} />
+              Explore Products <ArrowRight size={18} />
             </Link>
             <Link className="button button--secondary button--on-image" href="#categories">
-              Browse categories
+              Browse Categories
             </Link>
           </div>
         </div>

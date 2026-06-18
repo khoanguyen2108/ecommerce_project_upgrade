@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { AdminLandingPage } from "@/components/admin-landing/AdminLandingPage";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "Landing Page",
+  title: "Categories",
 };
 
 export default function LandingAdminPage() {
-  return <AdminLandingPage />;
+  redirect("/admin/categories");
 }
