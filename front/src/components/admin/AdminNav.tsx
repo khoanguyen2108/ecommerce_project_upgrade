@@ -4,6 +4,7 @@ import {
   ClipboardList,
   CreditCard,
   LayoutDashboard,
+  PanelsTopLeft,
   Package,
   ShieldCheck,
   Tags,
@@ -32,6 +33,11 @@ const adminNavItems = [
     href: "/admin/categories",
     icon: Tags,
     label: "Categories",
+  },
+  {
+    href: "/admin/landing",
+    icon: PanelsTopLeft,
+    label: "Landing Page",
   },
   {
     href: "/admin/orders",

@@ -7,24 +7,41 @@ import {
   Truck,
   ArrowRight,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
-import { getCategories, getProducts } from "@/features/catalog/api";
-import type { Category, Product } from "@/features/catalog/types";
+import { getProducts } from "@/features/catalog/api";
+import type { Product } from "@/features/catalog/types";
+import { getLandingPage } from "@/features/landing/api";
+import type {
+  FeaturedCategory,
+  LandingHero,
+} from "@/features/landing/types";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface LandingCatalogState {
-  categories: Category[];
+  featuredCategories: FeaturedCategory[];
+  hero: LandingHero;
   products: Product[];
   error?: string;
   isLoading: boolean;
 }
 
+const FALLBACK_HERO_IMAGE =
+  "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1800&q=85";
+
+const FALLBACK_HERO: LandingHero = {
+  heroImageUrl: null,
+  heroEyebrow: "New season essentials",
+  heroTitle: "Elevate your everyday wardrobe",
+  heroSubtitle:
+    "Crisp cotton, soft tailoring, and easy layers selected for real days, repeat wear, and clean silhouettes.",
+};
+
 export function LandingPage() {
   const [catalog, setCatalog] = useState<LandingCatalogState>({
-    categories: [],
+    featuredCategories: [],
+    hero: FALLBACK_HERO,
     products: [],
     isLoading: true,
   });
@@ -34,8 +51,8 @@ export function LandingPage() {
 
     async function loadCatalog() {
       try {
-        const [categories, productsResponse] = await Promise.all([
-          getCategories(),
+        const [landingPage, productsResponse] = await Promise.all([
+          getLandingPage(),
           getProducts({ limit: 8, sort: "newest" }),
         ]);
 
@@ -44,7 +61,8 @@ export function LandingPage() {
         }
 
         setCatalog({
-          categories,
+          featuredCategories: landingPage.featuredCategories,
+          hero: landingPage.hero,
           products: productsResponse.products,
           isLoading: false,
         });
@@ -54,7 +72,8 @@ export function LandingPage() {
         }
 
         setCatalog({
-          categories: [],
+          featuredCategories: [],
+          hero: FALLBACK_HERO,
           products: [],
           error: getCatalogErrorMessage(error),
           isLoading: false,
@@ -69,39 +88,19 @@ export function LandingPage() {
     };
   }, []);
 
-  const categoryImageMap = useMemo(() => {
-    const map = new Map<string, string>();
-
-    for (const product of catalog.products) {
-      const imageUrl = product.imageUrls[0];
-
-      if (imageUrl && !map.has(product.category.slug)) {
-        map.set(product.category.slug, imageUrl);
-      }
-    }
-
-    return map;
-  }, [catalog.products]);
-
   return (
     <main>
       <section className="hero-section" aria-labelledby="hero-heading">
-        <Image
+        <img
           alt="Models wearing minimalist neutral clothing in a fashion campaign"
           className="hero-section__image"
-          fill
-          priority
-          sizes="100vw"
-          src="https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1800&q=85"
+          src={catalog.hero.heroImageUrl || FALLBACK_HERO_IMAGE}
         />
         <div className="hero-section__shade" />
         <div className="hero-section__content">
-          <p className="eyebrow">New season essentials</p>
-          <h1 id="hero-heading">Elevate your everyday wardrobe</h1>
-          <p>
-            Crisp cotton, soft tailoring, and easy layers selected for real
-            days, repeat wear, and clean silhouettes.
-          </p>
+          <p className="eyebrow">{catalog.hero.heroEyebrow}</p>
+          <h1 id="hero-heading">{catalog.hero.heroTitle}</h1>
+          <p>{catalog.hero.heroSubtitle}</p>
           <div className="hero-section__actions">
             <Link className="button button--primary" href="#new-arrivals">
               Explore products <ArrowRight size={18} />
@@ -123,16 +122,12 @@ export function LandingPage() {
           {!catalog.isLoading && catalog.error ? (
             <CatalogStateMessage message={catalog.error} />
           ) : null}
-          {!catalog.isLoading && !catalog.error && catalog.categories.length === 0 ? (
-            <CatalogStateMessage message="No categories are available yet." />
+          {!catalog.isLoading && !catalog.error && catalog.featuredCategories.length === 0 ? (
+            <CatalogStateMessage message="No featured categories are available yet." />
           ) : null}
           {!catalog.isLoading && !catalog.error
-            ? catalog.categories.slice(0, 3).map((category) => (
-                <CategoryTile
-                  category={category}
-                  imageUrl={categoryImageMap.get(category.slug)}
-                  key={category.id}
-                />
+            ? catalog.featuredCategories.slice(0, 3).map((category) => (
+                <CategoryTile category={category} key={category.id} />
               ))
             : null}
         </div>
@@ -224,19 +219,17 @@ function TrustItem({ icon, title, text }: TrustItemProps) {
 
 function CategoryTile({
   category,
-  imageUrl,
 }: {
-  category: Category;
-  imageUrl?: string;
+  category: FeaturedCategory;
 }) {
   return (
     <Link className="category-tile" href={`/categories/${category.slug}`}>
-      {imageUrl ? (
+      {category.imageUrl ? (
         <img
           alt={`${category.name} category`}
           className="category-tile__image"
           loading="lazy"
-          src={imageUrl}
+          src={category.imageUrl}
         />
       ) : (
         <div className="category-tile__fallback" aria-hidden="true" />

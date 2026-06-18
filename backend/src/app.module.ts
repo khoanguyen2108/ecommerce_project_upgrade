@@ -11,6 +11,7 @@ import { CartModule } from './cart/cart.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { HealthModule } from './health/health.module';
+import { LandingPageModule } from './landing-page/landing-page.module';
 import { OrderExpiryModule } from './order-expiry/order-expiry.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
@@ -56,6 +57,7 @@ const getPositiveNumber = (
     AdminUsersModule,
     AdminStatsModule,
     CatalogModule,
+    LandingPageModule,
     CartModule,
     CheckoutModule,
     OrderExpiryModule,

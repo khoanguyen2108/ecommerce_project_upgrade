@@ -3,6 +3,9 @@ export interface Category {
   name: string;
   slug: string;
   description: string | null;
+  imageUrl: string | null;
+  isFeatured: boolean;
+  featuredOrder: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

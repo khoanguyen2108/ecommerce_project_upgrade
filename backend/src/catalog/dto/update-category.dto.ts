@@ -38,6 +38,32 @@ export class UpdateCategoryDto {
   description?: string | null;
 
   @ApiPropertyOptional({
+    example: 'https://images.example.com/categories/graphic-t-shirts.jpg',
+    maxLength: 2048,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({
+    example: true,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean | null;
+
+  @ApiPropertyOptional({
+    example: 2,
+    maximum: 3,
+    minimum: 1,
+    nullable: true,
+  })
+  @IsOptional()
+  featuredOrder?: number | null;
+
+  @ApiPropertyOptional({
     example: true,
     nullable: true,
   })

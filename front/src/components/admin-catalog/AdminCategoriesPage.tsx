@@ -38,6 +38,15 @@ import {
 const CATEGORY_LIMIT = 20;
 
 const CATEGORY_ERROR_MESSAGES: Record<string, string> = {
+  ADMIN_CATEGORY_FEATURED_LIMIT_EXCEEDED:
+    "Three active categories are already featured. Unfeature one before adding another.",
+  ADMIN_CATEGORY_FEATURED_ORDER_CONFLICT:
+    "Another featured category already uses that display order.",
+  ADMIN_CATEGORY_FEATURED_ORDER_INVALID:
+    "Choose featured order 1, 2, or 3.",
+  ADMIN_CATEGORY_IMAGE_URL_INVALID:
+    "Enter a valid public HTTP or HTTPS image URL.",
+  ADMIN_CATEGORY_NOT_FOUND: "That category no longer exists.",
   AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
   BAD_REQUEST: "Some category fields are invalid. Review the form and try again.",
   CATALOG_UPDATE_EMPTY: "Change at least one category field before saving.",
@@ -54,7 +63,10 @@ interface AdminCategoriesPageProps {
 
 interface CategoryFormState {
   description: string;
+  featuredOrder: "" | "1" | "2" | "3";
+  imageUrl: string;
   isActive: boolean;
+  isFeatured: boolean;
   name: string;
   slug: string;
 }
@@ -209,7 +221,10 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       if (panelMode === "create") {
         const response = await createAdminCategory({
           description: normalizeNullableText(form.description),
+          featuredOrder: form.isFeatured ? Number(form.featuredOrder) : null,
+          imageUrl: normalizeNullableText(form.imageUrl),
           isActive: form.isActive,
+          isFeatured: form.isFeatured,
           name: form.name.trim(),
           slug: form.slug.trim(),
         });
@@ -221,7 +236,10 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       } else if (selectedCategory) {
         const response = await updateAdminCategory(selectedCategory.id, {
           description: normalizeNullableText(form.description),
+          featuredOrder: form.isFeatured ? Number(form.featuredOrder) : null,
+          imageUrl: normalizeNullableText(form.imageUrl),
           isActive: form.isActive,
+          isFeatured: form.isFeatured,
           name: form.name.trim(),
           slug: form.slug.trim(),
         });
@@ -281,7 +299,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   const hasFilters = Boolean(query.search) || query.isActive !== undefined;
 
   return (
-    <div className="admin-resource">
+    <div className="admin-resource admin-resource--categories">
       <section
         className="admin-resource__header"
         aria-labelledby="admin-categories-heading"
@@ -374,19 +392,21 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
             <thead>
               <tr>
                 <th>Name</th>
+                <th>Image</th>
                 <th>Slug</th>
                 <th>Description</th>
                 <th>Status</th>
+                <th>Landing</th>
                 <th>Created</th>
                 <th>Updated</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {isLoading ? <AdminTableSkeleton columns={7} rows={6} /> : null}
+              {isLoading ? <AdminTableSkeleton columns={9} rows={6} /> : null}
               {!isLoading && !listError && categories.length === 0 ? (
                 <tr>
-                  <td className="admin-table__state" colSpan={7}>
+                  <td className="admin-table__state" colSpan={9}>
                     No categories match the current filters.
                   </td>
                 </tr>
@@ -397,6 +417,19 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                       <td>
                         <strong>{category.name}</strong>
                       </td>
+                      <td>
+                        {category.imageUrl ? (
+                          <img
+                            alt=""
+                            className="admin-category-thumbnail"
+                            src={category.imageUrl}
+                          />
+                        ) : (
+                          <span className="admin-category-thumbnail admin-category-thumbnail--empty">
+                            None
+                          </span>
+                        )}
+                      </td>
                       <td>{category.slug}</td>
                       <td className="admin-table__muted">
                         {formatOptional(category.description)}
@@ -405,11 +438,18 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                         <span
                           className={`admin-badge ${
                             category.isActive
-                              ? "admin-badge--success"
+                              ? "admin-badge--neutral"
                               : "admin-badge--muted"
                           }`}
                         >
                           {category.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="admin-badge admin-badge--neutral">
+                          {category.isFeatured
+                            ? `Featured #${category.featuredOrder}`
+                            : "Not featured"}
                         </span>
                       </td>
                       <td>{formatAdminDate(category.createdAt)}</td>
@@ -505,6 +545,32 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               />
             </label>
 
+            <label>
+              <span>Image URL</span>
+              <input
+                disabled={isDetailLoading}
+                maxLength={2048}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    imageUrl: event.target.value,
+                  }))
+                }
+                placeholder="https://example.com/category.jpg"
+                type="url"
+                value={form.imageUrl}
+              />
+              <small>Landing images are loaded from the Image URL.</small>
+            </label>
+
+            <div className="admin-category-preview">
+              {form.imageUrl.trim() ? (
+                <img alt="Category preview" src={form.imageUrl.trim()} />
+              ) : (
+                <span>No category image</span>
+              )}
+            </div>
+
             <label className="admin-checkbox">
               <input
                 checked={form.isActive}
@@ -513,11 +579,57 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                   setForm((current) => ({
                     ...current,
                     isActive: event.target.checked,
+                    isFeatured: event.target.checked ? current.isFeatured : false,
+                    featuredOrder: event.target.checked
+                      ? current.featuredOrder
+                      : "",
                   }))
                 }
                 type="checkbox"
               />
               <span>Active</span>
+            </label>
+
+            <label className="admin-checkbox">
+              <input
+                checked={form.isFeatured}
+                disabled={isDetailLoading || !form.isActive}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    isFeatured: event.target.checked,
+                    featuredOrder: event.target.checked
+                      ? current.featuredOrder
+                      : "",
+                  }))
+                }
+                type="checkbox"
+              />
+              <span>Featured on landing</span>
+            </label>
+
+            <label>
+              <span>Featured order</span>
+              <select
+                disabled={isDetailLoading || !form.isFeatured}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    featuredOrder: event.target
+                      .value as CategoryFormState["featuredOrder"],
+                  }))
+                }
+                required={form.isFeatured}
+                value={form.featuredOrder}
+              >
+                <option value="">Choose an order</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+              <small>
+                Up to 3 active categories can be featured on the landing page.
+              </small>
             </label>
 
             <button
@@ -560,7 +672,10 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
 function getEmptyCategoryForm(): CategoryFormState {
   return {
     description: "",
+    featuredOrder: "",
+    imageUrl: "",
     isActive: true,
+    isFeatured: false,
     name: "",
     slug: "",
   };
@@ -569,7 +684,12 @@ function getEmptyCategoryForm(): CategoryFormState {
 function getCategoryForm(category: AdminCategory): CategoryFormState {
   return {
     description: category.description || "",
+    featuredOrder: category.featuredOrder
+      ? (String(category.featuredOrder) as CategoryFormState["featuredOrder"])
+      : "",
+    imageUrl: category.imageUrl || "",
     isActive: category.isActive,
+    isFeatured: category.isFeatured,
     name: category.name,
     slug: category.slug,
   };
@@ -584,7 +704,24 @@ function validateCategoryForm(form: CategoryFormState): string | undefined {
     return "Category slug is required.";
   }
 
+  if (form.imageUrl.trim() && !isPublicHttpUrl(form.imageUrl)) {
+    return "Enter a valid public HTTP or HTTPS image URL.";
+  }
+
+  if (form.isFeatured && !form.featuredOrder) {
+    return "Choose featured order 1, 2, or 3.";
+  }
+
   return undefined;
+}
+
+function isPublicHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function AdminFeedback({

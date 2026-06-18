@@ -36,6 +36,9 @@ export interface AdminCategory {
   name: string;
   slug: string;
   description: string | null;
+  imageUrl: string | null;
+  isFeatured: boolean;
+  featuredOrder: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -113,6 +116,9 @@ export interface CreateAdminCategoryRequest {
   name: string;
   slug: string;
   description?: string | null;
+  imageUrl?: string | null;
+  isFeatured?: boolean;
+  featuredOrder?: number | null;
   isActive?: boolean;
 }
 
@@ -120,6 +126,9 @@ export interface UpdateAdminCategoryRequest {
   name?: string;
   slug?: string;
   description?: string | null;
+  imageUrl?: string | null;
+  isFeatured?: boolean;
+  featuredOrder?: number | null;
   isActive?: boolean;
 }
 

@@ -43,9 +43,21 @@ const categorySelect: Prisma.CategorySelect = {
   name: true,
   slug: true,
   description: true,
+  imageUrl: true,
+  isFeatured: true,
+  featuredOrder: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
+};
+
+const featuredCategorySelect: Prisma.CategorySelect = {
+  id: true,
+  name: true,
+  slug: true,
+  description: true,
+  imageUrl: true,
+  featuredOrder: true,
 };
 
 const categorySummarySelect: Prisma.CategorySelect = {
@@ -121,6 +133,20 @@ export class CatalogService {
     return { categories };
   }
 
+  async listFeaturedCategories() {
+    const categories = await this.prismaService.category.findMany({
+      where: {
+        isActive: true,
+        isFeatured: true,
+      },
+      orderBy: [{ featuredOrder: 'asc' }, { createdAt: 'asc' }],
+      take: 3,
+      select: featuredCategorySelect,
+    });
+
+    return { categories };
+  }
+
   async listAdminCategories(query: AdminCategoryQueryDto) {
     const page = query.page ?? 1;
     const limit = Math.min(
@@ -176,7 +202,7 @@ export class CatalogService {
     });
 
     if (!category) {
-      throw this.categoryNotFoundException();
+      throw this.adminCategoryNotFoundException();
     }
 
     return { category };
@@ -200,7 +226,24 @@ export class CatalogService {
 
   async createCategory(dto: CreateCategoryDto) {
     const slug = this.normalizeSlug(dto.slug);
+    const isActive = this.normalizeOptionalBoolean(
+      dto.isActive,
+      true,
+      'isActive',
+    );
+    const isFeatured = isActive
+      ? this.normalizeOptionalBoolean(dto.isFeatured, false, 'isFeatured')
+      : false;
+    const featuredOrder = this.normalizeFeaturedOrder(
+      isFeatured,
+      dto.featuredOrder,
+    );
     await this.assertCategorySlugAvailable(slug);
+    await this.assertFeaturedCategoryAvailable(
+      undefined,
+      isFeatured,
+      featuredOrder,
+    );
 
     try {
       const category = await this.prismaService.category.create({
@@ -208,7 +251,10 @@ export class CatalogService {
           name: this.normalizeRequiredText(dto.name, 'name'),
           slug,
           description: this.normalizeOptionalText(dto.description),
-          isActive: this.normalizeOptionalBoolean(dto.isActive, true, 'isActive'),
+          imageUrl: this.normalizeCategoryImageUrl(dto.imageUrl),
+          isFeatured,
+          featuredOrder,
+          isActive,
         },
         select: categorySelect,
       });
@@ -216,6 +262,10 @@ export class CatalogService {
       return { category };
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
+        if (this.getUniqueConstraintTarget(error).includes('featuredOrder')) {
+          throw this.featuredOrderConflictException();
+        }
+
         throw this.categorySlugExistsException();
       }
 
@@ -224,7 +274,7 @@ export class CatalogService {
   }
 
   async updateCategory(id: string, dto: UpdateCategoryDto) {
-    await this.getCategoryForAdmin(id);
+    const existingCategory = await this.getCategoryForAdmin(id);
 
     const data: Prisma.CategoryUpdateInput = {};
 
@@ -242,6 +292,10 @@ export class CatalogService {
       data.description = this.normalizeOptionalText(dto.description);
     }
 
+    if ('imageUrl' in dto) {
+      data.imageUrl = this.normalizeCategoryImageUrl(dto.imageUrl);
+    }
+
     if ('isActive' in dto) {
       data.isActive = this.normalizeOptionalBoolean(
         dto.isActive,
@@ -249,6 +303,35 @@ export class CatalogService {
         'isActive',
       );
     }
+
+    const nextIsActive =
+      typeof data.isActive === 'boolean'
+        ? data.isActive
+        : existingCategory.isActive;
+    const explicitlyFeatured = 'isFeatured' in dto;
+    const nextIsFeatured = nextIsActive
+      ? explicitlyFeatured
+        ? this.normalizeOptionalBoolean(dto.isFeatured, undefined, 'isFeatured')
+        : existingCategory.isFeatured
+      : false;
+    const nextFeaturedOrder = nextIsFeatured
+      ? 'featuredOrder' in dto
+        ? this.normalizeFeaturedOrder(true, dto.featuredOrder)
+        : explicitlyFeatured
+          ? this.normalizeFeaturedOrder(true, undefined)
+          : existingCategory.featuredOrder
+      : null;
+
+    if ('isFeatured' in dto || 'featuredOrder' in dto || !nextIsActive) {
+      data.isFeatured = nextIsFeatured;
+      data.featuredOrder = nextFeaturedOrder;
+    }
+
+    await this.assertFeaturedCategoryAvailable(
+      id,
+      nextIsFeatured,
+      nextFeaturedOrder,
+    );
 
     this.assertUpdateHasFields(data, 'CATEGORY_UPDATE_EMPTY');
 
@@ -264,6 +347,10 @@ export class CatalogService {
       return { category };
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
+        if (this.getUniqueConstraintTarget(error).includes('featuredOrder')) {
+          throw this.featuredOrderConflictException();
+        }
+
         throw this.categorySlugExistsException();
       }
 
@@ -280,6 +367,8 @@ export class CatalogService {
       },
       data: {
         isActive: false,
+        isFeatured: false,
+        featuredOrder: null,
       },
       select: categorySelect,
     });
@@ -1033,13 +1122,16 @@ export class CatalogService {
         id,
       },
       select: {
+        featuredOrder: true,
         id: true,
+        isActive: true,
+        isFeatured: true,
         slug: true,
       },
     });
 
     if (!category) {
-      throw this.categoryNotFoundException();
+      throw this.adminCategoryNotFoundException();
     }
 
     return category;
@@ -1265,6 +1357,95 @@ export class CatalogService {
     });
   }
 
+  private normalizeCategoryImageUrl(
+    value: string | null | undefined,
+  ): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      throw this.categoryImageUrlInvalidException();
+    }
+
+    const normalized = value.trim();
+
+    if (!normalized) {
+      return null;
+    }
+
+    if (normalized.length > 2048) {
+      throw this.categoryImageUrlInvalidException();
+    }
+
+    try {
+      const url = new URL(normalized);
+
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        throw new Error('Unsupported protocol');
+      }
+    } catch {
+      throw this.categoryImageUrlInvalidException();
+    }
+
+    return normalized;
+  }
+
+  private normalizeFeaturedOrder(
+    isFeatured: boolean,
+    value: number | null | undefined,
+  ): number | null {
+    if (!isFeatured) {
+      return null;
+    }
+
+    if (!Number.isInteger(value) || (value as number) < 1 || (value as number) > 3) {
+      throw new BadRequestException({
+        code: 'ADMIN_CATEGORY_FEATURED_ORDER_INVALID',
+        message: 'Featured order must be 1, 2, or 3 for a featured category.',
+      });
+    }
+
+    return value as number;
+  }
+
+  private async assertFeaturedCategoryAvailable(
+    excludeId: string | undefined,
+    isFeatured: boolean,
+    featuredOrder: number | null,
+  ) {
+    if (!isFeatured || featuredOrder === null) {
+      return;
+    }
+
+    const where: Prisma.CategoryWhereInput = {
+      isActive: true,
+      isFeatured: true,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    };
+    const [featuredCount, orderConflict] = await this.prismaService.$transaction([
+      this.prismaService.category.count({ where }),
+      this.prismaService.category.findFirst({
+        where: {
+          ...where,
+          featuredOrder,
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (featuredCount >= 3) {
+      throw new ConflictException({
+        code: 'ADMIN_CATEGORY_FEATURED_LIMIT_EXCEEDED',
+        message: 'Up to 3 active categories can be featured on the landing page.',
+      });
+    }
+
+    if (orderConflict) {
+      throw this.featuredOrderConflictException();
+    }
+  }
+
   private normalizeOptionalSku(value: string | null | undefined): string | null {
     if (value === null || value === undefined) {
       return null;
@@ -1355,6 +1536,27 @@ export class CatalogService {
     return new NotFoundException({
       code: 'CATEGORY_NOT_FOUND',
       message: 'Category was not found.',
+    });
+  }
+
+  private adminCategoryNotFoundException() {
+    return new NotFoundException({
+      code: 'ADMIN_CATEGORY_NOT_FOUND',
+      message: 'Category was not found.',
+    });
+  }
+
+  private categoryImageUrlInvalidException() {
+    return new BadRequestException({
+      code: 'ADMIN_CATEGORY_IMAGE_URL_INVALID',
+      message: 'Image URL must be a valid public HTTP or HTTPS URL.',
+    });
+  }
+
+  private featuredOrderConflictException() {
+    return new ConflictException({
+      code: 'ADMIN_CATEGORY_FEATURED_ORDER_CONFLICT',
+      message: 'Another featured category already uses this display order.',
     });
   }
 

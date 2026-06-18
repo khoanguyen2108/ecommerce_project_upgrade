@@ -80,16 +80,30 @@ model PasswordResetOtp {
 }
 
 model Category {
-  id          String    @id @default(uuid()) @db.Uuid
-  name        String    @db.VarChar(120)
-  slug        String    @unique @db.VarChar(160)
-  description String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  products    Product[]
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String    @db.VarChar(120)
+  slug          String    @unique @db.VarChar(160)
+  description   String?
+  imageUrl      String?   @db.VarChar(2048)
+  isFeatured    Boolean   @default(false)
+  featuredOrder Int?      @unique
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  products      Product[]
 
   @@index([isActive])
+  @@index([isActive, isFeatured, featuredOrder])
+}
+
+model LandingPageSetting {
+  id             String   @id @default("default") @db.VarChar(32)
+  heroImageUrl   String?  @db.VarChar(2048)
+  heroEyebrow    String?  @db.VarChar(120)
+  heroTitle      String?  @db.VarChar(160)
+  heroSubtitle   String?  @db.VarChar(300)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Product {

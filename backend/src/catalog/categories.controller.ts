@@ -28,6 +28,15 @@ export class CategoriesController {
     return this.catalogService.listCategories();
   }
 
+  @ApiOperation({ summary: 'List active landing-page featured categories' })
+  @ApiOkResponse(
+    envelopeResponse('Featured categories returned.', categoryListDataExample),
+  )
+  @Get('featured')
+  listFeaturedCategories() {
+    return this.catalogService.listFeaturedCategories();
+  }
+
   @ApiOperation({ summary: 'Get an active public category by slug' })
   @ApiParam({
     description: 'Category slug.',

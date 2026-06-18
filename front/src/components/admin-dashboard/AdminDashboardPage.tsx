@@ -8,6 +8,7 @@ import {
   Clock3,
   CreditCard,
   Package,
+  PanelsTopLeft,
   ShieldCheck,
   ShoppingBag,
   Users,
@@ -46,6 +47,12 @@ interface DashboardSnapshot {
 }
 
 const quickLinks = [
+  {
+    description: "Update the storefront hero and featured category visuals.",
+    href: "/admin/landing",
+    icon: PanelsTopLeft,
+    label: "Manage Landing Page",
+  },
   {
     description: "Review fulfillment state and pending payment orders.",
     href: "/admin/orders",
