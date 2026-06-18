@@ -46,6 +46,11 @@ const orderItemSelect = {
   quantity: true,
   lineTotal: true,
   createdAt: true,
+  product: {
+    select: {
+      imageUrls: true,
+    },
+  },
 } as const satisfies Prisma.OrderItemSelect;
 
 const orderSelect = {
@@ -73,6 +78,10 @@ const orderSelect = {
     select: paymentSummarySelect,
   },
 } as const satisfies Prisma.OrderSelect;
+
+type OrderRecord = Prisma.OrderGetPayload<{
+  select: typeof orderSelect;
+}>;
 
 const variantSnapshotSelect = {
   id: true,
@@ -188,7 +197,7 @@ export class OrdersService {
 
     void this.orderEmailService.sendOrderCreatedEmail(order.id);
 
-    return { order };
+    return { order: this.toOrderResponse(order) };
   }
 
   async listOrders(user: AuthenticatedUser, query: OrderQueryDto) {
@@ -208,7 +217,7 @@ export class OrdersService {
     ]);
 
     return {
-      orders,
+      orders: orders.map((order) => this.toOrderResponse(order)),
       pagination: {
         page,
         limit,
@@ -228,7 +237,17 @@ export class OrdersService {
       throw this.orderNotFoundException();
     }
 
-    return { order };
+    return { order: this.toOrderResponse(order) };
+  }
+
+  private toOrderResponse(order: OrderRecord) {
+    return {
+      ...order,
+      items: order.items.map(({ product, ...item }) => ({
+        ...item,
+        imageUrl: product.imageUrls[0] ?? null,
+      })),
+    };
   }
 
   private buildOrderWhere(

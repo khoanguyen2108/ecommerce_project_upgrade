@@ -34,6 +34,7 @@ export interface OrderItem {
   productId: string;
   variantId: string;
   productName: string;
+  imageUrl?: string | null;
   sku: string | null;
   size: string;
   color: string;

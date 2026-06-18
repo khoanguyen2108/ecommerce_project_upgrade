@@ -13,7 +13,13 @@ import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { useWishlist } from "@/features/wishlist/useWishlist";
 
 interface SiteHeaderProps {
-  active?: "shop" | "account" | "cart" | "orders" | "wishlist";
+  active?:
+    | "shop"
+    | "categories"
+    | "account"
+    | "cart"
+    | "orders"
+    | "wishlist";
 }
 
 export function SiteHeader({ active }: SiteHeaderProps) {
@@ -40,7 +46,12 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           >
             Shop
           </Link>
-          <Link href="/#categories">Categories</Link>
+          <Link
+            className={active === "categories" ? "is-active" : undefined}
+            href="/#categories"
+          >
+            Categories
+          </Link>
           <Link href="/#new-arrivals">New Arrivals</Link>
           <Link href="/#about">About</Link>
         </nav>

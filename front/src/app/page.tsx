@@ -5,7 +5,7 @@ import { LandingPage } from "@/components/marketing/LandingPage";
 export default function HomePage() {
   return (
     <>
-      <SiteHeader active="shop" />
+      <SiteHeader />
       <LandingPage />
       <SiteFooter />
     </>

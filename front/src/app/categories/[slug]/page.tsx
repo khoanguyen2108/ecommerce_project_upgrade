@@ -18,7 +18,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
 
   return (
     <>
-      <SiteHeader active="shop" />
+      <SiteHeader active="categories" />
       <CategoryDetailPage slug={slug} />
       <SiteFooter />
     </>

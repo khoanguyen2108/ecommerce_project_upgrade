@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { listOrders } from "@/features/orders/api";
 import type { Order, OrderQuery, OrderStatus } from "@/features/orders/types";
 import type { Pagination } from "@/lib/api/types";
+import { OrderItemImage } from "@/components/orders/OrderItemImage";
 import {
   formatCurrency,
   formatDateTime,
@@ -166,6 +167,7 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
           <table className="order-table">
             <thead>
               <tr>
+                <th>Products</th>
                 <th>Order</th>
                 <th>Status</th>
                 <th>Total</th>
@@ -176,10 +178,10 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? <OrderTableSkeleton columns={7} rows={5} /> : null}
+              {isLoading ? <OrderTableSkeleton columns={8} rows={5} /> : null}
               {!isLoading && !error && orders.length === 0 ? (
                 <tr>
-                  <td className="order-table__state" colSpan={7}>
+                  <td className="order-table__state" colSpan={8}>
                     No orders are visible for this account yet.
                   </td>
                 </tr>
@@ -190,6 +192,9 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
 
                     return (
                       <tr key={order.id}>
+                        <td>
+                          <OrderProductPreview order={order} />
+                        </td>
                         <td>
                           <span className="order-id">{order.id}</span>
                         </td>
@@ -248,6 +253,26 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
         </nav>
       </section>
     </main>
+  );
+}
+
+function OrderProductPreview({ order }: { order: Order }) {
+  const firstItem = order.items?.[0];
+  const additionalItems = Math.max(0, (order.items?.length ?? 0) - 1);
+
+  return (
+    <div className="order-product-preview">
+      <OrderItemImage
+        alt={firstItem?.productName || "Order product"}
+        imageUrl={firstItem?.imageUrl}
+        size="compact"
+      />
+      {additionalItems > 0 ? (
+        <span aria-label={`${additionalItems} more products`}>
+          +{additionalItems}
+        </span>
+      ) : null}
+    </div>
   );
 }
 

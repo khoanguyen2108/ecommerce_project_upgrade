@@ -3926,6 +3926,61 @@ img {
   color: var(--color-text-muted);
 }
 
+.order-product-preview {
+  align-items: flex-end;
+  display: inline-flex;
+  position: relative;
+}
+
+.order-product-preview > span:last-child:not(.order-item-image) {
+  background: var(--color-text);
+  border: 2px solid var(--color-surface);
+  color: var(--color-surface);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 24px;
+  min-width: 28px;
+  padding: 0 5px;
+  position: absolute;
+  right: -12px;
+  text-align: center;
+  top: 32px;
+}
+
+.order-item-image {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  flex: 0 0 auto;
+  object-fit: cover;
+}
+
+.order-item-image--compact {
+  height: 58px;
+  width: 48px;
+}
+
+.order-item-image--detail {
+  height: 72px;
+  width: 60px;
+}
+
+.order-item-image--fallback {
+  background-image:
+    linear-gradient(135deg, transparent 47%, var(--color-border) 48%, var(--color-border) 52%, transparent 53%);
+  display: block;
+}
+
+.order-item-product {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  min-width: 220px;
+}
+
+.order-item-product strong {
+  line-height: 1.35;
+}
+
 .order-id {
   display: inline-block;
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;

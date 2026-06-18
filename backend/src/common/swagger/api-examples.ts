@@ -295,6 +295,7 @@ export const orderItemExample = {
   productId: productExample.id,
   variantId: productVariantExample.id,
   productName: productExample.name,
+  imageUrl: productExample.imageUrls[0],
   sku: productVariantExample.sku,
   size: productVariantExample.size,
   color: productVariantExample.color,

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getOrder } from "@/features/orders/api";
 import type { Order, PaymentSummary } from "@/features/orders/types";
+import { OrderItemImage } from "@/components/orders/OrderItemImage";
 import {
   OrderStatusBadge,
   PaymentStatusBadge,
@@ -211,7 +212,13 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
                 order.items.map((item) => (
                   <tr key={item.id}>
                     <td>
-                      <strong>{item.productName}</strong>
+                      <div className="order-item-product">
+                        <OrderItemImage
+                          alt={item.productName}
+                          imageUrl={item.imageUrl}
+                        />
+                        <strong>{item.productName}</strong>
+                      </div>
                     </td>
                     <td>
                       {item.size} / {item.color}
