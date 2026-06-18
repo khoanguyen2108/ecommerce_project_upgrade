@@ -54,7 +54,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           </Link>
           <Link
             className={active === "categories" ? "is-active" : undefined}
-            href="/#categories"
+            href="/categories"
           >
             Categories
           </Link>
