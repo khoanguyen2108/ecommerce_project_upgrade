@@ -611,10 +611,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         className="admin-resource__header"
         aria-labelledby="admin-products-heading"
       >
-        <div>
-          <p className="eyebrow">Admin catalog</p>
-          <h1 id="admin-products-heading">Products</h1>
-        </div>
+        <h1 id="admin-products-heading">Products</h1>
         <div className="admin-header-actions">
           <button
             className="button button--secondary"

@@ -73,7 +73,7 @@ export function AdminPaymentsPage({ initialQuery }: { initialQuery: AdminPayment
 
   return (
     <div className="admin-resource admin-resource--wide">
-      <section className="admin-resource__header" aria-labelledby="admin-payments-heading"><div><p className="eyebrow">Commerce diagnostics</p><h1 id="admin-payments-heading">Payments</h1></div><button className="button button--secondary" disabled={isLoading} onClick={() => setRefreshKey((current) => current + 1)} type="button"><RefreshCw aria-hidden="true" className={isLoading ? "spin" : undefined} size={17} />Refresh</button></section>
+      <section className="admin-resource__header" aria-labelledby="admin-payments-heading"><h1 id="admin-payments-heading">Payments</h1><button className="button button--secondary" disabled={isLoading} onClick={() => setRefreshKey((current) => current + 1)} type="button"><RefreshCw aria-hidden="true" className={isLoading ? "spin" : undefined} size={17} />Refresh</button></section>
       <AdminPaymentSafetyNote />
 
       <section className="admin-resource__toolbar" aria-label="Payment filters">

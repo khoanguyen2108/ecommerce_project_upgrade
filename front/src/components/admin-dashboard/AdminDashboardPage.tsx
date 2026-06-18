@@ -150,14 +150,7 @@ export function AdminDashboardPage() {
   return (
     <div className="admin-dashboard-modern">
       <section className="admin-dashboard-modern__heading" aria-labelledby="dashboard-heading">
-        <div>
-          <p className="admin-dashboard-modern__eyebrow">Admin overview</p>
-          <h1 id="dashboard-heading">Operations dashboard</h1>
-          <p>
-            A clear view of customers, orders, and webhook-verified sales across
-            Belikeme.
-          </p>
-        </div>
+        <h1 id="dashboard-heading">Dashboard</h1>
         <AdminDashboardFilters
           isLoading={isLoading}
           onApply={setRange}

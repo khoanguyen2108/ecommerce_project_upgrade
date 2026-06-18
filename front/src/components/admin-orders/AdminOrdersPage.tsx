@@ -153,10 +153,7 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
   return (
     <div className="admin-resource admin-resource--wide">
       <section className="admin-resource__header" aria-labelledby="admin-orders-heading">
-        <div>
-          <p className="eyebrow">Commerce diagnostics</p>
-          <h1 id="admin-orders-heading">Orders</h1>
-        </div>
+        <h1 id="admin-orders-heading">Orders</h1>
         <button
           className="button button--secondary"
           disabled={isLoading}

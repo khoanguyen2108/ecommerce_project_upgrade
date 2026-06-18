@@ -50,16 +50,16 @@ export function AdminPaymentDetailPage({ paymentId }: { paymentId: string }) {
   }, [paymentId, refreshKey]);
 
   if (isLoading && !payment) {
-    return <div className="admin-resource"><section className="admin-resource__header"><div><p className="eyebrow">Admin payment</p><h1>Loading payment</h1></div></section><div className="admin-detail-loading" role="status"><span className="admin-skeleton-line admin-skeleton-line--wide" /><span className="admin-skeleton-line" /><span className="admin-skeleton-line admin-skeleton-line--wide" /></div></div>;
+    return <div className="admin-resource"><section className="admin-resource__header"><h1>Loading payment</h1></section><div className="admin-detail-loading" role="status"><span className="admin-skeleton-line admin-skeleton-line--wide" /><span className="admin-skeleton-line" /><span className="admin-skeleton-line admin-skeleton-line--wide" /></div></div>;
   }
 
   if (!payment) {
-    return <div className="admin-resource"><section className="admin-resource__header"><div><p className="eyebrow">Admin payment</p><h1>Payment unavailable</h1></div></section>{error ? <AdminFeedback message={error} requestId={requestId} tone="error" /> : null}<Link className="button button--secondary admin-back-link" href="/admin/payments">Back to payments</Link></div>;
+    return <div className="admin-resource"><section className="admin-resource__header"><h1>Payment unavailable</h1></section>{error ? <AdminFeedback message={error} requestId={requestId} tone="error" /> : null}<Link className="button button--secondary admin-back-link" href="/admin/payments">Back to payments</Link></div>;
   }
 
   return (
     <div className="admin-resource admin-resource--wide">
-      <section className="admin-resource__header" aria-labelledby="admin-payment-detail-heading"><div><p className="eyebrow">Admin payment detail</p><h1 id="admin-payment-detail-heading">Payment <span className="admin-heading-code">{payment.id}</span></h1></div><button className="button button--secondary" disabled={isLoading} onClick={() => setRefreshKey((current) => current + 1)} type="button"><RefreshCw aria-hidden="true" className={isLoading ? "spin" : undefined} size={17} />Refresh</button></section>
+      <section className="admin-resource__header" aria-labelledby="admin-payment-detail-heading"><h1 id="admin-payment-detail-heading">Payment <span className="admin-heading-code">{payment.id}</span></h1><button className="button button--secondary" disabled={isLoading} onClick={() => setRefreshKey((current) => current + 1)} type="button"><RefreshCw aria-hidden="true" className={isLoading ? "spin" : undefined} size={17} />Refresh</button></section>
       <AdminPaymentSafetyNote />
       {error ? <AdminFeedback message={error} requestId={requestId} tone="error" /> : null}
 

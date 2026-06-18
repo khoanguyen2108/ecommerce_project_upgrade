@@ -50,7 +50,7 @@ export function PayosReadinessPage() {
 
   return (
     <div className="admin-resource">
-      <section className="admin-resource__header" aria-labelledby="payos-readiness-heading"><div><p className="eyebrow">Configuration diagnostics</p><h1 id="payos-readiness-heading">payOS Readiness</h1></div><button className="button button--secondary" disabled={isLoading} onClick={() => setRefreshKey((current) => current + 1)} type="button"><RefreshCw aria-hidden="true" className={isLoading ? "spin" : undefined} size={17} />Refresh</button></section>
+      <section className="admin-resource__header" aria-labelledby="payos-readiness-heading"><h1 id="payos-readiness-heading">payOS Readiness</h1><button className="button button--secondary" disabled={isLoading} onClick={() => setRefreshKey((current) => current + 1)} type="button"><RefreshCw aria-hidden="true" className={isLoading ? "spin" : undefined} size={17} />Refresh</button></section>
       <AdminPaymentSafetyNote />
       <div className="admin-readiness-disclaimer" role="note"><strong>Local configuration check only.</strong><span>This checks configuration presence and URL shape. It does not verify real provider checkout or webhook delivery, and it never calls payOS.</span></div>
       {error ? <AdminFeedback message={error} requestId={requestId} tone="error" /> : null}

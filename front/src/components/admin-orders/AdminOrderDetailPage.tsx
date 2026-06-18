@@ -83,17 +83,17 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
   }
 
   if (isLoading && !order) {
-    return <div className="admin-resource"><section className="admin-resource__header"><div><p className="eyebrow">Admin order</p><h1>Loading order</h1></div></section><div className="admin-detail-loading" role="status"><span className="admin-skeleton-line admin-skeleton-line--wide" /><span className="admin-skeleton-line" /><span className="admin-skeleton-line admin-skeleton-line--wide" /></div></div>;
+    return <div className="admin-resource"><section className="admin-resource__header"><h1>Loading order</h1></section><div className="admin-detail-loading" role="status"><span className="admin-skeleton-line admin-skeleton-line--wide" /><span className="admin-skeleton-line" /><span className="admin-skeleton-line admin-skeleton-line--wide" /></div></div>;
   }
 
   if (!order) {
-    return <div className="admin-resource"><section className="admin-resource__header"><div><p className="eyebrow">Admin order</p><h1>Order unavailable</h1></div></section>{error ? <AdminFeedback message={error} requestId={requestId} tone="error" /> : null}<Link className="button button--secondary admin-back-link" href="/admin/orders">Back to orders</Link></div>;
+    return <div className="admin-resource"><section className="admin-resource__header"><h1>Order unavailable</h1></section>{error ? <AdminFeedback message={error} requestId={requestId} tone="error" /> : null}<Link className="button button--secondary admin-back-link" href="/admin/orders">Back to orders</Link></div>;
   }
 
   return (
     <div className="admin-resource admin-resource--wide">
       <section className="admin-resource__header" aria-labelledby="admin-order-detail-heading">
-        <div><p className="eyebrow">Admin order detail</p><h1 id="admin-order-detail-heading">Order <span className="admin-heading-code">{order.id}</span></h1></div>
+        <h1 id="admin-order-detail-heading">Order <span className="admin-heading-code">{order.id}</span></h1>
         <div className="admin-header-actions">
           {order.status === "PENDING_PAYMENT" ? <>
             <button className="button button--secondary" disabled={Boolean(busyAction)} onClick={() => void transition("cancel")} type="button">{busyAction === "cancel" ? "Cancelling" : "Cancel order"}</button>

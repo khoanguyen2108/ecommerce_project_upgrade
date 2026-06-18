@@ -304,10 +304,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
         className="admin-resource__header"
         aria-labelledby="admin-categories-heading"
       >
-        <div>
-          <p className="eyebrow">Admin catalog</p>
-          <h1 id="admin-categories-heading">Categories</h1>
-        </div>
+        <h1 id="admin-categories-heading">Categories</h1>
         <div className="admin-header-actions">
           <button
             className="button button--secondary"

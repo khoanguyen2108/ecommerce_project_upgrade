@@ -1593,7 +1593,7 @@ img {
 .admin-shell__content {
   margin: 0 auto;
   max-width: 1180px;
-  padding: clamp(36px, 5vw, 64px) clamp(20px, 4vw, 48px);
+  padding: var(--space-6) clamp(20px, 4vw, 48px);
   width: 100%;
 }
 
@@ -1669,7 +1669,7 @@ img {
 
 .admin-resource {
   display: grid;
-  gap: var(--space-6);
+  gap: 20px;
 }
 
 .admin-resource--wide {
@@ -1677,12 +1677,12 @@ img {
 }
 
 .admin-resource__header {
-  align-items: end;
+  align-items: center;
   border-bottom: 1px solid var(--color-border);
   display: flex;
   gap: var(--space-4);
   justify-content: space-between;
-  padding-bottom: var(--space-6);
+  padding-bottom: var(--space-3);
 }
 
 .admin-resource__header h1,
@@ -1696,7 +1696,12 @@ img {
 }
 
 .admin-resource__header h1 {
-  font-size: clamp(2.2rem, 4vw, 4rem);
+  font-size: 1.25rem;
+}
+
+.admin-resource__header .button {
+  min-height: 42px;
+  padding: 9px 14px;
 }
 
 .admin-header-actions {
@@ -2553,17 +2558,12 @@ img {
 }
 
 .admin-dashboard-modern__heading {
-  align-items: end;
+  align-items: center;
   display: flex;
   gap: var(--space-6);
   justify-content: space-between;
 }
 
-.admin-dashboard-modern__heading > div:first-child {
-  max-width: 620px;
-}
-
-.admin-dashboard-modern__eyebrow,
 .admin-dashboard-card__kicker {
   color: var(--dashboard-ink);
   font-size: 0.72rem;
@@ -2575,16 +2575,11 @@ img {
 
 .admin-dashboard-modern__heading h1 {
   font-family: Montserrat, Inter, sans-serif;
-  font-size: clamp(2.4rem, 5vw, 4.6rem);
+  font-size: 1.25rem;
   font-weight: 760;
   letter-spacing: 0;
   line-height: 1.08;
   margin: 0;
-}
-
-.admin-dashboard-modern__heading > div > p:last-child {
-  color: var(--dashboard-muted);
-  margin: var(--space-3) 0 0;
 }
 
 .admin-dashboard-filters {
@@ -3213,7 +3208,7 @@ img {
 
 @media (max-width: 560px) {
   .admin-dashboard-modern__heading h1 {
-    font-size: 2rem;
+    font-size: 1.125rem;
   }
 
   .admin-dashboard-filters form,
@@ -4441,7 +4436,7 @@ img {
   }
 
   .admin-shell__content {
-    padding-top: var(--space-8);
+    padding-top: var(--space-4);
   }
 
   .admin-entry-card {

@@ -294,10 +294,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
   return (
     <div className="admin-resource">
       <section className="admin-resource__header" aria-labelledby="admin-users-heading">
-        <div>
-          <p className="eyebrow">Admin users</p>
-          <h1 id="admin-users-heading">Users</h1>
-        </div>
+        <h1 id="admin-users-heading">Users</h1>
         <button
           className="button button--secondary"
           disabled={isLoading}
