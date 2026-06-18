@@ -9,7 +9,6 @@ import {
   RotateCcw,
   Save,
   Search,
-  XCircle,
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
@@ -36,8 +35,8 @@ import type {
 } from "@/features/admin-catalog/types";
 import { formatPrice } from "@/features/catalog/format";
 import type { Pagination } from "@/lib/api/types";
+import { AdminModal } from "@/components/admin/AdminModal";
 import {
-  formatAdminDate,
   formatOptional,
   getApiErrorMessage,
   getApiRequestId,
@@ -169,6 +168,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   const [variantForm, setVariantForm] =
     useState<VariantFormState>(getEmptyVariantForm());
   const [editingVariantId, setEditingVariantId] = useState<string>();
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProductLoading, setIsProductLoading] = useState(true);
   const [isCategoryLoading, setIsCategoryLoading] = useState(true);
   const [isPanelLoading, setIsPanelLoading] = useState(false);
@@ -336,6 +336,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     setEditingVariantId(undefined);
     setActionError(undefined);
     setSuccessMessage(undefined);
+    setRequestId(undefined);
+    setIsModalOpen(true);
   }
 
   async function openEditPanel(product: AdminProduct) {
@@ -346,6 +348,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     setEditingVariantId(undefined);
     setActionError(undefined);
     setSuccessMessage(undefined);
+    setRequestId(undefined);
+    setIsModalOpen(true);
     setIsPanelLoading(true);
 
     try {
@@ -391,15 +395,23 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       return;
     }
 
+    if (
+      panelMode === "edit" &&
+      selectedProduct &&
+      productPayload.payload.isActive !== selectedProduct.isActive &&
+      !window.confirm(
+        `${productPayload.payload.isActive ? "Activate" : "Deactivate"} ${selectedProduct.name}?`,
+      )
+    ) {
+      return;
+    }
+
     setIsSavingProduct(true);
 
     try {
       if (panelMode === "create") {
-        const response = await createAdminProduct(productPayload.payload);
+        await createAdminProduct(productPayload.payload);
 
-        setPanelMode("edit");
-        setSelectedProduct(response.product);
-        setProductForm(getProductForm(response.product));
         setSuccessMessage("Product created.");
       } else if (selectedProduct) {
         const response = await updateAdminProduct(
@@ -418,6 +430,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       }
 
       setRefreshKey((current) => current + 1);
+      setIsModalOpen(false);
     } catch (error) {
       setActionError(
         getApiErrorMessage(
@@ -432,13 +445,26 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     }
   }
 
-  async function handleDeactivateProduct(product: AdminProduct) {
+  async function handleProductStatusChange(product: AdminProduct) {
+    const nextIsActive = !product.isActive;
+
+    if (
+      !window.confirm(
+        `${nextIsActive ? "Activate" : "Deactivate"} ${product.name}?`,
+      )
+    ) {
+      return;
+    }
+
     setBusyAction(`${product.id}:product`);
     setActionError(undefined);
     setSuccessMessage(undefined);
+    setRequestId(undefined);
 
     try {
-      const response = await deactivateAdminProduct(product.id);
+      const response = nextIsActive
+        ? await updateAdminProduct(product.id, { isActive: true })
+        : await deactivateAdminProduct(product.id);
       const updatedProduct = {
         ...response.product,
         variants:
@@ -449,13 +475,15 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
       syncProduct(updatedProduct);
       setRefreshKey((current) => current + 1);
-      setSuccessMessage("Product deactivated.");
+      setSuccessMessage(
+        response.product.isActive ? "Product activated." : "Product deactivated.",
+      );
     } catch (error) {
       setActionError(
         getApiErrorMessage(
           error,
           PRODUCT_ERROR_MESSAGES,
-          "Product could not be deactivated.",
+          "Product status could not be changed.",
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -503,6 +531,20 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       return;
     }
 
+    const editingVariant = editingVariantId
+      ? selectedProduct.variants.find((variant) => variant.id === editingVariantId)
+      : undefined;
+
+    if (
+      editingVariant &&
+      variantPayload.payload.isActive !== editingVariant.isActive &&
+      !window.confirm(
+        `${variantPayload.payload.isActive ? "Activate" : "Deactivate"} variant ${editingVariant.size} / ${editingVariant.color}?`,
+      )
+    ) {
+      return;
+    }
+
     setIsSavingVariant(true);
 
     try {
@@ -541,23 +583,37 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     }
   }
 
-  async function handleDeactivateVariant(variant: AdminProductVariant) {
+  async function handleVariantStatusChange(variant: AdminProductVariant) {
+    const nextIsActive = !variant.isActive;
+
+    if (
+      !window.confirm(
+        `${nextIsActive ? "Activate" : "Deactivate"} variant ${variant.size} / ${variant.color}?`,
+      )
+    ) {
+      return;
+    }
+
     setBusyAction(`${variant.id}:variant`);
     setActionError(undefined);
     setSuccessMessage(undefined);
 
     try {
-      const response = await deactivateAdminProductVariant(variant.id);
+      const response = nextIsActive
+        ? await updateAdminProductVariant(variant.id, { isActive: true })
+        : await deactivateAdminProductVariant(variant.id);
 
       syncVariant(response.variant);
       setRefreshKey((current) => current + 1);
-      setSuccessMessage("Variant deactivated.");
+      setSuccessMessage(
+        response.variant.isActive ? "Variant activated." : "Variant deactivated.",
+      );
     } catch (error) {
       setActionError(
         getApiErrorMessage(
           error,
           PRODUCT_ERROR_MESSAGES,
-          "Variant could not be deactivated.",
+          "Variant status could not be changed.",
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -604,9 +660,25 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     query.order !== "desc";
 
   const selectedSortValue = getProductSortValue(query);
+  const productFormBaseline =
+    panelMode === "edit" && selectedProduct
+      ? getProductForm(selectedProduct)
+      : getEmptyProductForm();
+  const editingVariant = editingVariantId
+    ? selectedProduct?.variants.find(
+        (variant) => variant.id === editingVariantId,
+      )
+    : undefined;
+  const variantFormBaseline = editingVariant
+    ? getVariantForm(editingVariant)
+    : getEmptyVariantForm();
+  const hasUnsavedChanges = isModalOpen
+    ? !areProductFormsEqual(productForm, productFormBaseline) ||
+      !areVariantFormsEqual(variantForm, variantFormBaseline)
+    : false;
 
   return (
-    <div className="admin-resource admin-resource--wide">
+    <div className="admin-resource admin-resource--full-width">
       <section
         className="admin-resource__header"
         aria-labelledby="admin-products-heading"
@@ -739,17 +811,17 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       {categoryError ? (
         <AdminFeedback message={categoryError} tone="error" />
       ) : null}
-      {successMessage ? (
+      {!isModalOpen && successMessage ? (
         <AdminFeedback message={successMessage} tone="success" />
       ) : null}
-      {actionError ? (
+      {!isModalOpen && actionError ? (
         <AdminFeedback message={actionError} requestId={requestId} tone="error" />
       ) : null}
       {listError ? (
         <AdminFeedback message={listError} requestId={requestId} tone="error" />
       ) : null}
 
-      <section className="admin-resource__body admin-resource__body--products">
+      <section className="admin-resource__body admin-resource__body--full-width">
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
@@ -775,7 +847,19 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               ) : null}
               {!isProductLoading && !listError
                 ? products.map((product) => (
-                    <tr key={product.id}>
+                    <tr
+                      aria-label={`Open ${product.name}`}
+                      className="admin-table__clickable-row"
+                      key={product.id}
+                      onClick={() => void openEditPanel(product)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          void openEditPanel(product);
+                        }
+                      }}
+                      tabIndex={0}
+                    >
                       <td>
                         <div className="admin-product-thumb">
                           {product.imageUrls[0] ? (
@@ -804,7 +888,11 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                       </td>
                       <td>{product.variants.length}</td>
                       <td>
-                        <div className="admin-row-actions">
+                        <div
+                          className="admin-row-actions"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
                           <button
                             aria-label={`Edit ${product.name}`}
                             className="icon-button admin-icon-button"
@@ -817,13 +905,12 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           <button
                             className="admin-link-button"
                             disabled={
-                              !product.isActive ||
                               busyAction === `${product.id}:product`
                             }
-                            onClick={() => void handleDeactivateProduct(product)}
+                            onClick={() => void handleProductStatusChange(product)}
                             type="button"
                           >
-                            Deactivate
+                            {product.isActive ? "Deactivate" : "Activate"}
                           </button>
                         </div>
                       </td>
@@ -834,21 +921,57 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
           </table>
         </div>
 
-        <aside className="admin-panel admin-panel--product" aria-labelledby="product-detail-heading">
-          <div className="admin-panel__header">
-            <div>
-              <p className="eyebrow">
-                {panelMode === "create" ? "Create product" : "Product detail"}
-              </p>
-              <h2 id="product-detail-heading">
-                {panelMode === "create"
-                  ? "New product"
-                  : selectedProduct?.name || "Product"}
-              </h2>
-            </div>
-          </div>
+      </section>
 
-          <form className="admin-form" onSubmit={handleProductSave}>
+      <AdminPagination
+        isLoading={isProductLoading}
+        onPageChange={goToPage}
+        pagination={pagination}
+      />
+
+      <AdminModal
+        closeDisabled={isSavingProduct || isSavingVariant}
+        footer={(requestClose) => (
+          <>
+            <button
+              className="button button--secondary"
+              disabled={isSavingProduct || isSavingVariant}
+              onClick={requestClose}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="button button--primary"
+              disabled={isSavingProduct || isSavingVariant || isPanelLoading}
+              form="admin-product-form"
+              type="submit"
+            >
+              <Save aria-hidden="true" size={17} />
+              {isSavingProduct
+                ? "Saving"
+                : panelMode === "create"
+                  ? "Create"
+                  : "Save"}
+            </button>
+          </>
+        )}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={
+          panelMode === "create"
+            ? "New product"
+            : selectedProduct?.name || "Product detail"
+        }
+      >
+        {actionError ? (
+          <AdminFeedback message={actionError} requestId={requestId} tone="error" />
+        ) : null}
+        {successMessage ? (
+          <AdminFeedback message={successMessage} tone="success" />
+        ) : null}
+          <form className="admin-form" id="admin-product-form" onSubmit={handleProductSave}>
             <label>
               <span>Name</span>
               <input
@@ -971,30 +1094,6 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               <span>Active</span>
             </label>
 
-            <button
-              className="button button--primary button--full"
-              disabled={isSavingProduct || isPanelLoading}
-              type="submit"
-            >
-              <Save aria-hidden="true" size={17} />
-              {isSavingProduct
-                ? "Saving"
-                : panelMode === "create"
-                  ? "Create product"
-                  : "Save product"}
-            </button>
-
-            {panelMode === "edit" && selectedProduct?.isActive ? (
-              <button
-                className="button button--secondary button--full"
-                disabled={busyAction === `${selectedProduct.id}:product`}
-                onClick={() => void handleDeactivateProduct(selectedProduct)}
-                type="button"
-              >
-                <XCircle aria-hidden="true" size={17} />
-                Deactivate product
-              </button>
-            ) : null}
           </form>
 
           <section className="admin-variants" aria-labelledby="product-variants-heading">
@@ -1075,14 +1174,11 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                                 </button>
                                 <button
                                   className="admin-link-button"
-                                  disabled={
-                                    !variant.isActive ||
-                                    busyAction === `${variant.id}:variant`
-                                  }
-                                  onClick={() => void handleDeactivateVariant(variant)}
+                                  disabled={busyAction === `${variant.id}:variant`}
+                                  onClick={() => void handleVariantStatusChange(variant)}
                                   type="button"
                                 >
-                                  Deactivate
+                                  {variant.isActive ? "Deactivate" : "Activate"}
                                 </button>
                               </div>
                             </td>
@@ -1207,14 +1303,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               </div>
             )}
           </section>
-        </aside>
-      </section>
-
-      <AdminPagination
-        isLoading={isProductLoading}
-        onPageChange={goToPage}
-        pagination={pagination}
-      />
+      </AdminModal>
     </div>
   );
 }
@@ -1274,6 +1363,35 @@ function getVariantForm(variant: AdminProductVariant): VariantFormState {
     sku: variant.sku || "",
     stock: String(variant.stock),
   };
+}
+
+function areProductFormsEqual(
+  left: ProductFormState,
+  right: ProductFormState,
+): boolean {
+  return (
+    left.basePrice === right.basePrice &&
+    left.categoryId === right.categoryId &&
+    left.description === right.description &&
+    left.imageUrlsText === right.imageUrlsText &&
+    left.isActive === right.isActive &&
+    left.name === right.name &&
+    left.slug === right.slug
+  );
+}
+
+function areVariantFormsEqual(
+  left: VariantFormState,
+  right: VariantFormState,
+): boolean {
+  return (
+    left.color === right.color &&
+    left.isActive === right.isActive &&
+    left.priceOverride === right.priceOverride &&
+    left.size === right.size &&
+    left.sku === right.sku &&
+    left.stock === right.stock
+  );
 }
 
 function getProductPayload(form: ProductFormState):

@@ -24,6 +24,7 @@ import type {
 } from "@/features/admin-users/types";
 import type { AuthProvider, UserRole } from "@/features/auth/types";
 import type { Pagination } from "@/lib/api/types";
+import { AdminModal } from "@/components/admin/AdminModal";
 import {
   formatAdminDate,
   formatOptional,
@@ -54,8 +55,10 @@ interface AdminUsersPageProps {
 }
 
 interface UserFormState {
+  isActive: boolean;
   name: string;
   phone: string;
+  role: UserRole;
 }
 
 export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
@@ -73,7 +76,13 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     totalPages: 1,
   });
   const [selectedUser, setSelectedUser] = useState<AdminUser>();
-  const [form, setForm] = useState<UserFormState>({ name: "", phone: "" });
+  const [form, setForm] = useState<UserFormState>({
+    isActive: true,
+    name: "",
+    phone: "",
+    role: "CUSTOMER",
+  });
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -157,6 +166,8 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     setForm(getUserFormState(user));
     setActionError(undefined);
     setSuccessMessage(undefined);
+    setRequestId(undefined);
+    setIsModalOpen(true);
     setIsDetailLoading(true);
 
     try {
@@ -185,18 +196,61 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
       return;
     }
 
-    setIsSaving(true);
     setActionError(undefined);
     setSuccessMessage(undefined);
+    setRequestId(undefined);
+
+    const name = normalizeNullableText(form.name);
+    const phone = normalizeNullableText(form.phone);
+    const profileChanged = name !== selectedUser.name || phone !== selectedUser.phone;
+    const roleChanged = form.role !== selectedUser.role;
+    const statusChanged = form.isActive !== selectedUser.isActive;
+
+    if (!profileChanged && !roleChanged && !statusChanged) {
+      setActionError("Change at least one editable field before saving.");
+      return;
+    }
+
+    if (
+      statusChanged &&
+      !window.confirm(
+        `${form.isActive ? "Activate" : "Deactivate"} ${selectedUser.email}?`,
+      )
+    ) {
+      return;
+    }
+
+    setIsSaving(true);
 
     try {
-      const response = await updateAdminUser(selectedUser.id, {
-        name: normalizeNullableText(form.name),
-        phone: normalizeNullableText(form.phone),
-      });
+      let updatedUser = selectedUser;
 
-      syncUser(response.user);
-      setSuccessMessage("User profile updated.");
+      if (profileChanged) {
+        const response = await updateAdminUser(selectedUser.id, { name, phone });
+        updatedUser = response.user;
+        syncUser(updatedUser);
+      }
+
+      if (roleChanged) {
+        const response = await updateAdminUserRole(selectedUser.id, {
+          role: form.role,
+        });
+        updatedUser = response.user;
+        syncUser(updatedUser);
+      }
+
+      if (statusChanged) {
+        const response = await updateAdminUserStatus(selectedUser.id, {
+          isActive: form.isActive,
+        });
+        updatedUser = response.user;
+        syncUser(updatedUser);
+      }
+
+      setForm(getUserFormState(updatedUser));
+      setRefreshKey((current) => current + 1);
+      setSuccessMessage("User updated.");
+      setIsModalOpen(false);
     } catch (error) {
       setActionError(
         getApiErrorMessage(
@@ -212,15 +266,26 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
   }
 
   async function handleStatusChange(user: AdminUser) {
+    const nextIsActive = !user.isActive;
+
+    if (
+      !window.confirm(
+        `${nextIsActive ? "Activate" : "Deactivate"} ${user.email}?`,
+      )
+    ) {
+      return;
+    }
+
     const actionKey = `${user.id}:status`;
 
     setBusyAction(actionKey);
     setActionError(undefined);
     setSuccessMessage(undefined);
+    setRequestId(undefined);
 
     try {
       const response = await updateAdminUserStatus(user.id, {
-        isActive: !user.isActive,
+        isActive: nextIsActive,
       });
 
       syncUser(response.user);
@@ -244,37 +309,6 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     }
   }
 
-  async function handleRoleChange(user: AdminUser, role: UserRole) {
-    if (user.role === role) {
-      return;
-    }
-
-    const actionKey = `${user.id}:role`;
-
-    setBusyAction(actionKey);
-    setActionError(undefined);
-    setSuccessMessage(undefined);
-
-    try {
-      const response = await updateAdminUserRole(user.id, { role });
-
-      syncUser(response.user);
-      setRefreshKey((current) => current + 1);
-      setSuccessMessage("User role updated.");
-    } catch (error) {
-      setActionError(
-        getApiErrorMessage(
-          error,
-          USER_ERROR_MESSAGES,
-          "User role could not be changed.",
-        ),
-      );
-      setRequestId(getApiRequestId(error));
-    } finally {
-      setBusyAction(undefined);
-    }
-  }
-
   function syncUser(user: AdminUser) {
     setUsers((current) =>
       current.map((item) => (item.id === user.id ? user : item)),
@@ -290,9 +324,12 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     Boolean(query.role) ||
     Boolean(query.authProvider) ||
     query.isActive !== undefined;
+  const hasUnsavedChanges = selectedUser
+    ? !areUserFormsEqual(form, getUserFormState(selectedUser))
+    : false;
 
   return (
-    <div className="admin-resource">
+    <div className="admin-resource admin-resource--full-width">
       <section className="admin-resource__header" aria-labelledby="admin-users-heading">
         <h1 id="admin-users-heading">Users</h1>
         <button
@@ -400,14 +437,14 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
       {successMessage ? (
         <AdminFeedback message={successMessage} tone="success" />
       ) : null}
-      {actionError ? (
+      {!isModalOpen && actionError ? (
         <AdminFeedback message={actionError} requestId={requestId} tone="error" />
       ) : null}
       {listError ? (
         <AdminFeedback message={listError} requestId={requestId} tone="error" />
       ) : null}
 
-      <section className="admin-resource__body">
+      <section className="admin-resource__body admin-resource__body--full-width">
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
@@ -434,32 +471,25 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               ) : null}
               {!isLoading && !listError
                 ? users.map((user) => (
-                    <tr key={user.id}>
+                    <tr
+                      aria-label={`Open ${user.email}`}
+                      className="admin-table__clickable-row"
+                      key={user.id}
+                      onClick={() => void openUserDetail(user)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          void openUserDetail(user);
+                        }
+                      }}
+                      tabIndex={0}
+                    >
                       <td>
                         <strong>{user.email}</strong>
                       </td>
                       <td>{formatOptional(user.name)}</td>
                       <td>{formatOptional(user.phone)}</td>
-                      <td>
-                        <select
-                          aria-label={`Change role for ${user.email}`}
-                          className="admin-inline-select"
-                          disabled={busyAction === `${user.id}:role`}
-                          onChange={(event) =>
-                            void handleRoleChange(
-                              user,
-                              event.target.value as UserRole,
-                            )
-                          }
-                          value={user.role}
-                        >
-                          {ROLE_OPTIONS.map((role) => (
-                            <option key={role} value={role}>
-                              {role}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
+                      <td>{user.role}</td>
                       <td>{user.authProvider}</td>
                       <td>
                         <span
@@ -475,7 +505,11 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                       <td>{formatAdminDate(user.createdAt)}</td>
                       <td>{formatAdminDate(user.updatedAt)}</td>
                       <td>
-                        <div className="admin-row-actions">
+                        <div
+                          className="admin-row-actions"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
                           <button
                             aria-label={`Edit ${user.email}`}
                             className="icon-button admin-icon-button"
@@ -502,18 +536,47 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
           </table>
         </div>
 
-        <aside className="admin-panel" aria-labelledby="user-detail-heading">
-          <div className="admin-panel__header">
-            <div>
-              <p className="eyebrow">User detail</p>
-              <h2 id="user-detail-heading">
-                {selectedUser ? selectedUser.email : "Select a user"}
-              </h2>
-            </div>
-          </div>
+      </section>
 
-          {selectedUser ? (
-            <form className="admin-form" onSubmit={handleUserSave}>
+      <AdminPagination
+        isLoading={isLoading}
+        onPageChange={goToPage}
+        pagination={pagination}
+      />
+
+      <AdminModal
+        closeDisabled={isSaving}
+        footer={(requestClose) => (
+          <>
+            <button
+              className="button button--secondary"
+              disabled={isSaving}
+              onClick={requestClose}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="button button--primary"
+              disabled={isSaving || isDetailLoading}
+              form="admin-user-edit-form"
+              type="submit"
+            >
+              <Save aria-hidden="true" size={17} />
+              {isSaving ? "Saving" : "Save"}
+            </button>
+          </>
+        )}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={selectedUser ? selectedUser.email : "User detail"}
+      >
+        {actionError ? (
+          <AdminFeedback message={actionError} requestId={requestId} tone="error" />
+        ) : null}
+        {selectedUser ? (
+            <form className="admin-form" id="admin-user-edit-form" onSubmit={handleUserSave}>
               <label>
                 <span>Name</span>
                 <input
@@ -528,6 +591,43 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                   value={form.name}
                 />
               </label>
+
+              <div className="admin-form__split">
+                <label>
+                  <span>Role</span>
+                  <select
+                    disabled={isDetailLoading}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        role: event.target.value as UserRole,
+                      }))
+                    }
+                    value={form.role}
+                  >
+                    {ROLE_OPTIONS.map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="admin-checkbox admin-checkbox--modal">
+                  <input
+                    checked={form.isActive}
+                    disabled={isDetailLoading}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        isActive: event.target.checked,
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  <span>Active</span>
+                </label>
+              </div>
 
               <label>
                 <span>Phone</span>
@@ -563,37 +663,33 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                 </span>
               </div>
 
-              <button
-                className="button button--primary button--full"
-                disabled={isSaving || isDetailLoading}
-                type="submit"
-              >
-                <Save aria-hidden="true" size={17} />
-                {isSaving ? "Saving" : "Save profile"}
-              </button>
             </form>
           ) : (
             <div className="admin-panel__empty" role="status">
-              Choose a user row to edit safe profile fields.
+              Loading user detail.
             </div>
           )}
-        </aside>
-      </section>
-
-      <AdminPagination
-        isLoading={isLoading}
-        onPageChange={goToPage}
-        pagination={pagination}
-      />
+      </AdminModal>
     </div>
   );
 }
 
 function getUserFormState(user: AdminUser): UserFormState {
   return {
+    isActive: user.isActive,
     name: user.name || "",
     phone: user.phone || "",
+    role: user.role,
   };
+}
+
+function areUserFormsEqual(left: UserFormState, right: UserFormState): boolean {
+  return (
+    left.isActive === right.isActive &&
+    left.name === right.name &&
+    left.phone === right.phone &&
+    left.role === right.role
+  );
 }
 
 function AdminFeedback({

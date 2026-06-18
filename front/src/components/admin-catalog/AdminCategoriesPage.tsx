@@ -9,7 +9,6 @@ import {
   RotateCcw,
   Save,
   Search,
-  XCircle,
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
@@ -25,6 +24,7 @@ import type {
   AdminCategoryQuery,
 } from "@/features/admin-catalog/types";
 import type { Pagination } from "@/lib/api/types";
+import { AdminModal } from "@/components/admin/AdminModal";
 import {
   formatAdminDate,
   formatOptional,
@@ -90,6 +90,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   const [panelMode, setPanelMode] = useState<CategoryPanelMode>("create");
   const [selectedCategory, setSelectedCategory] = useState<AdminCategory>();
   const [form, setForm] = useState<CategoryFormState>(getEmptyCategoryForm());
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -174,6 +175,8 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
     setForm(getEmptyCategoryForm());
     setActionError(undefined);
     setSuccessMessage(undefined);
+    setRequestId(undefined);
+    setIsModalOpen(true);
   }
 
   async function openEditPanel(category: AdminCategory) {
@@ -182,6 +185,8 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
     setForm(getCategoryForm(category));
     setActionError(undefined);
     setSuccessMessage(undefined);
+    setRequestId(undefined);
+    setIsModalOpen(true);
     setIsDetailLoading(true);
 
     try {
@@ -215,11 +220,22 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       return;
     }
 
+    if (
+      panelMode === "edit" &&
+      selectedCategory &&
+      form.isActive !== selectedCategory.isActive &&
+      !window.confirm(
+        `${form.isActive ? "Activate" : "Deactivate"} ${selectedCategory.name}?`,
+      )
+    ) {
+      return;
+    }
+
     setIsSaving(true);
 
     try {
       if (panelMode === "create") {
-        const response = await createAdminCategory({
+        await createAdminCategory({
           description: normalizeNullableText(form.description),
           featuredOrder: form.isFeatured ? Number(form.featuredOrder) : null,
           imageUrl: normalizeNullableText(form.imageUrl),
@@ -229,9 +245,6 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
           slug: form.slug.trim(),
         });
 
-        setSelectedCategory(response.category);
-        setPanelMode("edit");
-        setForm(getCategoryForm(response.category));
         setSuccessMessage("Category created.");
       } else if (selectedCategory) {
         const response = await updateAdminCategory(selectedCategory.id, {
@@ -250,6 +263,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       }
 
       setRefreshKey((current) => current + 1);
+      setIsModalOpen(false);
     } catch (error) {
       setActionError(
         getApiErrorMessage(
@@ -264,13 +278,26 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
     }
   }
 
-  async function handleDeactivateCategory(category: AdminCategory) {
+  async function handleCategoryStatusChange(category: AdminCategory) {
+    const nextIsActive = !category.isActive;
+
+    if (
+      !window.confirm(
+        `${nextIsActive ? "Activate" : "Deactivate"} ${category.name}?`,
+      )
+    ) {
+      return;
+    }
+
     setBusyAction(category.id);
     setActionError(undefined);
     setSuccessMessage(undefined);
+    setRequestId(undefined);
 
     try {
-      const response = await deactivateAdminCategory(category.id);
+      const response = nextIsActive
+        ? await updateAdminCategory(category.id, { isActive: true })
+        : await deactivateAdminCategory(category.id);
 
       setSelectedCategory((current) =>
         current?.id === response.category.id ? response.category : current,
@@ -281,13 +308,17 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
           : current,
       );
       setRefreshKey((current) => current + 1);
-      setSuccessMessage("Category deactivated.");
+      setSuccessMessage(
+        response.category.isActive
+          ? "Category activated."
+          : "Category deactivated.",
+      );
     } catch (error) {
       setActionError(
         getApiErrorMessage(
           error,
           CATEGORY_ERROR_MESSAGES,
-          "Category could not be deactivated.",
+          "Category status could not be changed.",
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -297,9 +328,17 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   }
 
   const hasFilters = Boolean(query.search) || query.isActive !== undefined;
+  const hasUnsavedChanges = isModalOpen
+    ? !areCategoryFormsEqual(
+        form,
+        panelMode === "edit" && selectedCategory
+          ? getCategoryForm(selectedCategory)
+          : getEmptyCategoryForm(),
+      )
+    : false;
 
   return (
-    <div className="admin-resource admin-resource--categories">
+    <div className="admin-resource admin-resource--categories admin-resource--full-width">
       <section
         className="admin-resource__header"
         aria-labelledby="admin-categories-heading"
@@ -376,14 +415,14 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       {successMessage ? (
         <AdminFeedback message={successMessage} tone="success" />
       ) : null}
-      {actionError ? (
+      {!isModalOpen && actionError ? (
         <AdminFeedback message={actionError} requestId={requestId} tone="error" />
       ) : null}
       {listError ? (
         <AdminFeedback message={listError} requestId={requestId} tone="error" />
       ) : null}
 
-      <section className="admin-resource__body">
+      <section className="admin-resource__body admin-resource__body--full-width">
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
@@ -410,7 +449,19 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               ) : null}
               {!isLoading && !listError
                 ? categories.map((category) => (
-                    <tr key={category.id}>
+                    <tr
+                      aria-label={`Open ${category.name}`}
+                      className="admin-table__clickable-row"
+                      key={category.id}
+                      onClick={() => void openEditPanel(category)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          void openEditPanel(category);
+                        }
+                      }}
+                      tabIndex={0}
+                    >
                       <td>
                         <strong>{category.name}</strong>
                       </td>
@@ -452,7 +503,11 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                       <td>{formatAdminDate(category.createdAt)}</td>
                       <td>{formatAdminDate(category.updatedAt)}</td>
                       <td>
-                        <div className="admin-row-actions">
+                        <div
+                          className="admin-row-actions"
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
                           <button
                             aria-label={`Edit ${category.name}`}
                             className="icon-button admin-icon-button"
@@ -464,11 +519,11 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                           </button>
                           <button
                             className="admin-link-button"
-                            disabled={!category.isActive || busyAction === category.id}
-                            onClick={() => void handleDeactivateCategory(category)}
+                            disabled={busyAction === category.id}
+                            onClick={() => void handleCategoryStatusChange(category)}
                             type="button"
                           >
-                            Deactivate
+                            {category.isActive ? "Deactivate" : "Activate"}
                           </button>
                         </div>
                       </td>
@@ -479,21 +534,54 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
           </table>
         </div>
 
-        <aside className="admin-panel" aria-labelledby="category-detail-heading">
-          <div className="admin-panel__header">
-            <div>
-              <p className="eyebrow">
-                {panelMode === "create" ? "Create category" : "Category detail"}
-              </p>
-              <h2 id="category-detail-heading">
-                {panelMode === "create"
-                  ? "New category"
-                  : selectedCategory?.name || "Category"}
-              </h2>
-            </div>
-          </div>
+      </section>
 
-          <form className="admin-form" onSubmit={handleCategorySave}>
+      <AdminPagination
+        isLoading={isLoading}
+        onPageChange={goToPage}
+        pagination={pagination}
+      />
+
+      <AdminModal
+        closeDisabled={isSaving}
+        footer={(requestClose) => (
+          <>
+            <button
+              className="button button--secondary"
+              disabled={isSaving}
+              onClick={requestClose}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button
+              className="button button--primary"
+              disabled={isSaving || isDetailLoading}
+              form="admin-category-form"
+              type="submit"
+            >
+              <Save aria-hidden="true" size={17} />
+              {isSaving
+                ? "Saving"
+                : panelMode === "create"
+                  ? "Create"
+                  : "Save"}
+            </button>
+          </>
+        )}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={
+          panelMode === "create"
+            ? "New category"
+            : selectedCategory?.name || "Category detail"
+        }
+      >
+        {actionError ? (
+          <AdminFeedback message={actionError} requestId={requestId} tone="error" />
+        ) : null}
+          <form className="admin-form" id="admin-category-form" onSubmit={handleCategorySave}>
             <label>
               <span>Name</span>
               <input
@@ -629,39 +717,8 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               </small>
             </label>
 
-            <button
-              className="button button--primary button--full"
-              disabled={isSaving || isDetailLoading}
-              type="submit"
-            >
-              <Save aria-hidden="true" size={17} />
-              {isSaving
-                ? "Saving"
-                : panelMode === "create"
-                  ? "Create category"
-                  : "Save category"}
-            </button>
-
-            {panelMode === "edit" && selectedCategory?.isActive ? (
-              <button
-                className="button button--secondary button--full"
-                disabled={busyAction === selectedCategory.id}
-                onClick={() => void handleDeactivateCategory(selectedCategory)}
-                type="button"
-              >
-                <XCircle aria-hidden="true" size={17} />
-                Deactivate category
-              </button>
-            ) : null}
           </form>
-        </aside>
-      </section>
-
-      <AdminPagination
-        isLoading={isLoading}
-        onPageChange={goToPage}
-        pagination={pagination}
-      />
+      </AdminModal>
     </div>
   );
 }
@@ -690,6 +747,21 @@ function getCategoryForm(category: AdminCategory): CategoryFormState {
     name: category.name,
     slug: category.slug,
   };
+}
+
+function areCategoryFormsEqual(
+  left: CategoryFormState,
+  right: CategoryFormState,
+): boolean {
+  return (
+    left.description === right.description &&
+    left.featuredOrder === right.featuredOrder &&
+    left.imageUrl === right.imageUrl &&
+    left.isActive === right.isActive &&
+    left.isFeatured === right.isFeatured &&
+    left.name === right.name &&
+    left.slug === right.slug
+  );
 }
 
 function validateCategoryForm(form: CategoryFormState): string | undefined {
