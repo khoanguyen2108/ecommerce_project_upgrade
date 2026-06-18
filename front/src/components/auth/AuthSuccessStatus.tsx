@@ -9,6 +9,12 @@ import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
 type Status = "checking" | "confirmed" | "unconfirmed";
 
+const SESSION_CONFIRMATION_ATTEMPTS = 3;
+const SESSION_CONFIRMATION_RETRY_DELAY_MS = 400;
+
+const wait = (delayMs: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
+
 export function AuthSuccessStatus() {
   const router = useRouter();
   const { setAuthenticatedUser } = useAuthSession();
@@ -19,20 +25,27 @@ export function AuthSuccessStatus() {
     let redirectTimer: number | undefined;
 
     async function confirmSession() {
-      try {
-        const response = await getCurrentUser();
+      for (let attempt = 1; attempt <= SESSION_CONFIRMATION_ATTEMPTS; attempt += 1) {
+        try {
+          const response = await getCurrentUser();
 
-        if (!isMounted) {
+          if (!isMounted) {
+            return;
+          }
+
+          setAuthenticatedUser(response.user);
+          setStatus("confirmed");
+          redirectTimer = window.setTimeout(() => router.replace("/"), 1400);
           return;
+        } catch {
+          if (attempt < SESSION_CONFIRMATION_ATTEMPTS) {
+            await wait(SESSION_CONFIRMATION_RETRY_DELAY_MS);
+          }
         }
+      }
 
-        setAuthenticatedUser(response.user);
-        setStatus("confirmed");
-        redirectTimer = window.setTimeout(() => router.replace("/"), 1400);
-      } catch {
-        if (isMounted) {
-          setStatus("unconfirmed");
-        }
+      if (isMounted) {
+        setStatus("unconfirmed");
       }
     }
 

@@ -67,11 +67,10 @@ export function logoutUser(): Promise<{ success: true }> {
   });
 }
 
-export function refreshToken(refreshTokenValue: string): Promise<AuthResponse> {
+export function refreshToken(refreshTokenValue?: string): Promise<AuthResponse> {
   return apiRequest<AuthResponse>("/auth/refresh", {
-    body: {
-      refreshToken: refreshTokenValue,
-    },
+    body: refreshTokenValue ? { refreshToken: refreshTokenValue } : {},
+    credentials: "include",
     method: "POST",
   });
 }

@@ -6,15 +6,23 @@ import { ApiResponseInterceptor } from './common/interceptors/api-response.inter
 import { setupSwagger } from './swagger';
 
 async function bootstrap() {
-  const corsOrigin = process.env.CORS_ORIGIN?.trim();
+  const corsOrigins = (process.env.CORS_ORIGIN ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (corsOrigins.includes('*')) {
+    throw new Error(
+      'CORS_ORIGIN must list explicit origins when credentials are enabled.',
+    );
+  }
+
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
 
   app.enableCors({
-    origin: corsOrigin
-      ? corsOrigin.split(',').map((origin) => origin.trim())
-      : undefined,
+    origin: corsOrigins.length > 0 ? corsOrigins : false,
     credentials: true,
   });
 

@@ -285,7 +285,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const refreshToken =
-      dto?.refreshToken ?? this.getCookie(request, AUTH_REFRESH_TOKEN_COOKIE);
+      this.getCookie(request, AUTH_REFRESH_TOKEN_COOKIE) ?? dto?.refreshToken;
 
     if (!refreshToken) {
       throw new BadRequestException({
@@ -319,11 +319,8 @@ export class AuthController {
         this.authService.getGoogleAuthorizationUrl();
 
       this.appendCookie(response, GOOGLE_OAUTH_STATE_COOKIE, state, {
-        httpOnly: true,
+        ...this.getBaseCookieOptions(),
         maxAgeSeconds: getOAuthStateCookieMaxAgeSeconds(),
-        path: '/',
-        sameSite: 'Lax',
-        secure: this.shouldUseSecureCookies(),
       });
 
       return response.redirect(302, authorizationUrl);
@@ -504,22 +501,16 @@ export class AuthController {
     tokenResponse: AuthTokenResponse,
   ) {
     this.appendCookie(response, AUTH_ACCESS_TOKEN_COOKIE, tokenResponse.accessToken, {
-      httpOnly: true,
+      ...this.getBaseCookieOptions(),
       maxAgeSeconds: this.authService.getAccessTokenCookieMaxAgeSeconds(),
-      path: '/',
-      sameSite: 'Lax',
-      secure: this.shouldUseSecureCookies(),
     });
     this.appendCookie(
       response,
       AUTH_REFRESH_TOKEN_COOKIE,
       tokenResponse.refreshToken,
       {
-        httpOnly: true,
+        ...this.getBaseCookieOptions(),
         maxAgeSeconds: this.authService.getRefreshTokenCookieMaxAgeSeconds(),
-        path: '/',
-        sameSite: 'Lax',
-        secure: this.shouldUseSecureCookies(),
       },
     );
   }
@@ -541,12 +532,20 @@ export class AuthController {
 
   private clearCookie(response: Response, name: string) {
     this.appendCookie(response, name, '', {
-      httpOnly: true,
+      ...this.getBaseCookieOptions(),
       maxAgeSeconds: 0,
-      path: '/',
-      sameSite: 'Lax',
-      secure: this.shouldUseSecureCookies(),
     });
+  }
+
+  private getBaseCookieOptions(): CookieOptions {
+    const secure = this.shouldUseSecureCookies();
+
+    return {
+      httpOnly: true,
+      path: '/',
+      sameSite: secure ? 'None' : 'Lax',
+      secure,
+    };
   }
 
   private serializeCookie(
