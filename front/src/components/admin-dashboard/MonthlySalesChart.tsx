@@ -1,0 +1,158 @@
+import type { AdminRevenueBucket } from "@/features/admin-stats/types";
+
+interface MonthlySalesChartProps {
+  buckets?: AdminRevenueBucket[];
+  isLoading?: boolean;
+}
+
+const CHART_WIDTH = 760;
+const CHART_HEIGHT = 278;
+const PLOT_LEFT = 54;
+const PLOT_RIGHT = 18;
+const PLOT_TOP = 20;
+const PLOT_BOTTOM = 44;
+
+export function MonthlySalesChart({
+  buckets = [],
+  isLoading = false,
+}: MonthlySalesChartProps) {
+  const hasSales = buckets.some((bucket) => bucket.revenue > 0);
+  const maxValue = Math.max(...buckets.map((bucket) => bucket.revenue), 0);
+  const plotWidth = CHART_WIDTH - PLOT_LEFT - PLOT_RIGHT;
+  const plotHeight = CHART_HEIGHT - PLOT_TOP - PLOT_BOTTOM;
+  const slotWidth = buckets.length > 0 ? plotWidth / buckets.length : plotWidth;
+  const barWidth = Math.max(8, Math.min(34, slotWidth * 0.54));
+  const labelStep = Math.max(1, Math.ceil(buckets.length / 8));
+
+  return (
+    <article className="admin-dashboard-card admin-dashboard-card--sales">
+      <header className="admin-dashboard-card__header">
+        <div>
+          <p className="admin-dashboard-card__kicker">Performance</p>
+          <h2>Monthly sales</h2>
+          <span>Verified paid revenue in the selected range</span>
+        </div>
+        <span className="admin-dashboard-legend">
+          <i aria-hidden="true" /> Paid revenue
+        </span>
+      </header>
+
+      {isLoading && buckets.length === 0 ? (
+        <ChartLoading label="Loading monthly sales" />
+      ) : !hasSales ? (
+        <div className="admin-dashboard-chart-empty" role="status">
+          <strong>No sales data yet</strong>
+          <span>
+            Verified paid revenue will appear here when it is available for this
+            date range.
+          </span>
+        </div>
+      ) : (
+        <div className="admin-dashboard-chart-wrap">
+          <svg
+            aria-labelledby="monthly-sales-title monthly-sales-description"
+            className="admin-dashboard-bar-chart"
+            role="img"
+            viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          >
+            <title id="monthly-sales-title">Monthly verified paid revenue</title>
+            <desc id="monthly-sales-description">
+              Bar chart of verified paid revenue for each API-provided monthly
+              bucket in the selected range.
+            </desc>
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+              const y = PLOT_TOP + plotHeight * ratio;
+              const value = maxValue * (1 - ratio);
+
+              return (
+                <g key={ratio}>
+                  <line
+                    className="admin-dashboard-chart-gridline"
+                    x1={PLOT_LEFT}
+                    x2={CHART_WIDTH - PLOT_RIGHT}
+                    y1={y}
+                    y2={y}
+                  />
+                  <text
+                    className="admin-dashboard-chart-axis"
+                    textAnchor="end"
+                    x={PLOT_LEFT - 10}
+                    y={y + 4}
+                  >
+                    {formatCompactCurrency(value)}
+                  </text>
+                </g>
+              );
+            })}
+            {buckets.map((bucket, index) => {
+              const height = (bucket.revenue / maxValue) * plotHeight;
+              const x = PLOT_LEFT + slotWidth * index + (slotWidth - barWidth) / 2;
+
+              return (
+                <g key={`${bucket.periodStart}-${index}`}>
+                  <rect
+                    className="admin-dashboard-chart-bar"
+                    height={Math.max(height, 2)}
+                    rx="5"
+                    width={barWidth}
+                    x={x}
+                    y={PLOT_TOP + plotHeight - Math.max(height, 2)}
+                  >
+                    <title>
+                      {formatBucketLabel(bucket.periodStart, true)}: {formatCurrency(bucket.revenue)}
+                    </title>
+                  </rect>
+                  {index % labelStep === 0 || index === buckets.length - 1 ? (
+                    <text
+                      className="admin-dashboard-chart-axis admin-dashboard-chart-axis--x"
+                      textAnchor="middle"
+                      x={x + barWidth / 2}
+                      y={CHART_HEIGHT - 15}
+                    >
+                      {formatBucketLabel(bucket.periodStart, buckets.length > 12)}
+                    </text>
+                  ) : null}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ChartLoading({ label }: { label: string }) {
+  return (
+    <div aria-label={label} className="admin-dashboard-chart-loading" role="status">
+      <span className="admin-dashboard-skeleton admin-dashboard-skeleton--chart" />
+    </div>
+  );
+}
+
+function formatBucketLabel(value: string, includeYear: boolean): string {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    timeZone: "UTC",
+    ...(includeYear ? { year: "2-digit" } : {}),
+  }).format(new Date(value));
+}
+
+function formatCompactCurrency(value: number): string {
+  if (value === 0) {
+    return "0";
+  }
+
+  return new Intl.NumberFormat("en", {
+    maximumFractionDigits: 1,
+    notation: "compact",
+  }).format(value);
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("vi-VN", {
+    currency: "VND",
+    maximumFractionDigits: 0,
+    style: "currency",
+  }).format(value);
+}

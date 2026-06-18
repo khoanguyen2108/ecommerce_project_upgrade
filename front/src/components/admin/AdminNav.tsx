@@ -1,9 +1,11 @@
 "use client";
 
 import {
-  ChartNoAxesColumnIncreasing,
+  ClipboardList,
+  CreditCard,
   LayoutDashboard,
   Package,
+  ShieldCheck,
   Tags,
   Users,
 } from "lucide-react";
@@ -32,9 +34,19 @@ const adminNavItems = [
     label: "Categories",
   },
   {
-    href: "/admin/stats",
-    icon: ChartNoAxesColumnIncreasing,
-    label: "Stats",
+    href: "/admin/orders",
+    icon: ClipboardList,
+    label: "Orders",
+  },
+  {
+    href: "/admin/payments",
+    icon: CreditCard,
+    label: "Payments",
+  },
+  {
+    href: "/admin/payments/payos/readiness",
+    icon: ShieldCheck,
+    label: "payOS Readiness",
   },
 ] as const;
 
@@ -66,6 +78,13 @@ export function AdminNav() {
 function isActiveAdminPath(pathname: string, href: string): boolean {
   if (href === "/admin") {
     return pathname === "/admin";
+  }
+
+  if (
+    href === "/admin/payments" &&
+    pathname.startsWith("/admin/payments/payos/readiness")
+  ) {
+    return false;
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);

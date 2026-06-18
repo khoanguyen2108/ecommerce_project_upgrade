@@ -134,7 +134,7 @@ function Read-ErrorResponseContent {
     return ''
   }
 
-  if ($Response -is [System.Net.Http.HttpResponseMessage]) {
+  if ($Response.GetType().FullName -eq 'System.Net.Http.HttpResponseMessage') {
     return $Response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
   }
 
@@ -206,6 +206,13 @@ function Invoke-SmokeRequest {
 
     $statusCode = [int]$errorResponse.StatusCode
     $content = Read-ErrorResponseContent -Response $errorResponse
+
+    if (
+      [string]::IsNullOrWhiteSpace($content) -and
+      -not [string]::IsNullOrWhiteSpace([string]$_.ErrorDetails.Message)
+    ) {
+      $content = [string]$_.ErrorDetails.Message
+    }
   }
 
   $parsed = $null
@@ -448,16 +455,18 @@ try {
   $adminPassword = Get-EnvValue -Name 'ADMIN_PASSWORD'
   $staffEmail = Get-EnvValue -Name 'OPTIONAL_STAFF_EMAIL'
   $staffPassword = Get-EnvValue -Name 'OPTIONAL_STAFF_PASSWORD'
+  $staffEmailProvided = -not [string]::IsNullOrWhiteSpace($staffEmail)
+  $staffPasswordProvided = -not [string]::IsNullOrWhiteSpace($staffPassword)
   $allowMutatingAdminActions = Get-EnvBool -Name 'ALLOW_MUTATING_ADMIN_ACTIONS' -DefaultValue $false
   $allowPayosProviderCalls = Get-EnvBool -Name 'ALLOW_PAYOS_PROVIDER_CALLS' -DefaultValue $false
   $allowPayosWebhookFixture = Get-EnvBool -Name 'ALLOW_PAYOS_WEBHOOK_FIXTURE' -DefaultValue $false
   $adminOrderMutation = (Get-EnvValue -Name 'ADMIN_ORDER_MUTATION' -DefaultValue 'cancel').Trim().ToLowerInvariant()
 
-  if (($null -eq $staffEmail) -xor ($null -eq $staffPassword)) {
+  if ($staffEmailProvided -xor $staffPasswordProvided) {
     Fail 'Set both OPTIONAL_STAFF_EMAIL and OPTIONAL_STAFF_PASSWORD, or leave both blank.'
   }
 
-  if ($null -ne $staffEmail) {
+  if ($staffEmailProvided) {
     $staffEmail = $staffEmail.Trim()
   }
 
@@ -636,7 +645,7 @@ try {
   $customerAdminResponse = Invoke-SmokeRequest -Method 'GET' -Path '/admin/orders' -Headers $customerHeaders -ExpectedStatus @(403)
   Assert-Equals -Actual (Get-EnvelopeErrorCode -ResponseBody $customerAdminResponse.Body) -Expected 'FORBIDDEN' -Message 'Customer admin-order request error code mismatch.'
 
-  if ($null -ne $staffEmail) {
+  if ($staffEmailProvided) {
     $staffSession = Login-SmokeUser -Label 'staff' -Email $staffEmail -Password $staffPassword
     Assert-Equals -Actual $staffSession.Role -Expected 'STAFF' -Message 'OPTIONAL_STAFF credentials must belong to a STAFF user.'
     $staffHeaders = Get-AuthHeaders -AccessToken $staffSession.AccessToken
