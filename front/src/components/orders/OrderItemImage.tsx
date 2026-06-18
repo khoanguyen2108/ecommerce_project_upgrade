@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 interface OrderItemImageProps {
   alt: string;
   imageUrl?: string | null;
@@ -10,8 +14,10 @@ export function OrderItemImage({
   size = "detail",
 }: OrderItemImageProps) {
   const className = `order-item-image order-item-image--${size}`;
+  const normalizedImageUrl = imageUrl?.trim() || null;
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
 
-  if (!imageUrl) {
+  if (!normalizedImageUrl || failedImageUrl === normalizedImageUrl) {
     return (
       <span
         aria-label={`${alt} image unavailable`}
@@ -21,5 +27,13 @@ export function OrderItemImage({
     );
   }
 
-  return <img alt={alt} className={className} loading="lazy" src={imageUrl} />;
+  return (
+    <img
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setFailedImageUrl(normalizedImageUrl)}
+      src={normalizedImageUrl}
+    />
+  );
 }

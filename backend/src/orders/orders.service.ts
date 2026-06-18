@@ -11,6 +11,7 @@ import { OrderExpiryService } from '../order-expiry/order-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
 import type { OrderQueryDto } from './dto/order-query.dto';
+import { getFirstProductImage } from './order-item-image';
 
 const DEFAULT_ORDER_LIMIT = 20;
 const MAX_ORDER_LIMIT = 50;
@@ -245,7 +246,7 @@ export class OrdersService {
       ...order,
       items: order.items.map(({ product, ...item }) => ({
         ...item,
-        imageUrl: product.imageUrls[0] ?? null,
+        imageUrl: getFirstProductImage(product),
       })),
     };
   }

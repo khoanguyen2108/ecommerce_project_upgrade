@@ -4,6 +4,7 @@ import { OrderEmailService } from '../email/order-email.service';
 import { Prisma } from '../generated/prisma/client';
 import { OrderStatus } from '../generated/prisma/enums';
 import { OrderExpiryService } from '../order-expiry/order-expiry.service';
+import { getFirstProductImage } from '../orders/order-item-image';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   CheckoutSummaryItemResponseDto,
@@ -78,6 +79,11 @@ const checkoutOrderItemSelect = {
   quantity: true,
   lineTotal: true,
   createdAt: true,
+  product: {
+    select: {
+      imageUrls: true,
+    },
+  },
 } as const satisfies Prisma.OrderItemSelect;
 
 const checkoutPaymentSelect = {
@@ -121,6 +127,10 @@ const checkoutOrderSelect = {
     select: checkoutPaymentSelect,
   },
 } as const satisfies Prisma.OrderSelect;
+
+type CheckoutOrderRecord = Prisma.OrderGetPayload<{
+  select: typeof checkoutOrderSelect;
+}>;
 
 type CheckoutCartRecord = Prisma.CartGetPayload<{
   select: typeof checkoutCartSelect;
@@ -256,7 +266,17 @@ export class CheckoutService {
     void this.orderEmailService.sendOrderCreatedEmail(order.id);
 
     return {
-      order,
+      order: this.toOrderResponse(order),
+    };
+  }
+
+  private toOrderResponse(order: CheckoutOrderRecord) {
+    return {
+      ...order,
+      items: order.items.map(({ product, ...item }) => ({
+        ...item,
+        imageUrl: getFirstProductImage(product),
+      })),
     };
   }
 
@@ -327,7 +347,7 @@ export class CheckoutService {
       productId: product.id,
       productName: product.name,
       productSlug: product.slug,
-      imageUrl: imageUrls[0] ?? null,
+      imageUrl: getFirstProductImage(product),
       imageUrls,
       categoryName: product.category.name,
       categorySlug: product.category.slug,
