@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Search } from "lucide-react";
+import { AlertCircle, RotateCcw, Search } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { getCategories, getProducts } from "@/features/catalog/api";
@@ -37,6 +37,7 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
   const [productError, setProductError] = useState<string>();
   const [isCategoryLoading, setIsCategoryLoading] = useState(true);
   const [isProductLoading, setIsProductLoading] = useState(true);
+  const [productRequestKey, setProductRequestKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -98,7 +99,7 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [query]);
+  }, [productRequestKey, query]);
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -126,6 +127,14 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
     }));
   }
 
+  function handleReset() {
+    setSearchInput("");
+    setQuery({
+      limit: PRODUCT_LIMIT,
+      page: 1,
+    });
+  }
+
   function goToPage(page: number) {
     setQuery((current) => ({
       ...current,
@@ -136,46 +145,56 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
   const activeCategoryName =
     categories.find((category) => category.slug === query.categorySlug)?.name ||
     query.categorySlug;
+  const hasActiveFilters = Boolean(
+    query.categorySlug || query.search || (query.sort && query.sort !== "newest"),
+  );
+  const productCountLabel = isProductLoading
+    ? "Loading products"
+    : productError
+      ? "Catalog unavailable"
+      : `${pagination.total} ${pagination.total === 1 ? "product" : "products"}`;
 
   return (
-    <main className="catalog-page">
-      <section className="catalog-hero">
-        <p className="eyebrow">Shop Belikeme</p>
-        <h1>Clean layers, ready to wear</h1>
-        <p>
-          Search the live catalog, filter by category, and open product details
-          for sizes, colors, and stock.
+    <main className="catalog-page catalog-page--shop">
+      <section className="catalog-intro" aria-labelledby="shop-heading">
+        <div>
+          <p className="eyebrow">Shop</p>
+          <h1 id="shop-heading">Shop the collection</h1>
+          <p>
+            Considered everyday pieces, clean silhouettes, and easy layers for
+            your wardrobe.
+          </p>
+        </div>
+        <p aria-live="polite" className="catalog-product-count">
+          {productCountLabel}
         </p>
       </section>
 
-      <section className="catalog-shell" aria-labelledby="products-heading">
-        <div className="catalog-toolbar">
-          <div>
-            <p className="eyebrow">Catalog</p>
-            <h2 id="products-heading">Products</h2>
-          </div>
-
-          <form className="catalog-search" onSubmit={handleSearchSubmit}>
-            <label htmlFor="product-search">Search products</label>
-            <div>
+      <section className="catalog-shell" aria-label="Product catalog">
+        <form className="catalog-controls" onSubmit={handleSearchSubmit}>
+          <div className="catalog-control catalog-control--search">
+            <label htmlFor="product-search">Search</label>
+            <div className="catalog-search-row">
               <input
                 id="product-search"
                 name="search"
                 onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search tees, jackets, denim..."
+                placeholder="Search products"
                 type="search"
                 value={searchInput}
               />
-              <button className="button button--primary" type="submit">
-                <Search size={17} />
-                Search
+              <button
+                aria-label="Search products"
+                className="catalog-search-button"
+                type="submit"
+              >
+                <Search aria-hidden="true" size={18} />
+                <span>Search</span>
               </button>
             </div>
-          </form>
-        </div>
+          </div>
 
-        <div className="catalog-filters" aria-label="Product filters">
-          <label>
+          <label className="catalog-control">
             <span>Category</span>
             <select
               disabled={isCategoryLoading || Boolean(categoryError)}
@@ -191,8 +210,8 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
             </select>
           </label>
 
-          <label>
-            <span>Sort</span>
+          <label className="catalog-control">
+            <span>Sort by</span>
             <select
               onChange={(event) =>
                 handleSortChange(event.target.value as ProductQuery["sort"] | "")
@@ -204,7 +223,17 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
               <option value="price_desc">Price: high to low</option>
             </select>
           </label>
-        </div>
+
+          <button
+            className="catalog-reset"
+            disabled={!hasActiveFilters || isProductLoading}
+            onClick={handleReset}
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" size={16} />
+            Reset
+          </button>
+        </form>
 
         {categoryError ? (
           <div className="catalog-inline-alert" role="status">
@@ -212,58 +241,91 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
           </div>
         ) : null}
 
-        {activeCategoryName || query.search ? (
-          <p className="catalog-context">
-            Showing {activeCategoryName ? activeCategoryName : "all categories"}
-            {query.search ? ` matching "${query.search}"` : ""}.
-          </p>
-        ) : null}
+        <div className="catalog-results-heading">
+          <div>
+            <p className="eyebrow">Collection</p>
+            <h2>
+              {activeCategoryName || query.search ? "Filtered products" : "All products"}
+            </h2>
+          </div>
+          {activeCategoryName || query.search ? (
+            <p className="catalog-context">
+              Showing {activeCategoryName ? activeCategoryName : "all categories"}
+              {query.search ? ` matching “${query.search}”` : ""}
+            </p>
+          ) : (
+            <p className="catalog-context">Browse the complete Belikeme catalog.</p>
+          )}
+        </div>
 
         {productError ? (
-          <div className="catalog-error" role="alert">
-            <AlertCircle size={20} />
-            <span>{productError}</span>
+          <div className="catalog-error catalog-error--shop" role="alert">
+            <AlertCircle aria-hidden="true" size={20} />
+            <div>
+              <strong>Products could not be loaded</strong>
+              <span>{productError}</span>
+            </div>
+            <button
+              className="button button--secondary"
+              onClick={() => setProductRequestKey((current) => current + 1)}
+              type="button"
+            >
+              Retry
+            </button>
           </div>
         ) : null}
 
-        <div className="product-grid">
+        <div className="product-grid catalog-product-grid">
           {isProductLoading ? <CatalogSkeleton count={PRODUCT_LIMIT} /> : null}
           {!isProductLoading && !productError && products.length === 0 ? (
-            <div className="catalog-state" role="status">
-              No products match these filters. Try clearing the search or
-              choosing another category.
+            <div className="catalog-state catalog-state--shop" role="status">
+              <p className="eyebrow">Nothing here yet</p>
+              <h2>No products found</h2>
+              <p>Try a different search or reset the current filters.</p>
+              {hasActiveFilters ? (
+                <button
+                  className="button button--secondary"
+                  onClick={handleReset}
+                  type="button"
+                >
+                  Reset filters
+                </button>
+              ) : null}
             </div>
           ) : null}
           {!isProductLoading && !productError
             ? products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} variant="shop" />
               ))
             : null}
         </div>
 
-        <div className="catalog-pagination" aria-label="Product pagination">
-          <button
-            className="button button--secondary"
-            disabled={isProductLoading || pagination.page <= 1}
-            onClick={() => goToPage(Math.max(1, pagination.page - 1))}
-            type="button"
-          >
-            Previous
-          </button>
-          <span>
-            Page {pagination.page} of {Math.max(1, pagination.totalPages)}
-          </span>
-          <button
-            className="button button--secondary"
-            disabled={
-              isProductLoading || pagination.page >= Math.max(1, pagination.totalPages)
-            }
-            onClick={() => goToPage(pagination.page + 1)}
-            type="button"
-          >
-            Next
-          </button>
-        </div>
+        {!productError && pagination.totalPages > 1 ? (
+          <div className="catalog-pagination" aria-label="Product pagination">
+            <button
+              className="button button--secondary"
+              disabled={isProductLoading || pagination.page <= 1}
+              onClick={() => goToPage(Math.max(1, pagination.page - 1))}
+              type="button"
+            >
+              Previous
+            </button>
+            <span>
+              Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+            </span>
+            <button
+              className="button button--secondary"
+              disabled={
+                isProductLoading ||
+                pagination.page >= Math.max(1, pagination.totalPages)
+              }
+              onClick={() => goToPage(pagination.page + 1)}
+              type="button"
+            >
+              Next
+            </button>
+          </div>
+        ) : null}
       </section>
     </main>
   );
@@ -271,7 +333,12 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
 
 function CatalogSkeleton({ count }: { count: number }) {
   return Array.from({ length: count }, (_, index) => (
-    <div aria-hidden="true" className="catalog-skeleton" key={index} />
+    <div aria-hidden="true" className="catalog-skeleton" key={index}>
+      <div className="catalog-skeleton__image" />
+      <div className="catalog-skeleton__line catalog-skeleton__line--short" />
+      <div className="catalog-skeleton__line" />
+      <div className="catalog-skeleton__line catalog-skeleton__line--price" />
+    </div>
   ));
 }
 
