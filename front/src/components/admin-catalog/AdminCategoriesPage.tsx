@@ -549,6 +549,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
 
       <AdminModal
         closeDisabled={isSaving}
+        compact
         footer={(requestClose) => (
           <>
             <button
@@ -577,59 +578,58 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
         hasUnsavedChanges={hasUnsavedChanges}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        description="Define storefront organization, imagery, and landing-page placement."
-        title={panelMode === "create" ? "Create Category" : "Edit Category"}
+        title={panelMode === "create" ? "New category" : "Edit category"}
       >
         {actionError ? (
           <AdminFeedback message={actionError} requestId={requestId} tone="error" />
         ) : null}
-          <form className="admin-form admin-catalog-form" id="admin-category-form" onSubmit={handleCategorySave}>
-            <section className="admin-form-section" aria-labelledby="category-basic-heading">
+          <form className="admin-form admin-compact-form" id="admin-category-form" onSubmit={handleCategorySave}>
+            <section className="admin-form-section admin-compact-basic" aria-labelledby="category-basic-heading">
               <div className="admin-form-section__heading">
-                <p className="eyebrow">01 / Basic information</p>
+                <p className="eyebrow">Basic information</p>
                 <h3 id="category-basic-heading">Category details</h3>
                 <p>Name the collection and describe how it appears in the storefront.</p>
               </div>
-              <div className="admin-form-section__content admin-form-section__content--two-column">
-                <label>
+              <div className="admin-form-section__content admin-compact-fields">
+                <label className="admin-compact-field--wide">
                   <span>Name</span>
-                  <input disabled={isDetailLoading} maxLength={120} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required value={form.name} />
+                  <input disabled={isDetailLoading} maxLength={120} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. Dresses" required value={form.name} />
                 </label>
-                <label>
+                <label className="admin-compact-field--wide">
                   <span>Slug</span>
-                  <input disabled={isDetailLoading} maxLength={160} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} required value={form.slug} />
+                  <input disabled={isDetailLoading} maxLength={160} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder="dresses" required value={form.slug} />
                 </label>
-                <label className="admin-form-field--wide">
+                <label className="admin-compact-field--wide">
                   <span>Description</span>
-                  <textarea disabled={isDetailLoading} maxLength={2000} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} rows={5} value={form.description} />
+                  <textarea disabled={isDetailLoading} maxLength={2000} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Enter category detail..." rows={3} value={form.description} />
                 </label>
               </div>
             </section>
 
             <section className="admin-form-section" aria-labelledby="category-visual-heading">
               <div className="admin-form-section__heading">
-                <p className="eyebrow">02 / Visual</p>
+                <p className="eyebrow">Category image</p>
                 <h3 id="category-visual-heading">Category image</h3>
                 <p>Use one public HTTP or HTTPS image URL.</p>
               </div>
               <div className="admin-category-visual-grid">
+                <CategoryImagePreview url={form.imageUrl.trim()} />
                 <label>
                   <span>Image URL</span>
                   <input disabled={isDetailLoading} maxLength={2048} onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="https://example.com/category.jpg" type="url" value={form.imageUrl} />
                   <small>Landing and category views load this URL directly.</small>
                 </label>
-                <CategoryImagePreview url={form.imageUrl.trim()} />
               </div>
             </section>
 
             <section className="admin-form-section admin-form-section--compact" aria-labelledby="category-featured-heading">
               <div className="admin-form-section__heading">
-                <p className="eyebrow">03 / Featured placement</p>
-                <h3 id="category-featured-heading">Landing page position</h3>
+                <p className="eyebrow">Featured placement</p>
+                <h3 id="category-featured-heading">Featured placement</h3>
                 <p>Up to three active categories can occupy the numbered featured slots.</p>
               </div>
               <div className="admin-form-section__content admin-form-section__content--two-column">
-                <label className="admin-checkbox admin-form-toggle">
+                <label className="admin-checkbox admin-compact-checkbox">
                   <input
                     checked={form.isFeatured}
                     disabled={isDetailLoading || !form.isActive}
@@ -652,11 +652,11 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
 
             <section className="admin-form-section admin-form-section--compact" aria-labelledby="category-status-heading">
               <div className="admin-form-section__heading">
-                <p className="eyebrow">04 / Status</p>
-                <h3 id="category-status-heading">Store visibility</h3>
+                <p className="eyebrow">Status</p>
+                <h3 id="category-status-heading">Status</h3>
                 <p>Deactivating a category also removes it from featured placement.</p>
               </div>
-              <label className="admin-checkbox admin-form-toggle">
+              <label className="admin-checkbox admin-compact-checkbox">
               <input
                 checked={form.isActive}
                 disabled={isDetailLoading}
@@ -672,7 +672,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                 }
                 type="checkbox"
               />
-              <span>Category is active</span>
+              <span>Active</span>
             </label>
             </section>
           </form>

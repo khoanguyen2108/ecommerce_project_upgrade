@@ -957,6 +957,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
       <AdminModal
         closeDisabled={isSavingProduct || isSavingVariant}
+        compact
         footer={(requestClose) => (
           <>
             <button
@@ -985,8 +986,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         hasUnsavedChanges={hasUnsavedChanges}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        description="Manage product details, merchandising, categories, and inventory options."
-        title={panelMode === "create" ? "Create Product" : "Edit Product"}
+        title={panelMode === "create" ? "New product" : "Edit product"}
       >
         {actionError ? (
           <AdminFeedback message={actionError} requestId={requestId} tone="error" />
@@ -994,15 +994,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         {successMessage ? (
           <AdminFeedback message={successMessage} tone="success" />
         ) : null}
-          <form className="admin-form admin-catalog-form" id="admin-product-form" onSubmit={handleProductSave}>
-            <section className="admin-form-section" aria-labelledby="product-basic-heading">
-              <div className="admin-form-section__heading">
-                <p className="eyebrow">01 / Basic information</p>
-                <h3 id="product-basic-heading">Product details</h3>
-                <p>Core storefront information and the product's standard price.</p>
-              </div>
-              <div className="admin-form-section__content admin-form-section__content--two-column">
-                <label>
+          <form className="admin-form admin-compact-form" id="admin-product-form" onSubmit={handleProductSave}>
+              <div className="admin-compact-fields">
+                <label className="admin-compact-field--wide">
                   <span>Name</span>
                   <input
                     disabled={isPanelLoading}
@@ -1010,11 +1004,12 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     onChange={(event) =>
                       setProductForm((current) => ({ ...current, name: event.target.value }))
                     }
+                    placeholder="e.g. Silk Slip Dress"
                     required
                     value={productForm.name}
                   />
                 </label>
-                <label>
+                <label className="admin-compact-field--wide">
                   <span>Slug</span>
                   <input
                     disabled={isPanelLoading}
@@ -1022,11 +1017,12 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     onChange={(event) =>
                       setProductForm((current) => ({ ...current, slug: event.target.value }))
                     }
+                    placeholder="silk-slip-dress"
                     required
                     value={productForm.slug}
                   />
                 </label>
-                <label className="admin-form-field--wide">
+                <label className="admin-compact-field--wide">
                   <span>Description</span>
                   <textarea
                     disabled={isPanelLoading}
@@ -1034,12 +1030,13 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     onChange={(event) =>
                       setProductForm((current) => ({ ...current, description: event.target.value }))
                     }
+                    placeholder="Enter product detail..."
                     rows={4}
                     value={productForm.description}
                   />
                 </label>
                 <label>
-                  <span>Base price</span>
+                  <span>Base price (&#8363;)</span>
                   <input
                     disabled={isPanelLoading}
                     min="0"
@@ -1050,13 +1047,21 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     type="number"
                     value={productForm.basePrice}
                   />
-                  <small>Whole-number price in the store's configured currency.</small>
+                </label>
+                <label>
+                  <span>Stock quantity</span>
+                  <input
+                    aria-label="Stock quantity managed by variants"
+                    disabled
+                    type="number"
+                    value={selectedProduct ? getProductStock(selectedProduct) : 0}
+                  />
+                  <small>Managed through variants.</small>
                 </label>
               </div>
-            </section>
 
             <fieldset className="admin-category-picker">
-              <legend>02 / Categories</legend>
+              <legend>Categories</legend>
               <small>
                 Select one or more. The first selected category is the primary category.
               </small>
@@ -1136,7 +1141,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
             <section className="admin-image-url-editor" aria-labelledby="image-urls-heading">
               <div className="admin-image-url-editor__header">
                 <div>
-                  <span id="image-urls-heading">03 / Product images</span>
+                  <span id="image-urls-heading">Product images</span>
                   <small>Optional. Add up to four http or https image URLs.</small>
                 </div>
                 <button
@@ -1208,13 +1213,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               </div>
             </section>
 
-            <section className="admin-form-section admin-form-section--compact" aria-labelledby="product-status-heading">
-              <div className="admin-form-section__heading">
-                <p className="eyebrow">04 / Status</p>
-                <h3 id="product-status-heading">Store visibility</h3>
-                <p>Inactive products remain in the catalog console but are hidden from sale.</p>
-              </div>
-              <label className="admin-checkbox admin-form-toggle">
+              <label className="admin-checkbox admin-compact-checkbox">
                 <input
                   checked={productForm.isActive}
                   disabled={isPanelLoading}
@@ -1223,16 +1222,15 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   }
                   type="checkbox"
                 />
-                <span>Product is active</span>
+                <span>Active</span>
               </label>
-            </section>
 
           </form>
 
           <section className="admin-variants" aria-labelledby="product-variants-heading">
             <div className="admin-variants__header">
               <div>
-                <p className="eyebrow">05 / Variants</p>
+                <p className="eyebrow">Variants</p>
                 <h3 id="product-variants-heading">Product variants</h3>
                 <p className="admin-variants__helper">Manage SKU, size, color, stock, and optional price overrides.</p>
               </div>

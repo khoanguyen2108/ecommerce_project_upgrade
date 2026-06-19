@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useRef } from "react";
 interface AdminModalProps {
   children: ReactNode;
   closeDisabled?: boolean;
+  compact?: boolean;
   confirmCloseMessage?: string;
   description?: string;
   footer?: ReactNode | ((requestClose: () => void) => ReactNode);
@@ -28,6 +29,7 @@ const FOCUSABLE_SELECTOR = [
 export function AdminModal({
   children,
   closeDisabled = false,
+  compact = false,
   confirmCloseMessage = "Discard your unsaved changes?",
   description,
   footer,
@@ -145,7 +147,7 @@ export function AdminModal({
         aria-describedby={description ? descriptionId : undefined}
         aria-labelledby={titleId}
         aria-modal="true"
-        className="admin-modal"
+        className={`admin-modal${compact ? " admin-modal--compact" : ""}`}
         ref={dialogRef}
         role="dialog"
         tabIndex={-1}

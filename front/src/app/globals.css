@@ -2876,6 +2876,268 @@ img {
   min-width: 120px;
 }
 
+.admin-modal--compact {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  max-width: 560px;
+  width: min(560px, calc(100vw - 24px));
+}
+
+.admin-modal--compact .admin-modal__header {
+  min-height: 42px;
+  padding: 8px 10px 8px 12px;
+}
+
+.admin-modal--compact .admin-modal__header h2 {
+  font-family: Inter, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.admin-modal--compact .admin-modal__header .admin-icon-button {
+  height: 28px;
+  min-height: 28px;
+  padding: 5px;
+  width: 28px;
+}
+
+.admin-modal--compact .admin-modal__header .admin-icon-button svg {
+  height: 14px;
+  width: 14px;
+}
+
+.admin-modal--compact .admin-modal__body {
+  gap: 10px;
+  padding: 12px;
+}
+
+.admin-modal--compact .admin-modal__footer {
+  gap: 8px;
+  padding: 9px 12px;
+}
+
+.admin-modal--compact .admin-modal__footer .button {
+  min-height: 32px;
+  min-width: 82px;
+  padding: 7px 12px;
+}
+
+.admin-compact-form {
+  gap: 10px;
+}
+
+.admin-compact-form label {
+  gap: 4px;
+}
+
+.admin-compact-form label > span,
+.admin-compact-group h3 {
+  font-size: 0.61rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.admin-compact-form input,
+.admin-compact-form select,
+.admin-compact-form textarea {
+  font-size: 0.75rem;
+  min-height: 32px;
+  padding: 7px 8px;
+}
+
+.admin-compact-form textarea {
+  min-height: 68px;
+}
+
+.admin-compact-form label > small,
+.admin-compact-form section small {
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.admin-compact-fields {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-compact-field--wide {
+  grid-column: 1 / -1;
+}
+
+.admin-compact-checkbox {
+  align-items: center;
+  display: flex !important;
+  gap: 6px !important;
+  min-height: 24px;
+}
+
+.admin-compact-checkbox input,
+.admin-compact-form .admin-category-picker__options input {
+  height: 14px;
+  min-height: 14px;
+  width: 14px;
+}
+
+.admin-compact-group,
+.admin-compact-form .admin-form-section:not(.admin-compact-basic) {
+  border: 1px solid var(--color-border);
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.admin-compact-group h3 {
+  margin: 0;
+}
+
+.admin-compact-form .admin-form-section {
+  grid-template-columns: 1fr;
+}
+
+.admin-compact-form .admin-compact-basic {
+  border: 0;
+  padding: 0;
+}
+
+.admin-compact-form .admin-compact-basic .admin-form-section__heading {
+  display: none;
+}
+
+.admin-compact-form .admin-form-section__heading {
+  gap: 3px;
+}
+
+.admin-compact-form .admin-form-section__heading .eyebrow,
+.admin-compact-form .admin-form-section__heading h3 {
+  font-family: Inter, sans-serif;
+  font-size: 0.61rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.admin-compact-form .admin-form-section__heading .eyebrow {
+  display: none;
+}
+
+.admin-compact-form .admin-category-picker,
+.admin-compact-form .admin-image-url-editor {
+  gap: 8px;
+  padding: 10px;
+}
+
+.admin-compact-form .admin-category-picker legend,
+.admin-compact-form .admin-image-url-editor__header > div > span {
+  font-size: 0.61rem;
+}
+
+.admin-compact-form .admin-category-picker > small,
+.admin-compact-form .admin-image-url-editor__header small {
+  font-size: 0.64rem;
+}
+
+.admin-compact-form .admin-category-picker__options {
+  gap: 6px;
+  max-height: 150px;
+}
+
+.admin-compact-form .admin-category-picker__options label {
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 7px;
+}
+
+.admin-compact-form .admin-category-picker__options span {
+  font-size: 0.62rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.admin-compact-form .admin-category-chip {
+  font-size: 0.63rem;
+  padding: 4px 6px;
+}
+
+.admin-compact-form .admin-image-url-editor__header .button {
+  font-size: 0.63rem;
+  min-height: 28px;
+  padding: 5px 8px;
+}
+
+.admin-compact-form .admin-image-url-list {
+  gap: 8px;
+}
+
+.admin-compact-form .admin-image-url-row {
+  gap: 8px;
+  grid-template-columns: 48px minmax(0, 1fr) 30px;
+}
+
+.admin-compact-form .admin-image-preview-wrap,
+.admin-compact-form .admin-image-url-preview {
+  width: 48px;
+}
+
+.admin-compact-form .admin-image-url-row > .icon-button {
+  height: 30px;
+  min-height: 30px;
+  padding: 6px;
+  width: 30px;
+}
+
+.admin-compact-form .admin-image-primary {
+  font-size: 0.45rem;
+  padding: 2px 3px;
+}
+
+.admin-compact-form .admin-category-visual-grid {
+  align-items: end;
+  gap: 8px;
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+
+.admin-compact-form .admin-category-visual-grid .admin-category-preview {
+  aspect-ratio: 1;
+  min-height: 0;
+  width: 56px;
+}
+
+.admin-meta-grid--compact {
+  border: 0;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+}
+
+.admin-meta-grid--compact small {
+  font-size: 0.58rem;
+}
+
+.admin-meta-grid--compact strong {
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-modal--compact .admin-feedback {
+  font-size: 0.72rem;
+  padding: 8px 10px;
+}
+
+.admin-modal--compact .admin-variants {
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.admin-modal--compact .admin-variants h3 {
+  font-size: 0.8rem;
+}
+
+.admin-modal--compact .admin-variants__helper {
+  font-size: 0.66rem;
+}
+
 .admin-checkbox--modal {
   align-self: end;
   min-height: 44px;
@@ -6667,6 +6929,7 @@ img {
   .admin-filter-grid--compact,
   .admin-stats__filters,
   .admin-form__split,
+  .admin-compact-fields,
   .admin-form-section,
   .admin-form-section__content--two-column,
   .admin-category-visual-grid,
@@ -6681,6 +6944,14 @@ img {
 
   .admin-form-field--wide {
     grid-column: auto;
+  }
+
+  .admin-compact-field--wide {
+    grid-column: auto;
+  }
+
+  .admin-meta-grid--compact {
+    grid-template-columns: 1fr;
   }
 
   .admin-category-visual-grid .admin-category-preview {

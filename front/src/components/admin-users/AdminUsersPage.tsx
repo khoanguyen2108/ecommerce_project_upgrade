@@ -546,6 +546,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
 
       <AdminModal
         closeDisabled={isSaving}
+        compact
         footer={(requestClose) => (
           <>
             <button
@@ -570,29 +571,34 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
         hasUnsavedChanges={hasUnsavedChanges}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={selectedUser ? selectedUser.email : "User detail"}
+        title="Edit user"
       >
         {actionError ? (
           <AdminFeedback message={actionError} requestId={requestId} tone="error" />
         ) : null}
         {selectedUser ? (
-            <form className="admin-form" id="admin-user-edit-form" onSubmit={handleUserSave}>
-              <label>
-                <span>Name</span>
-                <input
-                  disabled={isDetailLoading}
-                  maxLength={120}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  value={form.name}
-                />
-              </label>
+            <form className="admin-form admin-compact-form" id="admin-user-edit-form" onSubmit={handleUserSave}>
+              <section className="admin-compact-group" aria-labelledby="user-account-heading">
+                <h3 id="user-account-heading">Account</h3>
+                <div className="admin-compact-fields">
+                  <label className="admin-compact-field--wide">
+                    <span>Name</span>
+                    <input disabled={isDetailLoading} maxLength={120} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} value={form.name} />
+                  </label>
+                  <label className="admin-compact-field--wide">
+                    <span>Email</span>
+                    <input disabled readOnly type="email" value={selectedUser.email} />
+                  </label>
+                  <label className="admin-compact-field--wide">
+                    <span>Phone</span>
+                    <input disabled={isDetailLoading} maxLength={32} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} value={form.phone} />
+                  </label>
+                </div>
+              </section>
 
-              <div className="admin-form__split">
+              <section className="admin-compact-group" aria-labelledby="user-access-heading">
+                <h3 id="user-access-heading">Access</h3>
+                <div className="admin-compact-fields">
                 <label>
                   <span>Role</span>
                   <select
@@ -613,7 +619,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                   </select>
                 </label>
 
-                <label className="admin-checkbox admin-checkbox--modal">
+                <label className="admin-checkbox admin-compact-checkbox">
                   <input
                     checked={form.isActive}
                     disabled={isDetailLoading}
@@ -628,40 +634,25 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                   <span>Active</span>
                 </label>
               </div>
+              </section>
 
-              <label>
-                <span>Phone</span>
-                <input
-                  disabled={isDetailLoading}
-                  maxLength={32}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      phone: event.target.value,
-                    }))
-                  }
-                  value={form.phone}
-                />
-              </label>
-
-              <div className="admin-meta-grid">
-                <span>
-                  <small>Role</small>
-                  <strong>{selectedUser.role}</strong>
-                </span>
+              <section className="admin-compact-group" aria-labelledby="user-metadata-heading">
+                <h3 id="user-metadata-heading">Metadata</h3>
+                <div className="admin-meta-grid admin-meta-grid--compact">
                 <span>
                   <small>Provider</small>
                   <strong>{selectedUser.authProvider}</strong>
                 </span>
                 <span>
-                  <small>Status</small>
-                  <strong>{selectedUser.isActive ? "Active" : "Inactive"}</strong>
+                  <small>Created at</small>
+                  <strong>{formatAdminDate(selectedUser.createdAt)}</strong>
                 </span>
                 <span>
-                  <small>Updated</small>
+                  <small>Updated at</small>
                   <strong>{formatAdminDate(selectedUser.updatedAt)}</strong>
                 </span>
               </div>
+              </section>
 
             </form>
           ) : (
