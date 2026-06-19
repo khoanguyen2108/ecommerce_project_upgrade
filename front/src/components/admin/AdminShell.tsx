@@ -32,6 +32,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <AdminNav />
 
         <div className="admin-sidebar__footer">
+          <Link className="admin-store-link" href="/products">
+            <Store aria-hidden="true" size={17} strokeWidth={1.8} />
+            Storefront
+          </Link>
+
           <div className="admin-sidebar__account">
             <span className="admin-sidebar__avatar" aria-hidden="true">
               <UserRound size={18} strokeWidth={1.8} />
@@ -40,21 +45,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <span>{currentUser?.name || "Admin"}</span>
               <small>{currentUser?.email}</small>
             </div>
-          </div>
-
-          <div className="admin-topbar__actions">
-            <Link className="admin-store-link" href="/products">
-              <Store aria-hidden="true" size={17} strokeWidth={1.8} />
-              Storefront
-            </Link>
             <button
+              aria-label="Sign out"
               className="admin-signout-button"
               disabled={isSigningOut}
               onClick={() => void handleSignOut()}
+              title="Sign out"
               type="button"
             >
               <LogOut aria-hidden="true" size={17} strokeWidth={1.8} />
-              {isSigningOut ? "Signing out" : "Sign out"}
             </button>
           </div>
         </div>

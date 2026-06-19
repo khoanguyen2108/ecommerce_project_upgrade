@@ -553,10 +553,11 @@ export const adminTopProductsDataExample = {
   topProducts: [
     {
       productId: productExample.id,
-      variantId: productVariantExample.id,
-      productName: productExample.name,
-      quantitySold: 4,
-      revenue: 996000,
+      name: productExample.name,
+      slug: productExample.slug,
+      imageUrl: productExample.imageUrls[0],
+      categoryName: categoryExample.name,
+      soldQuantity: 4,
     },
   ],
   limit: 10,

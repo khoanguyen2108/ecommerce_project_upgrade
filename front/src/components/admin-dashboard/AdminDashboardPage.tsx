@@ -2,16 +2,11 @@
 
 import {
   AlertTriangle,
-  ArrowUpRight,
   CircleDollarSign,
   ClipboardList,
-  Package,
-  ShieldCheck,
   ShoppingBag,
-  Tags,
   Users,
 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   AdminDashboardFilters,
@@ -20,16 +15,19 @@ import {
 } from "@/components/admin-dashboard/AdminDashboardFilters";
 import { AdminMetricCard } from "@/components/admin-dashboard/AdminMetricCard";
 import { MonthlySalesChart } from "@/components/admin-dashboard/MonthlySalesChart";
+import { TopProductsCard } from "@/components/admin-dashboard/TopProductsCard";
 import {
   getAdminOrderStats,
   getAdminRevenue,
   getAdminStatsOverview,
+  getAdminTopProducts,
 } from "@/features/admin-stats/api";
 import { getAdminStatsError } from "@/features/admin-stats/errors";
 import type {
   AdminOrderStats,
   AdminRevenue,
   AdminStatsOverview,
+  AdminTopProduct,
 } from "@/features/admin-stats/types";
 import { formatPrice } from "@/features/catalog/format";
 
@@ -37,34 +35,8 @@ interface DashboardSnapshot {
   orders?: AdminOrderStats;
   overview?: AdminStatsOverview;
   revenue?: AdminRevenue;
+  topProducts?: AdminTopProduct[];
 }
-
-const quickLinks = [
-  {
-    description: "Review customer accounts, roles, and access.",
-    href: "/admin/users",
-    icon: Users,
-    label: "Users",
-  },
-  {
-    description: "Update products, variants, inventory, and visibility.",
-    href: "/admin/products",
-    icon: Package,
-    label: "Products",
-  },
-  {
-    description: "Maintain category content, order, and visibility.",
-    href: "/admin/categories",
-    icon: Tags,
-    label: "Categories",
-  },
-  {
-    description: "Review fulfillment state and pending payment orders.",
-    href: "/admin/orders",
-    icon: ClipboardList,
-    label: "Orders",
-  },
-] as const;
 
 export function AdminDashboardPage() {
   const [range, setRange] = useState<DashboardDateRange>(
@@ -74,6 +46,7 @@ export function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
   const [requestIds, setRequestIds] = useState<string[]>([]);
+  const [isTopProductsUnavailable, setIsTopProductsUnavailable] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -83,19 +56,21 @@ export function AdminDashboardPage() {
       setIsLoading(true);
       setErrors([]);
       setRequestIds([]);
+      setIsTopProductsUnavailable(false);
 
       const dateQuery = { from: range.from, to: range.to };
       const results = await Promise.allSettled([
         getAdminStatsOverview(dateQuery),
         getAdminOrderStats(dateQuery),
         getAdminRevenue({ ...dateQuery, groupBy: "month" }),
+        getAdminTopProducts({ ...dateQuery, limit: 5 }),
       ]);
 
       if (!isMounted) {
         return;
       }
 
-      const [overviewResult, ordersResult, revenueResult] = results;
+      const [overviewResult, ordersResult, revenueResult, topProductsResult] = results;
       const failures = results
         .filter((result): result is PromiseRejectedResult => result.status === "rejected")
         .map((result) => getAdminStatsError(result.reason));
@@ -111,7 +86,12 @@ export function AdminDashboardPage() {
           revenueResult.status === "fulfilled"
             ? revenueResult.value.revenue
             : undefined,
+        topProducts:
+          topProductsResult.status === "fulfilled"
+            ? topProductsResult.value.topProducts
+            : undefined,
       });
+      setIsTopProductsUnavailable(topProductsResult.status === "rejected");
       setErrors([...new Set(failures.map((failure) => failure.message))]);
       setRequestIds([
         ...new Set(
@@ -228,35 +208,12 @@ export function AdminDashboardPage() {
         />
       </section>
 
-      <section className="admin-dashboard-quick-links" aria-labelledby="quick-links-heading">
-        <header>
-          <div>
-            <p className="admin-dashboard-card__kicker">Workspace</p>
-            <h2 id="quick-links-heading">Quick links</h2>
-          </div>
-          <span>
-            <ShieldCheck aria-hidden="true" size={16} /> Payment state remains
-            webhook-authoritative
-          </span>
-        </header>
-        <div>
-          {quickLinks.map((link) => {
-            const Icon = link.icon;
-            return (
-              <Link href={link.href} key={link.href}>
-                <span className="admin-dashboard-quick-links__icon">
-                  <Icon aria-hidden="true" size={20} />
-                </span>
-                <span>
-                  <strong>{link.label}</strong>
-                  <small>{link.description}</small>
-                </span>
-                <ArrowUpRight aria-hidden="true" size={18} />
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      <TopProductsCard
+        isLoading={isLoading && !snapshot.topProducts}
+        isUnavailable={isTopProductsUnavailable}
+        onRetry={() => setRefreshKey((current) => current + 1)}
+        products={snapshot.topProducts}
+      />
     </div>
   );
 }

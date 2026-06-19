@@ -61,11 +61,12 @@ export interface AdminRevenueResponse {
 }
 
 export interface AdminTopProduct {
+  categoryName: string;
+  imageUrl: string | null;
+  name: string;
   productId: string;
-  variantId: string;
-  productName: string;
-  quantitySold: number;
-  revenue: number;
+  slug: string;
+  soldQuantity: number;
 }
 
 export interface AdminTopProductsResponse {

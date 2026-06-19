@@ -45,10 +45,19 @@ const paidOrderRevenueSelect = {
 
 const paidOrderItemSelect = {
   productId: true,
-  variantId: true,
-  productName: true,
   quantity: true,
-  lineTotal: true,
+  product: {
+    select: {
+      name: true,
+      slug: true,
+      imageUrls: true,
+      category: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
 } as const satisfies Prisma.OrderItemSelect;
 
 type PaidOrderForRevenue = Prisma.OrderGetPayload<{
@@ -72,11 +81,12 @@ interface RevenueBucket {
 }
 
 interface TopProductAggregate {
+  categoryName: string;
+  imageUrl: string | null;
+  name: string;
   productId: string;
-  productName: string;
-  quantitySold: number;
-  revenue: number;
-  variantId: string;
+  slug: string;
+  soldQuantity: number;
 }
 
 @Injectable()
@@ -252,32 +262,30 @@ export class AdminStatsService {
   }
 
   private aggregateTopProducts(items: PaidOrderItem[]): TopProductAggregate[] {
-    const productsByVariant = new Map<string, TopProductAggregate>();
+    const productsById = new Map<string, TopProductAggregate>();
 
     for (const item of items) {
-      const key = `${item.productId}:${item.variantId}`;
-      const existing = productsByVariant.get(key);
+      const existing = productsById.get(item.productId);
 
       if (existing) {
-        existing.quantitySold += item.quantity;
-        existing.revenue += item.lineTotal;
+        existing.soldQuantity += item.quantity;
         continue;
       }
 
-      productsByVariant.set(key, {
+      productsById.set(item.productId, {
+        categoryName: item.product.category.name,
+        imageUrl: item.product.imageUrls[0] ?? null,
+        name: item.product.name,
         productId: item.productId,
-        variantId: item.variantId,
-        productName: item.productName,
-        quantitySold: item.quantity,
-        revenue: item.lineTotal,
+        slug: item.product.slug,
+        soldQuantity: item.quantity,
       });
     }
 
-    return [...productsByVariant.values()].sort(
+    return [...productsById.values()].sort(
       (first, second) =>
-        second.revenue - first.revenue ||
-        second.quantitySold - first.quantitySold ||
-        first.productName.localeCompare(second.productName),
+        second.soldQuantity - first.soldQuantity ||
+        first.name.localeCompare(second.name),
     );
   }
 

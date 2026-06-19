@@ -2249,7 +2249,8 @@ img {
   align-items: center;
   display: grid;
   gap: 10px;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-width: 0;
 }
 
 .admin-sidebar__avatar {
@@ -2329,27 +2330,39 @@ img {
 }
 
 .admin-sidebar__footer .admin-store-link {
-  flex: 1;
   justify-content: center;
+  width: 100%;
 }
 
 .admin-signout-button {
   align-items: center;
   background: transparent;
-  border: 0;
+  border: 1px solid var(--color-border);
   color: var(--color-text-muted);
   display: inline-flex;
-  font-size: 0.68rem;
-  font-weight: 800;
-  gap: 6px;
+  height: 36px;
   justify-content: center;
-  min-height: 40px;
-  padding: 0 8px;
-  text-transform: uppercase;
+  padding: 0;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+  width: 36px;
 }
 
 .admin-signout-button:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border-strong);
   color: var(--color-text);
+}
+
+.admin-signout-button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.admin-signout-button:disabled {
+  opacity: 0.55;
 }
 
 .admin-store-link:hover {
@@ -4272,6 +4285,132 @@ img {
   color: var(--dashboard-subtle);
 }
 
+.admin-dashboard-top-products {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-dashboard-top-products .admin-dashboard-card__header > a {
+  border-bottom: 1px solid var(--dashboard-ink);
+  color: var(--dashboard-ink);
+  font-size: 0.72rem;
+  font-weight: 750;
+  padding: 2px 0;
+}
+
+.admin-dashboard-top-products .admin-dashboard-card__header > a:focus-visible {
+  outline: 2px solid var(--dashboard-ink);
+  outline-offset: 4px;
+}
+
+.admin-dashboard-top-products__list {
+  border-top: 1px solid var(--dashboard-line);
+  display: grid;
+}
+
+.admin-dashboard-top-product {
+  align-items: center;
+  border-bottom: 1px solid var(--dashboard-line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  margin: 0;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.admin-dashboard-top-product__thumbnail {
+  align-items: center;
+  background: var(--dashboard-soft);
+  border: 1px solid var(--dashboard-line);
+  color: var(--dashboard-subtle);
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  overflow: hidden;
+  width: 44px;
+}
+
+.admin-dashboard-top-product__thumbnail img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.admin-dashboard-top-product__details {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-dashboard-top-product__details strong,
+.admin-dashboard-top-product__details small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-dashboard-top-product__details strong {
+  font-size: 0.82rem;
+}
+
+.admin-dashboard-top-product__details small,
+.admin-dashboard-top-product > span:last-child {
+  color: var(--dashboard-subtle);
+  font-size: 0.7rem;
+}
+
+.admin-dashboard-top-product > span:last-child {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-dashboard-top-products__state {
+  align-items: center;
+  color: var(--dashboard-subtle);
+  display: flex;
+  font-size: 0.76rem;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 76px;
+  padding: 16px 0;
+}
+
+.admin-dashboard-top-products__state button {
+  background: transparent;
+  border: 1px solid var(--dashboard-line);
+  color: var(--dashboard-ink);
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.admin-dashboard-top-products__skeleton {
+  display: grid;
+}
+
+.admin-dashboard-top-products__skeleton > div {
+  align-items: center;
+  border-bottom: 1px solid var(--dashboard-line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 44px minmax(0, 1fr) 64px;
+  min-height: 65px;
+}
+
+.admin-dashboard-top-products__skeleton > div > span:first-child {
+  border-radius: 0;
+  height: 44px;
+}
+
+.admin-dashboard-top-products__skeleton > div > span:nth-child(2) {
+  height: 14px;
+  max-width: 280px;
+}
+
+.admin-dashboard-top-products__skeleton > div > span:last-child {
+  height: 12px;
+}
+
 @keyframes admin-dashboard-pulse {
   0% {
     background-position: 200% 0;
@@ -4375,6 +4514,16 @@ img {
 
   .admin-dashboard-quick-links > header > span {
     align-items: flex-start;
+  }
+
+  .admin-dashboard-top-product {
+    gap: 10px;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+  }
+
+  .admin-dashboard-top-product__thumbnail {
+    height: 40px;
+    width: 40px;
   }
 }
 
