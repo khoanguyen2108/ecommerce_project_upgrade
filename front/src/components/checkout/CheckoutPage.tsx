@@ -1,15 +1,16 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Info, Loader2, RefreshCw } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
-import { useCart } from "@/components/cart/CartProvider";
-import { OrderStatusBadge } from "@/components/orders/OrdersPage";
 import {
-  formatCurrency,
-  formatDateTime,
-} from "@/components/orders/order-format";
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  RefreshCw,
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { useCart } from "@/components/cart/CartProvider";
+import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
+import { formatCurrency } from "@/components/orders/order-format";
 import {
   createCheckoutOrder,
   getCheckoutSummary,
@@ -32,6 +33,7 @@ export function CheckoutPage() {
   const [errorCode, setErrorCode] = useState<string>();
   const [requestId, setRequestId] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const submissionLockRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -75,6 +77,11 @@ export function CheckoutPage() {
   }, [refreshKey]);
 
   async function handleCreateOrder() {
+    if (submissionLockRef.current) {
+      return;
+    }
+
+    submissionLockRef.current = true;
     setIsSubmitting(true);
     setError(undefined);
     setErrorCode(undefined);
@@ -95,6 +102,7 @@ export function CheckoutPage() {
       setErrorCode(getCheckoutErrorCode(submitError));
       setRequestId(getCheckoutRequestId(submitError));
     } finally {
+      submissionLockRef.current = false;
       setIsSubmitting(false);
     }
   }
@@ -103,114 +111,141 @@ export function CheckoutPage() {
     return <CheckoutSuccess order={createdOrder} />;
   }
 
+  const isEmpty = !isLoading && errorCode === "CHECKOUT_CART_EMPTY";
+
   return (
     <main className="customer-page checkout-page">
-      <section className="customer-hero" aria-labelledby="checkout-heading">
-        <div>
-          <p className="eyebrow">Checkout</p>
-          <h1 id="checkout-heading">Create pending order</h1>
-          <p>Confirm the cart summary before creating an unpaid order.</p>
-        </div>
-        <button
-          className="button button--secondary"
-          disabled={isLoading || isSubmitting}
-          onClick={() => setRefreshKey((current) => current + 1)}
-          type="button"
-        >
-          <RefreshCw
-            aria-hidden="true"
-            className={isLoading ? "spin" : undefined}
-            size={17}
-          />
-          Refresh
-        </button>
-      </section>
+      <CheckoutIntro
+        subtitle="Review your cart before creating an order that waits for payment confirmation."
+        title="Review your order"
+      />
+      <CheckoutStepper current="review" />
 
-      {error ? (
+      {error && !isEmpty ? (
         <div className="customer-feedback customer-feedback--error" role="alert">
           <AlertCircle aria-hidden="true" size={19} />
           <span>{error}</span>
           {requestId ? <small>Request {requestId}</small> : null}
+          <button
+            className="button button--secondary checkout-retry-button"
+            disabled={isLoading || isSubmitting}
+            onClick={() => setRefreshKey((current) => current + 1)}
+            type="button"
+          >
+            <RefreshCw aria-hidden="true" size={16} />
+            Retry
+          </button>
         </div>
       ) : null}
 
       {isLoading ? <CheckoutSkeleton /> : null}
 
-      {!isLoading && errorCode === "CHECKOUT_CART_EMPTY" ? (
-        <section className="wishlist-empty" aria-labelledby="checkout-empty-heading">
-          <Info aria-hidden="true" size={38} strokeWidth={1.6} />
-          <h2 id="checkout-empty-heading">Cart is empty</h2>
-          <p>Add an in-stock size and color before checkout.</p>
+      {isEmpty ? (
+        <section className="checkout-empty" aria-labelledby="checkout-empty-heading">
+          <Info aria-hidden="true" size={34} strokeWidth={1.6} />
+          <p className="eyebrow">Checkout</p>
+          <h2 id="checkout-empty-heading">Your cart is empty</h2>
+          <p>Add an in-stock size and color before returning to checkout.</p>
           <Link className="button button--primary" href="/products">
-            Browse products
+            Back to products
           </Link>
         </section>
       ) : null}
 
       {!isLoading && summary ? (
-        <>
-          <CheckoutSummary summary={summary} />
-          <section className="checkout-submit-panel" aria-label="Create order">
-            <div className="payment-read-note" role="status">
-              <Info aria-hidden="true" size={19} />
-              <span>
-                This creates an order with PENDING_PAYMENT status. Payment is not
-                started in this phase.
-              </span>
-            </div>
-            <button
-              className="button button--primary"
-              disabled={isSubmitting || summary.items.length === 0}
-              onClick={handleCreateOrder}
-              type="button"
-            >
-              {isSubmitting ? (
-                <Loader2 aria-hidden="true" className="spin" size={17} />
-              ) : null}
-              {isSubmitting ? "Creating order..." : "Create pending order"}
-            </button>
-          </section>
-        </>
+        <CheckoutSummary
+          isSubmitting={isSubmitting}
+          onCreateOrder={handleCreateOrder}
+          summary={summary}
+        />
       ) : null}
     </main>
   );
 }
 
+function CheckoutIntro({ subtitle, title }: { subtitle: string; title: string }) {
+  return (
+    <section className="checkout-intro" aria-labelledby="checkout-heading">
+      <p className="eyebrow">Checkout</p>
+      <h1 id="checkout-heading">{title}</h1>
+      <p>{subtitle}</p>
+    </section>
+  );
+}
+
+function CheckoutStepper({ current }: { current: "review" | "pending" }) {
+  const steps = [
+    { id: "cart", label: "Cart" },
+    { id: "review", label: "Review" },
+    { id: "pending", label: "Pending payment" },
+  ] as const;
+  const currentIndex = current === "review" ? 1 : 2;
+
+  return (
+    <nav className="checkout-stepper" aria-label="Checkout progress">
+      <ol>
+        {steps.map((step, index) => {
+          const isCurrent = step.id === current;
+          const isComplete = index < currentIndex;
+
+          return (
+            <li
+              aria-current={isCurrent ? "step" : undefined}
+              className={`${isCurrent ? "is-current" : ""} ${isComplete ? "is-complete" : ""}`}
+              key={step.id}
+            >
+              <span aria-hidden="true">{index + 1}</span>
+              <strong>{step.label}</strong>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
 function CheckoutSuccess({ order }: { order: Order }) {
   return (
-    <main className="customer-page checkout-page">
+    <main className="customer-page checkout-page checkout-page--success">
+      <CheckoutIntro
+        subtitle="Your order is saved and is now waiting for payment confirmation."
+        title="Order created"
+      />
+      <CheckoutStepper current="pending" />
+
       <section
         aria-labelledby="checkout-success-heading"
-        className="payment-status-panel checkout-success-panel"
+        className="checkout-success-panel"
         role="status"
       >
-        <CheckCircle2
-          aria-hidden="true"
-          className="payment-status-panel__icon"
-          size={34}
-        />
-        <p className="eyebrow">Order created</p>
-        <h1 id="checkout-success-heading">Pending payment order</h1>
-        <p>
-          Order {order.id} was created with status{" "}
-          <strong>PENDING_PAYMENT</strong>.
-        </p>
-        <OrderStatusBadge status={order.status} />
-        <dl className="order-summary-list">
+        <div className="checkout-success-panel__mark">
+          <CheckCircle2 aria-hidden="true" size={28} strokeWidth={1.7} />
+        </div>
+        <div className="checkout-success-panel__heading">
+          <p className="eyebrow">Order status</p>
+          <h2 id="checkout-success-heading">PENDING_PAYMENT</h2>
+        </div>
+
+        <dl className="checkout-success-details">
+          <div>
+            <dt>Order ID</dt>
+            <dd>{order.id}</dd>
+          </div>
           <div>
             <dt>Total</dt>
             <dd>{formatCurrency(order.totalAmount, order.currency)}</dd>
           </div>
-          <div>
-            <dt>Expires at</dt>
-            <dd>{formatDateTime(order.expiresAt)}</dd>
-          </div>
         </dl>
-        <div className="payment-read-note" role="status">
-          <Info aria-hidden="true" size={19} />
-          <span>Payment was not started. No paid status was created.</span>
+
+        <div className="checkout-pending-note" role="note">
+          <Info aria-hidden="true" size={18} />
+          <span>
+            Payment has not been completed yet. Your order is waiting for payment
+            confirmation.
+          </span>
         </div>
-        <div className="customer-actions">
+
+        <div className="checkout-success-actions">
           <Link
             className="button button--primary"
             href={`/orders/${encodeURIComponent(order.id)}`}
@@ -220,6 +255,9 @@ function CheckoutSuccess({ order }: { order: Order }) {
           <Link className="button button--secondary" href="/products">
             Continue shopping
           </Link>
+          <Link className="button button--secondary" href="/orders">
+            View orders
+          </Link>
         </div>
       </section>
     </main>
@@ -228,14 +266,14 @@ function CheckoutSuccess({ order }: { order: Order }) {
 
 function CheckoutSkeleton() {
   return (
-    <section className="checkout-summary-grid" aria-busy="true" aria-live="polite">
+    <section className="checkout-layout" aria-busy="true" aria-live="polite">
       <div className="checkout-items">
-        <div className="customer-section__header">
+        <div className="checkout-section-heading">
           <span className="customer-skeleton-line customer-skeleton-line--wide" />
           <span className="customer-skeleton-line" />
         </div>
         <div className="checkout-item-list">
-          {Array.from({ length: 3 }, (_, index) => (
+          {Array.from({ length: 2 }, (_, index) => (
             <div aria-hidden="true" className="checkout-item" key={index}>
               <span className="checkout-item__image checkout-item__image--skeleton" />
               <span className="checkout-item__body">
@@ -247,9 +285,10 @@ function CheckoutSkeleton() {
           ))}
         </div>
       </div>
-      <aside className="cart-summary-panel">
+      <aside className="checkout-order-summary checkout-order-summary--skeleton">
         <span className="customer-skeleton-line" />
         <span className="customer-skeleton-line customer-skeleton-line--wide" />
+        <span className="customer-skeleton-line" />
       </aside>
     </section>
   );
