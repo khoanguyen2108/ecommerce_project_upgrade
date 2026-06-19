@@ -47,7 +47,7 @@ import {
   parseActiveFilter,
 } from "@/components/admin/admin-format";
 
-const PRODUCT_LIMIT = 20;
+const PRODUCT_LIMIT = 8;
 const CATEGORY_OPTION_LIMIT = 100;
 const MAX_PRODUCT_IMAGES = 4;
 
@@ -242,6 +242,16 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         const response = await listAdminProducts(query);
 
         if (!isMounted) {
+          return;
+        }
+
+        const validPage = Math.min(
+          query.page || 1,
+          Math.max(1, response.pagination.totalPages),
+        );
+
+        if (validPage !== (query.page || 1)) {
+          setQuery((current) => ({ ...current, page: validPage }));
           return;
         }
 
@@ -708,7 +718,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         </div>
       </section>
 
-      <section className="admin-resource__toolbar" aria-label="Product filters">
+      <section className="admin-resource__toolbar admin-resource__toolbar--compact" aria-label="Product filters">
         <form className="admin-search admin-search--products" onSubmit={handleSearchSubmit}>
           <label htmlFor="admin-product-search">Search</label>
           <div>

@@ -35,7 +35,7 @@ import {
   parseActiveFilter,
 } from "@/components/admin/admin-format";
 
-const USER_LIMIT = 20;
+const USER_LIMIT = 8;
 const ROLE_OPTIONS: UserRole[] = ["CUSTOMER", "STAFF", "ADMIN"];
 const AUTH_PROVIDER_OPTIONS: AuthProvider[] = ["EMAIL", "GOOGLE"];
 
@@ -104,6 +104,16 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
         const response = await listAdminUsers(query);
 
         if (!isMounted) {
+          return;
+        }
+
+        const validPage = Math.min(
+          query.page || 1,
+          Math.max(1, response.pagination.totalPages),
+        );
+
+        if (validPage !== (query.page || 1)) {
+          setQuery((current) => ({ ...current, page: validPage }));
           return;
         }
 
@@ -347,7 +357,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
         </button>
       </section>
 
-      <section className="admin-resource__toolbar" aria-label="User filters">
+      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline" aria-label="User filters">
         <form className="admin-search" onSubmit={handleSearchSubmit}>
           <label htmlFor="admin-user-search">Search</label>
           <div>

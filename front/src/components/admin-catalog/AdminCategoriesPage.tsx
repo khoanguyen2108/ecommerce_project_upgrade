@@ -36,7 +36,7 @@ import {
   parseActiveFilter,
 } from "@/components/admin/admin-format";
 
-const CATEGORY_LIMIT = 20;
+const CATEGORY_LIMIT = 8;
 
 const CATEGORY_ERROR_MESSAGES: Record<string, string> = {
   ADMIN_CATEGORY_FEATURED_LIMIT_EXCEEDED:
@@ -113,6 +113,16 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
         const response = await listAdminCategories(query);
 
         if (!isMounted) {
+          return;
+        }
+
+        const validPage = Math.min(
+          query.page || 1,
+          Math.max(1, response.pagination.totalPages),
+        );
+
+        if (validPage !== (query.page || 1)) {
+          setQuery((current) => ({ ...current, page: validPage }));
           return;
         }
 
@@ -366,7 +376,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
         </div>
       </section>
 
-      <section className="admin-resource__toolbar" aria-label="Category filters">
+      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline" aria-label="Category filters">
         <form className="admin-search" onSubmit={handleSearchSubmit}>
           <label htmlFor="admin-category-search">Search</label>
           <div>

@@ -2538,6 +2538,44 @@ img {
   padding: 18px;
 }
 
+.admin-resource__toolbar.admin-resource__toolbar--compact {
+  gap: 10px;
+  padding: 12px;
+}
+
+.admin-resource__toolbar--compact .admin-search,
+.admin-resource__toolbar--compact .admin-filter-grid,
+.admin-resource__toolbar--compact .admin-filter-grid label {
+  gap: 6px;
+}
+
+.admin-resource__toolbar--compact .admin-search div {
+  gap: 8px;
+}
+
+.admin-resource__toolbar--compact .admin-search input,
+.admin-resource__toolbar--compact .admin-filter-grid input,
+.admin-resource__toolbar--compact .admin-filter-grid select,
+.admin-resource__toolbar--compact .button {
+  min-height: 40px;
+}
+
+.admin-resource__toolbar--compact .admin-search input,
+.admin-resource__toolbar--compact .admin-filter-grid input,
+.admin-resource__toolbar--compact .admin-filter-grid select {
+  padding-block: 8px;
+}
+
+.admin-resource__toolbar--compact .button {
+  padding: 8px 16px;
+}
+
+@media (min-width: 1100px) {
+  .admin-resource__toolbar--inline {
+    grid-template-columns: minmax(320px, 1.2fr) minmax(0, 2fr);
+  }
+}
+
 .admin-search {
   display: grid;
   gap: var(--space-2);

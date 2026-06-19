@@ -34,7 +34,7 @@ import {
   formatDateTime,
 } from "@/components/orders/order-format";
 
-const LIMIT = 20;
+const LIMIT = 8;
 const ORDER_STATUSES: OrderStatus[] = [
   "PENDING_PAYMENT",
   "PAID",
@@ -74,6 +74,16 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
       try {
         const response = await listAdminOrders(query);
         if (active) {
+          const validPage = Math.min(
+            query.page || 1,
+            Math.max(1, response.pagination.totalPages),
+          );
+
+          if (validPage !== (query.page || 1)) {
+            setQuery((current) => ({ ...current, page: validPage }));
+            return;
+          }
+
           setOrders(response.orders);
           setPagination(response.pagination);
         }
@@ -171,7 +181,7 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
 
       <AdminPaymentSafetyNote includeTransition />
 
-      <section className="admin-resource__toolbar" aria-label="Order filters">
+      <section className="admin-resource__toolbar admin-resource__toolbar--compact" aria-label="Order filters">
         <form className="admin-search" onSubmit={submitSearch}>
           <label htmlFor="admin-order-search">Search</label>
           <div>
