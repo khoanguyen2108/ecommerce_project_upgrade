@@ -27,6 +27,8 @@ export function CheckoutPage() {
   const { refreshCart } = useCart();
   const [summary, setSummary] = useState<CheckoutSummaryModel>();
   const [createdOrder, setCreatedOrder] = useState<Order>();
+  const [voucherInput, setVoucherInput] = useState("");
+  const [requestedVoucherCode, setRequestedVoucherCode] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string>();
@@ -34,6 +36,7 @@ export function CheckoutPage() {
   const [requestId, setRequestId] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
   const submissionLockRef = useRef(false);
+  const voucherRequestLockRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,7 +48,7 @@ export function CheckoutPage() {
       setRequestId(undefined);
 
       try {
-        const response = await getCheckoutSummary();
+        const response = await getCheckoutSummary(requestedVoucherCode);
 
         if (isMounted) {
           setSummary(response.summary);
@@ -65,6 +68,7 @@ export function CheckoutPage() {
       } finally {
         if (isMounted) {
           setIsLoading(false);
+          voucherRequestLockRef.current = false;
         }
       }
     }
@@ -74,10 +78,42 @@ export function CheckoutPage() {
     return () => {
       isMounted = false;
     };
-  }, [refreshKey]);
+  }, [refreshKey, requestedVoucherCode]);
+
+  function handleApplyVoucher(code = voucherInput) {
+    if (voucherRequestLockRef.current) {
+      return;
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+
+    if (!normalizedCode) {
+      setError("Enter a voucher code before applying it.");
+      setErrorCode("CHECKOUT_VOUCHER_CODE_REQUIRED");
+      return;
+    }
+
+    voucherRequestLockRef.current = true;
+    setVoucherInput(normalizedCode);
+    if (normalizedCode === requestedVoucherCode) {
+      setRefreshKey((current) => current + 1);
+    } else {
+      setRequestedVoucherCode(normalizedCode);
+    }
+  }
+
+  function handleRemoveVoucher() {
+    if (voucherRequestLockRef.current) {
+      return;
+    }
+
+    voucherRequestLockRef.current = true;
+    setVoucherInput("");
+    setRequestedVoucherCode(undefined);
+  }
 
   async function handleCreateOrder() {
-    if (submissionLockRef.current) {
+    if (submissionLockRef.current || voucherRequestLockRef.current) {
       return;
     }
 
@@ -88,7 +124,7 @@ export function CheckoutPage() {
     setRequestId(undefined);
 
     try {
-      const response = await createCheckoutOrder();
+      const response = await createCheckoutOrder(requestedVoucherCode);
       setCreatedOrder(response.order);
       setSummary(undefined);
       void refreshCart().catch(() => undefined);
@@ -138,7 +174,7 @@ export function CheckoutPage() {
         </div>
       ) : null}
 
-      {isLoading ? <CheckoutSkeleton /> : null}
+      {isLoading && !summary ? <CheckoutSkeleton /> : null}
 
       {isEmpty ? (
         <section className="checkout-empty" aria-labelledby="checkout-empty-heading">
@@ -152,11 +188,16 @@ export function CheckoutPage() {
         </section>
       ) : null}
 
-      {!isLoading && summary ? (
+      {summary ? (
         <CheckoutSummary
+          isLoading={isLoading}
           isSubmitting={isSubmitting}
+          onApplyVoucher={handleApplyVoucher}
           onCreateOrder={handleCreateOrder}
+          onRemoveVoucher={handleRemoveVoucher}
           summary={summary}
+          voucherInput={voucherInput}
+          onVoucherInputChange={setVoucherInput}
         />
       ) : null}
     </main>
@@ -223,7 +264,7 @@ function CheckoutSuccess({ order }: { order: Order }) {
         </div>
         <div className="checkout-success-panel__heading">
           <p className="eyebrow">Order status</p>
-          <h2 id="checkout-success-heading">PENDING_PAYMENT</h2>
+          <h2 id="checkout-success-heading">{order.status}</h2>
         </div>
 
         <dl className="checkout-success-details">
@@ -232,7 +273,21 @@ function CheckoutSuccess({ order }: { order: Order }) {
             <dd>{order.id}</dd>
           </div>
           <div>
-            <dt>Total</dt>
+            <dt>Subtotal</dt>
+            <dd>{formatCurrency(order.subtotalAmount, order.currency)}</dd>
+          </div>
+          <div>
+            <dt>Discount</dt>
+            <dd>{formatCurrency(order.discountAmount, order.currency)}</dd>
+          </div>
+          {order.voucherCodeSnapshot ? (
+            <div>
+              <dt>Voucher</dt>
+              <dd>{order.voucherCodeSnapshot}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt>Final total</dt>
             <dd>{formatCurrency(order.totalAmount, order.currency)}</dd>
           </div>
         </dl>

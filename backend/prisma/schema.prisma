@@ -37,6 +37,11 @@ enum PaymentProvider {
   PAYOS
 }
 
+enum VoucherDiscountType {
+  PERCENT
+  FIXED
+}
+
 model User {
   id                    String       @id @default(uuid()) @db.Uuid
   email                 String       @unique @db.VarChar(320)
@@ -190,7 +195,12 @@ model Order {
   user           User        @relation(fields: [userId], references: [id], onDelete: Restrict)
   status         OrderStatus @default(PENDING_PAYMENT)
   subtotalAmount Int
+  discountAmount Int         @default(0)
   totalAmount    Int
+  voucherId      String?     @db.Uuid
+  voucher        Voucher?    @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+  voucherCodeSnapshot String? @db.VarChar(64)
+  voucherNameSnapshot String? @db.VarChar(160)
   currency       String      @default("VND") @db.VarChar(3)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
@@ -203,6 +213,7 @@ model Order {
 
   @@index([userId, createdAt])
   @@index([status])
+  @@index([voucherId])
   @@index([createdAt])
 }
 
@@ -272,4 +283,26 @@ model PaymentWebhookEvent {
   @@index([orderId])
   @@index([receivedAt])
   @@index([processingStatus])
+}
+
+model Voucher {
+  id            String              @id @default(uuid()) @db.Uuid
+  code          String              @unique @db.VarChar(64)
+  name          String              @db.VarChar(160)
+  description   String?
+  discountType  VoucherDiscountType
+  discountValue Int
+  minSubtotal   Int
+  maxDiscount   Int?
+  usageLimit    Int?
+  perUserLimit  Int?
+  startsAt      DateTime?
+  endsAt        DateTime?
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  orders        Order[]
+
+  @@index([isActive])
+  @@index([createdAt])
 }

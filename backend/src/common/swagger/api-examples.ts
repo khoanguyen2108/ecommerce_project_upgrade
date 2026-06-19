@@ -72,6 +72,38 @@ export const adminUserListDataExample = {
   },
 };
 
+export const adminVoucherExample = {
+  id: '5a7fb7f4-acde-46a5-90b8-f1f950f7aa08',
+  code: 'SAVE10',
+  name: 'Save ten percent',
+  description: 'Ten percent off qualifying orders.',
+  discountType: 'PERCENT',
+  discountValue: 10,
+  minSubtotal: 300000,
+  maxDiscount: 50000,
+  usageLimit: 100,
+  perUserLimit: 1,
+  startsAt: '2026-06-20T00:00:00.000Z',
+  endsAt: '2026-07-20T00:00:00.000Z',
+  isActive: true,
+  createdAt: '2026-06-20T00:00:00.000Z',
+  updatedAt: '2026-06-20T00:00:00.000Z',
+};
+
+export const adminVoucherDataExample = {
+  voucher: adminVoucherExample,
+};
+
+export const adminVoucherListDataExample = {
+  vouchers: [adminVoucherExample],
+  pagination: {
+    page: 1,
+    limit: 8,
+    total: 1,
+    totalPages: 1,
+  },
+};
+
 export const authTokenDataExample = {
   user: publicUserExample,
   accessToken: 'access_token_placeholder',
@@ -284,8 +316,28 @@ export const checkoutSummaryDataExample = {
     ],
     totalQuantity: 2,
     subtotalAmount: 498000,
-    totalAmount: 498000,
+    discountAmount: 49800,
+    totalAmount: 448200,
     currency: 'VND',
+    appliedVoucher: {
+      code: 'SAVE10',
+      name: 'Save ten percent',
+      discountType: 'PERCENT',
+      discountValue: 10,
+      maxDiscount: 50000,
+      minSubtotal: 300000,
+    },
+    voucherError: null,
+    eligibleVouchers: [
+      {
+        code: 'SAVE10',
+        name: 'Save ten percent',
+        discountType: 'PERCENT',
+        discountValue: 10,
+        maxDiscount: 50000,
+        minSubtotal: 300000,
+      },
+    ],
     warnings: [],
   },
 };
@@ -329,7 +381,11 @@ export const orderExample = {
   userId: publicUserExample.id,
   status: 'PENDING_PAYMENT',
   subtotalAmount: 249000,
+  discountAmount: 0,
   totalAmount: 249000,
+  voucherId: null,
+  voucherCodeSnapshot: null,
+  voucherNameSnapshot: null,
   currency: 'VND',
   createdAt: '2026-06-14T10:30:00.000Z',
   updatedAt: '2026-06-14T10:30:00.000Z',

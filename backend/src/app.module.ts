@@ -6,6 +6,7 @@ import { AdminPaymentsModule } from './admin-payments/admin-payments.module';
 import { AdminOrdersModule } from './admin-orders/admin-orders.module';
 import { AdminStatsModule } from './admin-stats/admin-stats.module';
 import { AdminUsersModule } from './admin-users/admin-users.module';
+import { AdminVouchersModule } from './admin-vouchers/admin-vouchers.module';
 import { AuthModule } from './auth/auth.module';
 import { CartModule } from './cart/cart.module';
 import { CatalogModule } from './catalog/catalog.module';
@@ -55,6 +56,7 @@ const getPositiveNumber = (
     AdminOrdersModule,
     AdminPaymentsModule,
     AdminUsersModule,
+    AdminVouchersModule,
     AdminStatsModule,
     CatalogModule,
     LandingPageModule,

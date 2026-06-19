@@ -65,7 +65,11 @@ export interface Order {
   userId: string;
   status: OrderStatus;
   subtotalAmount: number;
+  discountAmount: number;
   totalAmount: number;
+  voucherId: string | null;
+  voucherCodeSnapshot: string | null;
+  voucherNameSnapshot: string | null;
   currency: string;
   createdAt: string;
   updatedAt: string;

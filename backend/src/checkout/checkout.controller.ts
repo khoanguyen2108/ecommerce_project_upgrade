@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -19,6 +19,7 @@ import {
   orderDataExample,
 } from '../common/swagger/api-examples';
 import { CheckoutService } from './checkout.service';
+import { CheckoutVoucherDto } from './dto/checkout-voucher.dto';
 
 @ApiTags('checkout')
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
@@ -50,8 +51,11 @@ export class CheckoutController {
     ),
   )
   @Get('summary')
-  getSummary(@CurrentUser() user: AuthenticatedUser) {
-    return this.checkoutService.getSummary(user);
+  getSummary(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: CheckoutVoucherDto,
+  ) {
+    return this.checkoutService.getSummary(user, query.voucherCode);
   }
 
   @ApiOperation({
@@ -70,7 +74,10 @@ export class CheckoutController {
     ),
   )
   @Post('orders')
-  createOrder(@CurrentUser() user: AuthenticatedUser) {
-    return this.checkoutService.createOrderFromCart(user);
+  createOrder(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CheckoutVoucherDto,
+  ) {
+    return this.checkoutService.createOrderFromCart(user, dto?.voucherCode);
   }
 }

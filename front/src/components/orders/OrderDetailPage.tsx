@@ -144,12 +144,27 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           <OrderStatusBadge status={order.status} />
           <dl className="order-summary-list">
             <div>
-              <dt>Total</dt>
-              <dd>{formatCurrency(order.totalAmount, order.currency)}</dd>
-            </div>
-            <div>
               <dt>Subtotal</dt>
               <dd>{formatCurrency(order.subtotalAmount, order.currency)}</dd>
+            </div>
+            <div>
+              <dt>Discount</dt>
+              <dd>{formatCurrency(order.discountAmount, order.currency)}</dd>
+            </div>
+            {order.voucherCodeSnapshot ? (
+              <div>
+                <dt>Voucher</dt>
+                <dd>
+                  {order.voucherCodeSnapshot}
+                  {order.voucherNameSnapshot
+                    ? ` — ${order.voucherNameSnapshot}`
+                    : ""}
+                </dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>Final total</dt>
+              <dd>{formatCurrency(order.totalAmount, order.currency)}</dd>
             </div>
             <div>
               <dt>Created</dt>

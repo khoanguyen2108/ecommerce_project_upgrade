@@ -7,6 +7,7 @@ import {
   Package,
   ShieldCheck,
   Tags,
+  TicketPercent,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -32,6 +33,11 @@ const adminNavItems = [
     href: "/admin/categories",
     icon: Tags,
     label: "Categories",
+  },
+  {
+    href: "/admin/vouchers",
+    icon: TicketPercent,
+    label: "Vouchers",
   },
   {
     href: "/admin/orders",

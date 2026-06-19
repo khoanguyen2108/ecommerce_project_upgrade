@@ -79,7 +79,11 @@ export interface AdminOrderBase {
   user: AdminOrderCustomer;
   status: OrderStatus;
   subtotalAmount: number;
+  discountAmount: number;
   totalAmount: number;
+  voucherId: string | null;
+  voucherCodeSnapshot: string | null;
+  voucherNameSnapshot: string | null;
   currency: string;
   itemCount: number;
   createdAt: string;

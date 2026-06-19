@@ -11,6 +11,18 @@ export const CHECKOUT_ERROR_MESSAGES: Record<string, string> = {
   CHECKOUT_PRODUCT_INACTIVE: "One product is no longer available.",
   CHECKOUT_TOTAL_INVALID:
     "Checkout totals could not be confirmed. Review the cart and try again.",
+  CHECKOUT_VOUCHER_DISCOUNT_INVALID:
+    "This voucher does not produce a valid discount.",
+  CHECKOUT_VOUCHER_EXPIRED: "This voucher has expired.",
+  CHECKOUT_VOUCHER_INACTIVE: "This voucher is inactive.",
+  CHECKOUT_VOUCHER_MIN_SUBTOTAL:
+    "Your cart has not reached this voucher's minimum subtotal.",
+  CHECKOUT_VOUCHER_NOT_FOUND: "This voucher code was not found.",
+  CHECKOUT_VOUCHER_NOT_STARTED: "This voucher is not active yet.",
+  CHECKOUT_VOUCHER_PER_USER_LIMIT_REACHED:
+    "You have reached your usage limit for this voucher.",
+  CHECKOUT_VOUCHER_USAGE_LIMIT_REACHED:
+    "This voucher's usage limit has been reached.",
   CHECKOUT_VARIANT_INACTIVE:
     "One size and color is no longer available for checkout.",
   CHECKOUT_VARIANT_NOT_FOUND: "One size and color could not be found.",

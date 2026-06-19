@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, Loader2 } from "lucide-react";
+import { Info, Loader2, TicketPercent, X } from "lucide-react";
 import Link from "next/link";
 import {
   formatCurrency,
@@ -9,15 +9,25 @@ import {
 import type { CheckoutSummary as CheckoutSummaryModel } from "@/features/checkout/types";
 
 interface CheckoutSummaryProps {
+  isLoading: boolean;
   isSubmitting: boolean;
+  onApplyVoucher: (code?: string) => void;
   onCreateOrder: () => void;
+  onRemoveVoucher: () => void;
+  onVoucherInputChange: (value: string) => void;
   summary: CheckoutSummaryModel;
+  voucherInput: string;
 }
 
 export function CheckoutSummary({
+  isLoading,
   isSubmitting,
+  onApplyVoucher,
   onCreateOrder,
+  onRemoveVoucher,
+  onVoucherInputChange,
   summary,
+  voucherInput,
 }: CheckoutSummaryProps) {
   return (
     <section className="checkout-layout" aria-label="Checkout review">
@@ -85,10 +95,101 @@ export function CheckoutSummary({
           <h2 id="checkout-total-heading">Order summary</h2>
         </header>
 
+        <section className="checkout-voucher" aria-labelledby="checkout-voucher-heading">
+          <div className="checkout-voucher__heading">
+            <TicketPercent aria-hidden="true" size={18} />
+            <h3 id="checkout-voucher-heading">Voucher</h3>
+          </div>
+
+          <form
+            className="checkout-voucher__form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onApplyVoucher();
+            }}
+          >
+            <label htmlFor="checkout-voucher-code">Voucher code</label>
+            <div>
+              <input
+                autoComplete="off"
+                disabled={isLoading || isSubmitting}
+                id="checkout-voucher-code"
+                maxLength={64}
+                onChange={(event) =>
+                  onVoucherInputChange(event.target.value.toUpperCase())
+                }
+                placeholder="SAVE10"
+                value={voucherInput}
+              />
+              <button
+                className="button button--secondary"
+                disabled={isLoading || isSubmitting || !voucherInput.trim()}
+                type="submit"
+              >
+                {isLoading ? "Checking" : "Apply"}
+              </button>
+            </div>
+          </form>
+
+          {summary.voucherError ? (
+            <p className="checkout-voucher__error" role="alert">
+              {summary.voucherError.message}
+            </p>
+          ) : null}
+
+          {summary.appliedVoucher ? (
+            <div className="checkout-voucher__applied" role="status">
+              <div>
+                <strong>{summary.appliedVoucher.code}</strong>
+                <span>
+                  −{formatCurrency(summary.discountAmount, summary.currency)}
+                </span>
+              </div>
+              <button
+                aria-label={`Remove voucher ${summary.appliedVoucher.code}`}
+                disabled={isLoading || isSubmitting}
+                onClick={onRemoveVoucher}
+                type="button"
+              >
+                <X aria-hidden="true" size={15} />
+                Remove
+              </button>
+            </div>
+          ) : null}
+
+          {summary.eligibleVouchers.length > 0 ? (
+            <div className="checkout-voucher__eligible">
+              <span>Eligible vouchers</span>
+              <div>
+                {summary.eligibleVouchers.map((voucher) => (
+                  <button
+                    className={
+                      summary.appliedVoucher?.code === voucher.code
+                        ? "is-applied"
+                        : undefined
+                    }
+                    disabled={isLoading || isSubmitting}
+                    key={voucher.code}
+                    onClick={() => onApplyVoucher(voucher.code)}
+                    type="button"
+                  >
+                    <strong>{voucher.code}</strong>
+                    <small>{formatVoucherValue(voucher, summary.currency)}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+
         <dl className="checkout-totals">
           <div>
             <dt>Subtotal</dt>
             <dd>{formatCurrency(summary.subtotalAmount, summary.currency)}</dd>
+          </div>
+          <div>
+            <dt>Discount</dt>
+            <dd>−{formatCurrency(summary.discountAmount, summary.currency)}</dd>
           </div>
           <div className="checkout-totals__total">
             <dt>Total</dt>
@@ -117,7 +218,12 @@ export function CheckoutSummary({
 
         <button
           className="button button--primary button--full checkout-create-button"
-          disabled={isSubmitting || summary.items.length === 0}
+          disabled={
+            isLoading ||
+            isSubmitting ||
+            summary.items.length === 0 ||
+            Boolean(summary.voucherError)
+          }
           onClick={onCreateOrder}
           type="button"
         >
@@ -129,4 +235,13 @@ export function CheckoutSummary({
       </aside>
     </section>
   );
+}
+
+function formatVoucherValue(
+  voucher: CheckoutSummaryModel["eligibleVouchers"][number],
+  currency: string,
+): string {
+  return voucher.discountType === "PERCENT"
+    ? `${voucher.discountValue}% off`
+    : `${formatCurrency(voucher.discountValue, currency)} off`;
 }
