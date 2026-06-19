@@ -97,16 +97,6 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               <ShoppingBag size={20} strokeWidth={1.8} />
             </Link>
           )}
-          {!isLoading && currentUser?.role === "ADMIN" ? (
-            <Link
-              aria-label="Admin"
-              className="icon-button"
-              href="/admin"
-              title="Admin"
-            >
-              <ShieldCheck size={20} strokeWidth={1.8} />
-            </Link>
-          ) : null}
           {isAuthenticated ? (
             <Link
               aria-label="Profile"
@@ -148,6 +138,16 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               <User size={20} strokeWidth={1.8} />
             </Link>
           )}
+          {!isLoading && currentUser?.role === "ADMIN" ? (
+            <Link
+              aria-label="Admin"
+              className="icon-button"
+              href="/admin"
+              title="Admin"
+            >
+              <ShieldCheck size={20} strokeWidth={1.8} />
+            </Link>
+          ) : null}
         </div>
       </div>
     </header>
