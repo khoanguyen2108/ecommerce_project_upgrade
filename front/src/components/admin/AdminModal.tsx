@@ -8,6 +8,7 @@ interface AdminModalProps {
   children: ReactNode;
   closeDisabled?: boolean;
   confirmCloseMessage?: string;
+  description?: string;
   footer?: ReactNode | ((requestClose: () => void) => ReactNode);
   hasUnsavedChanges?: boolean;
   isOpen: boolean;
@@ -28,6 +29,7 @@ export function AdminModal({
   children,
   closeDisabled = false,
   confirmCloseMessage = "Discard your unsaved changes?",
+  description,
   footer,
   hasUnsavedChanges = false,
   isOpen,
@@ -35,6 +37,7 @@ export function AdminModal({
   title,
 }: AdminModalProps) {
   const titleId = useId();
+  const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeOptionsRef = useRef({
     closeDisabled,
@@ -139,6 +142,7 @@ export function AdminModal({
       }}
     >
       <div
+        aria-describedby={description ? descriptionId : undefined}
         aria-labelledby={titleId}
         aria-modal="true"
         className="admin-modal"
@@ -147,7 +151,10 @@ export function AdminModal({
         tabIndex={-1}
       >
         <header className="admin-modal__header">
-          <h2 id={titleId}>{title}</h2>
+          <div className="admin-modal__heading">
+            <h2 id={titleId}>{title}</h2>
+            {description ? <p id={descriptionId}>{description}</p> : null}
+          </div>
           <button
             aria-label="Close modal"
             className="icon-button admin-icon-button"

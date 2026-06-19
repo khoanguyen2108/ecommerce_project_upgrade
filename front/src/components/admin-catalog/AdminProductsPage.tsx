@@ -985,11 +985,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         hasUnsavedChanges={hasUnsavedChanges}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={
-          panelMode === "create"
-            ? "New product"
-            : selectedProduct?.name || "Product detail"
-        }
+        description="Manage product details, merchandising, categories, and inventory options."
+        title={panelMode === "create" ? "Create Product" : "Edit Product"}
       >
         {actionError ? (
           <AdminFeedback message={actionError} requestId={requestId} tone="error" />
@@ -997,78 +994,82 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         {successMessage ? (
           <AdminFeedback message={successMessage} tone="success" />
         ) : null}
-          <form className="admin-form" id="admin-product-form" onSubmit={handleProductSave}>
-            <label>
-              <span>Name</span>
-              <input
-                disabled={isPanelLoading}
-                maxLength={160}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                required
-                value={productForm.name}
-              />
-            </label>
-
-            <label>
-              <span>Slug</span>
-              <input
-                disabled={isPanelLoading}
-                maxLength={180}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    slug: event.target.value,
-                  }))
-                }
-                required
-                value={productForm.slug}
-              />
-            </label>
-
-            <label>
-              <span>Description</span>
-              <textarea
-                disabled={isPanelLoading}
-                maxLength={4000}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                rows={4}
-                value={productForm.description}
-              />
-            </label>
-
-            <label>
-              <span>Base price</span>
-              <input
-                disabled={isPanelLoading}
-                min="0"
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    basePrice: event.target.value,
-                  }))
-                }
-                required
-                type="number"
-                value={productForm.basePrice}
-              />
-            </label>
+          <form className="admin-form admin-catalog-form" id="admin-product-form" onSubmit={handleProductSave}>
+            <section className="admin-form-section" aria-labelledby="product-basic-heading">
+              <div className="admin-form-section__heading">
+                <p className="eyebrow">01 / Basic information</p>
+                <h3 id="product-basic-heading">Product details</h3>
+                <p>Core storefront information and the product's standard price.</p>
+              </div>
+              <div className="admin-form-section__content admin-form-section__content--two-column">
+                <label>
+                  <span>Name</span>
+                  <input
+                    disabled={isPanelLoading}
+                    maxLength={160}
+                    onChange={(event) =>
+                      setProductForm((current) => ({ ...current, name: event.target.value }))
+                    }
+                    required
+                    value={productForm.name}
+                  />
+                </label>
+                <label>
+                  <span>Slug</span>
+                  <input
+                    disabled={isPanelLoading}
+                    maxLength={180}
+                    onChange={(event) =>
+                      setProductForm((current) => ({ ...current, slug: event.target.value }))
+                    }
+                    required
+                    value={productForm.slug}
+                  />
+                </label>
+                <label className="admin-form-field--wide">
+                  <span>Description</span>
+                  <textarea
+                    disabled={isPanelLoading}
+                    maxLength={4000}
+                    onChange={(event) =>
+                      setProductForm((current) => ({ ...current, description: event.target.value }))
+                    }
+                    rows={4}
+                    value={productForm.description}
+                  />
+                </label>
+                <label>
+                  <span>Base price</span>
+                  <input
+                    disabled={isPanelLoading}
+                    min="0"
+                    onChange={(event) =>
+                      setProductForm((current) => ({ ...current, basePrice: event.target.value }))
+                    }
+                    required
+                    type="number"
+                    value={productForm.basePrice}
+                  />
+                  <small>Whole-number price in the store's configured currency.</small>
+                </label>
+              </div>
+            </section>
 
             <fieldset className="admin-category-picker">
-              <legend>Categories</legend>
+              <legend>02 / Categories</legend>
               <small>
                 Select one or more. The first selected category is the primary category.
               </small>
               <div className="admin-category-picker__options">
+                {isCategoryLoading ? (
+                  <p className="admin-form-inline-state" role="status">Loading categories...</p>
+                ) : null}
+                {!isCategoryLoading && categoryError ? (
+                  <p className="admin-form-inline-state" role="status">Category options are unavailable.</p>
+                ) : null}
+                {!isCategoryLoading && !categoryError && categories.length === 0 ? (
+                  <p className="admin-form-inline-state" role="status">No categories are available.</p>
+                ) : null}
                 {categories.map((category) => {
                   const isSelected = productForm.categoryIds.includes(category.id);
 
@@ -1135,7 +1136,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
             <section className="admin-image-url-editor" aria-labelledby="image-urls-heading">
               <div className="admin-image-url-editor__header">
                 <div>
-                  <span id="image-urls-heading">Product images</span>
+                  <span id="image-urls-heading">03 / Product images</span>
                   <small>Optional. Add up to four http or https image URLs.</small>
                 </div>
                 <button
@@ -1159,11 +1160,14 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               <div className="admin-image-url-list">
                 {productForm.imageUrls.map((imageUrl, index) => (
                   <div className="admin-image-url-row" key={index}>
-                    <AdminProductImage
-                      alt={`Image ${index + 1} preview`}
-                      className="admin-image-url-preview"
-                      url={imageUrl.trim()}
-                    />
+                    <div className="admin-image-preview-wrap">
+                      <AdminProductImage
+                        alt={`Image ${index + 1} preview`}
+                        className="admin-image-url-preview"
+                        url={imageUrl.trim()}
+                      />
+                      {index === 0 ? <span className="admin-image-primary">Primary</span> : null}
+                    </div>
                     <label>
                       <span>Image URL {index + 1}</span>
                       <input
@@ -1204,28 +1208,33 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               </div>
             </section>
 
-            <label className="admin-checkbox">
-              <input
-                checked={productForm.isActive}
-                disabled={isPanelLoading}
-                onChange={(event) =>
-                  setProductForm((current) => ({
-                    ...current,
-                    isActive: event.target.checked,
-                  }))
-                }
-                type="checkbox"
-              />
-              <span>Active</span>
-            </label>
+            <section className="admin-form-section admin-form-section--compact" aria-labelledby="product-status-heading">
+              <div className="admin-form-section__heading">
+                <p className="eyebrow">04 / Status</p>
+                <h3 id="product-status-heading">Store visibility</h3>
+                <p>Inactive products remain in the catalog console but are hidden from sale.</p>
+              </div>
+              <label className="admin-checkbox admin-form-toggle">
+                <input
+                  checked={productForm.isActive}
+                  disabled={isPanelLoading}
+                  onChange={(event) =>
+                    setProductForm((current) => ({ ...current, isActive: event.target.checked }))
+                  }
+                  type="checkbox"
+                />
+                <span>Product is active</span>
+              </label>
+            </section>
 
           </form>
 
           <section className="admin-variants" aria-labelledby="product-variants-heading">
             <div className="admin-variants__header">
               <div>
-                <p className="eyebrow">Variants</p>
+                <p className="eyebrow">05 / Variants</p>
                 <h3 id="product-variants-heading">Product variants</h3>
+                <p className="admin-variants__helper">Manage SKU, size, color, stock, and optional price overrides.</p>
               </div>
               {editingVariantId ? (
                 <button
