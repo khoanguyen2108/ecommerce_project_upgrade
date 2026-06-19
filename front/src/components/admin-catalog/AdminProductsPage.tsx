@@ -683,7 +683,11 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         className="admin-resource__header"
         aria-labelledby="admin-products-heading"
       >
-        <h1 id="admin-products-heading">Products</h1>
+        <div className="admin-page-intro">
+          <p className="admin-page-intro__eyebrow">Catalog</p>
+          <h1 id="admin-products-heading">Products Management</h1>
+          <p>Manage catalog content, pricing, inventory, and visibility.</p>
+        </div>
         <div className="admin-header-actions">
           <button
             className="button button--secondary"
@@ -831,16 +835,17 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                 <th>Slug</th>
                 <th>Category</th>
                 <th>Base price</th>
+                <th>Stock</th>
                 <th>Status</th>
                 <th>Variants</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {isProductLoading ? <AdminTableSkeleton columns={8} rows={6} /> : null}
+              {isProductLoading ? <AdminTableSkeleton columns={9} rows={6} /> : null}
               {!isProductLoading && !listError && products.length === 0 ? (
                 <tr>
-                  <td className="admin-table__state" colSpan={8}>
+                  <td className="admin-table__state" colSpan={9}>
                     No products match the current filters.
                   </td>
                 </tr>
@@ -875,6 +880,19 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                       <td>{product.slug}</td>
                       <td>{product.category?.name || "Not set"}</td>
                       <td>{formatPrice(product.basePrice)}</td>
+                      <td>
+                        <span
+                          className={`admin-badge ${
+                            getProductStock(product) > 0
+                              ? "admin-badge--neutral"
+                              : "admin-badge--muted"
+                          }`}
+                        >
+                          {getProductStock(product) > 0
+                            ? `${getProductStock(product).toLocaleString("en")} in stock`
+                            : "Out of stock"}
+                        </span>
+                      </td>
                       <td>
                         <span
                           className={`admin-badge ${
@@ -1559,6 +1577,13 @@ function getProductSortValue(query: AdminProductQuery): string {
   return PRODUCT_SORT_CHOICES.some((choice) => choice.value === value)
     ? value
     : "createdAt_desc";
+}
+
+function getProductStock(product: AdminProduct): number {
+  return product.variants.reduce(
+    (total, variant) => total + (variant.isActive ? variant.stock : 0),
+    0,
+  );
 }
 
 function AdminFeedback({

@@ -151,9 +151,13 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
   );
 
   return (
-    <div className="admin-resource admin-resource--wide">
+    <div className="admin-resource admin-resource--full-width">
       <section className="admin-resource__header" aria-labelledby="admin-orders-heading">
-        <h1 id="admin-orders-heading">Orders</h1>
+        <div className="admin-page-intro">
+          <p className="admin-page-intro__eyebrow">Commerce operations</p>
+          <h1 id="admin-orders-heading">Orders Management</h1>
+          <p>Review order, customer, payment, and fulfillment state.</p>
+        </div>
         <button
           className="button button--secondary"
           disabled={isLoading}
@@ -209,19 +213,19 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
 
       <div className="admin-table-wrap admin-table-wrap--commerce">
         <table className="admin-table admin-table--commerce">
-          <thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Total</th><th>Items</th><th>Payment</th><th>Created</th><th>Paid</th><th>Cancelled</th><th>Expires</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Payment</th><th>Total</th><th>Items</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody>
-            {isLoading ? <AdminTableSkeleton columns={11} rows={6} /> : null}
-            {!isLoading && !error && orders.length === 0 ? <tr><td className="admin-table__state" colSpan={11}>No orders match the current filters.</td></tr> : null}
+            {isLoading ? <AdminTableSkeleton columns={8} rows={6} /> : null}
+            {!isLoading && !error && orders.length === 0 ? <tr><td className="admin-table__state" colSpan={8}>No orders match the current filters.</td></tr> : null}
             {!isLoading && !error ? orders.map((order) => (
               <tr key={order.id}>
                 <td><span className="admin-code">{order.id}</span></td>
                 <td><strong>{order.user.email}</strong><small className="admin-table__secondary">{order.user.name || "Name not set"}</small></td>
                 <td><AdminOrderStatusBadge status={order.status} /></td>
+                <td>{order.latestPayment ? <AdminPaymentStatusBadge status={order.latestPayment.status} /> : <span className="admin-table__muted">Not set</span>}</td>
                 <td>{formatCurrency(order.totalAmount, order.currency)}</td>
                 <td>{order.itemCount}</td>
-                <td>{order.latestPayment ? <AdminPaymentStatusBadge status={order.latestPayment.status} /> : <span className="admin-table__muted">Not set</span>}</td>
-                <td>{formatDateTime(order.createdAt)}</td><td>{formatDateTime(order.paidAt)}</td><td>{formatDateTime(order.cancelledAt)}</td><td>{formatDateTime(order.expiresAt)}</td>
+                <td>{formatDateTime(order.createdAt)}</td>
                 <td><div className="admin-row-actions admin-row-actions--commerce">
                   <Link aria-label={`View order ${order.id}`} className="icon-button admin-icon-button" href={`/admin/orders/${encodeURIComponent(order.id)}`} title="View order"><Eye aria-hidden="true" size={17} /></Link>
                   {order.status === "PENDING_PAYMENT" ? <>

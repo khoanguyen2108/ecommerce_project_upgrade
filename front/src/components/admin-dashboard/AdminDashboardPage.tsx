@@ -5,11 +5,10 @@ import {
   ArrowUpRight,
   CircleDollarSign,
   ClipboardList,
-  Clock3,
-  CreditCard,
   Package,
   ShieldCheck,
   ShoppingBag,
+  Tags,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,8 +20,6 @@ import {
 } from "@/components/admin-dashboard/AdminDashboardFilters";
 import { AdminMetricCard } from "@/components/admin-dashboard/AdminMetricCard";
 import { MonthlySalesChart } from "@/components/admin-dashboard/MonthlySalesChart";
-import { MonthlyTargetGauge } from "@/components/admin-dashboard/MonthlyTargetGauge";
-import { StatisticsAreaChart } from "@/components/admin-dashboard/StatisticsAreaChart";
 import {
   getAdminOrderStats,
   getAdminRevenue,
@@ -36,27 +33,18 @@ import type {
 } from "@/features/admin-stats/types";
 import { formatPrice } from "@/features/catalog/format";
 
-const LOCAL_MONTHLY_TARGET = 20_000_000;
-
 interface DashboardSnapshot {
   orders?: AdminOrderStats;
   overview?: AdminStatsOverview;
   revenue?: AdminRevenue;
-  targetRevenue?: number;
 }
 
 const quickLinks = [
   {
-    description: "Review fulfillment state and pending payment orders.",
-    href: "/admin/orders",
-    icon: ClipboardList,
-    label: "Manage orders",
-  },
-  {
-    description: "Inspect read-only payment and webhook diagnostics.",
-    href: "/admin/payments",
-    icon: CreditCard,
-    label: "Payment diagnostics",
+    description: "Review customer accounts, roles, and access.",
+    href: "/admin/users",
+    icon: Users,
+    label: "Users",
   },
   {
     description: "Update products, variants, inventory, and visibility.",
@@ -65,10 +53,16 @@ const quickLinks = [
     label: "Products",
   },
   {
-    description: "Review customer accounts, roles, and access.",
-    href: "/admin/users",
-    icon: Users,
-    label: "Users",
+    description: "Maintain category content, order, and visibility.",
+    href: "/admin/categories",
+    icon: Tags,
+    label: "Categories",
+  },
+  {
+    description: "Review fulfillment state and pending payment orders.",
+    href: "/admin/orders",
+    icon: ClipboardList,
+    label: "Orders",
   },
 ] as const;
 
@@ -91,19 +85,17 @@ export function AdminDashboardPage() {
       setRequestIds([]);
 
       const dateQuery = { from: range.from, to: range.to };
-      const currentMonthQuery = getCurrentMonthQuery();
       const results = await Promise.allSettled([
         getAdminStatsOverview(dateQuery),
         getAdminOrderStats(dateQuery),
         getAdminRevenue({ ...dateQuery, groupBy: "month" }),
-        getAdminRevenue({ ...currentMonthQuery, groupBy: "month" }),
       ]);
 
       if (!isMounted) {
         return;
       }
 
-      const [overviewResult, ordersResult, revenueResult, targetResult] = results;
+      const [overviewResult, ordersResult, revenueResult] = results;
       const failures = results
         .filter((result): result is PromiseRejectedResult => result.status === "rejected")
         .map((result) => getAdminStatsError(result.reason));
@@ -118,10 +110,6 @@ export function AdminDashboardPage() {
         revenue:
           revenueResult.status === "fulfilled"
             ? revenueResult.value.revenue
-            : undefined,
-        targetRevenue:
-          targetResult.status === "fulfilled"
-            ? targetResult.value.revenue.totalRevenue
             : undefined,
       });
       setErrors([...new Set(failures.map((failure) => failure.message))]);
@@ -150,7 +138,11 @@ export function AdminDashboardPage() {
   return (
     <div className="admin-dashboard-modern">
       <section className="admin-dashboard-modern__heading" aria-labelledby="dashboard-heading">
-        <h1 id="dashboard-heading">Dashboard</h1>
+        <div className="admin-page-intro">
+          <p className="admin-page-intro__eyebrow">Store operations</p>
+          <h1 id="dashboard-heading">Dashboard Overview</h1>
+          <p>Live catalog, customer, order, and verified revenue signals.</p>
+        </div>
         <AdminDashboardFilters
           isLoading={isLoading}
           onApply={setRange}
@@ -187,24 +179,10 @@ export function AdminDashboardPage() {
 
       <section aria-label="Key performance indicators" className="admin-dashboard-metrics">
         <AdminMetricCard
-          detail="All registered customer accounts"
-          icon={Users}
-          isLoading={isLoading && !snapshot.overview}
-          label="Customers"
-          value={snapshot.overview?.totalCustomers.toLocaleString("en")}
-        />
-        <AdminMetricCard
-          detail={filterLabel}
-          icon={ShoppingBag}
-          isLoading={isLoading && !snapshot.orders}
-          label="Orders"
-          value={snapshot.orders?.total.toLocaleString("en")}
-        />
-        <AdminMetricCard
           detail="Verified paid revenue only"
           icon={CircleDollarSign}
           isLoading={isLoading && !snapshot.overview}
-          label="Revenue"
+          label="Total revenue"
           value={
             snapshot.overview
               ? formatPrice(snapshot.overview.totalRevenue)
@@ -212,30 +190,43 @@ export function AdminDashboardPage() {
           }
         />
         <AdminMetricCard
-          detail="Awaiting payment completion"
-          icon={Clock3}
+          detail={filterLabel}
+          icon={ShoppingBag}
+          isLoading={isLoading && !snapshot.orders}
+          label="Paid orders"
+          value={snapshot.orders?.byStatus.PAID.toLocaleString("en")}
+        />
+        <AdminMetricCard
+          detail="Across verified paid orders"
+          icon={ClipboardList}
           isLoading={isLoading && !snapshot.overview}
-          label="Pending orders"
-          value={snapshot.overview?.pendingOrdersCount.toLocaleString("en")}
+          label="Average order value"
+          value={
+            snapshot.overview
+              ? formatPrice(snapshot.overview.averagePaidOrderValue)
+              : undefined
+          }
+        />
+        <AdminMetricCard
+          detail="All registered customer accounts"
+          icon={Users}
+          isLoading={isLoading && !snapshot.overview}
+          label="Customers"
+          value={snapshot.overview?.totalCustomers.toLocaleString("en")}
         />
       </section>
 
-      <section className="admin-dashboard-primary-grid" aria-label="Sales dashboard charts">
+      <section className="admin-dashboard-primary-grid" aria-label="Operational overview">
         <MonthlySalesChart
           buckets={snapshot.revenue?.buckets}
           isLoading={isLoading}
         />
-        <MonthlyTargetGauge
+        <OperationsOverview
           isLoading={isLoading}
-          revenue={snapshot.targetRevenue}
-          target={LOCAL_MONTHLY_TARGET}
+          orders={snapshot.orders}
+          overview={snapshot.overview}
         />
       </section>
-
-      <StatisticsAreaChart
-        buckets={snapshot.revenue?.buckets}
-        isLoading={isLoading}
-      />
 
       <section className="admin-dashboard-quick-links" aria-labelledby="quick-links-heading">
         <header>
@@ -270,22 +261,57 @@ export function AdminDashboardPage() {
   );
 }
 
-function getCurrentMonthQuery(): DashboardDateRange {
-  const today = new Date();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+function OperationsOverview({
+  isLoading,
+  orders,
+  overview,
+}: {
+  isLoading: boolean;
+  orders?: AdminOrderStats;
+  overview?: AdminStatsOverview;
+}) {
+  const rows = [
+    ["Pending payment", orders?.byStatus.PENDING_PAYMENT],
+    ["Paid", orders?.byStatus.PAID],
+    ["Cancelled", orders?.byStatus.CANCELLED],
+    ["Expired", orders?.byStatus.EXPIRED],
+  ] as const;
 
-  return {
-    from: toDateInputValue(monthStart),
-    to: toDateInputValue(today),
-  };
-}
+  return (
+    <article className="admin-dashboard-card admin-dashboard-card--operations">
+      <header className="admin-dashboard-card__header">
+        <div>
+          <p className="admin-dashboard-card__kicker">Operations</p>
+          <h2>Store status</h2>
+          <span>Current API totals for the selected range</span>
+        </div>
+      </header>
 
-function toDateInputValue(date: Date): string {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
+      <div className="admin-dashboard-operations-list">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <span>{label}</span>
+            {isLoading && value === undefined ? (
+              <span className="admin-dashboard-skeleton admin-dashboard-skeleton--compact" />
+            ) : (
+              <strong>{value?.toLocaleString("en") ?? "Unavailable"}</strong>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="admin-dashboard-inventory-summary">
+        <span>
+          <small>Total products</small>
+          <strong>{overview?.totalProducts.toLocaleString("en") ?? "Unavailable"}</strong>
+        </span>
+        <span>
+          <small>Low-stock variants</small>
+          <strong>{overview?.lowStockVariantsCount.toLocaleString("en") ?? "Unavailable"}</strong>
+        </span>
+      </div>
+    </article>
+  );
 }
 
 function formatRangeLabel(range: DashboardDateRange): string {

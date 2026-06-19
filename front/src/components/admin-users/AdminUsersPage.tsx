@@ -331,7 +331,11 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
   return (
     <div className="admin-resource admin-resource--full-width">
       <section className="admin-resource__header" aria-labelledby="admin-users-heading">
-        <h1 id="admin-users-heading">Users</h1>
+        <div className="admin-page-intro">
+          <p className="admin-page-intro__eyebrow">Access management</p>
+          <h1 id="admin-users-heading">Users Management</h1>
+          <p>Review customer and staff profiles, roles, and account access.</p>
+        </div>
         <button
           className="button button--secondary"
           disabled={isLoading}
@@ -453,18 +457,16 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                 <th>Name</th>
                 <th>Phone</th>
                 <th>Role</th>
-                <th>Provider</th>
                 <th>Status</th>
                 <th>Created</th>
-                <th>Updated</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {isLoading ? <AdminTableSkeleton columns={9} rows={6} /> : null}
+              {isLoading ? <AdminTableSkeleton columns={7} rows={6} /> : null}
               {!isLoading && !listError && users.length === 0 ? (
                 <tr>
-                  <td className="admin-table__state" colSpan={9}>
+                  <td className="admin-table__state" colSpan={7}>
                     No users match the current filters.
                   </td>
                 </tr>
@@ -490,7 +492,6 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                       <td>{formatOptional(user.name)}</td>
                       <td>{formatOptional(user.phone)}</td>
                       <td>{user.role}</td>
-                      <td>{user.authProvider}</td>
                       <td>
                         <span
                           className={`admin-badge ${
@@ -503,7 +504,6 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                         </span>
                       </td>
                       <td>{formatAdminDate(user.createdAt)}</td>
-                      <td>{formatAdminDate(user.updatedAt)}</td>
                       <td>
                         <div
                           className="admin-row-actions"

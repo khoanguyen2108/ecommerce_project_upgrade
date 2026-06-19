@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Store } from "lucide-react";
+import { LogOut, Store, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -26,17 +26,20 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <Link className="brand-mark" href="/admin" aria-label="Belikeme admin home">
             BELIKEME
           </Link>
-          <span>Admin</span>
+          <span>Management Console</span>
         </div>
 
         <AdminNav />
-      </aside>
 
-      <div className="admin-shell__workspace">
-        <header className="admin-topbar">
-          <div className="admin-topbar__identity">
-            <span>{currentUser?.name || "Admin"}</span>
-            <small>{currentUser?.email}</small>
+        <div className="admin-sidebar__footer">
+          <div className="admin-sidebar__account">
+            <span className="admin-sidebar__avatar" aria-hidden="true">
+              <UserRound size={18} strokeWidth={1.8} />
+            </span>
+            <div className="admin-topbar__identity">
+              <span>{currentUser?.name || "Admin"}</span>
+              <small>{currentUser?.email}</small>
+            </div>
           </div>
 
           <div className="admin-topbar__actions">
@@ -45,18 +48,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
               Storefront
             </Link>
             <button
-              aria-label="Sign out"
-              className="icon-button admin-icon-button"
+              className="admin-signout-button"
               disabled={isSigningOut}
               onClick={() => void handleSignOut()}
-              title="Sign out"
               type="button"
             >
-              <LogOut size={20} strokeWidth={1.8} />
+              <LogOut aria-hidden="true" size={17} strokeWidth={1.8} />
+              {isSigningOut ? "Signing out" : "Sign out"}
             </button>
           </div>
-        </header>
+        </div>
+      </aside>
 
+      <div className="admin-shell__workspace">
         <main className="admin-shell__content">{children}</main>
       </div>
     </div>
