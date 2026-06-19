@@ -1,6 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsInt,
@@ -21,6 +23,22 @@ export class UpdateProductDto {
   @IsOptional()
   @IsUUID()
   categoryId?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Canonical category membership for the product.',
+    example: [
+      '64c4bb83-3df2-45d8-85a0-1c18c3a1d675',
+      '0e5ecb7c-a454-4f02-ae59-9708820fbb58',
+    ],
+    nullable: true,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  categoryIds?: string[] | null;
 
   @ApiPropertyOptional({
     example: 'Classic Cotton T-Shirt',
@@ -64,13 +82,13 @@ export class UpdateProductDto {
 
   @ApiPropertyOptional({
     example: ['https://example.com/images/classic-cotton-t-shirt.jpg'],
-    maxItems: 12,
+    maxItems: 4,
     nullable: true,
     type: [String],
   })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(12)
+  @ArrayMaxSize(4)
   @IsUrl({ require_protocol: true }, { each: true })
   @MaxLength(2048, { each: true })
   imageUrls?: string[] | null;

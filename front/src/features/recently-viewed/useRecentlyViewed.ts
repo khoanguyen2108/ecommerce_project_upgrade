@@ -136,7 +136,7 @@ export function productToRecentlyViewedProduct(
   product: Product,
 ): RecentlyViewedProduct {
   return {
-    categoryName: product.category.name,
+    categoryName: product.categories?.[0]?.name || product.category.name,
     id: product.id,
     imageUrl: product.imageUrls[0],
     name: product.name,

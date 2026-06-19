@@ -40,6 +40,11 @@ export interface Product {
     name: string;
     slug: string;
   };
+  categories: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
   variants: ProductVariant[];
 }
 

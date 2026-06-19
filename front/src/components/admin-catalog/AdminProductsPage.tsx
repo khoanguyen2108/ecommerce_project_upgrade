@@ -4,11 +4,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Edit3,
+  ImageIcon,
   Plus,
   RefreshCw,
   RotateCcw,
   Save,
   Search,
+  Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
@@ -47,6 +49,7 @@ import {
 
 const PRODUCT_LIMIT = 20;
 const CATEGORY_OPTION_LIMIT = 100;
+const MAX_PRODUCT_IMAGES = 4;
 
 const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
   AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
@@ -73,9 +76,9 @@ interface AdminProductsPageProps {
 
 interface ProductFormState {
   basePrice: string;
-  categoryId: string;
+  categoryIds: string[];
   description: string;
-  imageUrlsText: string;
+  imageUrls: string[];
   isActive: boolean;
   name: string;
   slug: string;
@@ -866,19 +869,24 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                       tabIndex={0}
                     >
                       <td>
-                        <div className="admin-product-thumb">
-                          {product.imageUrls[0] ? (
-                            <img alt={product.name} src={product.imageUrls[0]} />
-                          ) : (
-                            <span>No image</span>
-                          )}
-                        </div>
+                        <AdminProductImage
+                          alt={product.name}
+                          className="admin-product-thumb"
+                          url={product.imageUrls[0]}
+                        />
                       </td>
                       <td>
                         <strong>{product.name}</strong>
                       </td>
                       <td>{product.slug}</td>
-                      <td>{product.category?.name || "Not set"}</td>
+                      <td>
+                        <span className="admin-category-summary">
+                          {getProductCategories(product)[0]?.name || "Not set"}
+                          {getProductCategories(product).length > 1 ? (
+                            <small>+{getProductCategories(product).length - 1}</small>
+                          ) : null}
+                        </span>
+                      </td>
                       <td>{formatPrice(product.basePrice)}</td>
                       <td>
                         <span
@@ -1038,64 +1046,163 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               />
             </label>
 
-            <div className="admin-form__split">
-              <label>
-                <span>Base price</span>
-                <input
-                  disabled={isPanelLoading}
-                  min="0"
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      basePrice: event.target.value,
-                    }))
-                  }
-                  required
-                  type="number"
-                  value={productForm.basePrice}
-                />
-              </label>
-
-              <label>
-                <span>Category</span>
-                <select
-                  disabled={isPanelLoading || isCategoryLoading}
-                  onChange={(event) =>
-                    setProductForm((current) => ({
-                      ...current,
-                      categoryId: event.target.value,
-                    }))
-                  }
-                  required
-                  value={productForm.categoryId}
-                >
-                  <option value="">Select category</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                      {category.isActive ? "" : " (inactive)"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
             <label>
-              <span>Image URLs</span>
-              <textarea
+              <span>Base price</span>
+              <input
                 disabled={isPanelLoading}
-                maxLength={24576}
+                min="0"
                 onChange={(event) =>
                   setProductForm((current) => ({
                     ...current,
-                    imageUrlsText: event.target.value,
+                    basePrice: event.target.value,
                   }))
                 }
-                placeholder="https://example.com/image.jpg"
-                rows={5}
-                value={productForm.imageUrlsText}
+                required
+                type="number"
+                value={productForm.basePrice}
               />
             </label>
+
+            <fieldset className="admin-category-picker">
+              <legend>Categories</legend>
+              <small>
+                Select one or more. The first selected category is the primary category.
+              </small>
+              <div className="admin-category-picker__options">
+                {categories.map((category) => {
+                  const isSelected = productForm.categoryIds.includes(category.id);
+
+                  return (
+                    <label key={category.id}>
+                      <input
+                        checked={isSelected}
+                        disabled={
+                          isPanelLoading ||
+                          isCategoryLoading ||
+                          (!category.isActive && !isSelected)
+                        }
+                        onChange={(event) =>
+                          setProductForm((current) => ({
+                            ...current,
+                            categoryIds: event.target.checked
+                              ? [...current.categoryIds, category.id]
+                              : current.categoryIds.filter(
+                                  (categoryId) => categoryId !== category.id,
+                                ),
+                          }))
+                        }
+                        type="checkbox"
+                      />
+                      <span>
+                        {category.name}
+                        {category.isActive ? "" : " (inactive)"}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {productForm.categoryIds.length > 0 ? (
+                <div className="admin-category-chips" aria-label="Selected categories">
+                  {productForm.categoryIds.map((categoryId, index) => {
+                    const category = categories.find((item) => item.id === categoryId);
+
+                    return (
+                      <span className="admin-category-chip" key={categoryId}>
+                        {category?.name || "Unknown category"}
+                        {index === 0 ? <small>Primary</small> : null}
+                        <button
+                          aria-label={`Remove ${category?.name || "category"}`}
+                          disabled={isPanelLoading}
+                          onClick={() =>
+                            setProductForm((current) => ({
+                              ...current,
+                              categoryIds: current.categoryIds.filter(
+                                (item) => item !== categoryId,
+                              ),
+                            }))
+                          }
+                          type="button"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </fieldset>
+
+            <section className="admin-image-url-editor" aria-labelledby="image-urls-heading">
+              <div className="admin-image-url-editor__header">
+                <div>
+                  <span id="image-urls-heading">Product images</span>
+                  <small>Optional. Add up to four http or https image URLs.</small>
+                </div>
+                <button
+                  className="button button--secondary"
+                  disabled={
+                    isPanelLoading || productForm.imageUrls.length >= MAX_PRODUCT_IMAGES
+                  }
+                  onClick={() =>
+                    setProductForm((current) => ({
+                      ...current,
+                      imageUrls: [...current.imageUrls, ""],
+                    }))
+                  }
+                  type="button"
+                >
+                  <Plus aria-hidden="true" size={15} />
+                  Add image
+                </button>
+              </div>
+
+              <div className="admin-image-url-list">
+                {productForm.imageUrls.map((imageUrl, index) => (
+                  <div className="admin-image-url-row" key={index}>
+                    <AdminProductImage
+                      alt={`Image ${index + 1} preview`}
+                      className="admin-image-url-preview"
+                      url={imageUrl.trim()}
+                    />
+                    <label>
+                      <span>Image URL {index + 1}</span>
+                      <input
+                        disabled={isPanelLoading}
+                        maxLength={2048}
+                        onChange={(event) =>
+                          setProductForm((current) => ({
+                            ...current,
+                            imageUrls: current.imageUrls.map((value, imageIndex) =>
+                              imageIndex === index ? event.target.value : value,
+                            ),
+                          }))
+                        }
+                        placeholder="https://example.com/image.jpg"
+                        type="url"
+                        value={imageUrl}
+                      />
+                    </label>
+                    <button
+                      aria-label={`Remove image URL ${index + 1}`}
+                      className="icon-button admin-icon-button"
+                      disabled={isPanelLoading || productForm.imageUrls.length === 1}
+                      onClick={() =>
+                        setProductForm((current) => ({
+                          ...current,
+                          imageUrls: current.imageUrls.filter(
+                            (_, imageIndex) => imageIndex !== index,
+                          ),
+                        }))
+                      }
+                      title="Remove image URL"
+                      type="button"
+                    >
+                      <Trash2 aria-hidden="true" size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <label className="admin-checkbox">
               <input
@@ -1329,9 +1436,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 function getEmptyProductForm(): ProductFormState {
   return {
     basePrice: "",
-    categoryId: "",
+    categoryIds: [],
     description: "",
-    imageUrlsText: "",
+    imageUrls: [""],
     isActive: true,
     name: "",
     slug: "",
@@ -1341,9 +1448,12 @@ function getEmptyProductForm(): ProductFormState {
 function getProductForm(product: AdminProduct): ProductFormState {
   return {
     basePrice: String(product.basePrice),
-    categoryId: product.categoryId,
+    categoryIds: getProductCategories(product).map((category) => category.id),
     description: product.description || "",
-    imageUrlsText: product.imageUrls.join("\n"),
+    imageUrls:
+      product.imageUrls.length > 0
+        ? product.imageUrls.slice(0, MAX_PRODUCT_IMAGES)
+        : [""],
     isActive: product.isActive,
     name: product.name,
     slug: product.slug,
@@ -1389,9 +1499,9 @@ function areProductFormsEqual(
 ): boolean {
   return (
     left.basePrice === right.basePrice &&
-    left.categoryId === right.categoryId &&
+    left.categoryIds.join("|") === right.categoryIds.join("|") &&
     left.description === right.description &&
-    left.imageUrlsText === right.imageUrlsText &&
+    left.imageUrls.join("|") === right.imageUrls.join("|") &&
     left.isActive === right.isActive &&
     left.name === right.name &&
     left.slug === right.slug
@@ -1417,6 +1527,7 @@ function getProductPayload(form: ProductFormState):
       payload: {
         basePrice: number;
         categoryId: string;
+        categoryIds: string[];
         description: string | null;
         imageUrls: string[];
         isActive: boolean;
@@ -1427,7 +1538,7 @@ function getProductPayload(form: ProductFormState):
     }
   | { error: string; payload?: undefined } {
   const basePrice = parseRequiredInteger(form.basePrice);
-  const imageUrls = parseImageUrls(form.imageUrlsText);
+  const imageUrls = parseImageUrls(form.imageUrls);
 
   if (!form.name.trim()) {
     return { error: "Product name is required." };
@@ -1437,8 +1548,8 @@ function getProductPayload(form: ProductFormState):
     return { error: "Product slug is required." };
   }
 
-  if (!form.categoryId) {
-    return { error: "Product category is required." };
+  if (form.categoryIds.length === 0) {
+    return { error: "Select at least one product category." };
   }
 
   if (basePrice === undefined) {
@@ -1452,7 +1563,8 @@ function getProductPayload(form: ProductFormState):
   return {
     payload: {
       basePrice,
-      categoryId: form.categoryId,
+      categoryId: form.categoryIds[0],
+      categoryIds: form.categoryIds,
       description: normalizeNullableText(form.description),
       imageUrls: imageUrls.urls,
       isActive: form.isActive,
@@ -1537,14 +1649,13 @@ function parseRequiredInteger(value: string): number | undefined {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-function parseImageUrls(text: string): { error?: string; urls: string[] } {
-  const urls = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
+function parseImageUrls(values: string[]): { error?: string; urls: string[] } {
+  const urls = values
+    .map((value) => value.trim())
     .filter(Boolean);
 
-  if (urls.length > 12) {
-    return { error: "Image URL list can include at most 12 URLs.", urls: [] };
+  if (urls.length > MAX_PRODUCT_IMAGES) {
+    return { error: "A product can include at most 4 image URLs.", urls: [] };
   }
 
   for (const url of urls) {
@@ -1583,6 +1694,43 @@ function getProductStock(product: AdminProduct): number {
   return product.variants.reduce(
     (total, variant) => total + (variant.isActive ? variant.stock : 0),
     0,
+  );
+}
+
+function getProductCategories(product: AdminProduct) {
+  return product.categories?.length > 0
+    ? product.categories
+    : product.category
+      ? [product.category]
+      : [];
+}
+
+function AdminProductImage({
+  alt,
+  className,
+  url,
+}: {
+  alt: string;
+  className: string;
+  url?: string;
+}) {
+  const [hasFailed, setHasFailed] = useState(false);
+
+  useEffect(() => {
+    setHasFailed(false);
+  }, [url]);
+
+  return (
+    <div className={className}>
+      {url && !hasFailed ? (
+        <img alt={alt} onError={() => setHasFailed(true)} src={url} />
+      ) : (
+        <span>
+          <ImageIcon aria-hidden="true" size={17} />
+          No image
+        </span>
+      )}
+    </div>
   );
 }
 

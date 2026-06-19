@@ -84,7 +84,7 @@ const variantOrderBy: Prisma.ProductVariantOrderByWithRelationInput[] = [
   { color: 'asc' },
 ];
 
-const productSelect: Prisma.ProductSelect = {
+const productSelect = {
   id: true,
   categoryId: true,
   name: true,
@@ -98,14 +98,33 @@ const productSelect: Prisma.ProductSelect = {
   category: {
     select: categorySummarySelect,
   },
+  productCategories: {
+    select: {
+      category: {
+        select: categorySummarySelect,
+      },
+    },
+  },
   variants: {
     select: variantSelect,
     orderBy: variantOrderBy,
   },
-};
+} satisfies Prisma.ProductSelect;
 
-const publicProductSelect: Prisma.ProductSelect = {
+const publicProductSelect = {
   ...productSelect,
+  productCategories: {
+    where: {
+      category: {
+        isActive: true,
+      },
+    },
+    select: {
+      category: {
+        select: categorySummarySelect,
+      },
+    },
+  },
   variants: {
     where: {
       isActive: true,
@@ -113,7 +132,27 @@ const publicProductSelect: Prisma.ProductSelect = {
     select: variantSelect,
     orderBy: variantOrderBy,
   },
-};
+} satisfies Prisma.ProductSelect;
+
+function serializeProduct<
+  T extends {
+    category: { id: string; name: string; slug: string };
+    productCategories: Array<{
+      category: { id: string; name: string; slug: string };
+    }>;
+  },
+>(product: T) {
+  const { productCategories, ...productData } = product;
+  const secondaryCategories = productCategories
+    .map((membership) => membership.category)
+    .filter((category) => category.id !== product.category.id)
+    .sort((first, second) => first.name.localeCompare(second.name));
+
+  return {
+    ...productData,
+    categories: [product.category, ...secondaryCategories],
+  };
+}
 
 @Injectable()
 export class CatalogService {
@@ -404,7 +443,7 @@ export class CatalogService {
     ]);
 
     return {
-      products,
+      products: products.map(serializeProduct),
       pagination: {
         page,
         limit,
@@ -436,7 +475,7 @@ export class CatalogService {
     ]);
 
     return {
-      products,
+      products: products.map(serializeProduct),
       pagination: {
         page,
         limit,
@@ -462,7 +501,7 @@ export class CatalogService {
       throw this.productNotFoundException();
     }
 
-    return { product };
+    return { product: serializeProduct(product) };
   }
 
   async getAdminProduct(id: string) {
@@ -477,7 +516,7 @@ export class CatalogService {
       throw this.productNotFoundException();
     }
 
-    return { product };
+    return { product: serializeProduct(product) };
   }
 
   async getPublicProductBySlug(slug: string) {
@@ -496,7 +535,7 @@ export class CatalogService {
       throw this.productNotFoundException();
     }
 
-    return { product };
+    return { product: serializeProduct(product) };
   }
 
   async getPublicProductVariants(id: string) {
@@ -607,13 +646,27 @@ export class CatalogService {
 
   async createProduct(dto: CreateProductDto) {
     const slug = this.normalizeSlug(dto.slug);
-    await this.assertActiveCategoryExists(dto.categoryId);
+    const categoryIds = this.normalizeCategoryIds(dto.categoryIds, dto.categoryId);
+    await this.assertActiveCategoriesExist(categoryIds);
     await this.assertProductSlugAvailable(slug);
 
     try {
       const product = await this.prismaService.product.create({
         data: {
-          categoryId: dto.categoryId,
+          category: {
+            connect: {
+              id: categoryIds[0],
+            },
+          },
+          productCategories: {
+            create: categoryIds.map((categoryId) => ({
+              category: {
+                connect: {
+                  id: categoryId,
+                },
+              },
+            })),
+          },
           name: this.normalizeRequiredText(dto.name, 'name'),
           slug,
           description: this.normalizeOptionalText(dto.description),
@@ -624,7 +677,7 @@ export class CatalogService {
         select: productSelect,
       });
 
-      return { product };
+      return { product: serializeProduct(product) };
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         throw this.productSlugExistsException();
@@ -637,12 +690,29 @@ export class CatalogService {
   async updateProduct(id: string, dto: UpdateProductDto) {
     await this.getProductForAdmin(id);
 
-    const data: Prisma.ProductUncheckedUpdateInput = {};
+    const data: Prisma.ProductUpdateInput = {};
 
-    if ('categoryId' in dto) {
-      const categoryId = this.normalizeRequiredId(dto.categoryId, 'categoryId');
-      await this.assertActiveCategoryExists(categoryId);
-      data.categoryId = categoryId;
+    if ('categoryIds' in dto || 'categoryId' in dto) {
+      const categoryIds = this.normalizeCategoryIds(
+        dto.categoryIds,
+        dto.categoryId,
+      );
+      await this.assertActiveCategoriesExist(categoryIds);
+      data.category = {
+        connect: {
+          id: categoryIds[0],
+        },
+      };
+      data.productCategories = {
+        deleteMany: {},
+        create: categoryIds.map((categoryId) => ({
+          category: {
+            connect: {
+              id: categoryId,
+            },
+          },
+        })),
+      };
     }
 
     if ('name' in dto) {
@@ -686,7 +756,7 @@ export class CatalogService {
         select: productSelect,
       });
 
-      return { product };
+      return { product: serializeProduct(product) };
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         throw this.productSlugExistsException();
@@ -709,7 +779,7 @@ export class CatalogService {
       select: productSelect,
     });
 
-    return { product };
+    return { product: serializeProduct(product) };
   }
 
   async createProductVariant(productId: string, dto: CreateProductVariantDto) {
@@ -899,12 +969,20 @@ export class CatalogService {
     }
 
     if (query.categoryId) {
-      where.categoryId = query.categoryId;
+      where.productCategories = {
+        some: {
+          categoryId: query.categoryId,
+        },
+      };
     }
 
     if (query.categorySlug) {
-      where.category = {
-        slug: this.normalizeSlug(query.categorySlug),
+      where.productCategories = {
+        some: {
+          category: {
+            slug: this.normalizeSlug(query.categorySlug),
+          },
+        },
       };
     }
 
@@ -1018,13 +1096,24 @@ export class CatalogService {
     }
 
     if (query.categoryId) {
-      where.categoryId = query.categoryId;
+      where.productCategories = {
+        some: {
+          categoryId: query.categoryId,
+          category: {
+            isActive: true,
+          },
+        },
+      };
     }
 
     if (query.categorySlug) {
-      where.category = {
-        isActive: true,
-        slug: this.normalizeSlug(query.categorySlug),
+      where.productCategories = {
+        some: {
+          category: {
+            isActive: true,
+            slug: this.normalizeSlug(query.categorySlug),
+          },
+        },
       };
     }
 
@@ -1176,10 +1265,12 @@ export class CatalogService {
     return variant;
   }
 
-  private async assertActiveCategoryExists(categoryId: string) {
-    const category = await this.prismaService.category.findUnique({
+  private async assertActiveCategoriesExist(categoryIds: string[]) {
+    const categories = await this.prismaService.category.findMany({
       where: {
-        id: categoryId,
+        id: {
+          in: categoryIds,
+        },
       },
       select: {
         id: true,
@@ -1187,11 +1278,11 @@ export class CatalogService {
       },
     });
 
-    if (!category) {
+    if (categories.length !== categoryIds.length) {
       throw this.categoryNotFoundException();
     }
 
-    if (!category.isActive) {
+    if (categories.some((category) => !category.isActive)) {
       throw new BadRequestException({
         code: 'CATEGORY_INACTIVE',
         message: 'Product category must be active.',
@@ -1342,6 +1433,10 @@ export class CatalogService {
       throw this.invalidFieldException('imageUrls');
     }
 
+    if (value.length > 4) {
+      throw this.invalidFieldException('imageUrls');
+    }
+
     return value.map((imageUrl) => {
       if (typeof imageUrl !== 'string') {
         throw this.invalidFieldException('imageUrls');
@@ -1355,6 +1450,40 @@ export class CatalogService {
 
       return normalized;
     });
+  }
+
+  private normalizeCategoryIds(
+    value: string[] | null | undefined,
+    primaryCategoryId: string | null | undefined,
+  ): string[] {
+    const normalizedPrimary = primaryCategoryId
+      ? this.normalizeRequiredId(primaryCategoryId, 'categoryId')
+      : undefined;
+    const sourceCategoryIds = Array.isArray(value)
+      ? value
+      : normalizedPrimary
+        ? [normalizedPrimary]
+        : [];
+    const categoryIds = Array.from(
+      new Set(
+        sourceCategoryIds.map((categoryId) =>
+          this.normalizeRequiredId(categoryId, 'categoryIds'),
+        ),
+      ),
+    );
+
+    if (categoryIds.length === 0) {
+      throw this.invalidFieldException('categoryIds');
+    }
+
+    if (!normalizedPrimary) {
+      return categoryIds;
+    }
+
+    return [
+      normalizedPrimary,
+      ...categoryIds.filter((categoryId) => categoryId !== normalizedPrimary),
+    ];
   }
 
   private normalizeCategoryImageUrl(

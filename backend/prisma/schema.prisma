@@ -90,7 +90,8 @@ model Category {
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  products      Product[]
+  primaryProducts   Product[]         @relation("PrimaryProductCategory")
+  productCategories ProductCategory[]
 
   @@index([isActive])
   @@index([isActive, isFeatured, featuredOrder])
@@ -109,7 +110,7 @@ model LandingPageSetting {
 model Product {
   id          String           @id @default(uuid()) @db.Uuid
   categoryId  String           @db.Uuid
-  category    Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  category    Category         @relation("PrimaryProductCategory", fields: [categoryId], references: [id], onDelete: Restrict)
   name        String           @db.VarChar(160)
   slug        String           @unique @db.VarChar(180)
   description String?
@@ -120,10 +121,21 @@ model Product {
   updatedAt   DateTime         @updatedAt
   variants    ProductVariant[]
   orderItems  OrderItem[]
+  productCategories ProductCategory[]
 
   @@index([categoryId])
   @@index([isActive])
   @@index([basePrice])
+}
+
+model ProductCategory {
+  productId  String   @db.Uuid
+  categoryId String   @db.Uuid
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
 }
 
 model ProductVariant {

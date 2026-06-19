@@ -130,7 +130,7 @@ export function useWishlist() {
 
 export function productToWishlistItem(product: Product): WishlistItem {
   return {
-    categoryName: product.category.name,
+    categoryName: product.categories?.[0]?.name || product.category.name,
     id: product.id,
     imageUrl: product.imageUrls[0],
     name: product.name,
@@ -258,4 +258,3 @@ function readRequiredString(value: unknown): string | undefined {
 function readOptionalString(value: unknown): string | undefined {
   return readRequiredString(value);
 }
-

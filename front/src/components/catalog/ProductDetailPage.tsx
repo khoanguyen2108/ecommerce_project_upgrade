@@ -1,17 +1,22 @@
 "use client";
 
-import { AlertCircle, Loader2, ShoppingBag } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  ImageOff,
+  Loader2,
+  Minus,
+  Plus,
+  ShoppingBag,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useCart } from "@/components/cart/CartProvider";
 import { RecentlyViewedProducts } from "@/components/recently-viewed/RecentlyViewedProducts";
 import { WishlistButton } from "@/components/wishlist/WishlistButton";
-import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
-import {
-  getCartErrorMessage,
-  getCartRequestId,
-} from "@/features/cart/errors";
+import { getCartErrorMessage, getCartRequestId } from "@/features/cart/errors";
 import {
   getProductById,
   getProductBySlug,
@@ -39,7 +44,6 @@ interface ProductDetailState {
 }
 
 interface CartFeedback {
-  kind: "error" | "success";
   message: string;
   requestId?: string;
 }
@@ -53,7 +57,8 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     variants: [],
   });
   const [activeImage, setActiveImage] = useState<string>();
-  const [selectedVariantId, setSelectedVariantId] = useState<string>();
+  const [selectedSize, setSelectedSize] = useState<string>();
+  const [selectedColor, setSelectedColor] = useState<string>();
   const [quantity, setQuantity] = useState(1);
   const [cartFeedback, setCartFeedback] = useState<CartFeedback>();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
@@ -63,11 +68,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     let isMounted = true;
 
     async function loadProduct() {
-      setState((current) => ({
-        ...current,
-        error: undefined,
-        isLoading: true,
-      }));
+      setState((current) => ({ ...current, error: undefined, isLoading: true }));
 
       try {
         const isUuidRef = isUuid(productRef);
@@ -82,25 +83,21 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           return;
         }
 
-        setState({
-          isLoading: false,
-          product,
-          variants,
-        });
-        setActiveImage(product.imageUrls[0]);
-        setSelectedVariantId(undefined);
+        const imageUrls = getProductImages(product);
+        setState({ isLoading: false, product, variants });
+        setActiveImage(imageUrls[0]);
+        setSelectedSize(undefined);
+        setSelectedColor(undefined);
         setQuantity(1);
         setCartFeedback(undefined);
       } catch (error) {
-        if (!isMounted) {
-          return;
+        if (isMounted) {
+          setState({
+            error: getCatalogErrorMessage(error),
+            isLoading: false,
+            variants: [],
+          });
         }
-
-        setState({
-          error: getCatalogErrorMessage(error),
-          isLoading: false,
-          variants: [],
-        });
       }
     }
 
@@ -112,49 +109,65 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   }, [productRef]);
 
   useEffect(() => {
-    if (!state.product) {
-      return;
+    if (state.product) {
+      addRecentlyViewedProduct(productToRecentlyViewedProduct(state.product));
     }
-
-    addRecentlyViewedProduct(productToRecentlyViewedProduct(state.product));
   }, [addRecentlyViewedProduct, state.product]);
 
-  const totalStock = useMemo(
-    () =>
-      state.variants.reduce(
-        (sum, variant) =>
-          sum + (isVariantSelectable(variant) ? variant.stock : 0),
-        0,
-      ),
+  const selectableVariants = useMemo(
+    () => state.variants.filter(isVariantSelectable),
     [state.variants],
   );
-
+  const sizes = useMemo(
+    () => Array.from(new Set(state.variants.map((variant) => variant.size))),
+    [state.variants],
+  );
+  const colors = useMemo(
+    () => Array.from(new Set(state.variants.map((variant) => variant.color))),
+    [state.variants],
+  );
   const selectedVariant = useMemo(
-    () => state.variants.find((variant) => variant.id === selectedVariantId),
-    [selectedVariantId, state.variants],
+    () =>
+      state.variants.find(
+        (variant) =>
+          variant.size === selectedSize && variant.color === selectedColor,
+      ),
+    [selectedColor, selectedSize, state.variants],
+  );
+  const totalStock = selectableVariants.reduce(
+    (sum, variant) => sum + variant.stock,
+    0,
   );
   const selectedMaxQuantity = selectedVariant
     ? Math.max(1, Math.min(99, selectedVariant.stock))
-    : 99;
+    : 1;
 
   useEffect(() => {
-    if (!selectedVariant || selectedVariant.stock <= 0) {
-      return;
-    }
-
     if (quantity > selectedMaxQuantity) {
       setQuantity(selectedMaxQuantity);
     }
-  }, [quantity, selectedMaxQuantity, selectedVariant]);
+  }, [quantity, selectedMaxQuantity]);
 
-  function handleVariantSelect(variant: ProductVariant) {
-    if (!isVariantSelectable(variant)) {
+  function handleSizeSelect(size: string) {
+    if (!hasSelectableSize(state.variants, size)) {
       return;
     }
 
-    const nextMaxQuantity = Math.max(1, Math.min(99, variant.stock));
-    setSelectedVariantId(variant.id);
-    setQuantity((current) => Math.max(1, Math.min(current, nextMaxQuantity)));
+    setSelectedSize(size);
+    if (!hasSelectableCombination(state.variants, size, selectedColor)) {
+      setSelectedColor(undefined);
+    }
+    setQuantity(1);
+    setCartFeedback(undefined);
+  }
+
+  function handleColorSelect(color: string) {
+    if (!selectedSize || !hasSelectableCombination(state.variants, selectedSize, color)) {
+      return;
+    }
+
+    setSelectedColor(color);
+    setQuantity(1);
     setCartFeedback(undefined);
   }
 
@@ -180,10 +193,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     }
 
     if (!selectedVariant || !isVariantSelectable(selectedVariant)) {
-      setCartFeedback({
-        kind: "error",
-        message: "Choose an in-stock size and color before adding to cart.",
-      });
       return;
     }
 
@@ -192,16 +201,15 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
 
     try {
       await addItemAndOpenDrawer(
-        {
-          quantity,
-          variantId: selectedVariant.id,
-        },
+        { quantity, variantId: selectedVariant.id },
         state.product.name,
       );
     } catch (error) {
       setCartFeedback({
-        kind: "error",
-        message: getCartErrorMessage(error, "This item could not be added to cart."),
+        message: getCartErrorMessage(
+          error,
+          "This item could not be added to cart.",
+        ),
         requestId: getCartRequestId(error),
       });
     } finally {
@@ -214,7 +222,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
       <main className="product-detail-page">
         <div className="product-detail-shell">
           <div className="product-detail-skeleton" aria-hidden="true" />
-          <div className="product-detail-copy">
+          <div className="product-detail-copy" aria-hidden="true">
             <div className="detail-line detail-line--wide" />
             <div className="detail-line" />
             <div className="detail-line detail-line--short" />
@@ -242,38 +250,47 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   }
 
   const product = state.product;
+  const imageUrls = getProductImages(product);
+  const categories = getProductCategories(product);
   const wishlistItem = productToWishlistItem(product);
   const displayPrice = selectedVariant
     ? getVariantUnitPrice(product, selectedVariant)
     : product.basePrice;
+  const hasValidSelection = isVariantSelectable(selectedVariant);
   const addToCartDisabled =
     isAuthLoading ||
     isAddingToCart ||
-    (isAuthenticated && !isVariantSelectable(selectedVariant));
+    (isAuthenticated && !hasValidSelection);
+  const selectionMessage = getSelectionMessage({
+    selectedColor,
+    selectedSize,
+    totalStock,
+  });
 
   return (
     <main className="product-detail-page">
       <section className="product-detail-shell" aria-labelledby="product-heading">
         <div className="product-gallery">
           <div className="product-gallery__main">
-            {activeImage ? (
-              <img alt={product.name} src={activeImage} />
-            ) : (
-              <div className="product-card__placeholder">No image available</div>
-            )}
+            <ProductImage
+              alt={product.name}
+              key={activeImage || "product-fallback"}
+              url={activeImage}
+            />
           </div>
 
-          {product.imageUrls.length > 1 ? (
+          {imageUrls.length > 1 ? (
             <div className="product-gallery__thumbs" aria-label="Product images">
-              {product.imageUrls.map((imageUrl) => (
+              {imageUrls.map((imageUrl, index) => (
                 <button
-                  aria-label={`View ${product.name} image`}
+                  aria-label={`View ${product.name} image ${index + 1}`}
+                  aria-pressed={imageUrl === activeImage}
                   className={imageUrl === activeImage ? "is-active" : undefined}
-                  key={imageUrl}
+                  key={`${imageUrl}-${index}`}
                   onClick={() => setActiveImage(imageUrl)}
                   type="button"
                 >
-                  <img alt="" src={imageUrl} />
+                  <ProductImage alt="" url={imageUrl} />
                 </button>
               ))}
             </div>
@@ -281,93 +298,135 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
         </div>
 
         <div className="product-detail-copy">
-          <Link
-            className="product-detail-copy__category"
-            href={`/categories/${product.category.slug}`}
-          >
-            {product.category.name}
-          </Link>
-          <h1 id="product-heading">{product.name}</h1>
-          <p className="product-detail-copy__price">{formatPrice(displayPrice)}</p>
-          {product.description ? (
-            <p className="product-detail-copy__description">{product.description}</p>
-          ) : (
-            <p className="product-detail-copy__description">
-              Product details are being prepared for this item.
-            </p>
-          )}
+          <div className="product-detail-copy__topline">
+            <div className="product-detail-copy__categories">
+              {categories.map((category) => (
+                <Link href={`/categories/${category.slug}`} key={category.id}>
+                  {category.name}
+                </Link>
+              ))}
+            </div>
+            <span className="product-status">
+              <Check aria-hidden="true" size={14} />
+              {product.isActive ? "Active" : "Inactive"}
+            </span>
+          </div>
+
+          <div className="product-detail-copy__heading">
+            <h1 id="product-heading">{product.name}</h1>
+            <p className="product-detail-copy__price">{formatPrice(displayPrice)}</p>
+          </div>
+
+          <p className="product-detail-copy__description">
+            {product.description || "Product details are being prepared for this item."}
+          </p>
 
           <div className="stock-summary" role="status">
-            {totalStock > 0
-              ? `${totalStock} items available across sizes and colors.`
-              : "This product is currently out of stock."}
+            <span>{totalStock > 0 ? "Available" : "Out of stock"}</span>
+            <strong>
+              {totalStock > 0
+                ? `${totalStock} item${totalStock === 1 ? "" : "s"} across all variants`
+                : "No purchasable variants"}
+            </strong>
           </div>
 
           <section className="variant-panel" aria-labelledby="variants-heading">
-            <h2 id="variants-heading">Sizes and colors</h2>
-            {state.variants.length > 0 ? (
-              <div className="variant-grid">
-                {state.variants.map((variant) => (
+            <div className="product-option-heading">
+              <h2 id="variants-heading">Size</h2>
+              <span>{selectedSize || "Select a size"}</span>
+            </div>
+            <div className="variant-choice-list">
+              {sizes.map((size) => {
+                const isAvailable = hasSelectableSize(state.variants, size);
+
+                return (
                   <button
-                    aria-pressed={variant.id === selectedVariantId}
-                    className={getVariantOptionClassName(
-                      variant,
-                      variant.id === selectedVariantId,
-                    )}
-                    disabled={!isVariantSelectable(variant)}
-                    key={variant.id}
-                    onClick={() => handleVariantSelect(variant)}
+                    aria-pressed={size === selectedSize}
+                    className={size === selectedSize ? "is-selected" : undefined}
+                    disabled={!isAvailable}
+                    key={size}
+                    onClick={() => handleSizeSelect(size)}
                     type="button"
                   >
-                    <span>{variant.size}</span>
-                    <strong>{variant.color}</strong>
-                    <small>
-                      {variant.isActive
-                        ? variant.stock > 0
-                          ? `${variant.stock} in stock`
-                          : "Sold out"
-                        : "Unavailable"}
-                    </small>
-                    {variant.priceOverride !== null ? (
-                      <small>{formatPrice(variant.priceOverride)}</small>
-                    ) : null}
+                    {size}
                   </button>
-                ))}
-              </div>
+                );
+              })}
+            </div>
+
+            <div className="product-option-heading product-option-heading--color">
+              <h2>Color</h2>
+              <span>{selectedColor || (selectedSize ? "Select a color" : "Choose size first")}</span>
+            </div>
+            <div className="variant-choice-list">
+              {colors.map((color) => {
+                const isAvailable = Boolean(
+                  selectedSize &&
+                    hasSelectableCombination(state.variants, selectedSize, color),
+                );
+
+                return (
+                  <button
+                    aria-pressed={color === selectedColor}
+                    className={color === selectedColor ? "is-selected" : undefined}
+                    disabled={!isAvailable}
+                    key={color}
+                    onClick={() => handleColorSelect(color)}
+                    type="button"
+                  >
+                    {color}
+                  </button>
+                );
+              })}
+            </div>
+
+            {state.variants.length === 0 ? (
+              <p className="product-selection-hint">No active variants are available.</p>
             ) : (
-              <p className="catalog-context">No active variants are available.</p>
+              <p className="product-selection-hint">{selectionMessage}</p>
             )}
           </section>
 
           <section className="quantity-panel" aria-labelledby="quantity-heading">
             <div>
               <h2 id="quantity-heading">Quantity</h2>
-              {selectedVariant ? (
-                <p>
-                  {selectedVariant.stock > 0
-                    ? `Up to ${selectedMaxQuantity} available.`
-                    : "This selection is sold out."}
-                </p>
-              ) : (
-                <p>Choose a size and color to set quantity.</p>
-              )}
+              <p>
+                {hasValidSelection
+                  ? `${selectedVariant.stock} available for this option.`
+                  : "Complete the size and color selection first."}
+              </p>
             </div>
-            <input
-              aria-label="Cart quantity"
-              disabled={!selectedVariant || !isVariantSelectable(selectedVariant)}
-              max={selectedMaxQuantity}
-              min={1}
-              onChange={(event) => handleQuantityChange(Number(event.target.value))}
-              type="number"
-              value={quantity}
-            />
+            <div className="quantity-stepper">
+              <button
+                aria-label="Decrease quantity"
+                disabled={!hasValidSelection || quantity <= 1}
+                onClick={() => handleQuantityChange(quantity - 1)}
+                type="button"
+              >
+                <Minus aria-hidden="true" size={15} />
+              </button>
+              <input
+                aria-label="Cart quantity"
+                disabled={!hasValidSelection}
+                max={selectedMaxQuantity}
+                min={1}
+                onChange={(event) => handleQuantityChange(Number(event.target.value))}
+                type="number"
+                value={quantity}
+              />
+              <button
+                aria-label="Increase quantity"
+                disabled={!hasValidSelection || quantity >= selectedMaxQuantity}
+                onClick={() => handleQuantityChange(quantity + 1)}
+                type="button"
+              >
+                <Plus aria-hidden="true" size={15} />
+              </button>
+            </div>
           </section>
 
           {cartFeedback ? (
-            <div
-              className={`customer-feedback customer-feedback--${cartFeedback.kind}`}
-              role={cartFeedback.kind === "error" ? "alert" : "status"}
-            >
+            <div className="customer-feedback customer-feedback--error" role="alert">
               <AlertCircle aria-hidden="true" size={19} />
               <span>{cartFeedback.message}</span>
               {cartFeedback.requestId ? (
@@ -377,7 +436,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           ) : null}
 
           <div className="product-detail-actions">
-            <WishlistButton item={wishlistItem} />
             <button
               className="button button--primary button--full"
               disabled={addToCartDisabled}
@@ -393,9 +451,38 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                 isAddingToCart,
                 isAuthenticated,
                 selectedVariant,
+                totalStock,
               })}
             </button>
+            <WishlistButton item={wishlistItem} />
           </div>
+
+          <dl className="product-facts">
+            <div>
+              <dt>SKU</dt>
+              <dd>{selectedVariant?.sku || "Select a variant"}</dd>
+            </div>
+            <div>
+              <dt>Variant</dt>
+              <dd>
+                {selectedVariant
+                  ? `${selectedVariant.size} / ${selectedVariant.color}`
+                  : `${selectableVariants.length} available option${
+                      selectableVariants.length === 1 ? "" : "s"
+                    }`}
+              </dd>
+            </div>
+            <div>
+              <dt>Availability</dt>
+              <dd>
+                {selectedVariant
+                  ? `${selectedVariant.stock} in stock`
+                  : totalStock > 0
+                    ? "In stock"
+                    : "Out of stock"}
+              </dd>
+            </div>
+          </dl>
         </div>
       </section>
       <RecentlyViewedProducts excludeProductId={product.id} />
@@ -403,12 +490,39 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   );
 }
 
-function getCatalogErrorMessage(error: unknown): string {
-  if (error instanceof ApiClientError) {
-    return error.message;
+function ProductImage({ alt, url }: { alt: string; url?: string }) {
+  const [hasFailed, setHasFailed] = useState(false);
+
+  useEffect(() => {
+    setHasFailed(false);
+  }, [url]);
+
+  if (!url || hasFailed) {
+    return (
+      <div className="product-image-fallback">
+        <ImageOff aria-hidden="true" size={28} strokeWidth={1.4} />
+        <span>Image unavailable</span>
+      </div>
+    );
   }
 
-  return "This product could not be loaded right now. Please try again soon.";
+  return <img alt={alt} onError={() => setHasFailed(true)} src={url} />;
+}
+
+function getProductImages(product: Product): string[] {
+  return Array.from(
+    new Set(product.imageUrls.map((imageUrl) => imageUrl.trim()).filter(Boolean)),
+  ).slice(0, 4);
+}
+
+function getProductCategories(product: Product) {
+  return product.categories?.length ? product.categories : [product.category];
+}
+
+function getCatalogErrorMessage(error: unknown): string {
+  return error instanceof ApiClientError
+    ? error.message
+    : "This product could not be loaded right now. Please try again soon.";
 }
 
 function isUuid(value: string): boolean {
@@ -423,39 +537,70 @@ function isVariantSelectable(
   return Boolean(variant?.isActive && variant.stock > 0);
 }
 
-function getVariantUnitPrice(product: Product, variant: ProductVariant): number {
-  return variant.priceOverride ?? product.basePrice;
+function hasSelectableSize(variants: ProductVariant[], size: string): boolean {
+  return variants.some(
+    (variant) => variant.size === size && isVariantSelectable(variant),
+  );
 }
 
-function getVariantOptionClassName(
-  variant: ProductVariant,
-  isSelected: boolean,
-): string {
-  const classNames = ["variant-option"];
+function hasSelectableCombination(
+  variants: ProductVariant[],
+  size: string,
+  color?: string,
+): boolean {
+  return Boolean(
+    color &&
+      variants.some(
+        (variant) =>
+          variant.size === size &&
+          variant.color === color &&
+          isVariantSelectable(variant),
+      ),
+  );
+}
 
-  if (!isVariantSelectable(variant)) {
-    classNames.push("variant-option--sold-out");
-  }
-
-  if (isSelected) {
-    classNames.push("is-selected");
-  }
-
-  return classNames.join(" ");
+function getVariantUnitPrice(product: Product, variant: ProductVariant): number {
+  return variant.priceOverride ?? product.basePrice;
 }
 
 function getProductReturnPath(product: Product): string {
   return `/products/${encodeURIComponent(product.slug)}`;
 }
 
+function getSelectionMessage({
+  selectedColor,
+  selectedSize,
+  totalStock,
+}: {
+  selectedColor?: string;
+  selectedSize?: string;
+  totalStock: number;
+}): string {
+  if (totalStock === 0) {
+    return "This product is currently out of stock.";
+  }
+
+  if (!selectedSize) {
+    return "Choose a size to see its available colors.";
+  }
+
+  if (!selectedColor) {
+    return "Choose an available color to complete your selection.";
+  }
+
+  return "Your size and color are available.";
+}
+
 function getAddToCartLabel({
   isAddingToCart,
   isAuthenticated,
   selectedVariant,
+  totalStock,
 }: {
   isAddingToCart: boolean;
   isAuthenticated: boolean;
   selectedVariant?: ProductVariant;
+  totalStock: number;
 }): string {
   if (isAddingToCart) {
     return "Adding...";
@@ -463,6 +608,10 @@ function getAddToCartLabel({
 
   if (!isAuthenticated) {
     return "Sign in to add to cart";
+  }
+
+  if (totalStock === 0) {
+    return "Out of stock";
   }
 
   if (!selectedVariant) {

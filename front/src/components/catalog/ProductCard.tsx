@@ -14,6 +14,9 @@ interface ProductCardProps {
 
 export function ProductCard({ product, variant = "default" }: ProductCardProps) {
   const imageUrl = product.imageUrls[0];
+  const categories = product.categories?.length
+    ? product.categories
+    : [product.category];
   const [imageFailed, setImageFailed] = useState(false);
   const wishlistItem = productToWishlistItem(product);
   const activeVariants = product.variants.filter((item) => item.isActive);
@@ -52,7 +55,10 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
           )}
         </div>
         <div className="product-card__body">
-          <p className="product-card__category">{product.category.name}</p>
+          <p className="product-card__category">
+            {categories[0].name}
+            {categories.length > 1 ? <span>+{categories.length - 1}</span> : null}
+          </p>
           <h3>{product.name}</h3>
           <div className="product-card__price-row">
             <p className="product-card__price">{formatPrice(product.basePrice)}</p>

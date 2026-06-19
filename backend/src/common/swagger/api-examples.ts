@@ -180,6 +180,7 @@ export const productExample = {
   createdAt: '2026-06-10T10:30:00.000Z',
   updatedAt: '2026-06-10T10:30:00.000Z',
   category: productCategoryExample,
+  categories: [productCategoryExample],
   variants: [productVariantExample],
 };
 

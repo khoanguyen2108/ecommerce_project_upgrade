@@ -75,6 +75,7 @@ export interface AdminProduct {
   createdAt: string;
   updatedAt: string;
   category: AdminProductCategorySummary;
+  categories: AdminProductCategorySummary[];
   variants: AdminProductVariant[];
 }
 
@@ -134,6 +135,7 @@ export interface UpdateAdminCategoryRequest {
 
 export interface CreateAdminProductRequest {
   categoryId: string;
+  categoryIds: string[];
   name: string;
   slug: string;
   description?: string | null;
@@ -144,6 +146,7 @@ export interface CreateAdminProductRequest {
 
 export interface UpdateAdminProductRequest {
   categoryId?: string;
+  categoryIds?: string[];
   name?: string;
   slug?: string;
   description?: string | null;
