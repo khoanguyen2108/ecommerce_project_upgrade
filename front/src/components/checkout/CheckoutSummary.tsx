@@ -2,6 +2,7 @@
 
 import { Info, Loader2, TicketPercent, X } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from 'react';
 import {
   formatCurrency,
   formatNumber,
@@ -17,6 +18,7 @@ interface CheckoutSummaryProps {
   onVoucherInputChange: (value: string) => void;
   summary: CheckoutSummaryModel;
   voucherInput: string;
+  shippingSection: ReactNode;
 }
 
 export function CheckoutSummary({
@@ -28,10 +30,12 @@ export function CheckoutSummary({
   onVoucherInputChange,
   summary,
   voucherInput,
+  shippingSection,
 }: CheckoutSummaryProps) {
   return (
     <section className="checkout-layout" aria-label="Checkout review">
       <section className="checkout-items" aria-labelledby="checkout-items-heading">
+        {shippingSection}
         <header className="checkout-section-heading">
           <div>
             <p className="eyebrow">Order details</p>

@@ -1,4 +1,5 @@
 import type { OrderResponse } from "@/features/orders/types";
+import type { AddressInput } from '@/features/addresses/types';
 
 export interface CheckoutSummaryItem {
   cartItemId: string;
@@ -53,3 +54,14 @@ export interface CheckoutSummaryResponse {
 }
 
 export type CreateCheckoutOrderResponse = OrderResponse;
+
+export interface CheckoutShippingInfo extends AddressInput {
+  saveAddress?: boolean;
+  setDefault?: boolean;
+}
+
+export interface CreateCheckoutOrderRequest {
+  voucherCode?: string;
+  addressId?: string;
+  shippingInfo?: CheckoutShippingInfo;
+}

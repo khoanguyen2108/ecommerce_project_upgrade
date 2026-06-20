@@ -20,6 +20,7 @@ import {
 } from '../common/swagger/api-examples';
 import { CheckoutService } from './checkout.service';
 import { CheckoutVoucherDto } from './dto/checkout-voucher.dto';
+import { CreateCheckoutOrderDto } from './dto/create-checkout-order.dto';
 
 @ApiTags('checkout')
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
@@ -76,8 +77,8 @@ export class CheckoutController {
   @Post('orders')
   createOrder(
     @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: CheckoutVoucherDto,
+    @Body() dto: CreateCheckoutOrderDto,
   ) {
-    return this.checkoutService.createOrderFromCart(user, dto?.voucherCode);
+    return this.checkoutService.createOrderFromCart(user, dto);
   }
 }

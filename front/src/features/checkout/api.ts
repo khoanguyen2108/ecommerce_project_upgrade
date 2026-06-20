@@ -3,6 +3,7 @@ import { withQuery } from "@/lib/api/query";
 import type {
   CheckoutSummaryResponse,
   CreateCheckoutOrderResponse,
+  CreateCheckoutOrderRequest,
 } from "@/features/checkout/types";
 
 export function getCheckoutSummary(
@@ -19,11 +20,11 @@ export function getCheckoutSummary(
 }
 
 export function createCheckoutOrder(
-  voucherCode?: string,
+  payload: CreateCheckoutOrderRequest,
 ): Promise<CreateCheckoutOrderResponse> {
   return apiRequest<CreateCheckoutOrderResponse>("/checkout/orders", {
     auth: true,
-    body: voucherCode ? { voucherCode } : {},
+    body: payload,
     credentials: "include",
     method: "POST",
   });

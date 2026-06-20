@@ -85,6 +85,13 @@ export interface AdminOrderBase {
   voucherCodeSnapshot: string | null;
   voucherNameSnapshot: string | null;
   currency: string;
+  shippingRecipientName: string | null;
+  shippingPhone: string | null;
+  shippingProvince: string | null;
+  shippingDistrict: string | null;
+  shippingWard: string | null;
+  shippingAddressLine: string | null;
+  shippingNote: string | null;
   itemCount: number;
   createdAt: string;
   updatedAt: string;

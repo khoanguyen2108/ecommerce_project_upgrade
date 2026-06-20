@@ -9,6 +9,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import type {
   CheckoutSummaryItemResponseDto,
 } from './dto/checkout-summary-response.dto';
+import type {
+  CheckoutShippingInfoDto,
+  CreateCheckoutOrderDto,
+} from './dto/create-checkout-order.dto';
 import { VoucherEligibilityService } from './voucher-eligibility.service';
 
 const MAX_CHECKOUT_ITEM_QUANTITY = 99;
@@ -113,6 +117,13 @@ const checkoutOrderSelect = {
   voucherCodeSnapshot: true,
   voucherNameSnapshot: true,
   currency: true,
+  shippingRecipientName: true,
+  shippingPhone: true,
+  shippingProvince: true,
+  shippingDistrict: true,
+  shippingWard: true,
+  shippingAddressLine: true,
+  shippingNote: true,
   createdAt: true,
   updatedAt: true,
   paidAt: true,
@@ -212,7 +223,9 @@ export class CheckoutService {
     };
   }
 
-  async createOrderFromCart(user: AuthenticatedUser, voucherCode?: string) {
+  async createOrderFromCart(user: AuthenticatedUser, dto: CreateCheckoutOrderDto) {
+    this.assertShippingSource(dto);
+
     const order = await this.prismaService.$transaction(async (tx) => {
       const cartSummary = await tx.cart.findUnique({
         where: {
@@ -248,12 +261,13 @@ export class CheckoutService {
 
       this.assertCartNotEmpty(cart);
       const summary = this.toValidatedSummary(cart);
-      const voucherResult = voucherCode
+      const shipping = await this.resolveShipping(tx, user.id, dto);
+      const voucherResult = dto.voucherCode
         ? await this.voucherEligibilityService.requireForOrder(
             tx,
             user.id,
             summary.subtotalAmount,
-            voucherCode,
+            dto.voucherCode,
           )
         : undefined;
       const discountAmount = voucherResult?.discountAmount ?? 0;
@@ -270,6 +284,13 @@ export class CheckoutService {
           voucherCodeSnapshot: voucherResult?.voucher.code,
           voucherNameSnapshot: voucherResult?.voucher.name,
           currency: summary.currency,
+          shippingRecipientName: shipping.recipientName,
+          shippingPhone: shipping.phone,
+          shippingProvince: shipping.province,
+          shippingDistrict: shipping.district,
+          shippingWard: shipping.ward,
+          shippingAddressLine: shipping.addressLine,
+          shippingNote: shipping.note,
           expiresAt: this.orderExpiryService.getPendingOrderExpiresAt(),
           items: {
             create: summary.items.map((item) => ({
@@ -323,6 +344,79 @@ export class CheckoutService {
         imageUrl: getFirstProductImage(product),
       })),
     };
+  }
+
+  private assertShippingSource(dto: CreateCheckoutOrderDto) {
+    const sourceCount = Number(Boolean(dto.addressId)) + Number(Boolean(dto.shippingInfo));
+    if (sourceCount !== 1) {
+      throw new BadRequestException({
+        code: 'CHECKOUT_SHIPPING_SOURCE_INVALID',
+        message: 'Provide exactly one shipping source: addressId or shippingInfo.',
+      });
+    }
+
+    if (dto.shippingInfo?.setDefault && !dto.shippingInfo.saveAddress) {
+      throw new BadRequestException({
+        code: 'CHECKOUT_SHIPPING_DEFAULT_INVALID',
+        message: 'setDefault requires saveAddress.',
+      });
+    }
+  }
+
+  private async resolveShipping(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    dto: CreateCheckoutOrderDto,
+  ) {
+    if (dto.addressId) {
+      const address = await tx.address.findFirst({
+        where: { id: dto.addressId, userId },
+        select: {
+          recipientName: true,
+          phone: true,
+          province: true,
+          district: true,
+          ward: true,
+          addressLine: true,
+          note: true,
+        },
+      });
+      if (!address) {
+        throw new BadRequestException({
+          code: 'CHECKOUT_ADDRESS_NOT_FOUND',
+          message: 'The selected shipping address was not found.',
+        });
+      }
+      return address;
+    }
+
+    const shipping = dto.shippingInfo as CheckoutShippingInfoDto;
+    const snapshot = {
+      recipientName: shipping.recipientName,
+      phone: shipping.phone,
+      province: shipping.province,
+      district: shipping.district,
+      ward: shipping.ward,
+      addressLine: shipping.addressLine,
+      note: shipping.note || null,
+    };
+
+    if (shipping.saveAddress) {
+      const count = await tx.address.count({ where: { userId } });
+      const isDefault = count === 0 || shipping.setDefault === true;
+      if (isDefault) {
+        await tx.address.updateMany({
+          where: { userId, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+      await tx.address.create({
+        data: { userId, ...snapshot, isDefault },
+        select: { id: true },
+      });
+    }
+
+    return snapshot;
   }
 
   private toValidatedSummary(cart: CheckoutCartRecord) {

@@ -7,6 +7,7 @@ import { AdminOrdersModule } from './admin-orders/admin-orders.module';
 import { AdminStatsModule } from './admin-stats/admin-stats.module';
 import { AdminUsersModule } from './admin-users/admin-users.module';
 import { AdminVouchersModule } from './admin-vouchers/admin-vouchers.module';
+import { AddressesModule } from './addresses/addresses.module';
 import { AuthModule } from './auth/auth.module';
 import { CartModule } from './cart/cart.module';
 import { CatalogModule } from './catalog/catalog.module';
@@ -53,6 +54,7 @@ const getPositiveNumber = (
     PrismaModule,
     RedisModule,
     AuthModule,
+    AddressesModule,
     AdminOrdersModule,
     AdminPaymentsModule,
     AdminUsersModule,

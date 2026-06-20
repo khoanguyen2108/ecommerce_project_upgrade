@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { Check, Copy, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -34,6 +34,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
   const [requestId, setRequestId] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -82,6 +83,13 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
     }
   }
 
+  async function copyDelivery() {
+    if (!order?.shippingRecipientName) return;
+    const value = [order.shippingRecipientName, order.shippingPhone, formatShippingAddress(order), order.shippingNote].filter(Boolean).join('\n');
+    try { await navigator.clipboard.writeText(value); setCopied(true); window.setTimeout(() => setCopied(false), 1800); }
+    catch { setError('Delivery information could not be copied.'); }
+  }
+
   if (isLoading && !order) {
     return <div className="admin-resource"><section className="admin-resource__header"><h1>Loading order</h1></section><div className="admin-detail-loading" role="status"><span className="admin-skeleton-line admin-skeleton-line--wide" /><span className="admin-skeleton-line" /><span className="admin-skeleton-line admin-skeleton-line--wide" /></div></div>;
   }
@@ -112,6 +120,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
           <Row label="Subtotal" value={formatCurrency(order.subtotalAmount, order.currency)} /><Row label="Discount" value={formatCurrency(order.discountAmount, order.currency)} />{order.voucherCodeSnapshot ? <Row label="Voucher" value={`${order.voucherCodeSnapshot}${order.voucherNameSnapshot ? ` — ${order.voucherNameSnapshot}` : ""}`} /> : null}<Row label="Final total" value={formatCurrency(order.totalAmount, order.currency)} /><Row label="Item quantity" value={String(order.itemCount)} /><Row label="Currency" value={order.currency} /><Row label="Created" value={formatDateTime(order.createdAt)} /><Row label="Updated" value={formatDateTime(order.updatedAt)} /><Row label="Paid" value={formatDateTime(order.paidAt)} /><Row label="Cancelled" value={formatDateTime(order.cancelledAt)} /><Row label="Expires" value={formatDateTime(order.expiresAt)} />
         </dl></article>
         <article className="admin-detail-card"><p className="eyebrow">Customer summary</p><dl className="admin-detail-list"><Row label="Email" value={order.user.email} /><Row label="Name" value={order.user.name || "Not set"} /><Row label="Phone" value={order.user.phone || "Not set"} /><Row label="User ID" value={order.user.id} code /></dl></article>
+        <article className="admin-detail-card"><div className="admin-detail-card__heading"><p className="eyebrow">Delivery information</p>{order.shippingRecipientName ? <button className="admin-link-button" onClick={() => void copyDelivery()} type="button">{copied ? <Check size={15} /> : <Copy size={15} />}{copied ? 'Copied' : 'Copy address'}</button> : null}</div>{order.shippingRecipientName ? <dl className="admin-detail-list"><Row label="Recipient" value={order.shippingRecipientName} /><Row label="Phone" value={order.shippingPhone || 'Not set'} /><Row label="Address" value={formatShippingAddress(order)} />{order.shippingNote ? <Row label="Note" value={order.shippingNote} /> : null}</dl> : <p className="admin-detail-empty">Delivery information is unavailable for this historical order.</p>}</article>
       </section>
 
       <DetailSection eyebrow="Item snapshots" title="Items" meta={`${order.items.length} records`}>
@@ -140,3 +149,5 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
 function Row({ code = false, label, value }: { code?: boolean; label: string; value: string }) { return <div><dt>{label}</dt><dd className={code ? "admin-code" : undefined}>{value}</dd></div>; }
 
 function DetailSection({ children, eyebrow, meta, title }: { children: ReactNode; eyebrow: string; meta: string; title: string }) { return <section className="admin-detail-section"><div className="admin-detail-section__header"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2></div><span>{meta}</span></div>{children}</section>; }
+
+function formatShippingAddress(order: AdminOrder): string { return [order.shippingAddressLine, order.shippingWard, order.shippingDistrict, order.shippingProvince].filter(Boolean).join(', ') || 'Not set'; }

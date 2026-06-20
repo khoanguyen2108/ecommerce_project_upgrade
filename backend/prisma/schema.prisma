@@ -59,12 +59,32 @@ model User {
   updatedAt             DateTime     @updatedAt
   passwordResetOtps     PasswordResetOtp[]
   orders                Order[]
+  addresses             Address[]
   cart                  Cart?
 
   @@index([role])
   @@index([isActive])
   @@index([createdAt])
   @@index([refreshTokenExpiresAt])
+}
+
+model Address {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientName String   @db.VarChar(120)
+  phone         String   @db.VarChar(20)
+  province      String   @db.VarChar(120)
+  district      String   @db.VarChar(120)
+  ward          String   @db.VarChar(120)
+  addressLine   String   @db.VarChar(255)
+  note          String?  @db.VarChar(500)
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, isDefault])
 }
 
 model PasswordResetOtp {
@@ -202,6 +222,13 @@ model Order {
   voucherCodeSnapshot String? @db.VarChar(64)
   voucherNameSnapshot String? @db.VarChar(160)
   currency       String      @default("VND") @db.VarChar(3)
+  shippingRecipientName String? @db.VarChar(120)
+  shippingPhone         String? @db.VarChar(20)
+  shippingProvince      String? @db.VarChar(120)
+  shippingDistrict      String? @db.VarChar(120)
+  shippingWard          String? @db.VarChar(120)
+  shippingAddressLine   String? @db.VarChar(255)
+  shippingNote          String? @db.VarChar(500)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   paidAt         DateTime?

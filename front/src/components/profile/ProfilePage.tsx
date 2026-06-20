@@ -4,6 +4,7 @@ import { Info, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+import { AddressBook } from "@/components/profile/AddressBook";
 
 export function ProfilePage() {
   const { currentUser } = useAuthSession();
@@ -51,6 +52,7 @@ export function ProfilePage() {
       </section>
 
       <ProfileForm user={currentUser} />
+      <AddressBook />
     </main>
   );
 }

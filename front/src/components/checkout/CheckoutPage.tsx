@@ -22,6 +22,10 @@ import {
 } from "@/features/checkout/errors";
 import type { CheckoutSummary as CheckoutSummaryModel } from "@/features/checkout/types";
 import type { Order } from "@/features/orders/types";
+import { listAddresses } from '@/features/addresses/api';
+import type { Address, AddressInput } from '@/features/addresses/types';
+import { AddressFields, emptyAddressInput, normalizeAddressInput, validateAddress } from '@/components/profile/AddressFields';
+import { MapPin } from 'lucide-react';
 
 export function CheckoutPage() {
   const { refreshCart } = useCart();
@@ -35,8 +39,26 @@ export function CheckoutPage() {
   const [errorCode, setErrorCode] = useState<string>();
   const [requestId, setRequestId] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('new');
+  const [shippingInfo, setShippingInfo] = useState<AddressInput>(emptyAddressInput);
+  const [saveAddress, setSaveAddress] = useState(false);
+  const [setDefault, setSetDefault] = useState(false);
   const submissionLockRef = useRef(false);
   const voucherRequestLockRef = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    listAddresses()
+      .then((response) => {
+        if (!active) return;
+        setAddresses(response.addresses);
+        const preferred = response.addresses.find((address) => address.isDefault) || response.addresses[0];
+        if (preferred) setSelectedAddressId(preferred.id);
+      })
+      .catch(() => { if (active) setSelectedAddressId('new'); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -117,6 +139,11 @@ export function CheckoutPage() {
       return;
     }
 
+    if (selectedAddressId === 'new') {
+      const shippingError = validateAddress(shippingInfo);
+      if (shippingError) { setError(shippingError); setErrorCode('CHECKOUT_SHIPPING_INVALID'); return; }
+    }
+
     submissionLockRef.current = true;
     setIsSubmitting(true);
     setError(undefined);
@@ -124,7 +151,12 @@ export function CheckoutPage() {
     setRequestId(undefined);
 
     try {
-      const response = await createCheckoutOrder(requestedVoucherCode);
+      const response = await createCheckoutOrder({
+        ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
+        ...(selectedAddressId === 'new'
+          ? { shippingInfo: { ...normalizeAddressInput(shippingInfo), saveAddress, setDefault: saveAddress && setDefault } }
+          : { addressId: selectedAddressId }),
+      });
       setCreatedOrder(response.order);
       setSummary(undefined);
       void refreshCart().catch(() => undefined);
@@ -198,9 +230,64 @@ export function CheckoutPage() {
           summary={summary}
           voucherInput={voucherInput}
           onVoucherInputChange={setVoucherInput}
+          shippingSection={
+            <CheckoutShipping
+              addresses={addresses}
+              disabled={isSubmitting}
+              onAddressChange={setShippingInfo}
+              onSaveAddressChange={(checked) => { setSaveAddress(checked); if (!checked) setSetDefault(false); }}
+              onSelectedAddressChange={setSelectedAddressId}
+              onSetDefaultChange={setSetDefault}
+              saveAddress={saveAddress}
+              selectedAddressId={selectedAddressId}
+              setDefault={setDefault}
+              shippingInfo={shippingInfo}
+            />
+          }
         />
       ) : null}
     </main>
+  );
+}
+
+function CheckoutShipping({ addresses, disabled, onAddressChange, onSaveAddressChange, onSelectedAddressChange, onSetDefaultChange, saveAddress, selectedAddressId, setDefault, shippingInfo }: {
+  addresses: Address[];
+  disabled: boolean;
+  onAddressChange: (value: AddressInput) => void;
+  onSaveAddressChange: (value: boolean) => void;
+  onSelectedAddressChange: (value: string) => void;
+  onSetDefaultChange: (value: boolean) => void;
+  saveAddress: boolean;
+  selectedAddressId: string;
+  setDefault: boolean;
+  shippingInfo: AddressInput;
+}) {
+  return (
+    <section className="checkout-shipping" aria-labelledby="checkout-shipping-heading">
+      <header className="checkout-section-heading"><div><p className="eyebrow">Delivery</p><h2 id="checkout-shipping-heading">Shipping information</h2></div><MapPin aria-hidden="true" size={22} /></header>
+      {addresses.length > 0 ? (
+        <div className="checkout-address-options">
+          {addresses.map((address) => (
+            <label className={`checkout-address-option ${selectedAddressId === address.id ? 'is-selected' : ''}`} key={address.id}>
+              <input checked={selectedAddressId === address.id} disabled={disabled} name="shipping-source" onChange={() => onSelectedAddressChange(address.id)} type="radio" />
+              <span><strong>{address.recipientName}{address.isDefault ? <small>Default</small> : null}</strong><span>{address.phone}</span><span>{[address.addressLine, address.ward, address.district, address.province].join(', ')}</span></span>
+            </label>
+          ))}
+          <label className={`checkout-address-option ${selectedAddressId === 'new' ? 'is-selected' : ''}`}>
+            <input checked={selectedAddressId === 'new'} disabled={disabled} name="shipping-source" onChange={() => onSelectedAddressChange('new')} type="radio" /><span><strong>Use a new address</strong><span>Enter delivery details below.</span></span>
+          </label>
+        </div>
+      ) : null}
+      {selectedAddressId === 'new' ? (
+        <div className="checkout-new-address">
+          <AddressFields disabled={disabled} idPrefix="checkout-shipping" onChange={onAddressChange} value={shippingInfo} />
+          <div className="checkout-address-checks">
+            <label className="address-checkbox"><input checked={saveAddress} disabled={disabled} onChange={(event) => onSaveAddressChange(event.target.checked)} type="checkbox" />Save this address</label>
+            <label className="address-checkbox"><input checked={setDefault} disabled={disabled || !saveAddress} onChange={(event) => onSetDefaultChange(event.target.checked)} type="checkbox" />Set as default</label>
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }
 

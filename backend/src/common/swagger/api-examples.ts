@@ -53,6 +53,23 @@ export const publicUserExample = {
   updatedAt: '2026-06-10T10:30:00.000Z',
 };
 
+export const addressExample = {
+  id: 'd98ffbf3-42d8-4c50-93e4-77f2903a50b3',
+  recipientName: 'Nguyen Van An',
+  phone: '0901234567',
+  province: 'Ho Chi Minh City',
+  district: 'District 1',
+  ward: 'Ben Nghe Ward',
+  addressLine: '12 Nguyen Hue Street',
+  note: 'Call before delivery',
+  isDefault: true,
+  createdAt: '2026-06-20T10:30:00.000Z',
+  updatedAt: '2026-06-20T10:30:00.000Z',
+};
+
+export const addressDataExample = { address: addressExample };
+export const addressListDataExample = { addresses: [addressExample] };
+
 export const adminUserExample = {
   ...publicUserExample,
   isActive: true,
@@ -387,6 +404,13 @@ export const orderExample = {
   voucherCodeSnapshot: null,
   voucherNameSnapshot: null,
   currency: 'VND',
+  shippingRecipientName: addressExample.recipientName,
+  shippingPhone: addressExample.phone,
+  shippingProvince: addressExample.province,
+  shippingDistrict: addressExample.district,
+  shippingWard: addressExample.ward,
+  shippingAddressLine: addressExample.addressLine,
+  shippingNote: addressExample.note,
   createdAt: '2026-06-14T10:30:00.000Z',
   updatedAt: '2026-06-14T10:30:00.000Z',
   paidAt: null,

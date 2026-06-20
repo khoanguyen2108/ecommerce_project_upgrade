@@ -3,6 +3,9 @@ import { ApiClientError } from "@/lib/errors/api-error";
 export const CHECKOUT_ERROR_MESSAGES: Record<string, string> = {
   AUTH_REQUIRED: "Sign in again to continue checkout.",
   CHECKOUT_CART_EMPTY: "Your cart is empty. Add an item before checkout.",
+  CHECKOUT_ADDRESS_NOT_FOUND: "The selected address is no longer available. Choose another address.",
+  CHECKOUT_SHIPPING_SOURCE_INVALID: "Choose a saved address or enter a new delivery address.",
+  CHECKOUT_SHIPPING_DEFAULT_INVALID: "Save the new address before making it the default.",
   CHECKOUT_CATEGORY_INACTIVE:
     "One item belongs to a category that is no longer available.",
   CHECKOUT_ITEM_QUANTITY_INVALID: "One item has an invalid quantity.",

@@ -193,6 +193,17 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           currency={order.currency}
           payments={order.payments}
         />
+        <article className="order-summary-panel">
+          <p className="eyebrow">Delivery information</p>
+          {order.shippingRecipientName ? (
+            <dl className="order-summary-list">
+              <div><dt>Recipient</dt><dd>{order.shippingRecipientName}</dd></div>
+              <div><dt>Phone</dt><dd>{order.shippingPhone || 'Not set'}</dd></div>
+              <div><dt>Address</dt><dd>{formatShippingAddress(order)}</dd></div>
+              {order.shippingNote ? <div><dt>Note</dt><dd>{order.shippingNote}</dd></div> : null}
+            </dl>
+          ) : <div className="order-summary-empty">Delivery information is unavailable for this historical order.</div>}
+        </article>
       </section>
 
       <section className="customer-section" aria-labelledby="order-items-heading">
@@ -260,6 +271,10 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       </div>
     </main>
   );
+}
+
+function formatShippingAddress(order: Order): string {
+  return [order.shippingAddressLine, order.shippingWard, order.shippingDistrict, order.shippingProvince].filter(Boolean).join(', ') || 'Not set';
 }
 
 function PaymentSummaryPanel({
