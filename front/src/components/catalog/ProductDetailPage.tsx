@@ -24,6 +24,7 @@ import {
   getProductVariantsBySlug,
 } from "@/features/catalog/api";
 import { formatPrice } from "@/features/catalog/format";
+import { sortSizesByStandardOrder } from "@/features/catalog/sizes";
 import type { Product, ProductVariant } from "@/features/catalog/types";
 import {
   productToRecentlyViewedProduct,
@@ -119,7 +120,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     [state.variants],
   );
   const sizes = useMemo(
-    () => Array.from(new Set(state.variants.map((variant) => variant.size))),
+    () => sortSizesByStandardOrder(state.variants.map((variant) => variant.size)),
     [state.variants],
   );
   const colors = useMemo(
@@ -129,12 +130,10 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   const sizesForSelectedColor = useMemo(
     () =>
       selectedColor
-        ? Array.from(
-            new Set(
-              state.variants
-                .filter((variant) => variant.color === selectedColor)
-                .map((variant) => variant.size),
-            ),
+        ? sortSizesByStandardOrder(
+            state.variants
+              .filter((variant) => variant.color === selectedColor)
+              .map((variant) => variant.size),
           )
         : sizes,
     [selectedColor, sizes, state.variants],

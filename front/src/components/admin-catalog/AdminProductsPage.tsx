@@ -36,6 +36,7 @@ import type {
   AdminProductSort,
 } from "@/features/admin-catalog/types";
 import { formatPrice } from "@/features/catalog/format";
+import { isStandardSize, SIZE_ORDER } from "@/features/catalog/sizes";
 import type { Pagination } from "@/lib/api/types";
 import { AdminModal } from "@/components/admin/AdminModal";
 import {
@@ -685,6 +686,11 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   const variantFormBaseline = editingVariant
     ? getVariantForm(editingVariant)
     : getEmptyVariantForm();
+  const hasLegacyVariantSize = Boolean(
+    editingVariantId &&
+      variantForm.size &&
+      !isStandardSize(variantForm.size),
+  );
   const hasUnsavedChanges = isModalOpen
     ? !areProductFormsEqual(productForm, productFormBaseline) ||
       !areVariantFormsEqual(variantForm, variantFormBaseline)
@@ -1342,8 +1348,12 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
                     <label>
                       <span>Size</span>
-                      <input
-                        maxLength={32}
+                      <select
+                        aria-describedby={
+                          hasLegacyVariantSize
+                            ? "admin-variant-size-guidance"
+                            : undefined
+                        }
                         onChange={(event) =>
                           setVariantForm((current) => ({
                             ...current,
@@ -1352,7 +1362,25 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                         }
                         required
                         value={variantForm.size}
-                      />
+                      >
+                        <option value="">Select a size</option>
+                        {hasLegacyVariantSize ? (
+                          <option disabled value={variantForm.size}>
+                            Custom: {variantForm.size}
+                          </option>
+                        ) : null}
+                        {SIZE_ORDER.map((size) => (
+                          <option key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>
+                      {hasLegacyVariantSize ? (
+                        <small id="admin-variant-size-guidance">
+                          This existing custom size is unchanged. Select XS, S, M,
+                          L, or XL before saving edits.
+                        </small>
+                      ) : null}
                     </label>
                   </div>
 
@@ -1604,6 +1632,10 @@ function getVariantPayload(form: VariantFormState):
 
   if (!form.size.trim()) {
     return { error: "Variant size is required." };
+  }
+
+  if (!isStandardSize(form.size.trim())) {
+    return { error: "Variant size must be XS, S, M, L, or XL." };
   }
 
   if (!form.color.trim()) {
