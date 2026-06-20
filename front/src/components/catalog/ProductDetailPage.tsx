@@ -85,10 +85,11 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
         }
 
         const imageUrls = getProductImages(product);
+        const initialColor = getOnlySelectableColor(variants);
         setState({ isLoading: false, product, variants });
         setActiveImage(imageUrls[0]);
         setSelectedSize(undefined);
-        setSelectedColor(undefined);
+        setSelectedColor(initialColor);
         setQuantity(1);
         setCartFeedback(undefined);
       } catch (error) {
@@ -572,6 +573,20 @@ function hasSelectableColor(variants: ProductVariant[], color: string): boolean 
   return variants.some(
     (variant) => variant.color === color && isVariantSelectable(variant),
   );
+}
+
+function getOnlySelectableColor(
+  variants: ProductVariant[],
+): string | undefined {
+  const selectableColors = Array.from(
+    new Set(
+      variants
+        .filter(isVariantSelectable)
+        .map((variant) => variant.color),
+    ),
+  );
+
+  return selectableColors.length === 1 ? selectableColors[0] : undefined;
 }
 
 function hasSelectableCombination(
