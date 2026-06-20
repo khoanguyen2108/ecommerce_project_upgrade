@@ -67,9 +67,6 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
             ) : null}
           </div>
           <p className="product-card__meta">{getVariantSummary(product.variants)}</p>
-          {variant === "shop" ? (
-            <span className="product-card__link">View product</span>
-          ) : null}
         </div>
       </Link>
     </article>
