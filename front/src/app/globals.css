@@ -1003,7 +1003,7 @@ img {
 .landing-about {
   align-items: stretch;
   display: grid;
-  gap: clamp(36px, 6vw, 88px);
+  gap: 0;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
   margin: 0 auto;
   max-width: var(--container);
@@ -1026,9 +1026,11 @@ img {
 
 .landing-about__content {
   align-content: center;
+  background: #090909;
+  color: #ffffff;
   display: grid;
   gap: var(--space-5);
-  padding: clamp(24px, 4vw, 56px) 0;
+  padding: clamp(36px, 5vw, 72px);
 }
 
 .landing-about__content h2 {
@@ -1037,28 +1039,36 @@ img {
   line-height: 1.02;
   margin: 0;
   max-width: 620px;
+  color: #ffffff;
 }
 
-.landing-about__content > p:not(.eyebrow) {
-  color: var(--color-text-muted);
+.landing-about__content > p {
+  color: #c8c8c8;
   line-height: 1.75;
   margin: 0;
   max-width: 660px;
 }
 
 .landing-about__content .landing-about__closing {
-  color: var(--color-text);
+  color: #ffffff;
   font-weight: 800;
 }
 
 .landing-about__content .button {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #090909;
   justify-self: start;
   margin-top: var(--space-2);
 }
 
+.landing-about__content .button:hover {
+  background: #e5e5e5;
+  border-color: #e5e5e5;
+}
+
 @media (max-width: 820px) {
   .landing-about {
-    gap: var(--space-8);
     grid-template-columns: 1fr;
   }
 
@@ -1068,7 +1078,7 @@ img {
   }
 
   .landing-about__content {
-    padding-top: 0;
+    padding: clamp(28px, 7vw, 48px);
   }
 }
 

@@ -20,9 +20,9 @@ interface LandingCatalogState {
 const LANDING_HERO_IMAGE_SRC = "/images/landing/hero.jpg";
 const LANDING_HERO_COPY = {
   heroEyebrow: "New season essentials",
-  heroTitle: "Elevate your everyday wardrobe",
+  heroTitle: "Elevate your everyday",
   heroSubtitle:
-    "Crisp cotton, soft tailoring, and easy layers selected for real days, repeat wear, and clean silhouettes.",
+    "Pieces made for real days, quiet confidence, and the little moments that let your personality show",
 };
 
 export function LandingPage() {
@@ -167,19 +167,23 @@ export function LandingPage() {
           />
         </div>
         <div className="landing-about__content">
-          <p className="eyebrow">ABOUT BELIKEME</p>
           <h2 id="about-heading">Be bold. Be real. Be like me.</h2>
           <p>
             Belikeme was created from the spirit of youth: the courage to try,
-            to stand apart, and to live fully for what you believe in. We
-            believe every young person carries their own color. Some shine
-            through confidence, some through passion, and some through the
-            quiet effort of becoming better every day.
+            to stand apart, and to live fully for what you believe in.
+          </p>
+          <p>
+            We believe every young person carries their own color. Some shine
+            through confidence, some through passion, and some through the quiet
+            effort of becoming better every day.
           </p>
           <p>
             Belikeme is more than a fashion brand. It is a reminder that you do
-            not have to look like anyone else to be seen. You only need to stay
-            true to yourself, follow what you love, and proudly say: this is me.
+            not have to look like anyone else to be seen.
+          </p>
+          <p>
+            You only need to stay true to yourself, follow what you love, and
+            proudly say: this is me.
           </p>
           <p className="landing-about__closing">
             We do not chase trends. We help you create your own mark.
