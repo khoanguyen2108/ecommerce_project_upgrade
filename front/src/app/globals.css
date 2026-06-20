@@ -6800,6 +6800,17 @@ img {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.profile-account-editable {
+  align-items: end;
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.profile-account-editable .profile-form__actions {
+  padding-bottom: 1.4rem;
+}
+
 .unified-profile-panel .form-field {
   gap: 6px;
 }
@@ -8049,7 +8060,8 @@ img {
   }
 
   .unified-profile-panel .profile-details,
-  .profile-contact-fields {
+  .profile-contact-fields,
+  .profile-account-editable {
     grid-template-columns: 1fr;
   }
 
@@ -8064,6 +8076,10 @@ img {
   .unified-profile-panel .profile-form__actions,
   .unified-profile-panel .profile-form__actions .button {
     width: auto;
+  }
+
+  .profile-account-editable .profile-form__actions {
+    padding-bottom: 0;
   }
 
   .unified-profile-panel .address-book__empty {
