@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -125,5 +126,11 @@ export class AdminVouchersController {
   @Patch(':id/deactivate')
   deactivateVoucher(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.adminVouchersService.setVoucherActive(id, false);
+  }
+
+  @ApiOperation({ summary: 'Safely delete an unused voucher as an admin' })
+  @Delete(':id')
+  deleteVoucher(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.adminVouchersService.deleteVoucher(id);
   }
 }

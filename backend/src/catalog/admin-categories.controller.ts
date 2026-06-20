@@ -126,6 +126,12 @@ export class AdminCategoriesController {
     return this.catalogService.updateCategory(id, dto);
   }
 
+  @ApiOperation({ summary: 'Activate a category as an admin' })
+  @Patch(':id/activate')
+  activateCategory(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.catalogService.activateCategory(id);
+  }
+
   @ApiOperation({ summary: 'Deactivate a category as an admin' })
   @ApiParam({
     description: 'Category UUID.',
@@ -141,8 +147,14 @@ export class AdminCategoriesController {
       'Category was not found.',
     ),
   )
-  @Delete(':id')
+  @Patch(':id/deactivate')
   deactivateCategory(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.catalogService.deactivateCategory(id);
+  }
+
+  @ApiOperation({ summary: 'Safely delete an empty category as an admin' })
+  @Delete(':id')
+  deleteCategory(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.catalogService.deleteCategory(id);
   }
 }

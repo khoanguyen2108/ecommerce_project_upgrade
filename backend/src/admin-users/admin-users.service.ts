@@ -186,6 +186,56 @@ export class AdminUsersService {
     return { user };
   }
 
+  async deleteUser(id: string, actorUserId: string) {
+    if (id === actorUserId) {
+      throw new ConflictException({
+        code: 'USER_DELETE_SELF_BLOCKED',
+        message: 'You cannot delete the admin account you are currently using.',
+      });
+    }
+
+    const user = await this.prismaService.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        isActive: true,
+        role: true,
+        cart: { select: { id: true } },
+        _count: {
+          select: {
+            addresses: true,
+            orders: true,
+            passwordResetOtps: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw this.userNotFoundException();
+    }
+
+    if (
+      user.cart ||
+      user._count.addresses > 0 ||
+      user._count.orders > 0 ||
+      user._count.passwordResetOtps > 0
+    ) {
+      throw new ConflictException({
+        code: 'USER_DELETE_BLOCKED',
+        message:
+          'This user cannot be deleted because related records exist. Deactivate the user instead.',
+      });
+    }
+
+    if (user.role === UserRole.ADMIN && user.isActive) {
+      await this.assertNotLastActiveAdmin(this.prismaService, id);
+    }
+
+    await this.prismaService.user.delete({ where: { id } });
+    return { deletedId: id };
+  }
+
   private buildUserWhere(query: AdminUserQueryDto): Prisma.UserWhereInput {
     const where: Prisma.UserWhereInput = {};
     const search = this.normalizeOptionalQueryText(query.search);

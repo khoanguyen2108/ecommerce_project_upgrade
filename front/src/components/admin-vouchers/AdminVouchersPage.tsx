@@ -28,6 +28,7 @@ import {
   activateAdminVoucher,
   createAdminVoucher,
   deactivateAdminVoucher,
+  deleteAdminVoucher,
   getAdminVoucher,
   listAdminVouchers,
   updateAdminVoucher,
@@ -51,6 +52,8 @@ const VOUCHER_ERRORS: Record<string, string> = {
   VOUCHER_NOT_FOUND: "That voucher no longer exists.",
   VOUCHER_RULE_INVALID: "The voucher does not satisfy its business rules.",
   VOUCHER_UPDATE_EMPTY: "Change at least one voucher field before saving.",
+  VOUCHER_DELETE_BLOCKED:
+    "This voucher is attached to orders. Deactivate it instead.",
 };
 
 interface AdminVouchersPageProps {
@@ -253,6 +256,30 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
     }
   }
 
+  async function handleDelete(voucher: AdminVoucher) {
+    if (busyAction) return;
+    if (!window.confirm(`Delete ${voucher.code}? This cannot be undone.`)) return;
+
+    setBusyAction(`${voucher.id}:delete`);
+    resetActionFeedback();
+    try {
+      await deleteAdminVoucher(voucher.id);
+      if (vouchers.length === 1 && (query.page || 1) > 1) {
+        setQuery((current) => ({ ...current, page: Math.max(1, (current.page || 1) - 1) }));
+      } else {
+        setRefreshKey((current) => current + 1);
+      }
+      setSuccessMessage("Voucher deleted.");
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(error, VOUCHER_ERRORS, "Voucher could not be deleted."),
+      );
+      setRequestId(getApiRequestId(error));
+    } finally {
+      setBusyAction(undefined);
+    }
+  }
+
   function resetActionFeedback() {
     setActionError(undefined);
     setSuccessMessage(undefined);
@@ -423,6 +450,14 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
                             type="button"
                           >
                             <Edit3 aria-hidden="true" size={17} />
+                          </button>
+                          <button
+                            className="admin-link-button admin-link-button--delete"
+                            disabled={Boolean(busyAction)}
+                            onClick={() => void handleDelete(voucher)}
+                            type="button"
+                          >
+                            {busyAction === `${voucher.id}:delete` ? "Deleting" : "Delete"}
                           </button>
                           <button
                             className="admin-link-button"

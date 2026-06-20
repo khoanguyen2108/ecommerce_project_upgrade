@@ -12,6 +12,9 @@ import {
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import {
+  activateAdminUser,
+  deactivateAdminUser,
+  deleteAdminUser,
   getAdminUser,
   listAdminUsers,
   updateAdminUser,
@@ -22,6 +25,7 @@ import type {
   AdminUser,
   AdminUserQuery,
 } from "@/features/admin-users/types";
+import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import type { AuthProvider, UserRole } from "@/features/auth/types";
 import type { Pagination } from "@/lib/api/types";
 import { AdminModal } from "@/components/admin/AdminModal";
@@ -47,6 +51,9 @@ const USER_ERROR_MESSAGES: Record<string, string> = {
   LAST_ACTIVE_ADMIN: "At least one active admin account must remain available.",
   NETWORK_ERROR: "The users API could not be reached. Check the backend and retry.",
   USER_NOT_FOUND: "That user no longer exists.",
+  USER_DELETE_BLOCKED:
+    "This user has related records. Deactivate the account instead.",
+  USER_DELETE_SELF_BLOCKED: "You cannot delete the admin account you are using.",
   VALIDATION_ERROR: "Some user fields are invalid. Review the form and try again.",
 };
 
@@ -62,6 +69,7 @@ interface UserFormState {
 }
 
 export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
+  const { currentUser } = useAuthSession();
   const [query, setQuery] = useState<AdminUserQuery>({
     ...initialQuery,
     limit: USER_LIMIT,
@@ -294,9 +302,9 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     setRequestId(undefined);
 
     try {
-      const response = await updateAdminUserStatus(user.id, {
-        isActive: nextIsActive,
-      });
+      const response = nextIsActive
+        ? await activateAdminUser(user.id)
+        : await deactivateAdminUser(user.id);
 
       syncUser(response.user);
       setRefreshKey((current) => current + 1);
@@ -312,6 +320,35 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
           USER_ERROR_MESSAGES,
           "User active status could not be changed.",
         ),
+      );
+      setRequestId(getApiRequestId(error));
+    } finally {
+      setBusyAction(undefined);
+    }
+  }
+
+  async function handleDelete(user: AdminUser) {
+    if (user.id === currentUser?.id) {
+      setActionError("You cannot delete the admin account you are using.");
+      return;
+    }
+    if (!window.confirm(`Delete ${user.email}? This cannot be undone.`)) return;
+
+    setBusyAction(`${user.id}:delete`);
+    setActionError(undefined);
+    setSuccessMessage(undefined);
+    setRequestId(undefined);
+    try {
+      await deleteAdminUser(user.id);
+      if (users.length === 1 && (query.page || 1) > 1) {
+        setQuery((current) => ({ ...current, page: Math.max(1, (current.page || 1) - 1) }));
+      } else {
+        setRefreshKey((current) => current + 1);
+      }
+      setSuccessMessage("User deleted.");
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(error, USER_ERROR_MESSAGES, "User could not be deleted."),
       );
       setRequestId(getApiRequestId(error));
     } finally {
@@ -536,6 +573,22 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                             type="button"
                           >
                             {user.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                          <button
+                            className="admin-link-button admin-link-button--delete"
+                            disabled={
+                              user.id === currentUser?.id ||
+                              busyAction === `${user.id}:delete`
+                            }
+                            onClick={() => void handleDelete(user)}
+                            title={
+                              user.id === currentUser?.id
+                                ? "You cannot delete your current account"
+                                : "Delete user"
+                            }
+                            type="button"
+                          >
+                            {busyAction === `${user.id}:delete` ? "Deleting" : "Delete"}
                           </button>
                         </div>
                       </td>

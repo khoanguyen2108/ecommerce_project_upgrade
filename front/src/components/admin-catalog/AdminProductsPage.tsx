@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import {
   createAdminProduct,
   createAdminProductVariant,
+  activateAdminProduct,
   deactivateAdminProduct,
   deactivateAdminProductVariant,
   getAdminProduct,
@@ -24,6 +25,7 @@ import {
   listAdminCategories,
   listAdminProducts,
   listAdminProductVariants,
+  deleteAdminProduct,
   updateAdminProduct,
   updateAdminProductVariant,
 } from "@/features/admin-catalog/api";
@@ -32,11 +34,18 @@ import type {
   AdminProduct,
   AdminProductQuery,
   AdminProductVariant,
+  CreateAdminProductVariantRequest,
   AdminSortOrder,
   AdminProductSort,
 } from "@/features/admin-catalog/types";
 import { formatPrice } from "@/features/catalog/format";
-import { isStandardSize, SIZE_ORDER } from "@/features/catalog/sizes";
+import {
+  CLOTHING_SIZE_ORDER,
+  isNoSize,
+  isShoeSize,
+  ONE_SIZE,
+  SHOE_SIZE_ORDER,
+} from "@/features/catalog/sizes";
 import type { Pagination } from "@/lib/api/types";
 import { AdminModal } from "@/components/admin/AdminModal";
 import {
@@ -63,6 +72,8 @@ const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
   INVALID_PRICE_RANGE: "The price filter range is invalid.",
   NETWORK_ERROR: "The product API could not be reached. Check the backend and retry.",
   PRODUCT_NOT_FOUND: "That product no longer exists.",
+  PRODUCT_DELETE_BLOCKED:
+    "This product has related orders or carts. Deactivate it instead.",
   PRODUCT_SLUG_EXISTS: "Another product already uses this slug.",
   PRODUCT_VARIANT_NOT_FOUND: "That variant no longer exists.",
   PRODUCT_VARIANT_OPTION_EXISTS:
@@ -92,6 +103,12 @@ interface VariantFormState {
   size: string;
   sku: string;
   stock: string;
+}
+
+type SizingType = "CLOTHING" | "SHOES" | "ACCESSORIES";
+
+interface DraftVariant extends CreateAdminProductVariantRequest {
+  tempId: string;
 }
 
 type ProductPanelMode = "create" | "edit";
@@ -171,6 +188,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     useState<ProductFormState>(getEmptyProductForm());
   const [variantForm, setVariantForm] =
     useState<VariantFormState>(getEmptyVariantForm());
+  const [draftVariants, setDraftVariants] = useState<DraftVariant[]>([]);
+  const [sizingType, setSizingType] = useState<SizingType>("CLOTHING");
   const [editingVariantId, setEditingVariantId] = useState<string>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProductLoading, setIsProductLoading] = useState(true);
@@ -347,6 +366,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     setSelectedProduct(undefined);
     setProductForm(getEmptyProductForm());
     setVariantForm(getEmptyVariantForm());
+    setDraftVariants([]);
+    setSizingType("CLOTHING");
     setEditingVariantId(undefined);
     setActionError(undefined);
     setSuccessMessage(undefined);
@@ -359,6 +380,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     setSelectedProduct(product);
     setProductForm(getProductForm(product));
     setVariantForm(getEmptyVariantForm());
+    setDraftVariants([]);
+    setSizingType(inferSizingType(product.variants));
     setEditingVariantId(undefined);
     setActionError(undefined);
     setSuccessMessage(undefined);
@@ -382,6 +405,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
       setSelectedProduct(loadedProduct);
       setProductForm(getProductForm(loadedProduct));
+      setSizingType(inferSizingType(loadedProduct.variants));
       syncProduct(loadedProduct);
     } catch (error) {
       setActionError(
@@ -424,7 +448,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
     try {
       if (panelMode === "create") {
-        await createAdminProduct(productPayload.payload);
+        await createAdminProduct({
+          ...productPayload.payload,
+          variants: draftVariants.map(({ tempId: _tempId, ...variant }) => variant),
+        });
 
         setSuccessMessage("Product created.");
       } else if (selectedProduct) {
@@ -477,7 +504,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
     try {
       const response = nextIsActive
-        ? await updateAdminProduct(product.id, { isActive: true })
+        ? await activateAdminProduct(product.id)
         : await deactivateAdminProduct(product.id);
       const updatedProduct = {
         ...response.product,
@@ -531,23 +558,29 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   async function handleVariantSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedProduct) {
-      return;
-    }
-
     setActionError(undefined);
     setSuccessMessage(undefined);
 
-    const variantPayload = getVariantPayload(variantForm);
+    const variantPayload = getVariantPayload(variantForm, sizingType);
 
     if (variantPayload.error || !variantPayload.payload) {
       setActionError(variantPayload.error || "Variant fields are invalid.");
       return;
     }
 
-    const editingVariant = editingVariantId
+    const editingVariant = editingVariantId && selectedProduct
       ? selectedProduct.variants.find((variant) => variant.id === editingVariantId)
       : undefined;
+
+    const duplicateError = getDuplicateVariantError(
+      variantPayload.payload,
+      panelMode === "create" ? draftVariants : selectedProduct?.variants ?? [],
+      editingVariantId,
+    );
+    if (duplicateError) {
+      setActionError(duplicateError);
+      return;
+    }
 
     if (
       editingVariant &&
@@ -562,7 +595,13 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     setIsSavingVariant(true);
 
     try {
-      if (editingVariantId) {
+      if (panelMode === "create") {
+        setDraftVariants((current) => [
+          ...current,
+          { ...variantPayload.payload, tempId: crypto.randomUUID() },
+        ]);
+        setSuccessMessage("Draft variant added. It will be saved with the product.");
+      } else if (editingVariantId) {
         const response = await updateAdminProductVariant(
           editingVariantId,
           variantPayload.payload,
@@ -570,7 +609,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
         syncVariant(response.variant);
         setSuccessMessage("Variant updated.");
-      } else {
+      } else if (selectedProduct) {
         const response = await createAdminProductVariant(
           selectedProduct.id,
           variantPayload.payload,
@@ -580,7 +619,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         setSuccessMessage("Variant created.");
       }
 
-      setVariantForm(getEmptyVariantForm());
+      setVariantForm(getEmptyVariantForm(sizingType));
       setEditingVariantId(undefined);
       setRefreshKey((current) => current + 1);
     } catch (error) {
@@ -595,6 +634,47 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     } finally {
       setIsSavingVariant(false);
     }
+  }
+
+  async function handleProductDelete(product: AdminProduct) {
+    if (!window.confirm(`Delete ${product.name}? This cannot be undone.`)) return;
+
+    setBusyAction(`${product.id}:delete`);
+    setActionError(undefined);
+    setSuccessMessage(undefined);
+    setRequestId(undefined);
+    try {
+      await deleteAdminProduct(product.id);
+      if (products.length === 1 && (query.page || 1) > 1) {
+        setQuery((current) => ({ ...current, page: Math.max(1, (current.page || 1) - 1) }));
+      } else {
+        setRefreshKey((current) => current + 1);
+      }
+      setSuccessMessage("Product deleted.");
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(error, PRODUCT_ERROR_MESSAGES, "Product could not be deleted."),
+      );
+      setRequestId(getApiRequestId(error));
+    } finally {
+      setBusyAction(undefined);
+    }
+  }
+
+  function handleSizingTypeChange(nextType: SizingType) {
+    const variants = panelMode === "create" ? draftVariants : selectedProduct?.variants ?? [];
+    if (
+      variants.length > 0 &&
+      !window.confirm(
+        "Changing classification may require updating variant sizes. Continue?",
+      )
+    ) {
+      return;
+    }
+
+    setSizingType(nextType);
+    setVariantForm(getEmptyVariantForm(nextType));
+    setEditingVariantId(undefined);
   }
 
   async function handleVariantStatusChange(variant: AdminProductVariant) {
@@ -685,15 +765,32 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     : undefined;
   const variantFormBaseline = editingVariant
     ? getVariantForm(editingVariant)
-    : getEmptyVariantForm();
+    : getEmptyVariantForm(sizingType);
+  const allowedSizes = getSizeOptions(sizingType);
   const hasLegacyVariantSize = Boolean(
     editingVariantId &&
       variantForm.size &&
-      !isStandardSize(variantForm.size),
+      !allowedSizes.includes(variantForm.size),
   );
+  const displayedVariants =
+    panelMode === "create"
+      ? draftVariants.map((variant) => ({
+          ...variant,
+          id: variant.tempId,
+          isDraft: true as const,
+        }))
+      : (selectedProduct?.variants ?? []).map((variant) => ({
+          ...variant,
+          isDraft: false as const,
+        }));
   const hasUnsavedChanges = isModalOpen
     ? !areProductFormsEqual(productForm, productFormBaseline) ||
-      !areVariantFormsEqual(variantForm, variantFormBaseline)
+      !areVariantFormsEqual(variantForm, variantFormBaseline) ||
+      draftVariants.length > 0 ||
+      sizingType !==
+        (panelMode === "edit" && selectedProduct
+          ? inferSizingType(selectedProduct.variants)
+          : "CLOTHING")
     : false;
 
   return (
@@ -954,6 +1051,14 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           >
                             {product.isActive ? "Deactivate" : "Activate"}
                           </button>
+                          <button
+                            className="admin-link-button admin-link-button--delete"
+                            disabled={busyAction === `${product.id}:delete`}
+                            onClick={() => void handleProductDelete(product)}
+                            type="button"
+                          >
+                            {busyAction === `${product.id}:delete` ? "Deleting" : "Delete"}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1073,6 +1178,21 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     value={selectedProduct ? getProductStock(selectedProduct) : 0}
                   />
                   <small>Managed through variants.</small>
+                </label>
+                <label className="admin-compact-field--wide">
+                  <span>Selling classification</span>
+                  <select
+                    disabled={isPanelLoading}
+                    onChange={(event) =>
+                      handleSizingTypeChange(event.target.value as SizingType)
+                    }
+                    value={sizingType}
+                  >
+                    <option value="CLOTHING">Clothing</option>
+                    <option value="SHOES">Shoes</option>
+                    <option value="ACCESSORIES">Accessories</option>
+                  </select>
+                  <small>Changing classification may require updating variant sizes.</small>
                 </label>
               </div>
 
@@ -1255,7 +1375,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   className="admin-link-button"
                   onClick={() => {
                     setEditingVariantId(undefined);
-                    setVariantForm(getEmptyVariantForm());
+                    setVariantForm(getEmptyVariantForm(sizingType));
                   }}
                   type="button"
                 >
@@ -1264,20 +1384,26 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               ) : null}
             </div>
 
-            {panelMode === "edit" && selectedProduct ? (
+            {panelMode === "create" || selectedProduct ? (
               <>
                 <div className="admin-variant-grid">
-                  {selectedProduct.variants.length === 0 ? (
+                  {displayedVariants.length === 0 ? (
                     <div className="admin-panel__empty admin-variant-grid__empty">
-                      No variants exist for this product.
+                      {panelMode === "create"
+                        ? "Add the first variant before creating this product."
+                        : "No variants exist for this product."}
                     </div>
                   ) : (
-                    selectedProduct.variants.map((variant, index) => (
+                    displayedVariants.map((variant, index) => (
                       <article className="admin-variant-card" key={variant.id}>
                         <div className="admin-variant-card__header">
                           <h4>Variant {index + 1}</h4>
                           <span className="admin-variant-card__status">
-                            {variant.isActive ? "Active" : "Inactive"}
+                            {variant.isDraft
+                              ? "Draft"
+                              : variant.isActive
+                                ? "Active"
+                                : "Inactive"}
                           </span>
                         </div>
                         <dl className="admin-variant-card__details">
@@ -1291,7 +1417,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           </div>
                           <div>
                             <dt>Size</dt>
-                            <dd>{variant.size}</dd>
+                            <dd>{isNoSize(variant.size) ? "No size" : variant.size}</dd>
                           </div>
                           <div>
                             <dt>Stock</dt>
@@ -1300,30 +1426,46 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           <div>
                             <dt>Override</dt>
                             <dd>
-                              {variant.priceOverride === null
+                              {variant.priceOverride == null
                                 ? "Not set"
                                 : formatPrice(variant.priceOverride)}
                             </dd>
                           </div>
                         </dl>
                         <div className="admin-variant-card__actions">
-                          <button
-                            aria-label={`Edit variant ${variant.size} ${variant.color}`}
-                            className="icon-button admin-icon-button"
-                            onClick={() => void handleEditVariant(variant)}
-                            title="Edit variant"
-                            type="button"
-                          >
-                            <Edit3 aria-hidden="true" size={16} />
-                          </button>
-                          <button
-                            className="admin-link-button"
-                            disabled={busyAction === `${variant.id}:variant`}
-                            onClick={() => void handleVariantStatusChange(variant)}
-                            type="button"
-                          >
-                            {variant.isActive ? "Deactivate" : "Activate"}
-                          </button>
+                          {variant.isDraft ? (
+                            <button
+                              className="admin-link-button admin-link-button--delete"
+                              onClick={() =>
+                                setDraftVariants((current) =>
+                                  current.filter((item) => item.tempId !== variant.id),
+                                )
+                              }
+                              type="button"
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                aria-label={`Edit variant ${variant.size} ${variant.color}`}
+                                className="icon-button admin-icon-button"
+                                onClick={() => void handleEditVariant(variant)}
+                                title="Edit variant"
+                                type="button"
+                              >
+                                <Edit3 aria-hidden="true" size={16} />
+                              </button>
+                              <button
+                                className="admin-link-button"
+                                disabled={busyAction === `${variant.id}:variant`}
+                                onClick={() => void handleVariantStatusChange(variant)}
+                                type="button"
+                              >
+                                {variant.isActive ? "Deactivate" : "Activate"}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </article>
                     ))
@@ -1348,37 +1490,41 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
                     <label>
                       <span>Size</span>
-                      <select
-                        aria-describedby={
-                          hasLegacyVariantSize
-                            ? "admin-variant-size-guidance"
-                            : undefined
-                        }
-                        onChange={(event) =>
-                          setVariantForm((current) => ({
-                            ...current,
-                            size: event.target.value,
-                          }))
-                        }
-                        required
-                        value={variantForm.size}
-                      >
-                        <option value="">Select a size</option>
-                        {hasLegacyVariantSize ? (
-                          <option disabled value={variantForm.size}>
-                            Custom: {variantForm.size}
-                          </option>
-                        ) : null}
-                        {SIZE_ORDER.map((size) => (
-                          <option key={size} value={size}>
-                            {size}
-                          </option>
-                        ))}
-                      </select>
+                      {sizingType === "ACCESSORIES" ? (
+                        <input disabled value="No size required" />
+                      ) : (
+                        <select
+                          aria-describedby={
+                            hasLegacyVariantSize
+                              ? "admin-variant-size-guidance"
+                              : undefined
+                          }
+                          onChange={(event) =>
+                            setVariantForm((current) => ({
+                              ...current,
+                              size: event.target.value,
+                            }))
+                          }
+                          required
+                          value={variantForm.size}
+                        >
+                          <option value="">Select a size</option>
+                          {hasLegacyVariantSize ? (
+                            <option disabled value={variantForm.size}>
+                              Custom: {variantForm.size}
+                            </option>
+                          ) : null}
+                          {allowedSizes.map((size) => (
+                            <option key={size} value={size}>
+                              {size}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {hasLegacyVariantSize ? (
                         <small id="admin-variant-size-guidance">
-                          This existing custom size is unchanged. Select XS, S, M,
-                          L, or XL before saving edits.
+                          This existing custom size is preserved until you choose
+                          a size allowed by the selected classification.
                         </small>
                       ) : null}
                     </label>
@@ -1460,11 +1606,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   </button>
                 </form>
               </>
-            ) : (
-              <div className="admin-panel__empty" role="status">
-                Save or open a product before editing variants.
-              </div>
-            )}
+            ) : null}
           </section>
       </AdminModal>
     </div>
@@ -1509,12 +1651,12 @@ function mergeVariant(
     : [...variants, variant];
 }
 
-function getEmptyVariantForm(): VariantFormState {
+function getEmptyVariantForm(sizingType: SizingType = "CLOTHING"): VariantFormState {
   return {
     color: "",
     isActive: true,
     priceOverride: "",
-    size: "",
+    size: sizingType === "ACCESSORIES" ? ONE_SIZE : "",
     sku: "",
     stock: "",
   };
@@ -1612,7 +1754,7 @@ function getProductPayload(form: ProductFormState):
   };
 }
 
-function getVariantPayload(form: VariantFormState):
+function getVariantPayload(form: VariantFormState, sizingType: SizingType):
   | {
       payload: {
         color: string;
@@ -1630,12 +1772,19 @@ function getVariantPayload(form: VariantFormState):
     ? parseRequiredInteger(form.priceOverride)
     : null;
 
-  if (!form.size.trim()) {
+  const size = sizingType === "ACCESSORIES" ? ONE_SIZE : form.size.trim();
+
+  if (!size) {
     return { error: "Variant size is required." };
   }
 
-  if (!isStandardSize(form.size.trim())) {
-    return { error: "Variant size must be XS, S, M, L, or XL." };
+  if (sizingType !== "ACCESSORIES" && !getSizeOptions(sizingType).includes(size)) {
+    return {
+      error:
+        sizingType === "SHOES"
+          ? "Shoe size must be between 35 and 46."
+          : "Clothing size must be XS, S, M, L, or XL.",
+    };
   }
 
   if (!form.color.trim()) {
@@ -1657,11 +1806,69 @@ function getVariantPayload(form: VariantFormState):
       color: form.color.trim(),
       isActive: form.isActive,
       priceOverride,
-      size: form.size.trim(),
+      size,
       sku: normalizeNullableText(form.sku),
       stock,
     },
   };
+}
+
+function getSizeOptions(sizingType: SizingType): string[] {
+  if (sizingType === "SHOES") return [...SHOE_SIZE_ORDER];
+  if (sizingType === "ACCESSORIES") return [];
+  return [...CLOTHING_SIZE_ORDER];
+}
+
+function inferSizingType(
+  variants: Array<Pick<AdminProductVariant, "size">>,
+): SizingType {
+  if (variants.length > 0 && variants.every((variant) => isNoSize(variant.size))) {
+    return "ACCESSORIES";
+  }
+  if (variants.length > 0 && variants.every((variant) => isShoeSize(variant.size))) {
+    return "SHOES";
+  }
+  return "CLOTHING";
+}
+
+function getDuplicateVariantError(
+  candidate: CreateAdminProductVariantRequest,
+  variants: Array<
+    CreateAdminProductVariantRequest & { id?: string; tempId?: string }
+  >,
+  excludeId?: string,
+): string | undefined {
+  const normalizedColor = candidate.color.trim().toLocaleLowerCase();
+  const duplicateCombination = variants.some((variant) => {
+    const variantId = variant.id ?? variant.tempId;
+    return (
+      variantId !== excludeId &&
+      variant.color.trim().toLocaleLowerCase() === normalizedColor &&
+      variant.size === candidate.size
+    );
+  });
+
+  if (duplicateCombination) {
+    return isNoSize(candidate.size)
+      ? "Each accessory color can only be used once."
+      : "Each color and size combination can only be used once.";
+  }
+
+  const normalizedSku = candidate.sku?.trim().toLocaleUpperCase();
+  if (
+    normalizedSku &&
+    variants.some((variant) => {
+      const variantId = variant.id ?? variant.tempId;
+      return (
+        variantId !== excludeId &&
+        variant.sku?.trim().toLocaleUpperCase() === normalizedSku
+      );
+    })
+  ) {
+    return "Each variant SKU must be unique.";
+  }
+
+  return undefined;
 }
 
 function parseOptionalInteger(value: string): {

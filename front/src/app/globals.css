@@ -2819,6 +2819,11 @@ img {
   opacity: 0.6;
 }
 
+.admin-link-button--delete {
+  border-bottom: 1px solid currentColor;
+  color: var(--color-text);
+}
+
 .admin-inline-select {
   min-width: 128px;
 }

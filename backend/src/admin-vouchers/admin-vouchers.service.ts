@@ -195,6 +195,34 @@ export class AdminVouchersService {
     return { voucher };
   }
 
+  async deleteVoucher(id: string) {
+    const voucher = await this.prismaService.voucher.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        _count: { select: { orders: true } },
+      },
+    });
+
+    if (!voucher) {
+      throw new NotFoundException({
+        code: 'VOUCHER_NOT_FOUND',
+        message: 'Voucher was not found.',
+      });
+    }
+
+    if (voucher._count.orders > 0) {
+      throw new ConflictException({
+        code: 'VOUCHER_DELETE_BLOCKED',
+        message:
+          'This voucher cannot be deleted because related orders exist. Deactivate the voucher instead.',
+      });
+    }
+
+    await this.prismaService.voucher.delete({ where: { id } });
+    return { deletedId: id };
+  }
+
   private async findVoucher(id: string) {
     const voucher = await this.prismaService.voucher.findUnique({
       where: { id },

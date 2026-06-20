@@ -415,6 +415,50 @@ export class CatalogService {
     return { category };
   }
 
+  async activateCategory(id: string) {
+    await this.getCategoryForAdmin(id);
+
+    const category = await this.prismaService.category.update({
+      where: { id },
+      data: { isActive: true },
+      select: categorySelect,
+    });
+
+    return { category };
+  }
+
+  async deleteCategory(id: string) {
+    const category = await this.prismaService.category.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        _count: {
+          select: {
+            primaryProducts: true,
+            productCategories: true,
+          },
+        },
+      },
+    });
+
+    if (!category) {
+      throw this.adminCategoryNotFoundException();
+    }
+
+    if (
+      category._count.primaryProducts > 0 ||
+      category._count.productCategories > 0
+    ) {
+      throw new ConflictException({
+        code: 'CATEGORY_DELETE_BLOCKED',
+        message: 'This category has products. Move or remove products before deleting.',
+      });
+    }
+
+    await this.prismaService.category.delete({ where: { id } });
+    return { deletedId: id };
+  }
+
   async listProducts(query: ProductQueryDto) {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? DEFAULT_PRODUCT_LIMIT, MAX_PRODUCT_LIMIT);
@@ -649,6 +693,20 @@ export class CatalogService {
     const categoryIds = this.normalizeCategoryIds(dto.categoryIds, dto.categoryId);
     await this.assertActiveCategoriesExist(categoryIds);
     await this.assertProductSlugAvailable(slug);
+    const variants = (dto.variants ?? []).map((variant) => ({
+      sku: this.normalizeOptionalSku(variant.sku),
+      size: this.normalizeSize(variant.size),
+      color: this.normalizeColor(variant.color),
+      stock: variant.stock,
+      priceOverride: variant.priceOverride ?? null,
+      isActive: this.normalizeOptionalBoolean(
+        variant.isActive,
+        true,
+        'isActive',
+      ),
+    }));
+    this.assertDraftVariantsAreUnique(variants);
+    await Promise.all(variants.map((variant) => this.assertSkuAvailable(variant.sku)));
 
     try {
       const product = await this.prismaService.product.create({
@@ -673,6 +731,13 @@ export class CatalogService {
           basePrice: dto.basePrice,
           imageUrls: this.normalizeImageUrls(dto.imageUrls),
           isActive: this.normalizeOptionalBoolean(dto.isActive, true, 'isActive'),
+          ...(variants.length > 0
+            ? {
+                variants: {
+                  create: variants,
+                },
+              }
+            : {}),
         },
         select: productSelect,
       });
@@ -680,7 +745,11 @@ export class CatalogService {
       return { product: serializeProduct(product) };
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
-        throw this.productSlugExistsException();
+        const target = this.getUniqueConstraintTarget(error);
+        if (target.includes('slug')) {
+          throw this.productSlugExistsException();
+        }
+        throw this.variantUniqueConflictException(error);
       }
 
       throw error;
@@ -780,6 +849,60 @@ export class CatalogService {
     });
 
     return { product: serializeProduct(product) };
+  }
+
+  async activateProduct(id: string) {
+    await this.getProductForAdmin(id);
+
+    const product = await this.prismaService.product.update({
+      where: { id },
+      data: { isActive: true },
+      select: productSelect,
+    });
+
+    return { product: serializeProduct(product) };
+  }
+
+  async deleteProduct(id: string) {
+    const product = await this.prismaService.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        orderItems: { select: { id: true }, take: 1 },
+        variants: {
+          select: {
+            cartItems: { select: { id: true }, take: 1 },
+            orderItems: { select: { id: true }, take: 1 },
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      throw this.productNotFoundException();
+    }
+
+    const isReferenced =
+      product.orderItems.length > 0 ||
+      product.variants.some(
+        (variant) =>
+          variant.orderItems.length > 0 || variant.cartItems.length > 0,
+      );
+
+    if (isReferenced) {
+      throw new ConflictException({
+        code: 'PRODUCT_DELETE_BLOCKED',
+        message:
+          'This product cannot be deleted because related orders or carts exist. Deactivate the product instead.',
+      });
+    }
+
+    await this.prismaService.$transaction([
+      this.prismaService.productVariant.deleteMany({ where: { productId: id } }),
+      this.prismaService.product.delete({ where: { id } }),
+    ]);
+
+    return { deletedId: id };
   }
 
   async createProductVariant(productId: string, dto: CreateProductVariantDto) {
@@ -1349,7 +1472,10 @@ export class CatalogService {
       where: {
         productId,
         size,
-        color,
+        color: {
+          equals: color,
+          mode: 'insensitive',
+        },
       },
       select: {
         id: true,
@@ -1358,6 +1484,28 @@ export class CatalogService {
 
     if (variant && variant.id !== excludeId) {
       throw this.variantOptionExistsException();
+    }
+  }
+
+  private assertDraftVariantsAreUnique(
+    variants: Array<{ sku: string | null; size: string; color: string }>,
+  ) {
+    const combinations = new Set<string>();
+    const skus = new Set<string>();
+
+    for (const variant of variants) {
+      const combination = `${variant.color.toLocaleLowerCase()}\u0000${variant.size}`;
+      if (combinations.has(combination)) {
+        throw this.variantOptionExistsException();
+      }
+      combinations.add(combination);
+
+      if (variant.sku) {
+        if (skus.has(variant.sku)) {
+          throw this.skuExistsException();
+        }
+        skus.add(variant.sku);
+      }
     }
   }
 

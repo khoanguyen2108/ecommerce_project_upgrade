@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -160,6 +161,41 @@ export class AdminUsersController {
     @CurrentUser() admin: AuthenticatedUser,
   ) {
     return this.adminUsersService.updateUserStatus(id, dto, admin.id);
+  }
+
+  @ApiOperation({ summary: 'Activate a user as an admin' })
+  @Patch(':id/activate')
+  activateUser(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.adminUsersService.updateUserStatus(
+      id,
+      { isActive: true },
+      admin.id,
+    );
+  }
+
+  @ApiOperation({ summary: 'Deactivate a user as an admin' })
+  @Patch(':id/deactivate')
+  deactivateUser(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.adminUsersService.updateUserStatus(
+      id,
+      { isActive: false },
+      admin.id,
+    );
+  }
+
+  @ApiOperation({ summary: 'Safely delete an unreferenced user as an admin' })
+  @Delete(':id')
+  deleteUser(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() admin: AuthenticatedUser,
+  ) {
+    return this.adminUsersService.deleteUser(id, admin.id);
   }
 
   @ApiOperation({ summary: 'Change a user role as an admin' })

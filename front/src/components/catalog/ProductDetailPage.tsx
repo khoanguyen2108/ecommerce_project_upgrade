@@ -24,7 +24,7 @@ import {
   getProductVariantsBySlug,
 } from "@/features/catalog/api";
 import { formatPrice } from "@/features/catalog/format";
-import { sortSizesByStandardOrder } from "@/features/catalog/sizes";
+import { isNoSize, sortSizesByStandardOrder } from "@/features/catalog/sizes";
 import type { Product, ProductVariant } from "@/features/catalog/types";
 import {
   productToRecentlyViewedProduct,
@@ -120,8 +120,17 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     () => state.variants.filter(isVariantSelectable),
     [state.variants],
   );
+  const requiresSize = useMemo(
+    () => state.variants.some((variant) => !isNoSize(variant.size)),
+    [state.variants],
+  );
   const sizes = useMemo(
-    () => sortSizesByStandardOrder(state.variants.map((variant) => variant.size)),
+    () =>
+      sortSizesByStandardOrder(
+        state.variants
+          .map((variant) => variant.size)
+          .filter((size) => !isNoSize(size)),
+      ),
     [state.variants],
   );
   const colors = useMemo(
@@ -139,14 +148,23 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
         : sizes,
     [selectedColor, sizes, state.variants],
   );
-  const selectedVariant = useMemo(
-    () =>
-      state.variants.find(
-        (variant) =>
-          variant.size === selectedSize && variant.color === selectedColor,
-      ),
-    [selectedColor, selectedSize, state.variants],
-  );
+  const selectedVariant = useMemo(() => {
+    if (!selectedColor) return undefined;
+
+    if (!requiresSize) {
+      return (
+        state.variants.find(
+          (variant) =>
+            variant.color === selectedColor && isVariantSelectable(variant),
+        ) || state.variants.find((variant) => variant.color === selectedColor)
+      );
+    }
+
+    return state.variants.find(
+      (variant) =>
+        variant.size === selectedSize && variant.color === selectedColor,
+    );
+  }, [requiresSize, selectedColor, selectedSize, state.variants]);
   const totalStock = selectableVariants.reduce(
     (sum, variant) => sum + variant.stock,
     0,
@@ -276,7 +294,9 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     ? getVariantUnitPrice(product, selectedVariant)
     : product.basePrice;
   const hasValidSelection = Boolean(
-    selectedColor && selectedSize && isVariantSelectable(selectedVariant),
+    selectedColor &&
+      (!requiresSize || selectedSize) &&
+      isVariantSelectable(selectedVariant),
   );
   const hasValidQuantity = Boolean(
     selectedVariant &&
@@ -291,6 +311,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     !hasValidSelection ||
     !hasValidQuantity;
   const selectionMessage = getSelectionMessage({
+    requiresSize,
     selectedColor,
     selectedSize,
     totalStock,
@@ -383,34 +404,40 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
               })}
             </div>
 
-            <div className="product-option-heading product-option-heading--secondary">
-              <h2>Size</h2>
-              <span>
-                {selectedSize ||
-                  (selectedColor ? "Select a size" : "Select a color first")}
-              </span>
-            </div>
-            <div className="variant-choice-list">
-              {sizesForSelectedColor.map((size) => {
-                const isAvailable = Boolean(
-                  selectedColor &&
-                    hasSelectableCombination(state.variants, selectedColor, size),
-                );
+            {requiresSize ? (
+              <>
+                <div className="product-option-heading product-option-heading--secondary">
+                  <h2>Size</h2>
+                  <span>
+                    {selectedSize ||
+                      (selectedColor ? "Select a size" : "Select a color first")}
+                  </span>
+                </div>
+                <div className="variant-choice-list">
+                  {sizesForSelectedColor.map((size) => {
+                    const isAvailable = Boolean(
+                      selectedColor &&
+                        hasSelectableCombination(state.variants, selectedColor, size),
+                    );
 
-                return (
-                  <button
-                    aria-pressed={size === selectedSize}
-                    className={size === selectedSize ? "is-selected" : undefined}
-                    disabled={!isAvailable}
-                    key={size}
-                    onClick={() => handleSizeSelect(size)}
-                    type="button"
-                  >
-                    {size}
-                  </button>
-                );
-              })}
-            </div>
+                    return (
+                      <button
+                        aria-pressed={size === selectedSize}
+                        className={size === selectedSize ? "is-selected" : undefined}
+                        disabled={!isAvailable}
+                        key={size}
+                        onClick={() => handleSizeSelect(size)}
+                        type="button"
+                      >
+                        {size}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <p className="product-selection-hint">No size required.</p>
+            )}
 
             {state.variants.length === 0 ? (
               <p className="product-selection-hint">No active variants are available.</p>
@@ -425,7 +452,9 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
               <p>
                 {hasValidSelection && selectedVariant
                   ? `${selectedVariant.stock} available for this option.`
-                  : "Complete the color and size selection first."}
+                  : requiresSize
+                    ? "Complete the color and size selection first."
+                    : "Select a color first."}
               </p>
             </div>
             <div className="quantity-stepper">
@@ -482,6 +511,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
               {getAddToCartLabel({
                 isAddingToCart,
                 isAuthenticated,
+                requiresSize,
                 selectedVariant,
                 totalStock,
               })}
@@ -498,7 +528,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
               <dt>Variant</dt>
               <dd>
                 {selectedVariant
-                  ? `${selectedVariant.size} / ${selectedVariant.color}`
+                  ? `${isNoSize(selectedVariant.size) ? "One size" : selectedVariant.size} / ${selectedVariant.color}`
                   : `${selectableVariants.length} available option${
                       selectableVariants.length === 1 ? "" : "s"
                     }`}
@@ -614,10 +644,12 @@ function getProductReturnPath(product: Product): string {
 }
 
 function getSelectionMessage({
+  requiresSize,
   selectedColor,
   selectedSize,
   totalStock,
 }: {
+  requiresSize: boolean;
   selectedColor?: string;
   selectedSize?: string;
   totalStock: number;
@@ -627,24 +659,30 @@ function getSelectionMessage({
   }
 
   if (!selectedColor) {
-    return "Choose a color to see its available sizes.";
+    return requiresSize
+      ? "Choose a color to see its available sizes."
+      : "Choose an available color.";
   }
 
-  if (!selectedSize) {
+  if (requiresSize && !selectedSize) {
     return "Choose an available size to complete your selection.";
   }
 
-  return "Your color and size are available.";
+  return requiresSize
+    ? "Your color and size are available."
+    : "Your selected color is available.";
 }
 
 function getAddToCartLabel({
   isAddingToCart,
   isAuthenticated,
+  requiresSize,
   selectedVariant,
   totalStock,
 }: {
   isAddingToCart: boolean;
   isAuthenticated: boolean;
+  requiresSize: boolean;
   selectedVariant?: ProductVariant;
   totalStock: number;
 }): string {
@@ -657,7 +695,7 @@ function getAddToCartLabel({
   }
 
   if (!isVariantSelectable(selectedVariant)) {
-    return "SELECT COLOR AND SIZE";
+    return requiresSize ? "SELECT COLOR AND SIZE" : "SELECT COLOR";
   }
 
   if (!isAuthenticated) {

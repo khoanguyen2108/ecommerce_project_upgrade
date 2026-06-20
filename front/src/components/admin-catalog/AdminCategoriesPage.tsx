@@ -14,8 +14,10 @@ import {
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import {
+  activateAdminCategory,
   createAdminCategory,
   deactivateAdminCategory,
+  deleteAdminCategory,
   getAdminCategory,
   listAdminCategories,
   updateAdminCategory,
@@ -53,6 +55,8 @@ const CATEGORY_ERROR_MESSAGES: Record<string, string> = {
   CATALOG_UPDATE_EMPTY: "Change at least one category field before saving.",
   CATEGORY_NOT_FOUND: "That category no longer exists.",
   CATEGORY_SLUG_EXISTS: "Another category already uses this slug.",
+  CATEGORY_DELETE_BLOCKED:
+    "This category has products. Move or remove them before deleting.",
   FORBIDDEN: "This account is not allowed to manage catalog categories.",
   NETWORK_ERROR: "The category API could not be reached. Check the backend and retry.",
   VALIDATION_ERROR: "Some category fields are invalid. Review the form and try again.",
@@ -307,7 +311,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
 
     try {
       const response = nextIsActive
-        ? await updateAdminCategory(category.id, { isActive: true })
+        ? await activateAdminCategory(category.id)
         : await deactivateAdminCategory(category.id);
 
       setSelectedCategory((current) =>
@@ -330,6 +334,35 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
           error,
           CATEGORY_ERROR_MESSAGES,
           "Category status could not be changed.",
+        ),
+      );
+      setRequestId(getApiRequestId(error));
+    } finally {
+      setBusyAction(undefined);
+    }
+  }
+
+  async function handleCategoryDelete(category: AdminCategory) {
+    if (!window.confirm(`Delete ${category.name}? This cannot be undone.`)) return;
+
+    setBusyAction(`${category.id}:delete`);
+    setActionError(undefined);
+    setSuccessMessage(undefined);
+    setRequestId(undefined);
+    try {
+      await deleteAdminCategory(category.id);
+      if (categories.length === 1 && (query.page || 1) > 1) {
+        setQuery((current) => ({ ...current, page: Math.max(1, (current.page || 1) - 1) }));
+      } else {
+        setRefreshKey((current) => current + 1);
+      }
+      setSuccessMessage("Category deleted.");
+    } catch (error) {
+      setActionError(
+        getApiErrorMessage(
+          error,
+          CATEGORY_ERROR_MESSAGES,
+          "Category could not be deleted.",
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -539,6 +572,14 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                             type="button"
                           >
                             {category.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                          <button
+                            className="admin-link-button admin-link-button--delete"
+                            disabled={busyAction === `${category.id}:delete`}
+                            onClick={() => void handleCategoryDelete(category)}
+                            type="button"
+                          >
+                            {busyAction === `${category.id}:delete` ? "Deleting" : "Delete"}
                           </button>
                         </div>
                       </td>

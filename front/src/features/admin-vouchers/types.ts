@@ -52,3 +52,7 @@ export interface AdminVouchersListResponse {
 export interface AdminVoucherResponse {
   voucher: AdminVoucher;
 }
+
+export interface AdminVoucherDeleteResponse {
+  deletedId: string;
+}

@@ -4,6 +4,7 @@ import type {
   AdminCategoriesListResponse,
   AdminCategoryQuery,
   AdminCategoryResponse,
+  AdminDeleteResponse,
   AdminProductQuery,
   AdminProductResponse,
   AdminProductsListResponse,
@@ -72,12 +73,26 @@ export function deactivateAdminCategory(
   id: string,
 ): Promise<AdminCategoryResponse> {
   return apiRequest<AdminCategoryResponse>(
-    `/admin/categories/${encodeURIComponent(id)}`,
+    `/admin/categories/${encodeURIComponent(id)}/deactivate`,
     {
       auth: true,
       credentials: "include",
-      method: "DELETE",
+      method: "PATCH",
     },
+  );
+}
+
+export function activateAdminCategory(id: string): Promise<AdminCategoryResponse> {
+  return apiRequest<AdminCategoryResponse>(
+    `/admin/categories/${encodeURIComponent(id)}/activate`,
+    { auth: true, credentials: "include", method: "PATCH" },
+  );
+}
+
+export function deleteAdminCategory(id: string): Promise<AdminDeleteResponse> {
+  return apiRequest<AdminDeleteResponse>(
+    `/admin/categories/${encodeURIComponent(id)}`,
+    { auth: true, credentials: "include", method: "DELETE" },
   );
 }
 
@@ -135,12 +150,26 @@ export function deactivateAdminProduct(
   id: string,
 ): Promise<AdminProductResponse> {
   return apiRequest<AdminProductResponse>(
-    `/admin/products/${encodeURIComponent(id)}`,
+    `/admin/products/${encodeURIComponent(id)}/deactivate`,
     {
       auth: true,
       credentials: "include",
-      method: "DELETE",
+      method: "PATCH",
     },
+  );
+}
+
+export function activateAdminProduct(id: string): Promise<AdminProductResponse> {
+  return apiRequest<AdminProductResponse>(
+    `/admin/products/${encodeURIComponent(id)}/activate`,
+    { auth: true, credentials: "include", method: "PATCH" },
+  );
+}
+
+export function deleteAdminProduct(id: string): Promise<AdminDeleteResponse> {
+  return apiRequest<AdminDeleteResponse>(
+    `/admin/products/${encodeURIComponent(id)}`,
+    { auth: true, credentials: "include", method: "DELETE" },
   );
 }
 

@@ -55,3 +55,7 @@ export interface AdminUsersListResponse {
 export interface AdminUserResponse {
   user: AdminUser;
 }
+
+export interface AdminUserDeleteResponse {
+  deletedId: string;
+}

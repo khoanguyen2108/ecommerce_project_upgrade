@@ -2,6 +2,7 @@ import { apiRequest } from "@/lib/api/client";
 import { withQuery } from "@/lib/api/query";
 import type {
   AdminVoucherQuery,
+  AdminVoucherDeleteResponse,
   AdminVoucherResponse,
   AdminVouchersListResponse,
   AdminVoucherWriteRequest,
@@ -51,6 +52,13 @@ export function activateAdminVoucher(id: string): Promise<AdminVoucherResponse> 
 
 export function deactivateAdminVoucher(id: string): Promise<AdminVoucherResponse> {
   return updateVoucherStatus(id, "deactivate");
+}
+
+export function deleteAdminVoucher(id: string): Promise<AdminVoucherDeleteResponse> {
+  return apiRequest<AdminVoucherDeleteResponse>(
+    `/admin/vouchers/${encodeURIComponent(id)}`,
+    { auth: true, credentials: "include", method: "DELETE" },
+  );
 }
 
 function updateVoucherStatus(

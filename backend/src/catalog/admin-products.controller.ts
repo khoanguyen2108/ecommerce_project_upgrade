@@ -167,6 +167,12 @@ export class AdminProductsController {
     return this.catalogService.updateProduct(id, dto);
   }
 
+  @ApiOperation({ summary: 'Activate a product as an admin' })
+  @Patch(':id/activate')
+  activateProduct(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.catalogService.activateProduct(id);
+  }
+
   @ApiOperation({ summary: 'Deactivate a product as an admin' })
   @ApiParam({
     description: 'Product UUID.',
@@ -182,9 +188,15 @@ export class AdminProductsController {
       'Product was not found.',
     ),
   )
-  @Delete(':id')
+  @Patch(':id/deactivate')
   deactivateProduct(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.catalogService.deactivateProduct(id);
+  }
+
+  @ApiOperation({ summary: 'Safely delete an unreferenced product as an admin' })
+  @Delete(':id')
+  deleteProduct(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.catalogService.deleteProduct(id);
   }
 
   @ApiOperation({ summary: 'Create a product variant as an admin' })

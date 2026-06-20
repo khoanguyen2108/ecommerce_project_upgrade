@@ -2,6 +2,7 @@ import { apiRequest } from "@/lib/api/client";
 import { withQuery } from "@/lib/api/query";
 import type {
   AdminUserQuery,
+  AdminUserDeleteResponse,
   AdminUserResponse,
   AdminUsersListResponse,
   UpdateAdminUserRequest,
@@ -57,6 +58,27 @@ export function updateAdminUserStatus(
       credentials: "include",
       method: "PATCH",
     },
+  );
+}
+
+export function activateAdminUser(id: string): Promise<AdminUserResponse> {
+  return apiRequest<AdminUserResponse>(
+    `/admin/users/${encodeURIComponent(id)}/activate`,
+    { auth: true, credentials: "include", method: "PATCH" },
+  );
+}
+
+export function deactivateAdminUser(id: string): Promise<AdminUserResponse> {
+  return apiRequest<AdminUserResponse>(
+    `/admin/users/${encodeURIComponent(id)}/deactivate`,
+    { auth: true, credentials: "include", method: "PATCH" },
+  );
+}
+
+export function deleteAdminUser(id: string): Promise<AdminUserDeleteResponse> {
+  return apiRequest<AdminUserDeleteResponse>(
+    `/admin/users/${encodeURIComponent(id)}`,
+    { auth: true, credentials: "include", method: "DELETE" },
   );
 }
 

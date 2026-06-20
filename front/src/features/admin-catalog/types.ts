@@ -142,6 +142,7 @@ export interface CreateAdminProductRequest {
   basePrice: number;
   imageUrls?: string[];
   isActive?: boolean;
+  variants?: CreateAdminProductVariantRequest[];
 }
 
 export interface UpdateAdminProductRequest {
@@ -198,4 +199,8 @@ export interface AdminProductVariantsListResponse {
 
 export interface AdminProductVariantResponse {
   variant: AdminProductVariant;
+}
+
+export interface AdminDeleteResponse {
+  deletedId: string;
 }
