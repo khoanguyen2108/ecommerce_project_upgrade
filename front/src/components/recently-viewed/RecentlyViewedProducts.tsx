@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo } from "react";
+import { useMemo } from "react";
 import { formatPrice } from "@/features/catalog/format";
 import type { RecentlyViewedProduct } from "@/features/recently-viewed/types";
 import { useRecentlyViewed } from "@/features/recently-viewed/useRecentlyViewed";
@@ -15,7 +15,6 @@ export function RecentlyViewedProducts({
   excludeProductId,
   limit = 4,
 }: RecentlyViewedProductsProps) {
-  const headingId = useId();
   const { isLoaded, items } = useRecentlyViewed();
   const visibleItems = useMemo(
     () =>
@@ -30,20 +29,10 @@ export function RecentlyViewedProducts({
   }
 
   return (
-    <section className="recently-viewed-section" aria-labelledby={headingId}>
-      <div className="recently-viewed-section__header">
-        <div>
-          <p className="eyebrow">On this device</p>
-          <h2 id={headingId}>Recently viewed</h2>
-          <p>Saved locally in this browser only.</p>
-        </div>
-        <span>
-          {visibleItems.length === 1
-            ? "1 product"
-            : `${visibleItems.length} products`}
-        </span>
-      </div>
-
+    <section className="recently-viewed-section" aria-labelledby="recently-viewed-heading">
+      <h2 className="recently-viewed-section__title" id="recently-viewed-heading">
+        Recently viewed
+      </h2>
       <div className="product-grid recently-viewed-grid">
         {visibleItems.map((item) => (
           <RecentlyViewedProductCard item={item} key={item.id} />
