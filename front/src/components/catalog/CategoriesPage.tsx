@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, ArrowRight } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getCategories } from "@/features/catalog/api";
@@ -155,10 +155,6 @@ function CategoryCard({ category }: { category: Category }) {
         <div className="categories-card__body">
           <h2>{category.name}</h2>
           {category.description ? <p>{category.description}</p> : null}
-          <span className="categories-card__action">
-            Shop category
-            <ArrowRight aria-hidden="true" size={16} strokeWidth={1.8} />
-          </span>
         </div>
       </Link>
     </article>
