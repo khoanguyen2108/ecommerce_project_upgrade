@@ -18,7 +18,7 @@ export function addCartItem(
 ): Promise<CartResponse> {
   return apiRequest<CartResponse>("/cart/items", {
     auth: true,
-    body: payload,
+    body: { quantity: payload.quantity, variantId: payload.variantId },
     credentials: "include",
     method: "POST",
   });

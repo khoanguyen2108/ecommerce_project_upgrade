@@ -10,7 +10,6 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
 import { RecentlyViewedProducts } from "@/components/recently-viewed/RecentlyViewedProducts";
@@ -50,8 +49,7 @@ interface CartFeedback {
 }
 
 export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
-  const router = useRouter();
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuthSession();
+  const { isLoading: isAuthLoading } = useAuthSession();
   const { addItemAndOpenDrawer } = useCart();
   const [state, setState] = useState<ProductDetailState>({
     isLoading: true,
@@ -222,13 +220,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
       return;
     }
 
-    if (!isAuthenticated) {
-      router.push(
-        `/login?next=${encodeURIComponent(getProductReturnPath(state.product))}`,
-      );
-      return;
-    }
-
     if (!selectedVariant || !isVariantSelectable(selectedVariant)) {
       return;
     }
@@ -238,7 +229,28 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
 
     try {
       await addItemAndOpenDrawer(
-        { quantity, variantId: selectedVariant.id },
+        {
+          quantity,
+          variantId: selectedVariant.id,
+          guestSnapshot: {
+            product: {
+              id: state.product.id,
+              name: state.product.name,
+              slug: state.product.slug,
+              imageUrls: state.product.imageUrls,
+              firstImageUrl: state.product.imageUrls[0] || null,
+              category: state.product.category,
+            },
+            variant: {
+              sku: selectedVariant.sku,
+              size: selectedVariant.size,
+              color: selectedVariant.color,
+              priceOverride: selectedVariant.priceOverride,
+              stock: selectedVariant.stock,
+            },
+            unitPrice: getVariantUnitPrice(state.product, selectedVariant),
+          },
+        },
         state.product.name,
       );
     } catch (error) {
@@ -510,7 +522,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
               )}
               {getAddToCartLabel({
                 isAddingToCart,
-                isAuthenticated,
                 requiresSize,
                 selectedVariant,
                 totalStock,
@@ -639,10 +650,6 @@ function getVariantUnitPrice(product: Product, variant: ProductVariant): number 
   return variant.priceOverride ?? product.basePrice;
 }
 
-function getProductReturnPath(product: Product): string {
-  return `/products/${encodeURIComponent(product.slug)}`;
-}
-
 function getSelectionMessage({
   requiresSize,
   selectedColor,
@@ -675,13 +682,11 @@ function getSelectionMessage({
 
 function getAddToCartLabel({
   isAddingToCart,
-  isAuthenticated,
   requiresSize,
   selectedVariant,
   totalStock,
 }: {
   isAddingToCart: boolean;
-  isAuthenticated: boolean;
   requiresSize: boolean;
   selectedVariant?: ProductVariant;
   totalStock: number;
@@ -696,10 +701,6 @@ function getAddToCartLabel({
 
   if (!isVariantSelectable(selectedVariant)) {
     return requiresSize ? "SELECT COLOR AND SIZE" : "SELECT COLOR";
-  }
-
-  if (!isAuthenticated) {
-    return "Sign in to add to cart";
   }
 
   return "Add to cart";

@@ -58,10 +58,26 @@ export type CreateCheckoutOrderResponse = OrderResponse;
 export interface CheckoutShippingInfo extends AddressInput {
   saveAddress?: boolean;
   setDefault?: boolean;
+  email?: string;
 }
 
 export interface CreateCheckoutOrderRequest {
   voucherCode?: string;
   addressId?: string;
   shippingInfo?: CheckoutShippingInfo;
+}
+
+export interface GuestCheckoutItemRequest {
+  variantId: string;
+  quantity: number;
+}
+
+export interface GuestCheckoutSummaryRequest {
+  items: GuestCheckoutItemRequest[];
+  voucherCode?: string;
+}
+
+export interface CreateGuestCheckoutOrderRequest
+  extends GuestCheckoutSummaryRequest {
+  shippingInfo: CheckoutShippingInfo;
 }

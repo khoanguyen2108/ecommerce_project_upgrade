@@ -20,11 +20,10 @@ import {
   removeCartItem,
   updateCartItem,
 } from "@/features/cart/api";
-import {
-  getCartErrorMessage,
-  getCartRequestId,
-} from "@/features/cart/errors";
-import type { AddCartItemRequest, Cart } from "@/features/cart/types";
+import { getCartErrorMessage, getCartRequestId } from "@/features/cart/errors";
+import type { AddCartItemRequest, Cart, CartItem } from "@/features/cart/types";
+
+export const GUEST_CART_STORAGE_KEY = "belikeme_guest_cart";
 
 interface CartToastState {
   id: number;
@@ -55,11 +54,7 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const {
-    currentUser,
-    isAuthenticated,
-    isLoading: isAuthLoading,
-  } = useAuthSession();
+  const { currentUser, isAuthenticated, isLoading: isAuthLoading } = useAuthSession();
   const [cart, setCart] = useState<Cart>();
   const [error, setError] = useState<string>();
   const [requestId, setRequestId] = useState<string>();
@@ -68,7 +63,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [toast, setToast] = useState<CartToastState>();
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const authenticatedUserIdRef = useRef(currentUser?.id);
   const toastTimerRef = useRef<number | undefined>(undefined);
+  authenticatedUserIdRef.current = currentUser?.id;
 
   const clearError = useCallback(() => {
     setError(undefined);
@@ -79,23 +76,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const showToast = useCallback(
     (kind: CartToastState["kind"], message: string) => {
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-      }
-
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
       setToast({ id: Date.now(), kind, message });
-      toastTimerRef.current = window.setTimeout(() => {
-        setToast(undefined);
-      }, kind === "success" ? 3200 : 4200);
+      toastTimerRef.current = window.setTimeout(
+        () => setToast(undefined),
+        kind === "success" ? 3200 : 4200,
+      );
     },
     [],
   );
 
   useEffect(
     () => () => {
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-      }
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     },
     [],
   );
@@ -110,24 +103,34 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [showToast],
   );
 
+  const setAndPersistGuestCart = useCallback((nextCart: Cart) => {
+    window.localStorage.setItem(
+      GUEST_CART_STORAGE_KEY,
+      JSON.stringify(nextCart.items),
+    );
+    setCart(nextCart);
+  }, []);
+
   const refreshCart = useCallback(async () => {
     if (!isAuthenticated) {
-      setCart(undefined);
+      refreshPromiseRef.current = null;
+      setCart(readGuestCart());
       setIsLoading(false);
+      clearError();
       return;
     }
 
-    if (refreshPromiseRef.current) {
-      return refreshPromiseRef.current;
-    }
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
 
     const request = (async () => {
+      const requestedUserId = currentUser?.id;
       setIsLoading(true);
       clearError();
-
       try {
         const response = await getCart();
-        setCart(response.cart);
+        if (authenticatedUserIdRef.current === requestedUserId) {
+          setCart(response.cart);
+        }
       } catch (caughtError) {
         handleError(caughtError, "Cart could not be loaded.");
         throw caughtError;
@@ -139,36 +142,60 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     refreshPromiseRef.current = request;
     return request;
-  }, [clearError, handleError, isAuthenticated]);
+  }, [clearError, currentUser?.id, handleError, isAuthenticated]);
 
   useEffect(() => {
-    if (isAuthLoading) {
-      return;
-    }
-
-    if (!isAuthenticated) {
-      setCart(undefined);
-      setIsLoading(false);
-      setIsOpen(false);
-      clearError();
-      return;
-    }
-
+    if (isAuthLoading) return;
     void refreshCart().catch(() => undefined);
-  }, [clearError, currentUser?.id, isAuthenticated, isAuthLoading, refreshCart]);
+  }, [currentUser?.id, isAuthLoading, refreshCart]);
 
   const addItemAndOpenDrawer = useCallback(
     async (payload: AddCartItemRequest, productName?: string) => {
-      if (isSaving) {
-        return;
-      }
-
+      if (isSaving) return;
       setIsSaving(true);
       clearError();
 
       try {
-        const response = await addCartItem(payload);
-        setCart(response.cart);
+        if (isAuthenticated) {
+          const response = await addCartItem(payload);
+          setCart(response.cart);
+        } else {
+          if (!payload.guestSnapshot) {
+            throw new Error("Guest cart item details are missing.");
+          }
+          const current = readGuestCart();
+          const existing = current.items.find(
+            (item) => item.variantId === payload.variantId,
+          );
+          const maxQuantity = Math.max(
+            1,
+            Math.min(99, payload.guestSnapshot.variant.stock),
+          );
+          const quantity = Math.min(
+            maxQuantity,
+            (existing?.quantity ?? 0) + payload.quantity,
+          );
+          const now = new Date().toISOString();
+          const item: CartItem = {
+            id: payload.variantId,
+            variantId: payload.variantId,
+            quantity,
+            currentUnitPrice: payload.guestSnapshot.unitPrice,
+            currentLineTotal: payload.guestSnapshot.unitPrice * quantity,
+            availableStock: payload.guestSnapshot.variant.stock,
+            product: payload.guestSnapshot.product,
+            variant: payload.guestSnapshot.variant,
+            createdAt: existing?.createdAt ?? now,
+            updatedAt: now,
+          };
+          const items = existing
+            ? current.items.map((candidate) =>
+                candidate.variantId === payload.variantId ? item : candidate,
+              )
+            : [...current.items, item];
+          setAndPersistGuestCart(createGuestCart(items));
+        }
+
         setIsOpen(true);
         showToast(
           "success",
@@ -181,21 +208,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setIsSaving(false);
       }
     },
-    [clearError, handleError, isSaving, showToast],
+    [
+      clearError,
+      handleError,
+      isAuthenticated,
+      isSaving,
+      setAndPersistGuestCart,
+      showToast,
+    ],
   );
 
   const updateQuantity = useCallback(
     async (id: string, quantity: number) => {
-      if (isSaving) {
-        return;
-      }
-
+      if (isSaving) return;
       setIsSaving(true);
       clearError();
-
       try {
-        const response = await updateCartItem(id, { quantity });
-        setCart(response.cart);
+        if (isAuthenticated) {
+          const response = await updateCartItem(id, { quantity });
+          setCart(response.cart);
+        } else {
+          const current = readGuestCart();
+          const items = current.items.map((item) => {
+            if (item.id !== id) return item;
+            const nextQuantity = Math.max(
+              1,
+              Math.min(99, item.availableStock, Math.trunc(quantity)),
+            );
+            return {
+              ...item,
+              quantity: nextQuantity,
+              currentLineTotal: item.currentUnitPrice * nextQuantity,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+          setAndPersistGuestCart(createGuestCart(items));
+        }
       } catch (caughtError) {
         handleError(caughtError, "Cart item could not be updated.");
         throw caughtError;
@@ -203,21 +251,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setIsSaving(false);
       }
     },
-    [clearError, handleError, isSaving],
+    [clearError, handleError, isAuthenticated, isSaving, setAndPersistGuestCart],
   );
 
   const removeItem = useCallback(
     async (id: string) => {
-      if (isSaving) {
-        return;
-      }
-
+      if (isSaving) return;
       setIsSaving(true);
       clearError();
-
       try {
-        const response = await removeCartItem(id);
-        setCart(response.cart);
+        if (isAuthenticated) {
+          const response = await removeCartItem(id);
+          setCart(response.cart);
+        } else {
+          const items = readGuestCart().items.filter((item) => item.id !== id);
+          setAndPersistGuestCart(createGuestCart(items));
+        }
       } catch (caughtError) {
         handleError(caughtError, "Cart item could not be removed.");
         throw caughtError;
@@ -225,27 +274,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setIsSaving(false);
       }
     },
-    [clearError, handleError, isSaving],
+    [clearError, handleError, isAuthenticated, isSaving, setAndPersistGuestCart],
   );
 
   const clearCart = useCallback(async () => {
-    if (isSaving) {
-      return;
-    }
-
+    if (isSaving) return;
     setIsSaving(true);
     clearError();
-
     try {
-      const response = await clearCartRequest();
-      setCart(response.cart);
+      if (isAuthenticated) {
+        const response = await clearCartRequest();
+        setCart(response.cart);
+      } else {
+        setAndPersistGuestCart(createGuestCart([]));
+      }
     } catch (caughtError) {
       handleError(caughtError, "Cart could not be cleared.");
       throw caughtError;
     } finally {
       setIsSaving(false);
     }
-  }, [clearError, handleError, isSaving]);
+  }, [clearError, handleError, isAuthenticated, isSaving, setAndPersistGuestCart]);
 
   const value = useMemo<CartContextValue>(
     () => ({
@@ -295,12 +344,62 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 }
 
+function createGuestCart(items: CartItem[]): Cart {
+  const now = new Date().toISOString();
+  return {
+    id: "guest",
+    userId: "guest",
+    items,
+    totalQuantity: items.reduce((total, item) => total + item.quantity, 0),
+    estimatedSubtotal: items.reduce(
+      (total, item) => total + item.currentLineTotal,
+      0,
+    ),
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function readGuestCart(): Cart {
+  try {
+    const stored = window.localStorage.getItem(GUEST_CART_STORAGE_KEY);
+    const parsed: unknown = stored ? JSON.parse(stored) : [];
+    if (!Array.isArray(parsed)) return createGuestCart([]);
+
+    const items = parsed.filter(isStoredCartItem).map((item) => ({
+      ...item,
+      currentLineTotal: item.currentUnitPrice * item.quantity,
+    }));
+    return createGuestCart(items);
+  } catch {
+    return createGuestCart([]);
+  }
+}
+
+function isStoredCartItem(value: unknown): value is CartItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<CartItem>;
+  return Boolean(
+    typeof item.id === "string" &&
+      typeof item.variantId === "string" &&
+      Number.isInteger(item.quantity) &&
+      Number(item.quantity) > 0 &&
+      typeof item.currentUnitPrice === "number" &&
+      Number.isFinite(item.currentUnitPrice) &&
+      item.currentUnitPrice > 0 &&
+      item.product &&
+      typeof item.product.id === "string" &&
+      typeof item.product.name === "string" &&
+      typeof item.product.slug === "string" &&
+      item.variant &&
+      typeof item.variant.size === "string" &&
+      typeof item.variant.color === "string" &&
+      typeof item.availableStock === "number",
+  );
+}
+
 export function useCart() {
   const context = useContext(CartContext);
-
-  if (!context) {
-    throw new Error("useCart must be used within CartProvider.");
-  }
-
+  if (!context) throw new Error("useCart must be used within CartProvider.");
   return context;
 }

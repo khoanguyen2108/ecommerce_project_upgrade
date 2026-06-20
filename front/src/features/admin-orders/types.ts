@@ -76,7 +76,8 @@ export interface AdminWebhookEventSummary {
 
 export interface AdminOrderBase {
   id: string;
-  user: AdminOrderCustomer;
+  user: AdminOrderCustomer | null;
+  guestEmail: string | null;
   status: OrderStatus;
   subtotalAmount: number;
   discountAmount: number;

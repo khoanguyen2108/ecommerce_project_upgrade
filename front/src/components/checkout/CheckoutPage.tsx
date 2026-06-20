@@ -9,11 +9,14 @@ import {
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
+import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
 import { formatCurrency } from "@/components/orders/order-format";
 import {
   createCheckoutOrder,
+  createGuestCheckoutOrder,
   getCheckoutSummary,
+  getGuestCheckoutSummary,
 } from "@/features/checkout/api";
 import {
   getCheckoutErrorCode,
@@ -28,7 +31,8 @@ import { AddressFields, emptyAddressInput, normalizeAddressInput, validateAddres
 import { MapPin } from 'lucide-react';
 
 export function CheckoutPage() {
-  const { refreshCart } = useCart();
+  const { cart, clearCart, refreshCart } = useCart();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuthSession();
   const [summary, setSummary] = useState<CheckoutSummaryModel>();
   const [createdOrder, setCreatedOrder] = useState<Order>();
   const [voucherInput, setVoucherInput] = useState("");
@@ -42,12 +46,19 @@ export function CheckoutPage() {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState('new');
   const [shippingInfo, setShippingInfo] = useState<AddressInput>(emptyAddressInput);
+  const [guestEmail, setGuestEmail] = useState("");
   const [saveAddress, setSaveAddress] = useState(false);
   const [setDefault, setSetDefault] = useState(false);
   const submissionLockRef = useRef(false);
   const voucherRequestLockRef = useRef(false);
 
   useEffect(() => {
+    if (isAuthLoading || !isAuthenticated) {
+      setAddresses([]);
+      setSelectedAddressId('new');
+      return;
+    }
+
     let active = true;
     listAddresses()
       .then((response) => {
@@ -58,19 +69,41 @@ export function CheckoutPage() {
       })
       .catch(() => { if (active) setSelectedAddressId('new'); });
     return () => { active = false; };
-  }, []);
+  }, [isAuthenticated, isAuthLoading]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadSummary() {
+      if (isAuthLoading || (!isAuthenticated && !cart)) return;
+
       setIsLoading(true);
       setError(undefined);
       setErrorCode(undefined);
       setRequestId(undefined);
 
       try {
-        const response = await getCheckoutSummary(requestedVoucherCode);
+        const guestItems = cart?.items.map((item) => ({
+          variantId: item.variantId,
+          quantity: item.quantity,
+        })) ?? [];
+        if (!isAuthenticated && guestItems.length === 0) {
+          if (isMounted) {
+            setSummary(undefined);
+            setError("Your cart is empty. Add an item before checkout.");
+            setErrorCode("CHECKOUT_CART_EMPTY");
+            setIsLoading(false);
+          }
+          return;
+        }
+        const response = isAuthenticated
+          ? await getCheckoutSummary(requestedVoucherCode)
+          : await getGuestCheckoutSummary({
+              items: guestItems,
+              ...(requestedVoucherCode
+                ? { voucherCode: requestedVoucherCode }
+                : {}),
+            });
 
         if (isMounted) {
           setSummary(response.summary);
@@ -100,7 +133,7 @@ export function CheckoutPage() {
     return () => {
       isMounted = false;
     };
-  }, [refreshKey, requestedVoucherCode]);
+  }, [cart, isAuthenticated, isAuthLoading, refreshKey, requestedVoucherCode]);
 
   function handleApplyVoucher(code = voucherInput) {
     if (voucherRequestLockRef.current) {
@@ -151,15 +184,32 @@ export function CheckoutPage() {
     setRequestId(undefined);
 
     try {
-      const response = await createCheckoutOrder({
-        ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
-        ...(selectedAddressId === 'new'
-          ? { shippingInfo: { ...normalizeAddressInput(shippingInfo), saveAddress, setDefault: saveAddress && setDefault } }
-          : { addressId: selectedAddressId }),
-      });
+      const normalizedShipping = normalizeAddressInput(shippingInfo);
+      const response = isAuthenticated
+        ? await createCheckoutOrder({
+            ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
+            ...(selectedAddressId === 'new'
+              ? { shippingInfo: { ...normalizedShipping, saveAddress, setDefault: saveAddress && setDefault } }
+              : { addressId: selectedAddressId }),
+          })
+        : await createGuestCheckoutOrder({
+            items: cart?.items.map((item) => ({
+              variantId: item.variantId,
+              quantity: item.quantity,
+            })) ?? [],
+            ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
+            shippingInfo: {
+              ...normalizedShipping,
+              ...(guestEmail.trim() ? { email: guestEmail.trim() } : {}),
+            },
+          });
       setCreatedOrder(response.order);
       setSummary(undefined);
-      void refreshCart().catch(() => undefined);
+      if (isAuthenticated) {
+        void refreshCart().catch(() => undefined);
+      } else {
+        await clearCart();
+      }
     } catch (submitError) {
       setError(
         getCheckoutErrorMessage(
@@ -176,7 +226,7 @@ export function CheckoutPage() {
   }
 
   if (createdOrder) {
-    return <CheckoutSuccess order={createdOrder} />;
+    return <CheckoutSuccess isGuest={!isAuthenticated} order={createdOrder} />;
   }
 
   const isEmpty = !isLoading && errorCode === "CHECKOUT_CART_EMPTY";
@@ -234,7 +284,10 @@ export function CheckoutPage() {
             <CheckoutShipping
               addresses={addresses}
               disabled={isSubmitting}
+              guestEmail={guestEmail}
+              isGuest={!isAuthenticated}
               onAddressChange={setShippingInfo}
+              onGuestEmailChange={setGuestEmail}
               onSaveAddressChange={(checked) => { setSaveAddress(checked); if (!checked) setSetDefault(false); }}
               onSelectedAddressChange={setSelectedAddressId}
               onSetDefaultChange={setSetDefault}
@@ -250,10 +303,13 @@ export function CheckoutPage() {
   );
 }
 
-function CheckoutShipping({ addresses, disabled, onAddressChange, onSaveAddressChange, onSelectedAddressChange, onSetDefaultChange, saveAddress, selectedAddressId, setDefault, shippingInfo }: {
+function CheckoutShipping({ addresses, disabled, guestEmail, isGuest, onAddressChange, onGuestEmailChange, onSaveAddressChange, onSelectedAddressChange, onSetDefaultChange, saveAddress, selectedAddressId, setDefault, shippingInfo }: {
   addresses: Address[];
   disabled: boolean;
+  guestEmail: string;
+  isGuest: boolean;
   onAddressChange: (value: AddressInput) => void;
+  onGuestEmailChange: (value: string) => void;
   onSaveAddressChange: (value: boolean) => void;
   onSelectedAddressChange: (value: string) => void;
   onSetDefaultChange: (value: boolean) => void;
@@ -281,10 +337,27 @@ function CheckoutShipping({ addresses, disabled, onAddressChange, onSaveAddressC
       {selectedAddressId === 'new' ? (
         <div className="checkout-new-address">
           <AddressFields disabled={disabled} idPrefix="checkout-shipping" onChange={onAddressChange} value={shippingInfo} />
+          {isGuest ? (
+            <div className="form-field checkout-guest-email">
+              <label htmlFor="checkout-guest-email">Email (optional)</label>
+              <input
+                autoComplete="email"
+                disabled={disabled}
+                id="checkout-guest-email"
+                maxLength={320}
+                onChange={(event) => onGuestEmailChange(event.target.value)}
+                placeholder="guest@example.com"
+                type="email"
+                value={guestEmail}
+              />
+              <small><Link href="/login?next=%2Fcheckout">Sign in</Link> to save this address for next time.</small>
+            </div>
+          ) : (
           <div className="checkout-address-checks">
             <label className="address-checkbox"><input checked={saveAddress} disabled={disabled} onChange={(event) => onSaveAddressChange(event.target.checked)} type="checkbox" />Save this address</label>
             <label className="address-checkbox"><input checked={setDefault} disabled={disabled || !saveAddress} onChange={(event) => onSetDefaultChange(event.target.checked)} type="checkbox" />Set as default</label>
           </div>
+          )}
         </div>
       ) : null}
     </section>
@@ -332,7 +405,7 @@ function CheckoutStepper({ current }: { current: "review" | "pending" }) {
   );
 }
 
-function CheckoutSuccess({ order }: { order: Order }) {
+function CheckoutSuccess({ isGuest, order }: { isGuest: boolean; order: Order }) {
   return (
     <main className="customer-page checkout-page checkout-page--success">
       <CheckoutIntro
@@ -379,6 +452,21 @@ function CheckoutSuccess({ order }: { order: Order }) {
           </div>
         </dl>
 
+        {order.shippingRecipientName ? (
+          <div className="checkout-success-shipping">
+            <p className="eyebrow">Shipping to</p>
+            <strong>{order.shippingRecipientName}</strong>
+            <span>{order.shippingPhone}</span>
+            <span>{[
+              order.shippingAddressLine,
+              order.shippingWard,
+              order.shippingDistrict,
+              order.shippingProvince,
+            ].filter(Boolean).join(", ")}</span>
+            {order.shippingNote ? <span>{order.shippingNote}</span> : null}
+          </div>
+        ) : null}
+
         <div className="checkout-pending-note" role="note">
           <Info aria-hidden="true" size={18} />
           <span>
@@ -388,18 +476,18 @@ function CheckoutSuccess({ order }: { order: Order }) {
         </div>
 
         <div className="checkout-success-actions">
-          <Link
-            className="button button--primary"
-            href={`/orders/${encodeURIComponent(order.id)}`}
-          >
-            View order
-          </Link>
+          {!isGuest ? (
+            <Link
+              className="button button--primary"
+              href={`/orders/${encodeURIComponent(order.id)}`}
+            >
+              View order
+            </Link>
+          ) : null}
           <Link className="button button--secondary" href="/products">
             Continue shopping
           </Link>
-          <Link className="button button--secondary" href="/orders">
-            View orders
-          </Link>
+          {!isGuest ? <Link className="button button--secondary" href="/orders">View orders</Link> : null}
         </div>
       </section>
     </main>

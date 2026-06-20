@@ -31,6 +31,8 @@ const orderEmailPaymentSelect = {
 
 const orderEmailSelect = {
   id: true,
+  guestEmail: true,
+  shippingRecipientName: true,
   status: true,
   subtotalAmount: true,
   totalAmount: true,
@@ -267,8 +269,18 @@ export class OrderEmailService {
         return false;
       }
 
+      const recipientEmail = order.user?.email ?? order.guestEmail;
+      if (!recipientEmail) {
+        this.log('warn', 'ORDER_EMAIL_SKIPPED_NO_RECIPIENT', {
+          event,
+          orderId,
+          paymentId,
+        });
+        return false;
+      }
+
       const sent = await this.emailService.sendTransactionalEmail({
-        to: order.user.email,
+        to: recipientEmail,
         subject: content.subject,
         text: content.text,
         html: content.html,
@@ -335,7 +347,8 @@ export class OrderEmailService {
     headline: string,
     messages: Array<string | undefined>,
   ): string {
-    const customerName = order.user.name?.trim() || 'there';
+    const customerName =
+      order.user?.name?.trim() || order.shippingRecipientName?.trim() || 'there';
     const parts = [
       `Hi ${customerName},`,
       '',
@@ -364,7 +377,9 @@ export class OrderEmailService {
     headline: string,
     messages: Array<string | undefined>,
   ): string {
-    const customerName = this.escapeHtml(order.user.name?.trim() || 'there');
+    const customerName = this.escapeHtml(
+      order.user?.name?.trim() || order.shippingRecipientName?.trim() || 'there',
+    );
     const messageHtml = messages
       .filter((message): message is string => Boolean(message))
       .map((message) => `<p>${this.escapeHtml(message)}</p>`)

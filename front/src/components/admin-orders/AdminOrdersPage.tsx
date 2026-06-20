@@ -230,7 +230,7 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
             {!isLoading && !error ? orders.map((order) => (
               <tr key={order.id}>
                 <td><span className="admin-code">{order.id}</span></td>
-                <td><strong>{order.user.email}</strong><small className="admin-table__secondary">{order.user.name || "Name not set"}</small></td>
+                <td><strong>{order.user?.email || order.guestEmail || "Guest"}</strong><small className="admin-table__secondary">{order.user?.name || order.shippingRecipientName || "Guest customer"}</small></td>
                 <td><AdminOrderStatusBadge status={order.status} /></td>
                 <td>{order.latestPayment ? <AdminPaymentStatusBadge status={order.latestPayment.status} /> : <span className="admin-table__muted">Not set</span>}</td>
                 <td>{formatCurrency(order.totalAmount, order.currency)}</td>

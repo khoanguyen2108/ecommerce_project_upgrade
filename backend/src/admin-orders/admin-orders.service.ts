@@ -70,6 +70,7 @@ const adminOrderWebhookEventSummarySelect = {
 
 const adminOrderListSelect = {
   id: true,
+  guestEmail: true,
   user: {
     select: adminOrderUserSummarySelect,
   },
@@ -107,6 +108,7 @@ const adminOrderListSelect = {
 
 const adminOrderDetailSelect = {
   id: true,
+  guestEmail: true,
   user: {
     select: adminOrderUserSummarySelect,
   },
@@ -353,6 +355,23 @@ export class AdminOrdersService {
           },
         },
       },
+      {
+        guestEmail: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        shippingRecipientName: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        shippingPhone: {
+          contains: search,
+        },
+      },
     ];
     const orderId = this.parseUuidSearch(search);
     const providerOrderCode = this.parseProviderOrderCodeSearch(search);
@@ -437,6 +456,7 @@ export class AdminOrdersService {
     return {
       id: order.id,
       user: order.user,
+      guestEmail: order.guestEmail,
       status: order.status,
       subtotalAmount: order.subtotalAmount,
       discountAmount: order.discountAmount,
@@ -466,6 +486,7 @@ export class AdminOrdersService {
     return {
       id: order.id,
       user: order.user,
+      guestEmail: order.guestEmail,
       status: order.status,
       subtotalAmount: order.subtotalAmount,
       discountAmount: order.discountAmount,

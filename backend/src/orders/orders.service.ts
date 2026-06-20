@@ -57,6 +57,7 @@ const orderItemSelect = {
 const orderSelect = {
   id: true,
   userId: true,
+  guestEmail: true,
   status: true,
   subtotalAmount: true,
   discountAmount: true,

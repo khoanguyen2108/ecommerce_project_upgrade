@@ -21,6 +21,10 @@ import {
 import { CheckoutService } from './checkout.service';
 import { CheckoutVoucherDto } from './dto/checkout-voucher.dto';
 import { CreateCheckoutOrderDto } from './dto/create-checkout-order.dto';
+import {
+  CreateGuestCheckoutOrderDto,
+  GuestCheckoutSummaryDto,
+} from './dto/guest-checkout.dto';
 
 @ApiTags('checkout')
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
@@ -80,5 +84,51 @@ export class CheckoutController {
     @Body() dto: CreateCheckoutOrderDto,
   ) {
     return this.checkoutService.createOrderFromCart(user, dto);
+  }
+}
+
+@ApiTags('checkout')
+@Controller('checkout/guest')
+export class GuestCheckoutController {
+  constructor(private readonly checkoutService: CheckoutService) {}
+
+  @ApiOperation({
+    summary: 'Preview checkout for a guest cart',
+    description:
+      'Accepts variant and quantity intents, then validates availability, prices, stock, and vouchers from backend data. It does not create an order or payment.',
+  })
+  @ApiOkResponse(
+    envelopeResponse('Guest checkout summary returned.', checkoutSummaryDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Guest cart is empty or contains unavailable items.',
+      'CHECKOUT_CART_EMPTY',
+      'Cart is empty.',
+    ),
+  )
+  @Post('summary')
+  getSummary(@Body() dto: GuestCheckoutSummaryDto) {
+    return this.checkoutService.getGuestSummary(dto);
+  }
+
+  @ApiOperation({
+    summary: 'Create a pending-payment order for a guest',
+    description:
+      'Revalidates guest item intents and shipping information in a transaction. It does not create payment, call payOS, change payment state, reserve stock, or decrement stock.',
+  })
+  @ApiCreatedResponse(
+    envelopeResponse('Guest pending payment order created.', orderDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Guest cart, shipping information, or voucher is invalid.',
+      'CHECKOUT_ITEM_STOCK_UNAVAILABLE',
+      'Requested quantity is not available for this item.',
+    ),
+  )
+  @Post('orders')
+  createOrder(@Body() dto: CreateGuestCheckoutOrderDto) {
+    return this.checkoutService.createGuestOrder(dto);
   }
 }

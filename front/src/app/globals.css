@@ -7374,6 +7374,28 @@ img {
   justify-content: start;
 }
 
+.checkout-guest-email {
+  max-width: 520px;
+}
+
+.checkout-guest-email input {
+  border: 1px solid var(--color-border);
+  min-height: 48px;
+  padding: 12px 14px;
+  width: 100%;
+}
+
+.checkout-guest-email small {
+  color: var(--color-text-muted);
+}
+
+.checkout-success-shipping {
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: 6px;
+  padding-top: var(--space-5, 20px);
+}
+
 .admin-detail-card__heading {
   align-items: center;
   display: flex;

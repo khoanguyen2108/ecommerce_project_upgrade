@@ -64,7 +64,7 @@ export class VoucherEligibilityService {
   constructor(private readonly prismaService: PrismaService) {}
 
   evaluateForSummary(
-    userId: string,
+    userId: string | undefined,
     subtotalAmount: number,
     voucherCode: string,
     now = new Date(),
@@ -81,7 +81,7 @@ export class VoucherEligibilityService {
 
   async requireForOrder(
     tx: Prisma.TransactionClient,
-    userId: string,
+    userId: string | undefined,
     subtotalAmount: number,
     voucherCode: string,
     now = new Date(),
@@ -103,7 +103,7 @@ export class VoucherEligibilityService {
   }
 
   async listEligible(
-    userId: string,
+    userId: string | undefined,
     subtotalAmount: number,
     now = new Date(),
   ): Promise<AppliedVoucherSnapshot[]> {
@@ -142,7 +142,7 @@ export class VoucherEligibilityService {
 
   private async evaluate(
     client: VoucherClient,
-    userId: string,
+    userId: string | undefined,
     subtotalAmount: number,
     voucherCode: string,
     now: Date,
@@ -194,7 +194,7 @@ export class VoucherEligibilityService {
 
   private async evaluateRecord(
     client: VoucherClient,
-    userId: string,
+    userId: string | undefined,
     subtotalAmount: number,
     voucher: VoucherRecord,
     now: Date,
@@ -254,7 +254,7 @@ export class VoucherEligibilityService {
         );
       }
     }
-    if (voucher.perUserLimit !== null) {
+    if (voucher.perUserLimit !== null && userId) {
       const userUsageCount = await client.order.count({
         where: { ...reservedOrderWhere, userId },
       });
