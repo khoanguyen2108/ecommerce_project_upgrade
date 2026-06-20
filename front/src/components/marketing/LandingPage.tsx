@@ -1,14 +1,8 @@
 "use client";
 
-import {
-  Headphones,
-  RotateCcw,
-  ShieldCheck,
-  Truck,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { getProducts } from "@/features/catalog/api";
 import type { Product } from "@/features/catalog/types";
@@ -149,31 +143,6 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="section trust-section" id="trust">
-        <div className="trust-grid">
-          <TrustItem
-            icon={<Truck size={24} />}
-            title="Fast delivery"
-            text="Packed within one business day for in-stock items."
-          />
-          <TrustItem
-            icon={<RotateCcw size={24} />}
-            title="Easy returns"
-            text="Seven-day return window for unworn items with tags."
-          />
-          <TrustItem
-            icon={<ShieldCheck size={24} />}
-            title="Checkout coming soon"
-            text="Cart and payment will open after the backend APIs are ready."
-          />
-          <TrustItem
-            icon={<Headphones size={24} />}
-            title="Support"
-            text="Human help for sizing, delivery, and account questions."
-          />
-        </div>
-      </section>
-
       <section className="campaign-band" id="delivery">
         <div>
           <p className="eyebrow">Weekend edit</p>
@@ -187,23 +156,40 @@ export function LandingPage() {
           Shop the edit
         </Link>
       </section>
+
+      <section className="landing-about" id="about" aria-labelledby="about-heading">
+        <div className="landing-about__image-wrap">
+          <img
+            alt="Belikeme brand story in motion"
+            className="landing-about__image"
+            loading="lazy"
+            src="/images/landing/aboutus.jpg"
+          />
+        </div>
+        <div className="landing-about__content">
+          <p className="eyebrow">ABOUT BELIKEME</p>
+          <h2 id="about-heading">Be bold. Be real. Be like me.</h2>
+          <p>
+            Belikeme was created from the spirit of youth: the courage to try,
+            to stand apart, and to live fully for what you believe in. We
+            believe every young person carries their own color. Some shine
+            through confidence, some through passion, and some through the
+            quiet effort of becoming better every day.
+          </p>
+          <p>
+            Belikeme is more than a fashion brand. It is a reminder that you do
+            not have to look like anyone else to be seen. You only need to stay
+            true to yourself, follow what you love, and proudly say: this is me.
+          </p>
+          <p className="landing-about__closing">
+            We do not chase trends. We help you create your own mark.
+          </p>
+          <Link className="button button--primary" href="/products">
+            SHOP BELIKEME
+          </Link>
+        </div>
+      </section>
     </main>
-  );
-}
-
-interface TrustItemProps {
-  icon: ReactNode;
-  title: string;
-  text: string;
-}
-
-function TrustItem({ icon, title, text }: TrustItemProps) {
-  return (
-    <article className="trust-item">
-      <div className="trust-item__icon">{icon}</div>
-      <h3>{title}</h3>
-      <p>{text}</p>
-    </article>
   );
 }
 
