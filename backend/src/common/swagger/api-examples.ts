@@ -548,14 +548,54 @@ export const adminPayosReadinessDataExample = {
     returnUrlConfigured: true,
     cancelUrlConfigured: true,
     webhookUrlConfigured: true,
+    webhookPathMatches: true,
     backendUrlConfigured: true,
     environmentReady: true,
+    credentials: {
+      clientId: { present: true, length: 36 },
+      apiKey: { present: true, length: 64 },
+      checksumKey: { present: true, length: 64 },
+    },
+    urls: {
+      return: {
+        configured: true,
+        valid: true,
+        host: 'ecommerce-project-upgrade.vercel.app',
+        url: 'https://ecommerce-project-upgrade.vercel.app/payment/return',
+      },
+      cancel: {
+        configured: true,
+        valid: true,
+        host: 'ecommerce-project-upgrade.vercel.app',
+        url: 'https://ecommerce-project-upgrade.vercel.app/payment/cancel',
+      },
+      webhook: {
+        configured: true,
+        valid: true,
+        host: 'ecommerce-project-upgrade-1.onrender.com',
+        url: 'https://ecommerce-project-upgrade-1.onrender.com/payments/payos/webhook',
+      },
+      backend: {
+        configured: true,
+        valid: true,
+        host: 'ecommerce-project-upgrade-1.onrender.com',
+        url: 'https://ecommerce-project-upgrade-1.onrender.com/',
+      },
+    },
+    webhookEndpointPath: '/payments/payos/webhook',
     warnings: [],
   },
 };
 
 export const payosPaymentDataExample = {
+  paymentId: paymentExample.id,
+  orderId: paymentExample.orderId,
+  status: paymentExample.status,
   checkoutUrl: paymentExample.checkoutUrl,
+  paymentUrl: paymentExample.checkoutUrl,
+  qrCode: '00020101021238570010A000000727012700069704220113VQRQ0000000000208QRIBFTTA530370454062490005802VN',
+  amount: paymentExample.amount,
+  expiredAt: orderExample.expiresAt,
   payment: paymentExample,
 };
 

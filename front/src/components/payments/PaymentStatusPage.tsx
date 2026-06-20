@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Info, Loader2 } from "lucide-react";
+import { AlertCircle, Info, Loader2, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -21,6 +21,7 @@ import {
   formatOrderCode,
 } from "@/components/orders/order-format";
 import { ApiClientError } from "@/lib/errors/api-error";
+import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
 
 type PaymentStatusSource = "return" | "cancel";
 
@@ -50,11 +51,13 @@ export function PaymentStatusPage({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [requestId, setRequestId] = useState<string>();
+  const [refreshKey, setRefreshKey] = useState(0);
   const hasLookup = Boolean(initialQuery.orderId || initialQuery.orderCode);
   const pageCopy = getPageCopy(source);
 
   useEffect(() => {
     let isMounted = true;
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
 
     async function loadStatus() {
       if (!hasLookup) {
@@ -79,6 +82,15 @@ export function PaymentStatusPage({
         }
 
         setStatus(response);
+        if (
+          response.order.status === "PENDING_PAYMENT" &&
+          response.payment.status === "PENDING"
+        ) {
+          pollTimer = setTimeout(
+            () => setRefreshKey((current) => current + 1),
+            3000,
+          );
+        }
       } catch (loadError) {
         if (!isMounted) {
           return;
@@ -98,8 +110,11 @@ export function PaymentStatusPage({
 
     return () => {
       isMounted = false;
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+      }
     };
-  }, [hasLookup, initialQuery, source]);
+  }, [hasLookup, initialQuery, refreshKey, source]);
 
   if (!hasLookup) {
     return (
@@ -115,7 +130,7 @@ export function PaymentStatusPage({
     );
   }
 
-  if (isLoading) {
+  if (isLoading && !status) {
     return (
       <main className="customer-page payment-page">
         <section className="payment-status-panel" aria-labelledby="payment-heading">
@@ -252,14 +267,51 @@ export function PaymentStatusPage({
         </span>
       </div>
 
-      <PaymentActions />
+      <PaymentActions
+        canRetry={
+          source === "cancel" &&
+          status.order.status === "PENDING_PAYMENT" &&
+          status.payment.status === "PENDING"
+        }
+        isRefreshing={isLoading}
+        onRefresh={() => setRefreshKey((current) => current + 1)}
+        orderId={status.order.id}
+      />
     </main>
   );
 }
 
-function PaymentActions() {
+function PaymentActions({
+  canRetry = false,
+  isRefreshing = false,
+  onRefresh,
+  orderId,
+}: {
+  canRetry?: boolean;
+  isRefreshing?: boolean;
+  onRefresh?: () => void;
+  orderId?: string;
+} = {}) {
   return (
     <div className="customer-actions">
+      {canRetry && orderId ? (
+        <PayosPaymentButton label="Retry with payOS" orderId={orderId} />
+      ) : null}
+      {onRefresh ? (
+        <button
+          className="button button--secondary"
+          disabled={isRefreshing}
+          onClick={onRefresh}
+          type="button"
+        >
+          <RefreshCw
+            aria-hidden="true"
+            className={isRefreshing ? "spin" : undefined}
+            size={17}
+          />
+          Refresh status
+        </button>
+      ) : null}
       <Link className="button button--primary" href="/orders">
         Back to orders
       </Link>

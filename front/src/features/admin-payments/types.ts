@@ -81,9 +81,34 @@ export interface PayosReadiness {
   returnUrlConfigured: boolean;
   cancelUrlConfigured: boolean;
   webhookUrlConfigured: boolean;
+  webhookPathMatches: boolean;
   backendUrlConfigured: boolean;
   environmentReady: boolean;
+  credentials: {
+    clientId: PayosSecretState;
+    apiKey: PayosSecretState;
+    checksumKey: PayosSecretState;
+  };
+  urls: {
+    return: PayosUrlState;
+    cancel: PayosUrlState;
+    webhook: PayosUrlState;
+    backend: PayosUrlState;
+  };
+  webhookEndpointPath: string;
   warnings: string[];
+}
+
+export interface PayosSecretState {
+  present: boolean;
+  length: number;
+}
+
+export interface PayosUrlState {
+  configured: boolean;
+  valid: boolean;
+  host: string | null;
+  url: string | null;
 }
 
 export interface PayosReadinessResponse {

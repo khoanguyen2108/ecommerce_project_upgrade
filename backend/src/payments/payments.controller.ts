@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -15,6 +24,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user';
 import { SWAGGER_BEARER_AUTH_NAME } from '../common/swagger/api-docs.constants';
+import type { RequestWithId } from '../common/types/request-with-id';
 import {
   envelopeResponse,
   errorEnvelopeResponse,
@@ -35,7 +45,7 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'Create or reuse a payOS checkout link for an order',
     description:
-      'Creates a provider checkout link from backend-calculated order data. This endpoint never marks the order or payment as paid.',
+      'Creates a provider checkout link from backend-calculated order data for an authenticated owner (or an admin under the existing role rules). Guest orders are not accepted because no secure guest payment token exists. This endpoint never marks the order or payment as paid.',
   })
   @ApiCreatedResponse(
     envelopeResponse('payOS checkout link created.', payosPaymentDataExample),
@@ -123,15 +133,15 @@ export class PaymentsController {
   )
   @Post('webhook')
   @HttpCode(200)
-  handlePayosWebhook(@Body() body: unknown) {
-    return this.paymentsService.handlePayosWebhook(body);
+  handlePayosWebhook(@Body() body: unknown, @Req() request: RequestWithId) {
+    return this.paymentsService.handlePayosWebhook(body, request.requestId);
   }
 
   @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
   @ApiOperation({
     summary: 'Read display-only payOS return status',
     description:
-      'Display-only read for browser return pages. It never marks payment or order state as paid.',
+      'Display-only read for browser return pages and safe frontend polling. It never marks payment or order state as paid.',
   })
   @ApiOkResponse(
     envelopeResponse('Display-only payment status returned.', payosStatusDataExample),
@@ -156,7 +166,7 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'Read display-only payOS cancel status',
     description:
-      'Display-only read for browser cancel pages. It never marks payment or order state as paid.',
+      'Display-only read for browser cancel pages and safe frontend polling. It never marks payment or order state as paid.',
   })
   @ApiOkResponse(
     envelopeResponse('Display-only payment status returned.', payosStatusDataExample),

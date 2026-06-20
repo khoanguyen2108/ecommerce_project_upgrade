@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
+import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
 import { formatCurrency } from "@/components/orders/order-format";
 import {
   createCheckoutOrder,
@@ -501,15 +502,17 @@ function CheckoutSuccess({ isGuest, order }: { isGuest: boolean; order: Order })
         <div className="checkout-pending-note" role="note">
           <Info aria-hidden="true" size={18} />
           <span>
-            Payment has not been completed yet. Your order is waiting for payment
-            confirmation.
+            {isGuest
+              ? "Guest online payment is deferred because this order has no secure guest access token. The order remains pending and is not attached to an account."
+              : "Payment has not been completed yet. payOS checkout creates a pending payment; only Belikeme's verified webhook can confirm it as paid."}
           </span>
         </div>
 
         <div className="checkout-success-actions">
+          {!isGuest ? <PayosPaymentButton orderId={order.id} /> : null}
           {!isGuest ? (
             <Link
-              className="button button--primary"
+              className="button button--secondary"
               href={`/orders/${encodeURIComponent(order.id)}`}
             >
               View order

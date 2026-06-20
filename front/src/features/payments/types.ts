@@ -17,7 +17,14 @@ export interface Payment extends PaymentSummary {
 }
 
 export interface PayosPaymentResponse {
+  paymentId: string;
+  orderId: string;
+  status: PaymentStatus;
   checkoutUrl: string | null;
+  paymentUrl: string | null;
+  qrCode: string | null;
+  amount: number;
+  expiredAt: string | null;
   payment: Payment;
 }
 

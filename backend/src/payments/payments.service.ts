@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -29,6 +30,7 @@ import type { PayosStatusQueryDto } from './dto/payos-status-query.dto';
 const PAYMENT_PROVIDER = PaymentProvider.PAYOS;
 const DEFAULT_CURRENCY = 'VND';
 const PAYOS_DESCRIPTION_PREFIX = 'Belikeme';
+const PAYOS_WEBHOOK_ENDPOINT_PATH = '/payments/payos/webhook';
 const WEBHOOK_STATUS_PROCESSED = 'PROCESSED';
 const WEBHOOK_STATUS_IGNORED = 'IGNORED';
 
@@ -151,6 +153,8 @@ export interface PayosWebhookResult {
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly orderEmailService: OrderEmailService,
@@ -168,10 +172,7 @@ export class PaymentsService {
     const payment = await this.getOrCreatePendingPayosPayment(order);
 
     if (payment.checkoutUrl) {
-      return {
-        checkoutUrl: payment.checkoutUrl,
-        payment,
-      };
+      return this.toCreatePaymentResponse(payment, order.expiresAt);
     }
 
     const paymentLink = await this.createPayosPaymentLink(
@@ -179,6 +180,7 @@ export class PaymentsService {
       order,
       payment,
     );
+    this.assertPayosPaymentLink(payment, paymentLink);
     const updateResult = await this.prismaService.payment.updateMany({
       where: {
         id: payment.id,
@@ -218,13 +220,17 @@ export class PaymentsService {
       throw this.paymentNotFoundException();
     }
 
-    return {
-      checkoutUrl: updatedPayment.checkoutUrl,
-      payment: updatedPayment,
-    };
+    return this.toCreatePaymentResponse(
+      updatedPayment,
+      order.expiresAt,
+      paymentLink.qrCode,
+    );
   }
 
-  async handlePayosWebhook(body: unknown): Promise<PayosWebhookResult> {
+  async handlePayosWebhook(
+    body: unknown,
+    requestId?: string,
+  ): Promise<PayosWebhookResult> {
     const credentials = this.getPayosCredentials();
     const webhook = this.assertWebhookPayload(body);
     const verifiedData = await this.verifyPayosWebhook(credentials, webhook);
@@ -233,7 +239,7 @@ export class PaymentsService {
     const metadata = this.sanitizeWebhookMetadata(webhook, verifiedData);
 
     try {
-      const result = await this.prismaService.$transaction(async (tx) => {
+      const result: PayosWebhookResult = await this.prismaService.$transaction(async (tx) => {
         const existingEvent = await tx.paymentWebhookEvent.findUnique({
           where: {
             provider_eventKey: {
@@ -352,10 +358,33 @@ export class PaymentsService {
       });
 
       this.queuePayosWebhookEmail(result);
+      this.logger.log(
+        JSON.stringify({
+          requestId,
+          provider: PAYMENT_PROVIDER,
+          orderCode: verifiedData.orderCode,
+          orderId: result.payment?.orderId,
+          duplicate: result.duplicate,
+          processed: result.processed ?? false,
+          paymentStatus: result.payment?.status,
+          reason: result.reason,
+        }),
+      );
 
       return result;
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
+        this.logger.log(
+          JSON.stringify({
+            requestId,
+            provider: PAYMENT_PROVIDER,
+            orderCode: verifiedData.orderCode,
+            duplicate: true,
+            processed: false,
+            reason: 'PAYOS_WEBHOOK_DUPLICATE_RACE',
+          }),
+        );
+
         return {
           received: true,
           duplicate: true,
@@ -850,6 +879,13 @@ export class PaymentsService {
       });
     }
 
+    if (order.items.length === 0) {
+      throw new BadRequestException({
+        code: 'ORDER_ITEMS_MISSING',
+        message: 'Order has no items.',
+      });
+    }
+
     if (order.currency !== DEFAULT_CURRENCY) {
       throw new BadRequestException({
         code: 'PAYMENT_CURRENCY_MISMATCH',
@@ -914,43 +950,15 @@ export class PaymentsService {
   private async getOrCreatePendingPayosPayment(
     order: OrderForPayment,
   ): Promise<PaymentRecord> {
-    const existingPayment = await this.prismaService.payment.findUnique({
+    const payment = await this.prismaService.payment.upsert({
       where: {
         orderId_provider: {
           orderId: order.id,
           provider: PAYMENT_PROVIDER,
         },
       },
-      select: paymentSelect,
-    });
-
-    if (existingPayment) {
-      if (existingPayment.status !== PaymentStatus.PENDING) {
-        throw new BadRequestException({
-          code: 'PAYMENT_NOT_PENDING',
-          message: 'Payment is not pending.',
-        });
-      }
-
-      if (existingPayment.amount !== order.totalAmount) {
-        throw new BadRequestException({
-          code: 'PAYMENT_AMOUNT_MISMATCH',
-          message: 'Payment amount does not match the order total.',
-        });
-      }
-
-      if (existingPayment.currency !== order.currency) {
-        throw new BadRequestException({
-          code: 'PAYMENT_CURRENCY_MISMATCH',
-          message: 'Payment currency does not match the order currency.',
-        });
-      }
-
-      return existingPayment;
-    }
-
-    return this.prismaService.payment.create({
-      data: {
+      update: {},
+      create: {
         orderId: order.id,
         provider: PAYMENT_PROVIDER,
         status: PaymentStatus.PENDING,
@@ -959,6 +967,29 @@ export class PaymentsService {
       },
       select: paymentSelect,
     });
+
+    if (payment.status !== PaymentStatus.PENDING) {
+      throw new BadRequestException({
+        code: 'PAYMENT_NOT_PENDING',
+        message: 'Payment is not pending.',
+      });
+    }
+
+    if (payment.amount !== order.totalAmount) {
+      throw new BadRequestException({
+        code: 'PAYMENT_AMOUNT_MISMATCH',
+        message: 'Payment amount does not match the order total.',
+      });
+    }
+
+    if (payment.currency !== order.currency) {
+      throw new BadRequestException({
+        code: 'PAYMENT_CURRENCY_MISMATCH',
+        message: 'Payment currency does not match the order currency.',
+      });
+    }
+
+    return payment;
   }
 
   private async createPayosPaymentLink(
@@ -973,11 +1004,10 @@ export class PaymentsService {
         orderCode: payment.providerOrderCode,
         amount: payment.amount,
         description: `${PAYOS_DESCRIPTION_PREFIX} ${payment.providerOrderCode}`,
-        items: order.items.map((item) => ({
-          name: this.truncatePayosItemName(item.productName),
-          quantity: item.quantity,
-          price: item.unitPrice,
-        })),
+        ...this.getPayosItems(order, payment.amount),
+        ...(order.expiresAt
+          ? { expiredAt: Math.floor(order.expiresAt.getTime() / 1000) }
+          : {}),
         returnUrl: this.buildRedirectUrl(
           config.returnUrl,
           order.id,
@@ -992,6 +1022,61 @@ export class PaymentsService {
     } catch (error) {
       throw this.payosProviderException(error);
     }
+  }
+
+  private getPayosItems(order: OrderForPayment, paymentAmount: number) {
+    const itemTotal = order.items.reduce(
+      (total, item) => total + item.unitPrice * item.quantity,
+      0,
+    );
+
+    if (itemTotal !== paymentAmount) {
+      return {};
+    }
+
+    return {
+      items: order.items.map((item) => ({
+        name: this.truncatePayosItemName(item.productName),
+        quantity: item.quantity,
+        price: item.unitPrice,
+      })),
+    };
+  }
+
+  private assertPayosPaymentLink(
+    payment: PaymentRecord,
+    paymentLink: CreatePaymentLinkResponse,
+  ) {
+    if (
+      paymentLink.orderCode !== payment.providerOrderCode ||
+      paymentLink.amount !== payment.amount ||
+      paymentLink.currency !== payment.currency ||
+      !paymentLink.checkoutUrl ||
+      !paymentLink.paymentLinkId
+    ) {
+      throw new ServiceUnavailableException({
+        code: 'PAYOS_PROVIDER_RESPONSE_INVALID',
+        message: 'payOS returned an invalid payment link response.',
+      });
+    }
+  }
+
+  private toCreatePaymentResponse(
+    payment: PaymentRecord,
+    expiresAt: Date | null,
+    qrCode: string | null = null,
+  ) {
+    return {
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      status: payment.status,
+      checkoutUrl: payment.checkoutUrl,
+      paymentUrl: payment.checkoutUrl,
+      qrCode,
+      amount: payment.amount,
+      expiredAt: expiresAt?.toISOString() ?? null,
+      payment,
+    };
   }
 
   private createPayosClient(credentials: PayosCredentials): PayOS {
@@ -1236,12 +1321,18 @@ export class PaymentsService {
   }
 
   private getPayosCheckoutConfig(): PayosCheckoutConfig {
-    return {
+    const config = {
       ...this.getPayosCredentials(),
       returnUrl: this.getRequiredUrlConfig('PAYMENT_RETURN_URL'),
       cancelUrl: this.getRequiredUrlConfig('PAYMENT_CANCEL_URL'),
       webhookUrl: this.getRequiredUrlConfig('PAYMENT_WEBHOOK_URL'),
     };
+
+    if (new URL(config.webhookUrl).pathname !== PAYOS_WEBHOOK_ENDPOINT_PATH) {
+      throw this.payosConfigurationException();
+    }
+
+    return config;
   }
 
   private getPayosCredentials(): PayosCredentials {
@@ -1266,7 +1357,22 @@ export class PaymentsService {
     const value = this.getRequiredConfig(key);
 
     try {
-      return new URL(value).toString();
+      const parsedUrl = new URL(value);
+      const validProtocol =
+        parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'http:';
+      const productionProtocolValid =
+        process.env.NODE_ENV !== 'production' || parsedUrl.protocol === 'https:';
+
+      if (
+        !validProtocol ||
+        !productionProtocolValid ||
+        parsedUrl.username ||
+        parsedUrl.password
+      ) {
+        throw new Error('Invalid payment URL.');
+      }
+
+      return parsedUrl.toString();
     } catch {
       throw this.payosConfigurationException();
     }

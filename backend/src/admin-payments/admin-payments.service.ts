@@ -11,6 +11,7 @@ import type {
 const DEFAULT_ADMIN_PAYMENT_LIMIT = 20;
 const MAX_ADMIN_PAYMENT_LIMIT = 100;
 const MAX_POSTGRES_INT = 2_147_483_647;
+const PAYOS_WEBHOOK_ENDPOINT_PATH = '/payments/payos/webhook';
 
 const adminPaymentUserSummarySelect = {
   id: true,
@@ -103,7 +104,14 @@ interface DateRange {
 
 interface ConfigState {
   configured: boolean;
+  length: number;
   valid: boolean;
+}
+
+interface UrlConfigState extends ConfigState {
+  host: string | null;
+  path: string | null;
+  url: string | null;
 }
 
 @Injectable()
@@ -166,6 +174,8 @@ export class AdminPaymentsService {
     const cancelUrl = this.getUrlConfigState('PAYMENT_CANCEL_URL');
     const webhookUrl = this.getUrlConfigState('PAYMENT_WEBHOOK_URL');
     const backendUrl = this.getUrlConfigState('BACKEND_URL');
+    const webhookPathMatches =
+      webhookUrl.path === PAYOS_WEBHOOK_ENDPOINT_PATH;
     const warnings = [
       ...this.getConfigWarnings('PAYOS_CLIENT_ID', clientId),
       ...this.getConfigWarnings('PAYOS_API_KEY', apiKey),
@@ -174,6 +184,11 @@ export class AdminPaymentsService {
       ...this.getConfigWarnings('PAYMENT_CANCEL_URL', cancelUrl, true),
       ...this.getConfigWarnings('PAYMENT_WEBHOOK_URL', webhookUrl, true),
       ...this.getOptionalUrlWarnings('BACKEND_URL', backendUrl),
+      ...(webhookUrl.valid && !webhookPathMatches
+        ? [
+            `PAYMENT_WEBHOOK_URL must end with ${PAYOS_WEBHOOK_ENDPOINT_PATH}.`,
+          ]
+        : []),
     ];
     const environmentReady =
       clientId.configured &&
@@ -181,7 +196,8 @@ export class AdminPaymentsService {
       checksumKey.configured &&
       returnUrl.valid &&
       cancelUrl.valid &&
-      webhookUrl.valid;
+      webhookUrl.valid &&
+      webhookPathMatches;
 
     return {
       readiness: {
@@ -191,8 +207,21 @@ export class AdminPaymentsService {
         returnUrlConfigured: returnUrl.configured,
         cancelUrlConfigured: cancelUrl.configured,
         webhookUrlConfigured: webhookUrl.configured,
+        webhookPathMatches,
         backendUrlConfigured: backendUrl.configured,
         environmentReady,
+        credentials: {
+          clientId: this.toSafeSecretState(clientId),
+          apiKey: this.toSafeSecretState(apiKey),
+          checksumKey: this.toSafeSecretState(checksumKey),
+        },
+        urls: {
+          return: this.toSafeUrlState(returnUrl),
+          cancel: this.toSafeUrlState(cancelUrl),
+          webhook: this.toSafeUrlState(webhookUrl),
+          backend: this.toSafeUrlState(backendUrl),
+        },
+        webhookEndpointPath: PAYOS_WEBHOOK_ENDPOINT_PATH,
         warnings,
       },
     };
@@ -388,37 +417,78 @@ export class AdminPaymentsService {
   }
 
   private getRequiredConfigState(key: string): ConfigState {
-    const configured = Boolean(this.configService.get<string>(key)?.trim());
+    const value = this.configService.get<string>(key)?.trim() ?? '';
+    const configured = Boolean(value);
 
     return {
       configured,
+      length: value.length,
       valid: configured,
     };
   }
 
-  private getUrlConfigState(key: string): ConfigState {
+  private getUrlConfigState(key: string): UrlConfigState {
     const value = this.configService.get<string>(key)?.trim();
     const configured = Boolean(value);
 
     if (!value) {
       return {
         configured,
+        host: null,
+        length: 0,
+        path: null,
+        url: null,
         valid: false,
       };
     }
 
     try {
-      new URL(value);
+      const parsedUrl = new URL(value);
+      const validProtocol =
+        parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'http:';
+      const productionProtocolValid =
+        process.env.NODE_ENV !== 'production' || parsedUrl.protocol === 'https:';
+      const valid =
+        validProtocol &&
+        productionProtocolValid &&
+        !parsedUrl.username &&
+        !parsedUrl.password;
+      const safeUrl = `${parsedUrl.protocol}//${parsedUrl.host}${parsedUrl.pathname}`;
+
       return {
         configured,
-        valid: true,
+        host: parsedUrl.host,
+        length: value.length,
+        path: parsedUrl.pathname,
+        url: valid ? safeUrl : null,
+        valid,
       };
     } catch {
       return {
         configured,
+        host: null,
+        length: value.length,
+        path: null,
+        url: null,
         valid: false,
       };
     }
+  }
+
+  private toSafeSecretState(state: ConfigState) {
+    return {
+      present: state.configured,
+      length: state.length,
+    };
+  }
+
+  private toSafeUrlState(state: UrlConfigState) {
+    return {
+      configured: state.configured,
+      valid: state.valid,
+      host: state.host,
+      url: state.url,
+    };
   }
 
   private getConfigWarnings(

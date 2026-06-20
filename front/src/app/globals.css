@@ -3658,6 +3658,29 @@ img {
   overflow-wrap: anywhere;
 }
 
+.admin-readiness-url-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.admin-readiness-url-row {
+  align-items: center;
+  border: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(120px, 0.6fr) minmax(0, 1.4fr) auto;
+  padding: var(--space-3);
+}
+
+.admin-readiness-url-row > span {
+  display: grid;
+}
+
+.admin-readiness-url-row code {
+  overflow-wrap: anywhere;
+}
+
 .admin-warning-list {
   display: grid;
   gap: var(--space-2);
@@ -6035,6 +6058,17 @@ img {
   gap: var(--space-3);
 }
 
+.payos-payment-action {
+  align-items: flex-start;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.payos-payment-action__error {
+  color: var(--color-danger);
+  max-width: 360px;
+}
+
 .checkout-order-summary--skeleton {
   min-height: 300px;
 }
@@ -7945,6 +7979,16 @@ img {
     grid-template-columns: 1fr;
   }
 
+  .admin-readiness-url-row {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-readiness-url-row code {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
   .admin-feedback small {
     margin-left: 0;
     white-space: normal;
@@ -8148,6 +8192,11 @@ img {
 
   .checkout-success-actions,
   .checkout-success-actions .button {
+    width: 100%;
+  }
+
+  .checkout-success-actions .payos-payment-action,
+  .payos-payment-action .button {
     width: 100%;
   }
 

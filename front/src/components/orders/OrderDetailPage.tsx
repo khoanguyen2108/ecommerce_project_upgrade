@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { getOrder } from "@/features/orders/api";
 import type { Order, PaymentSummary } from "@/features/orders/types";
 import { OrderItemImage } from "@/components/orders/OrderItemImage";
+import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
 import {
   OrderStatusBadge,
   PaymentStatusBadge,
@@ -262,6 +263,9 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       </section>
 
       <div className="customer-actions">
+        {order.status === "PENDING_PAYMENT" ? (
+          <PayosPaymentButton label="Continue payment with payOS" orderId={order.id} />
+        ) : null}
         <Link className="button button--primary" href="/orders">
           Back to orders
         </Link>
