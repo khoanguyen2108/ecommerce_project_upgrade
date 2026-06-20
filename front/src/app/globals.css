@@ -6679,12 +6679,13 @@ img {
 
 /* Unified customer profile */
 .profile-page {
-  max-width: 1120px;
+  max-width: 1040px;
 }
 
 .unified-profile-panel {
   background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
   display: grid;
   min-width: 0;
   width: 100%;
@@ -6692,11 +6693,11 @@ img {
 
 .unified-profile-panel__header {
   align-items: center;
-  border-bottom: 1px solid var(--color-border-strong);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   gap: var(--space-5, 20px);
   justify-content: space-between;
-  padding: clamp(20px, 3vw, 28px);
+  padding: clamp(24px, 4vw, 38px);
 }
 
 .unified-profile-panel__header > div {
@@ -6706,7 +6707,7 @@ img {
 
 .unified-profile-panel__header h1 {
   font-family: Montserrat, Inter, sans-serif;
-  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-size: clamp(2.15rem, 5vw, 3.25rem);
   letter-spacing: -0.02em;
   line-height: 1.08;
   margin: 0;
@@ -6724,9 +6725,9 @@ img {
 .profile-subsection {
   border-bottom: 1px solid var(--color-border);
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-5, 20px);
   min-width: 0;
-  padding: 18px clamp(20px, 3vw, 28px);
+  padding: 24px clamp(24px, 4vw, 38px);
 }
 
 .unified-profile-panel > .profile-subsection:last-child {
@@ -6747,9 +6748,15 @@ img {
 
 .profile-subsection__header h2 {
   font-family: Montserrat, Inter, sans-serif;
-  font-size: 1.05rem;
+  font-size: 1.25rem;
   line-height: 1.2;
   margin: 0;
+}
+
+.profile-subsection__header > div > p:not(.eyebrow) {
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  margin: 4px 0 0;
 }
 
 .profile-subsection__header > span {
@@ -6762,27 +6769,29 @@ img {
 
 .unified-profile-panel .profile-details {
   display: grid;
-  gap: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
 }
 
 .unified-profile-panel .profile-details div,
 .unified-profile-panel .profile-details div:first-child {
-  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(92px, 0.4fr) minmax(0, 1fr);
-  padding: 10px 12px 10px 0;
+  gap: 6px;
+  grid-template-columns: 1fr;
+  padding: 13px 14px;
 }
 
 .unified-profile-panel .profile-details div:nth-child(even) {
   border-left: 1px solid var(--color-border);
-  padding-left: 18px;
+  padding-left: 14px;
 }
 
 .unified-profile-panel .profile-details dd {
   font-weight: 650;
-  text-align: right;
+  text-align: left;
 }
 
 .profile-contact-fields {
@@ -6796,7 +6805,11 @@ img {
 }
 
 .unified-profile-panel .form-field input {
-  min-height: 42px;
+  border-color: #d6d6d6;
+  border-radius: 10px;
+  min-height: 48px;
+  padding-left: 14px;
+  padding-right: 14px;
 }
 
 .unified-profile-panel .form-helper {
@@ -6810,8 +6823,9 @@ img {
 
 .unified-profile-panel .profile-form__actions .button,
 .unified-profile-panel .profile-subsection__header .button {
-  min-height: 38px;
-  padding: 8px 13px;
+  border-radius: 9px;
+  min-height: 42px;
+  padding: 9px 15px;
 }
 
 .address-book {
@@ -6936,16 +6950,16 @@ img {
 }
 
 .unified-profile-panel .address-list {
-  border-top: 1px solid var(--color-border);
-  gap: 0;
+  border-top: 0;
+  gap: 12px;
 }
 
 .unified-profile-panel .address-card {
   background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: 13px;
   gap: var(--space-4);
-  padding: 13px 0;
+  padding: 16px;
 }
 
 .unified-profile-panel .address-card__content {
@@ -6958,7 +6972,10 @@ img {
 }
 
 .unified-profile-panel .address-default-badge {
-  padding: 2px 6px;
+  background: var(--color-text);
+  border-radius: 999px;
+  color: var(--color-surface);
+  padding: 3px 8px;
 }
 
 .unified-profile-panel .address-card__actions {
@@ -6967,9 +6984,10 @@ img {
 
 .unified-profile-panel .address-card__actions button,
 .unified-profile-panel .address-form__heading button {
+  border-radius: 8px;
   font-size: 0.75rem;
-  min-height: 32px;
-  padding: 5px 8px;
+  min-height: 34px;
+  padding: 6px 9px;
 }
 
 .unified-profile-panel .address-form {
@@ -6987,7 +7005,9 @@ img {
 }
 
 .unified-profile-panel .address-book__empty {
-  border: 1px dashed var(--color-border);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 13px;
   justify-content: flex-start;
   min-height: 0;
   padding: 14px 16px;
@@ -7000,6 +7020,134 @@ img {
 
 .unified-profile-panel .address-book__empty .button {
   margin-left: auto;
+}
+
+.address-book__empty-icon {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  display: inline-flex;
+  flex: 0 0 42px;
+  height: 42px;
+  justify-content: center;
+}
+
+.address-modal {
+  align-items: center;
+  background: rgb(0 0 0 / 48%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 1000;
+}
+
+.address-modal__panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 22px;
+  box-shadow: 0 14px 38px rgb(0 0 0 / 14%);
+  max-height: calc(100svh - 48px);
+  max-width: 760px;
+  overflow: auto;
+  width: 100%;
+}
+
+.address-modal__header {
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 24px 28px 20px;
+}
+
+.address-modal__header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.address-modal__header h2 {
+  font-family: Montserrat, Inter, sans-serif;
+  font-size: clamp(1.55rem, 4vw, 2rem);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.address-modal__close {
+  align-items: center;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-text);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 42px;
+  height: 42px;
+  justify-content: center;
+}
+
+.address-modal__form {
+  display: grid;
+  gap: 20px;
+  padding: 24px 28px 28px;
+}
+
+.address-modal__form .address-form__fields {
+  gap: 16px;
+}
+
+.address-modal__form .address-form__field--ward,
+.address-modal__form .address-form__field--addressLine,
+.address-modal__form .address-form__field--note {
+  grid-column: 1 / -1;
+}
+
+.address-modal__form .form-field {
+  gap: 7px;
+}
+
+.address-modal__form .form-field label {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.address-modal__form .form-field input {
+  border: 1px solid #d2d2d2;
+  border-radius: 11px;
+  min-height: 50px;
+  padding: 12px 15px;
+}
+
+.address-modal__form .form-field input:focus {
+  border-color: var(--color-text);
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 7%);
+}
+
+.address-modal__default-note {
+  align-items: center;
+  color: var(--color-text-muted);
+  display: flex;
+  font-size: 0.82rem;
+  gap: 8px;
+  margin: 0;
+}
+
+.address-modal__actions {
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 20px;
+}
+
+.address-modal__actions .button {
+  border-radius: 10px;
+  min-height: 44px;
 }
 
 .checkout-shipping {
@@ -7908,10 +8056,9 @@ img {
   .unified-profile-panel .profile-details div,
   .unified-profile-panel .profile-details div:first-child,
   .unified-profile-panel .profile-details div:nth-child(even) {
-    border-left: 0;
-    grid-template-columns: minmax(90px, 0.42fr) minmax(0, 1fr);
-    padding-left: 0;
-    padding-right: 0;
+    border-left: 1px solid var(--color-border);
+    grid-template-columns: 1fr;
+    padding: 13px 14px;
   }
 
   .unified-profile-panel .profile-form__actions,
@@ -7926,6 +8073,30 @@ img {
 
   .unified-profile-panel .address-book__empty .button {
     margin-left: 0;
+  }
+
+  .address-modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .address-modal__panel {
+    border-bottom: 0;
+    border-radius: 22px 22px 0 0;
+    max-height: 92svh;
+    max-width: none;
+  }
+
+  .address-modal__header {
+    padding: 20px 18px 16px;
+  }
+
+  .address-modal__form {
+    padding: 18px 18px 22px;
+  }
+
+  .address-modal__actions .button {
+    flex: 1 1 0;
   }
 }
 

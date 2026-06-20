@@ -4,7 +4,8 @@ export const emptyAddressInput: AddressInput = {
   recipientName: '', phone: '', province: '', district: '', ward: '', addressLine: '', note: '',
 };
 
-export function AddressFields({ compact = false, disabled = false, idPrefix, onChange, value }: {
+export function AddressFields({ autoFocus = false, compact = false, disabled = false, idPrefix, onChange, value }: {
+  autoFocus?: boolean;
   compact?: boolean;
   disabled?: boolean;
   idPrefix: string;
@@ -12,10 +13,11 @@ export function AddressFields({ compact = false, disabled = false, idPrefix, onC
   value: AddressInput;
 }) {
   const field = (key: keyof AddressInput, label: string, autoComplete: string, maxLength: number, placeholder: string) => (
-    <div className={`form-field ${(compact ? key === 'note' : key === 'addressLine' || key === 'note') ? 'address-form__wide' : ''}`}>
+    <div className={`form-field address-form__field--${key} ${(compact ? key === 'note' : key === 'addressLine' || key === 'note') ? 'address-form__wide' : ''}`}>
       <label htmlFor={`${idPrefix}-${key}`}>{label}{key === 'note' ? ' (optional)' : ''}</label>
       <input
         autoComplete={autoComplete}
+        autoFocus={autoFocus && key === 'recipientName'}
         disabled={disabled}
         id={`${idPrefix}-${key}`}
         maxLength={maxLength}
@@ -35,7 +37,7 @@ export function AddressFields({ compact = false, disabled = false, idPrefix, onC
       {field('province', 'Province / City', 'address-level1', 120, 'Ho Chi Minh City')}
       {field('district', 'District', 'address-level2', 120, 'District 1')}
       {field('ward', 'Ward', 'address-level3', 120, 'Ben Nghe Ward')}
-      {field('addressLine', 'Address line', 'street-address', 255, '12 Nguyen Hue Street')}
+      {field('addressLine', compact ? 'Street address / Address line' : 'Address line', 'street-address', 255, '12 Nguyen Hue Street')}
       {field('note', 'Delivery note', 'off', 500, 'Call before delivery')}
     </div>
   );

@@ -131,7 +131,6 @@ export function ProfileForm({ user }: ProfileFormProps) {
 
         <dl className="profile-details">
           <ProfileDetail label="Email" value={user.email} />
-          <ProfileDetail label="Role" value={formatEnumValue(user.role)} />
           <ProfileDetail
             label="Auth provider"
             value={formatEnumValue(user.authProvider)}

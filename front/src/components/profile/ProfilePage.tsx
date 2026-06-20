@@ -40,7 +40,7 @@ export function ProfilePage() {
         <header className="unified-profile-panel__header">
           <div>
             <p className="eyebrow">Account</p>
-            <h1 id="profile-heading">Profile settings</h1>
+            <h1 id="profile-heading">Account Details</h1>
             <p>Manage your contact details and delivery addresses.</p>
           </div>
           <Link className="button button--secondary" href="/orders">
