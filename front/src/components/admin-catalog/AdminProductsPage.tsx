@@ -1260,75 +1260,68 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
             {panelMode === "edit" && selectedProduct ? (
               <>
-                <div className="admin-table-wrap admin-table-wrap--compact">
-                  <table className="admin-table admin-table--compact">
-                    <thead>
-                      <tr>
-                        <th>SKU</th>
-                        <th>Size</th>
-                        <th>Color</th>
-                        <th>Stock</th>
-                        <th>Override</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedProduct.variants.length === 0 ? (
-                        <tr>
-                          <td className="admin-table__state" colSpan={7}>
-                            No variants exist for this product.
-                          </td>
-                        </tr>
-                      ) : (
-                        selectedProduct.variants.map((variant) => (
-                          <tr key={variant.id}>
-                            <td>{formatOptional(variant.sku)}</td>
-                            <td>{variant.size}</td>
-                            <td>{variant.color}</td>
-                            <td>{variant.stock}</td>
-                            <td>
+                <div className="admin-variant-grid">
+                  {selectedProduct.variants.length === 0 ? (
+                    <div className="admin-panel__empty admin-variant-grid__empty">
+                      No variants exist for this product.
+                    </div>
+                  ) : (
+                    selectedProduct.variants.map((variant, index) => (
+                      <article className="admin-variant-card" key={variant.id}>
+                        <div className="admin-variant-card__header">
+                          <h4>Variant {index + 1}</h4>
+                          <span className="admin-variant-card__status">
+                            {variant.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                        <dl className="admin-variant-card__details">
+                          <div className="admin-variant-card__detail--wide">
+                            <dt>SKU</dt>
+                            <dd>{formatOptional(variant.sku)}</dd>
+                          </div>
+                          <div>
+                            <dt>Color</dt>
+                            <dd>{variant.color}</dd>
+                          </div>
+                          <div>
+                            <dt>Size</dt>
+                            <dd>{variant.size}</dd>
+                          </div>
+                          <div>
+                            <dt>Stock</dt>
+                            <dd>{variant.stock}</dd>
+                          </div>
+                          <div>
+                            <dt>Override</dt>
+                            <dd>
                               {variant.priceOverride === null
                                 ? "Not set"
                                 : formatPrice(variant.priceOverride)}
-                            </td>
-                            <td>
-                              <span
-                                className={`admin-badge ${
-                                  variant.isActive
-                                    ? "admin-badge--success"
-                                    : "admin-badge--muted"
-                                }`}
-                              >
-                                {variant.isActive ? "Active" : "Inactive"}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="admin-row-actions">
-                                <button
-                                  aria-label={`Edit variant ${variant.size} ${variant.color}`}
-                                  className="icon-button admin-icon-button"
-                                  onClick={() => void handleEditVariant(variant)}
-                                  title="Edit variant"
-                                  type="button"
-                                >
-                                  <Edit3 aria-hidden="true" size={16} />
-                                </button>
-                                <button
-                                  className="admin-link-button"
-                                  disabled={busyAction === `${variant.id}:variant`}
-                                  onClick={() => void handleVariantStatusChange(variant)}
-                                  type="button"
-                                >
-                                  {variant.isActive ? "Deactivate" : "Activate"}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                            </dd>
+                          </div>
+                        </dl>
+                        <div className="admin-variant-card__actions">
+                          <button
+                            aria-label={`Edit variant ${variant.size} ${variant.color}`}
+                            className="icon-button admin-icon-button"
+                            onClick={() => void handleEditVariant(variant)}
+                            title="Edit variant"
+                            type="button"
+                          >
+                            <Edit3 aria-hidden="true" size={16} />
+                          </button>
+                          <button
+                            className="admin-link-button"
+                            disabled={busyAction === `${variant.id}:variant`}
+                            onClick={() => void handleVariantStatusChange(variant)}
+                            type="button"
+                          >
+                            {variant.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                        </div>
+                      </article>
+                    ))
+                  )}
                 </div>
 
                 <form className="admin-form admin-form--variant" onSubmit={handleVariantSave}>
@@ -1435,7 +1428,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                       ? "Saving"
                       : editingVariantId
                         ? "Save variant"
-                        : "Create variant"}
+                        : "Add variant"}
                   </button>
                 </form>
               </>
@@ -1485,7 +1478,7 @@ function mergeVariant(
 
   return hasVariant
     ? variants.map((item) => (item.id === variant.id ? variant : item))
-    : [variant, ...variants];
+    : [...variants, variant];
 }
 
 function getEmptyVariantForm(): VariantFormState {
