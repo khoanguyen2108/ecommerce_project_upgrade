@@ -195,6 +195,7 @@ export class OrdersService {
       return tx.order.create({
         data: {
           userId: user.id,
+          guestEmail: null,
           status: OrderStatus.PENDING_PAYMENT,
           subtotalAmount,
           totalAmount: subtotalAmount,

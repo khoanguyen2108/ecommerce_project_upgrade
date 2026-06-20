@@ -23,18 +23,26 @@ import {
   getCheckoutErrorMessage,
   getCheckoutRequestId,
 } from "@/features/checkout/errors";
-import type { CheckoutSummary as CheckoutSummaryModel } from "@/features/checkout/types";
+import type {
+  CheckoutSummary as CheckoutSummaryModel,
+  GuestCheckoutItemRequest,
+} from "@/features/checkout/types";
 import type { Order } from "@/features/orders/types";
 import { listAddresses } from '@/features/addresses/api';
 import type { Address, AddressInput } from '@/features/addresses/types';
 import { AddressFields, emptyAddressInput, normalizeAddressInput, validateAddress } from '@/components/profile/AddressFields';
 import { MapPin } from 'lucide-react';
 
+type CheckoutMode = "AUTHENTICATED" | "GUEST";
+
 export function CheckoutPage() {
-  const { cart, clearCart, refreshCart } = useCart();
+  const { clearGuestCart, getGuestCartItems, refreshCart } = useCart();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthSession();
+  const [checkoutMode, setCheckoutMode] = useState<CheckoutMode>();
+  const [guestItems, setGuestItems] = useState<GuestCheckoutItemRequest[]>([]);
   const [summary, setSummary] = useState<CheckoutSummaryModel>();
   const [createdOrder, setCreatedOrder] = useState<Order>();
+  const [createdCheckoutMode, setCreatedCheckoutMode] = useState<CheckoutMode>();
   const [voucherInput, setVoucherInput] = useState("");
   const [requestedVoucherCode, setRequestedVoucherCode] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +61,24 @@ export function CheckoutPage() {
   const voucherRequestLockRef = useRef(false);
 
   useEffect(() => {
-    if (isAuthLoading || !isAuthenticated) {
+    if (checkoutMode || isAuthLoading) return;
+
+    if (isAuthenticated) {
+      setCheckoutMode("AUTHENTICATED");
+      return;
+    }
+
+    setGuestItems(
+      getGuestCartItems().map((item) => ({
+        variantId: item.variantId,
+        quantity: item.quantity,
+      })),
+    );
+    setCheckoutMode("GUEST");
+  }, [checkoutMode, getGuestCartItems, isAuthenticated, isAuthLoading]);
+
+  useEffect(() => {
+    if (checkoutMode !== "AUTHENTICATED") {
       setAddresses([]);
       setSelectedAddressId('new');
       return;
@@ -69,13 +94,13 @@ export function CheckoutPage() {
       })
       .catch(() => { if (active) setSelectedAddressId('new'); });
     return () => { active = false; };
-  }, [isAuthenticated, isAuthLoading]);
+  }, [checkoutMode]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadSummary() {
-      if (isAuthLoading || (!isAuthenticated && !cart)) return;
+      if (!checkoutMode) return;
 
       setIsLoading(true);
       setError(undefined);
@@ -83,11 +108,7 @@ export function CheckoutPage() {
       setRequestId(undefined);
 
       try {
-        const guestItems = cart?.items.map((item) => ({
-          variantId: item.variantId,
-          quantity: item.quantity,
-        })) ?? [];
-        if (!isAuthenticated && guestItems.length === 0) {
+        if (checkoutMode === "GUEST" && guestItems.length === 0) {
           if (isMounted) {
             setSummary(undefined);
             setError("Your cart is empty. Add an item before checkout.");
@@ -96,7 +117,7 @@ export function CheckoutPage() {
           }
           return;
         }
-        const response = isAuthenticated
+        const response = checkoutMode === "AUTHENTICATED"
           ? await getCheckoutSummary(requestedVoucherCode)
           : await getGuestCheckoutSummary({
               items: guestItems,
@@ -133,7 +154,7 @@ export function CheckoutPage() {
     return () => {
       isMounted = false;
     };
-  }, [cart, isAuthenticated, isAuthLoading, refreshKey, requestedVoucherCode]);
+  }, [checkoutMode, guestItems, refreshKey, requestedVoucherCode]);
 
   function handleApplyVoucher(code = voucherInput) {
     if (voucherRequestLockRef.current) {
@@ -172,9 +193,18 @@ export function CheckoutPage() {
       return;
     }
 
-    if (selectedAddressId === 'new') {
+    if (!checkoutMode) return;
+
+    if (checkoutMode === "GUEST" || selectedAddressId === 'new') {
       const shippingError = validateAddress(shippingInfo);
       if (shippingError) { setError(shippingError); setErrorCode('CHECKOUT_SHIPPING_INVALID'); return; }
+    }
+
+    const normalizedGuestEmail = guestEmail.trim().toLowerCase();
+    if (checkoutMode === "GUEST" && !isValidGuestEmail(normalizedGuestEmail)) {
+      setError("Enter a valid email address for order updates.");
+      setErrorCode("CHECKOUT_GUEST_EMAIL_INVALID");
+      return;
     }
 
     submissionLockRef.current = true;
@@ -185,7 +215,7 @@ export function CheckoutPage() {
 
     try {
       const normalizedShipping = normalizeAddressInput(shippingInfo);
-      const response = isAuthenticated
+      const response = checkoutMode === "AUTHENTICATED"
         ? await createCheckoutOrder({
             ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
             ...(selectedAddressId === 'new'
@@ -193,22 +223,20 @@ export function CheckoutPage() {
               : { addressId: selectedAddressId }),
           })
         : await createGuestCheckoutOrder({
-            items: cart?.items.map((item) => ({
-              variantId: item.variantId,
-              quantity: item.quantity,
-            })) ?? [],
+            items: guestItems,
             ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
             shippingInfo: {
               ...normalizedShipping,
-              ...(guestEmail.trim() ? { email: guestEmail.trim() } : {}),
+              email: normalizedGuestEmail,
             },
           });
       setCreatedOrder(response.order);
+      setCreatedCheckoutMode(checkoutMode);
       setSummary(undefined);
-      if (isAuthenticated) {
+      if (checkoutMode === "AUTHENTICATED") {
         void refreshCart().catch(() => undefined);
       } else {
-        await clearCart();
+        clearGuestCart();
       }
     } catch (submitError) {
       setError(
@@ -225,8 +253,8 @@ export function CheckoutPage() {
     }
   }
 
-  if (createdOrder) {
-    return <CheckoutSuccess isGuest={!isAuthenticated} order={createdOrder} />;
+  if (createdOrder && createdCheckoutMode) {
+    return <CheckoutSuccess isGuest={createdCheckoutMode === "GUEST"} order={createdOrder} />;
   }
 
   const isEmpty = !isLoading && errorCode === "CHECKOUT_CART_EMPTY";
@@ -285,7 +313,7 @@ export function CheckoutPage() {
               addresses={addresses}
               disabled={isSubmitting}
               guestEmail={guestEmail}
-              isGuest={!isAuthenticated}
+              isGuest={checkoutMode === "GUEST"}
               onAddressChange={setShippingInfo}
               onGuestEmailChange={setGuestEmail}
               onSaveAddressChange={(checked) => { setSaveAddress(checked); if (!checked) setSetDefault(false); }}
@@ -336,10 +364,9 @@ function CheckoutShipping({ addresses, disabled, guestEmail, isGuest, onAddressC
       ) : null}
       {selectedAddressId === 'new' ? (
         <div className="checkout-new-address">
-          <AddressFields disabled={disabled} idPrefix="checkout-shipping" onChange={onAddressChange} value={shippingInfo} />
           {isGuest ? (
             <div className="form-field checkout-guest-email">
-              <label htmlFor="checkout-guest-email">Email (optional)</label>
+              <label htmlFor="checkout-guest-email">Email</label>
               <input
                 autoComplete="email"
                 disabled={disabled}
@@ -347,17 +374,20 @@ function CheckoutShipping({ addresses, disabled, guestEmail, isGuest, onAddressC
                 maxLength={320}
                 onChange={(event) => onGuestEmailChange(event.target.value)}
                 placeholder="guest@example.com"
+                required
                 type="email"
                 value={guestEmail}
               />
-              <small><Link href="/login?next=%2Fcheckout">Sign in</Link> to save this address for next time.</small>
+              <small>We will use this email only for this order update.</small>
             </div>
-          ) : (
+          ) : null}
+          <AddressFields disabled={disabled} idPrefix="checkout-shipping" onChange={onAddressChange} value={shippingInfo} />
+          {!isGuest ? (
           <div className="checkout-address-checks">
             <label className="address-checkbox"><input checked={saveAddress} disabled={disabled} onChange={(event) => onSaveAddressChange(event.target.checked)} type="checkbox" />Save this address</label>
             <label className="address-checkbox"><input checked={setDefault} disabled={disabled || !saveAddress} onChange={(event) => onSetDefaultChange(event.target.checked)} type="checkbox" />Set as default</label>
           </div>
-          )}
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -454,7 +484,8 @@ function CheckoutSuccess({ isGuest, order }: { isGuest: boolean; order: Order })
 
         {order.shippingRecipientName ? (
           <div className="checkout-success-shipping">
-            <p className="eyebrow">Shipping to</p>
+            <p className="eyebrow">Customer and shipping</p>
+            {isGuest && order.guestEmail ? <span>Email: {order.guestEmail}</span> : null}
             <strong>{order.shippingRecipientName}</strong>
             <span>{order.shippingPhone}</span>
             <span>{[
@@ -521,5 +552,13 @@ function CheckoutSkeleton() {
         <span className="customer-skeleton-line" />
       </aside>
     </section>
+  );
+}
+
+function isValidGuestEmail(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value.length <= 320 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
   );
 }

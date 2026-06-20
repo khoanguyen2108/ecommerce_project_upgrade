@@ -328,6 +328,7 @@ export class CheckoutService {
       const createdOrder = await tx.order.create({
         data: {
           userId: user.id,
+          guestEmail: null,
           status: OrderStatus.PENDING_PAYMENT,
           subtotalAmount: summary.subtotalAmount,
           discountAmount,
@@ -405,7 +406,7 @@ export class CheckoutService {
       return tx.order.create({
         data: {
           userId: null,
-          guestEmail: shipping.email || null,
+          guestEmail: shipping.email,
           status: OrderStatus.PENDING_PAYMENT,
           subtotalAmount: summary.subtotalAmount,
           discountAmount: voucherResult?.discountAmount ?? 0,

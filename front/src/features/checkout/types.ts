@@ -77,7 +77,11 @@ export interface GuestCheckoutSummaryRequest {
   voucherCode?: string;
 }
 
+export interface GuestCheckoutShippingInfo extends AddressInput {
+  email: string;
+}
+
 export interface CreateGuestCheckoutOrderRequest
   extends GuestCheckoutSummaryRequest {
-  shippingInfo: CheckoutShippingInfo;
+  shippingInfo: GuestCheckoutShippingInfo;
 }

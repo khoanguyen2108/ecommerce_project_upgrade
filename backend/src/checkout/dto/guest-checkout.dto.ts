@@ -1,19 +1,19 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsEmail,
+  IsDefined,
   IsInt,
-  IsOptional,
   IsUUID,
   Max,
   MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
-import { AddressFieldsDto, trimText } from '../../addresses/dto/address-fields.dto';
+import { AddressFieldsDto } from '../../addresses/dto/address-fields.dto';
 import { CheckoutVoucherDto } from './checkout-voucher.dto';
 
 export class GuestCheckoutItemDto {
@@ -40,12 +40,14 @@ export class GuestCheckoutSummaryDto extends CheckoutVoucherDto {
 }
 
 export class GuestCheckoutShippingInfoDto extends AddressFieldsDto {
-  @ApiPropertyOptional({ example: 'guest@example.com', maxLength: 320 })
-  @IsOptional()
-  @Transform(trimText)
+  @ApiProperty({ example: 'guest@example.com', maxLength: 320 })
+  @IsDefined()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   @MaxLength(320)
-  email?: string;
+  email: string;
 }
 
 export class CreateGuestCheckoutOrderDto extends GuestCheckoutSummaryDto {

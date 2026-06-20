@@ -70,6 +70,7 @@ const adminOrderWebhookEventSummarySelect = {
 
 const adminOrderListSelect = {
   id: true,
+  userId: true,
   guestEmail: true,
   user: {
     select: adminOrderUserSummarySelect,
@@ -108,6 +109,7 @@ const adminOrderListSelect = {
 
 const adminOrderDetailSelect = {
   id: true,
+  userId: true,
   guestEmail: true,
   user: {
     select: adminOrderUserSummarySelect,
@@ -455,8 +457,13 @@ export class AdminOrdersService {
   private toOrderSummary(order: AdminOrderListRecord) {
     return {
       id: order.id,
+      userId: order.userId,
       user: order.user,
       guestEmail: order.guestEmail,
+      customerType: order.userId ? 'REGISTERED' : 'GUEST',
+      customerEmail: order.userId ? (order.user?.email ?? null) : order.guestEmail,
+      customerName: order.userId ? (order.user?.name ?? null) : order.shippingRecipientName,
+      customerPhone: order.userId ? (order.user?.phone ?? null) : order.shippingPhone,
       status: order.status,
       subtotalAmount: order.subtotalAmount,
       discountAmount: order.discountAmount,
@@ -485,8 +492,13 @@ export class AdminOrdersService {
   private toOrderDetail(order: AdminOrderDetailRecord) {
     return {
       id: order.id,
+      userId: order.userId,
       user: order.user,
       guestEmail: order.guestEmail,
+      customerType: order.userId ? 'REGISTERED' : 'GUEST',
+      customerEmail: order.userId ? (order.user?.email ?? null) : order.guestEmail,
+      customerName: order.userId ? (order.user?.name ?? null) : order.shippingRecipientName,
+      customerPhone: order.userId ? (order.user?.phone ?? null) : order.shippingPhone,
       status: order.status,
       subtotalAmount: order.subtotalAmount,
       discountAmount: order.discountAmount,

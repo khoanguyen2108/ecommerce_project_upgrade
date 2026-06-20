@@ -18,6 +18,7 @@ import {
   persistEmailAuthSession,
 } from "@/features/auth/session";
 import type { AuthResponse, User } from "@/features/auth/types";
+import { ApiClientError } from "@/lib/errors/api-error";
 
 interface AuthSessionContextValue {
   accessToken?: string;
@@ -81,12 +82,16 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         persistAuthenticatedUser(response.user);
         setCurrentUser(response.user);
         setAccessToken(getStoredAccessToken());
-      } catch {
+      } catch (error) {
         if (!isMounted) {
           return;
         }
 
-        if (!getStoredAccessToken()) {
+        if (error instanceof ApiClientError && error.status === 401) {
+          clearAuthSession();
+          setAccessToken(undefined);
+          setCurrentUser(undefined);
+        } else if (!getStoredAccessToken()) {
           setCurrentUser(undefined);
         }
       } finally {

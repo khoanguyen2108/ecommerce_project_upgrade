@@ -36,6 +36,7 @@ interface CartContextValue {
   cartCount: number;
   closeCart: () => void;
   clearCart: () => Promise<void>;
+  clearGuestCart: () => void;
   error?: string;
   isLoading: boolean;
   isOpen: boolean;
@@ -44,6 +45,7 @@ interface CartContextValue {
   removeItem: (id: string) => Promise<void>;
   requestId?: string;
   refreshCart: () => Promise<void>;
+  getGuestCartItems: () => CartItem[];
   addItemAndOpenDrawer: (
     payload: AddCartItemRequest,
     productName?: string,
@@ -110,6 +112,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
     setCart(nextCart);
   }, []);
+
+  const getGuestCartItems = useCallback(() => readGuestCart().items, []);
+
+  const clearGuestCart = useCallback(() => {
+    const emptyGuestCart = createGuestCart([]);
+    window.localStorage.setItem(GUEST_CART_STORAGE_KEY, JSON.stringify([]));
+    if (!isAuthenticated) setCart(emptyGuestCart);
+  }, [isAuthenticated]);
 
   const refreshCart = useCallback(async () => {
     if (!isAuthenticated) {
@@ -302,8 +312,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       cart,
       cartCount: cart?.totalQuantity ?? 0,
       clearCart,
+      clearGuestCart,
       closeCart,
       error,
+      getGuestCartItems,
       isLoading,
       isOpen,
       isSaving,
@@ -317,8 +329,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItemAndOpenDrawer,
       cart,
       clearCart,
+      clearGuestCart,
       closeCart,
       error,
+      getGuestCartItems,
       isLoading,
       isOpen,
       isSaving,
