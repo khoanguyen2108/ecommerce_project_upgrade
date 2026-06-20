@@ -36,23 +36,22 @@ export function ProfilePage() {
 
   return (
     <main className="customer-page profile-page">
-      <section className="customer-hero" aria-labelledby="profile-heading">
-        <div>
-          <p className="eyebrow">Account</p>
-          <h1 id="profile-heading">Profile</h1>
-          <p>
-            Keep your contact details current. Email, role, and sign-in provider
-            are read-only here.
-          </p>
-        </div>
-        <Link className="button button--secondary" href="/orders">
-          <ReceiptText aria-hidden="true" size={17} />
-          Orders
-        </Link>
-      </section>
+      <section className="unified-profile-panel" aria-labelledby="profile-heading">
+        <header className="unified-profile-panel__header">
+          <div>
+            <p className="eyebrow">Account</p>
+            <h1 id="profile-heading">Profile settings</h1>
+            <p>Manage your contact details and delivery addresses.</p>
+          </div>
+          <Link className="button button--secondary" href="/orders">
+            <ReceiptText aria-hidden="true" size={17} />
+            Orders
+          </Link>
+        </header>
 
-      <ProfileForm user={currentUser} />
-      <AddressBook />
+        <ProfileForm user={currentUser} />
+        <AddressBook />
+      </section>
     </main>
   );
 }

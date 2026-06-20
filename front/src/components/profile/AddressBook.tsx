@@ -62,22 +62,22 @@ export function AddressBook() {
   }
 
   return (
-    <section className="address-book" aria-labelledby="address-book-heading">
-      <div className="customer-section__header">
-        <div><p className="eyebrow">Delivery</p><h2 id="address-book-heading">Address book</h2></div>
-        <button className="button button--primary" disabled={isBusy || Boolean(editingId)} onClick={openCreate} type="button"><Plus size={16} />Add address</button>
+    <section className="profile-subsection address-book" aria-labelledby="address-book-heading">
+      <div className="profile-subsection__header">
+        <div><p className="eyebrow">Delivery</p><h2 id="address-book-heading">Delivery addresses</h2></div>
+        {addresses.length > 0 ? <button className="button button--primary" disabled={isBusy || Boolean(editingId)} onClick={openCreate} type="button"><Plus size={16} />Add address</button> : null}
       </div>
       {error ? <div className="customer-feedback customer-feedback--error" role="alert"><AlertCircle size={18} /><span>{error}</span></div> : null}
       {editingId ? (
         <form className="address-form" onSubmit={(event) => void submit(event)}>
           <div className="address-form__heading"><strong>{editingId === 'new' ? 'New address' : 'Edit address'}</strong><button aria-label="Close form" onClick={() => setEditingId(null)} type="button"><X size={18} /></button></div>
-          <AddressFields disabled={isBusy} idPrefix="profile-address" onChange={setForm} value={form} />
+          <AddressFields compact disabled={isBusy} idPrefix="profile-address" onChange={setForm} value={form} />
           <label className="address-checkbox"><input checked={makeDefault} disabled={isBusy} onChange={(event) => setMakeDefault(event.target.checked)} type="checkbox" />Set as default address</label>
           <div className="profile-form__actions"><button className="button button--primary" disabled={isBusy} type="submit"><Check size={16} />{isBusy ? 'Saving...' : 'Save address'}</button><button className="button button--secondary" disabled={isBusy} onClick={() => setEditingId(null)} type="button">Cancel</button></div>
         </form>
       ) : null}
       <div className="address-list">
-        {addresses.length === 0 && !editingId ? <div className="address-book__empty"><MapPin size={26} /><p>No saved delivery addresses yet.</p></div> : addresses.map((address) => (
+        {addresses.length === 0 && !editingId ? <div className="address-book__empty"><MapPin size={22} /><div><strong>No saved addresses yet</strong><p>Add an address for a faster checkout.</p></div><button className="button button--secondary" disabled={isBusy} onClick={openCreate} type="button"><Plus size={15} />Add address</button></div> : addresses.map((address) => (
           <article className="address-card" key={address.id}>
             <div className="address-card__content"><div><strong>{address.recipientName}</strong>{address.isDefault ? <span className="address-default-badge">Default</span> : null}</div><p>{address.phone}</p><p>{[address.addressLine, address.ward, address.district, address.province].join(', ')}</p>{address.note ? <small>{address.note}</small> : null}</div>
             <div className="address-card__actions">{!address.isDefault ? <button disabled={isBusy} onClick={() => void makeAddressDefault(address.id)} type="button">Set default</button> : null}<button aria-label="Edit address" disabled={isBusy} onClick={() => openEdit(address)} type="button"><Pencil size={15} />Edit</button><button aria-label="Delete address" disabled={isBusy} onClick={() => void remove(address)} type="button"><Trash2 size={15} />Delete</button></div>

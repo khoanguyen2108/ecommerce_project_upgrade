@@ -119,35 +119,34 @@ export function ProfileForm({ user }: ProfileFormProps) {
   }
 
   return (
-    <section className="profile-grid" aria-label="Profile settings">
-      <section className="profile-panel" aria-labelledby="profile-details-heading">
-        <div className="profile-panel__header">
+    <div className="profile-settings-sections">
+      <section className="profile-subsection" aria-labelledby="profile-details-heading">
+        <div className="profile-subsection__header">
           <div>
-            <p className="eyebrow">Current profile</p>
-            <h2 id="profile-details-heading">Account details</h2>
+            <p className="eyebrow">Account information</p>
+            <h2 id="profile-details-heading">Account information</h2>
           </div>
-          <span>Read-only fields are locked</span>
+          <span>Read only</span>
         </div>
 
         <dl className="profile-details">
           <ProfileDetail label="Email" value={user.email} />
-          <ProfileDetail label="Name" value={user.name} />
-          <ProfileDetail label="Phone" value={user.phone} />
           <ProfileDetail label="Role" value={formatEnumValue(user.role)} />
           <ProfileDetail
             label="Auth provider"
             value={formatEnumValue(user.authProvider)}
           />
+          <ProfileDetail label="Member since" value={formatProfileDate(user.createdAt)} />
         </dl>
       </section>
 
-      <form className="profile-panel profile-form" noValidate onSubmit={handleSubmit}>
-        <div className="profile-panel__header">
+      <form className="profile-subsection profile-form" noValidate onSubmit={handleSubmit}>
+        <div className="profile-subsection__header">
           <div>
-            <p className="eyebrow">Editable</p>
+            <p className="eyebrow">Contact</p>
             <h2>Contact settings</h2>
           </div>
-          <span>Name and phone only</span>
+          <span>Editable</span>
         </div>
 
         {formError ? (
@@ -165,50 +164,48 @@ export function ProfileForm({ user }: ProfileFormProps) {
           </div>
         ) : null}
 
-        <div className="form-field">
-          <label htmlFor="profile-name">Name</label>
-          <input
-            aria-describedby={fieldErrors.name ? "profile-name-error" : undefined}
-            aria-invalid={Boolean(fieldErrors.name)}
-            autoComplete="name"
-            id="profile-name"
-            maxLength={NAME_MAX_LENGTH}
-            name="name"
-            onChange={(event) => {
-              setName(event.target.value);
-              setSuccessMessage(undefined);
-            }}
-            placeholder="Belikeme Customer"
-            type="text"
-            value={name}
-          />
-          <FieldError id="profile-name-error" message={fieldErrors.name} />
-          <p className="form-helper">
-            {name.length}/{NAME_MAX_LENGTH} characters
-          </p>
-        </div>
+        <div className="profile-contact-fields">
+          <div className="form-field">
+            <label htmlFor="profile-name">Name</label>
+            <input
+              aria-describedby={fieldErrors.name ? "profile-name-error" : undefined}
+              aria-invalid={Boolean(fieldErrors.name)}
+              autoComplete="name"
+              id="profile-name"
+              maxLength={NAME_MAX_LENGTH}
+              name="name"
+              onChange={(event) => {
+                setName(event.target.value);
+                setSuccessMessage(undefined);
+              }}
+              placeholder="Belikeme Customer"
+              type="text"
+              value={name}
+            />
+            <FieldError id="profile-name-error" message={fieldErrors.name} />
+            <p className="form-helper">{name.length}/{NAME_MAX_LENGTH} characters</p>
+          </div>
 
-        <div className="form-field">
-          <label htmlFor="profile-phone">Phone</label>
-          <input
-            aria-describedby={fieldErrors.phone ? "profile-phone-error" : undefined}
-            aria-invalid={Boolean(fieldErrors.phone)}
-            autoComplete="tel"
-            id="profile-phone"
-            maxLength={PHONE_MAX_LENGTH}
-            name="phone"
-            onChange={(event) => {
-              setPhone(event.target.value);
-              setSuccessMessage(undefined);
-            }}
-            placeholder="+84901234567"
-            type="tel"
-            value={phone}
-          />
-          <FieldError id="profile-phone-error" message={fieldErrors.phone} />
-          <p className="form-helper">
-            {phone.length}/{PHONE_MAX_LENGTH} characters
-          </p>
+          <div className="form-field">
+            <label htmlFor="profile-phone">Phone</label>
+            <input
+              aria-describedby={fieldErrors.phone ? "profile-phone-error" : undefined}
+              aria-invalid={Boolean(fieldErrors.phone)}
+              autoComplete="tel"
+              id="profile-phone"
+              maxLength={PHONE_MAX_LENGTH}
+              name="phone"
+              onChange={(event) => {
+                setPhone(event.target.value);
+                setSuccessMessage(undefined);
+              }}
+              placeholder="+84901234567"
+              type="tel"
+              value={phone}
+            />
+            <FieldError id="profile-phone-error" message={fieldErrors.phone} />
+            <p className="form-helper">{phone.length}/{PHONE_MAX_LENGTH} characters</p>
+          </div>
         </div>
 
         <div className="profile-form__actions">
@@ -235,7 +232,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
           </button>
         </div>
       </form>
-    </section>
+    </div>
   );
 }
 
@@ -284,6 +281,13 @@ function formatEnumValue(value: string | null | undefined): string {
     .split("_")
     .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
     .join(" ");
+}
+
+function formatProfileDate(value: string | null | undefined): string {
+  if (!value) return "Not available";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not available";
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(date);
 }
 
 function getProfileErrorMessage(error: unknown): string {
