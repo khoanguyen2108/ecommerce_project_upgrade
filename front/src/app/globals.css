@@ -1029,7 +1029,7 @@ img {
   background: #090909;
   color: #ffffff;
   display: grid;
-  gap: var(--space-5);
+  gap: 0;
   padding: clamp(36px, 5vw, 72px);
 }
 
@@ -1037,16 +1037,21 @@ img {
   font-family: Montserrat, Inter, sans-serif;
   font-size: clamp(2.2rem, 4vw, 4rem);
   line-height: 1.02;
-  margin: 0;
+  margin: 0 0 clamp(24px, 2.4vw, 36px);
   max-width: 620px;
   color: #ffffff;
 }
 
 .landing-about__content > p {
   color: #c8c8c8;
+  font-size: clamp(1.04rem, 1.15vw, 1.14rem);
   line-height: 1.75;
   margin: 0;
   max-width: 660px;
+}
+
+.landing-about__content > p + p {
+  margin-top: clamp(16px, 1.6vw, 24px);
 }
 
 .landing-about__content .landing-about__closing {
@@ -1059,7 +1064,7 @@ img {
   border-color: #ffffff;
   color: #090909;
   justify-self: start;
-  margin-top: var(--space-2);
+  margin-top: clamp(24px, 2.4vw, 36px);
 }
 
 .landing-about__content .button:hover {
