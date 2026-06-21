@@ -101,7 +101,7 @@ export function PayosPaymentButton({
   );
 }
 
-function getSafeCheckoutUrl(value: string | null): string | null {
+export function getSafeCheckoutUrl(value: string | null): string | null {
   if (!value) {
     return null;
   }

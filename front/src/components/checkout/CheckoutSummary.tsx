@@ -10,6 +10,7 @@ import {
 import type { CheckoutSummary as CheckoutSummaryModel } from "@/features/checkout/types";
 
 interface CheckoutSummaryProps {
+  isDirectPay: boolean;
   isLoading: boolean;
   isSubmitting: boolean;
   onApplyVoucher: (code?: string) => void;
@@ -22,6 +23,7 @@ interface CheckoutSummaryProps {
 }
 
 export function CheckoutSummary({
+  isDirectPay,
   isLoading,
   isSubmitting,
   onApplyVoucher,
@@ -215,8 +217,17 @@ export function CheckoutSummary({
         <div className="checkout-pending-note" role="note">
           <Info aria-hidden="true" size={18} />
           <span>
-            Your order will be created as <strong>PENDING_PAYMENT</strong>.
-            Payment is not completed at this step.
+            {isDirectPay ? (
+              <>
+                You will be redirected to payOS to complete your payment. Your
+                order is confirmed only after payment is verified.
+              </>
+            ) : (
+              <>
+                Your order will be created as <strong>PENDING_PAYMENT</strong>.
+                Payment is not completed at this step.
+              </>
+            )}
           </span>
         </div>
 
@@ -234,7 +245,13 @@ export function CheckoutSummary({
           {isSubmitting ? (
             <Loader2 aria-hidden="true" className="spin" size={17} />
           ) : null}
-          {isSubmitting ? "Creating order..." : "Create pending order"}
+          {isSubmitting
+            ? isDirectPay
+              ? "CREATING PAYMENT..."
+              : "Creating order..."
+            : isDirectPay
+              ? "PAY WITH PAYOS"
+              : "Create pending order"}
         </button>
       </aside>
     </section>

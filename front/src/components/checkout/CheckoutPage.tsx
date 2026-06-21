@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
-import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
+import { getSafeCheckoutUrl } from "@/components/payments/PayosPaymentButton";
 import { formatCurrency } from "@/components/orders/order-format";
 import {
   createCheckoutOrder,
@@ -29,6 +29,7 @@ import type {
   GuestCheckoutItemRequest,
 } from "@/features/checkout/types";
 import type { Order } from "@/features/orders/types";
+import { createPayosPayment } from "@/features/payments/api";
 import { listAddresses } from '@/features/addresses/api';
 import type { Address, AddressInput } from '@/features/addresses/types';
 import { AddressFields, emptyAddressInput, normalizeAddressInput, validateAddress } from '@/components/profile/AddressFields';
@@ -42,8 +43,8 @@ export function CheckoutPage() {
   const [checkoutMode, setCheckoutMode] = useState<CheckoutMode>();
   const [guestItems, setGuestItems] = useState<GuestCheckoutItemRequest[]>([]);
   const [summary, setSummary] = useState<CheckoutSummaryModel>();
-  const [createdOrder, setCreatedOrder] = useState<Order>();
-  const [createdCheckoutMode, setCreatedCheckoutMode] = useState<CheckoutMode>();
+  const [createdGuestOrder, setCreatedGuestOrder] = useState<Order>();
+  const [paymentRecoveryOrderId, setPaymentRecoveryOrderId] = useState<string>();
   const [voucherInput, setVoucherInput] = useState("");
   const [requestedVoucherCode, setRequestedVoucherCode] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
@@ -213,6 +214,9 @@ export function CheckoutPage() {
     setError(undefined);
     setErrorCode(undefined);
     setRequestId(undefined);
+    setPaymentRecoveryOrderId(undefined);
+
+    let authenticatedOrderId: string | undefined;
 
     try {
       const normalizedShipping = normalizeAddressInput(shippingInfo);
@@ -231,22 +235,50 @@ export function CheckoutPage() {
               email: normalizedGuestEmail,
             },
           });
-      setCreatedOrder(response.order);
-      setCreatedCheckoutMode(checkoutMode);
-      setSummary(undefined);
       if (checkoutMode === "AUTHENTICATED") {
+        authenticatedOrderId = response.order.id;
         void refreshCart().catch(() => undefined);
-      } else {
-        clearGuestCart();
+
+        const paymentResponse = await createPayosPayment({
+          orderId: response.order.id,
+        });
+        const checkoutUrl = getSafeCheckoutUrl(
+          paymentResponse.checkoutUrl || paymentResponse.paymentUrl,
+        );
+
+        if (!checkoutUrl) {
+          throw new Error("PAYOS_CHECKOUT_URL_MISSING");
+        }
+
+        window.location.assign(checkoutUrl);
+        return;
       }
+
+      setCreatedGuestOrder(response.order);
+      setSummary(undefined);
+      clearGuestCart();
     } catch (submitError) {
-      setError(
-        getCheckoutErrorMessage(
-          submitError,
-          "Pending order could not be created.",
-        ),
-      );
-      setErrorCode(getCheckoutErrorCode(submitError));
+      const submitErrorCode = getCheckoutErrorCode(submitError);
+
+      if (authenticatedOrderId) {
+        setSummary(undefined);
+        setPaymentRecoveryOrderId(authenticatedOrderId);
+        setError(
+          submitErrorCode === "PAYMENT_RECONCILIATION_REQUIRED"
+            ? "Payment requires manual review. Please contact support."
+            : "Payment link could not be created. Please retry from your order.",
+        );
+      } else {
+        setError(
+          getCheckoutErrorMessage(
+            submitError,
+            checkoutMode === "AUTHENTICATED"
+              ? "Checkout could not be started."
+              : "Pending order could not be created.",
+          ),
+        );
+      }
+      setErrorCode(submitErrorCode);
       setRequestId(getCheckoutRequestId(submitError));
     } finally {
       submissionLockRef.current = false;
@@ -254,8 +286,8 @@ export function CheckoutPage() {
     }
   }
 
-  if (createdOrder && createdCheckoutMode) {
-    return <CheckoutSuccess isGuest={createdCheckoutMode === "GUEST"} order={createdOrder} />;
+  if (createdGuestOrder) {
+    return <GuestCheckoutSuccess order={createdGuestOrder} />;
   }
 
   const isEmpty = !isLoading && errorCode === "CHECKOUT_CART_EMPTY";
@@ -263,7 +295,11 @@ export function CheckoutPage() {
   return (
     <main className="customer-page checkout-page">
       <CheckoutIntro
-        subtitle="Review your cart before creating an order that waits for payment confirmation."
+        subtitle={
+          checkoutMode === "AUTHENTICATED"
+            ? "You will be redirected to payOS to complete your payment."
+            : "Review your cart before creating an order that waits for payment confirmation."
+        }
         title="Review your order"
       />
       <CheckoutStepper current="review" />
@@ -273,15 +309,24 @@ export function CheckoutPage() {
           <AlertCircle aria-hidden="true" size={19} />
           <span>{error}</span>
           {requestId ? <small>Request {requestId}</small> : null}
-          <button
-            className="button button--secondary checkout-retry-button"
-            disabled={isLoading || isSubmitting}
-            onClick={() => setRefreshKey((current) => current + 1)}
-            type="button"
-          >
-            <RefreshCw aria-hidden="true" size={16} />
-            Retry
-          </button>
+          {paymentRecoveryOrderId ? (
+            <Link
+              className="button button--secondary checkout-retry-button"
+              href={`/orders/${encodeURIComponent(paymentRecoveryOrderId)}`}
+            >
+              View order and retry
+            </Link>
+          ) : (
+            <button
+              className="button button--secondary checkout-retry-button"
+              disabled={isLoading || isSubmitting}
+              onClick={() => setRefreshKey((current) => current + 1)}
+              type="button"
+            >
+              <RefreshCw aria-hidden="true" size={16} />
+              Retry
+            </button>
+          )}
         </div>
       ) : null}
 
@@ -301,6 +346,7 @@ export function CheckoutPage() {
 
       {summary ? (
         <CheckoutSummary
+          isDirectPay={checkoutMode === "AUTHENTICATED"}
           isLoading={isLoading}
           isSubmitting={isSubmitting}
           onApplyVoucher={handleApplyVoucher}
@@ -409,7 +455,7 @@ function CheckoutStepper({ current }: { current: "review" | "pending" }) {
   const steps = [
     { id: "cart", label: "Cart" },
     { id: "review", label: "Review" },
-    { id: "pending", label: "Pending payment" },
+    { id: "pending", label: "Payment" },
   ] as const;
   const currentIndex = current === "review" ? 1 : 2;
 
@@ -436,7 +482,7 @@ function CheckoutStepper({ current }: { current: "review" | "pending" }) {
   );
 }
 
-function CheckoutSuccess({ isGuest, order }: { isGuest: boolean; order: Order }) {
+function GuestCheckoutSuccess({ order }: { order: Order }) {
   return (
     <main className="customer-page checkout-page checkout-page--success">
       <CheckoutIntro
@@ -486,7 +532,7 @@ function CheckoutSuccess({ isGuest, order }: { isGuest: boolean; order: Order })
         {order.shippingRecipientName ? (
           <div className="checkout-success-shipping">
             <p className="eyebrow">Customer and shipping</p>
-            {isGuest && order.guestEmail ? <span>Email: {order.guestEmail}</span> : null}
+            {order.guestEmail ? <span>Email: {order.guestEmail}</span> : null}
             <strong>{order.shippingRecipientName}</strong>
             <span>{order.shippingPhone}</span>
             <span>{[
@@ -502,26 +548,16 @@ function CheckoutSuccess({ isGuest, order }: { isGuest: boolean; order: Order })
         <div className="checkout-pending-note" role="note">
           <Info aria-hidden="true" size={18} />
           <span>
-            {isGuest
-              ? "Guest online payment is deferred because this order has no secure guest access token. The order remains pending and is not attached to an account."
-              : "Payment has not been completed yet. payOS checkout creates a pending payment; only Belikeme's verified webhook can confirm it as paid."}
+            Guest online payment is deferred because this order has no secure
+            guest access token. The order remains pending and is not attached
+            to an account.
           </span>
         </div>
 
         <div className="checkout-success-actions">
-          {!isGuest ? <PayosPaymentButton orderId={order.id} /> : null}
-          {!isGuest ? (
-            <Link
-              className="button button--secondary"
-              href={`/orders/${encodeURIComponent(order.id)}`}
-            >
-              View order
-            </Link>
-          ) : null}
           <Link className="button button--secondary" href="/products">
             Continue shopping
           </Link>
-          {!isGuest ? <Link className="button button--secondary" href="/orders">View orders</Link> : null}
         </div>
       </section>
     </main>
