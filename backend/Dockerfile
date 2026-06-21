@@ -17,6 +17,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
+COPY --from=build /app/scripts/check-prisma-migrations.mjs ./scripts/check-prisma-migrations.mjs
 COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=build /app/src/generated/prisma ./src/generated/prisma
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
