@@ -177,8 +177,9 @@ export interface PayosWebhookResult {
 }
 
 type PayosWebhookValidationStage =
-  | 'dashboard-ping-detected'
-  | 'malformed-envelope'
+  | 'dashboard-ping'
+  | 'malformed-payment-envelope'
+  | 'payment-shaped'
   | 'processed'
   | 'received'
   | 'rejected'
@@ -187,9 +188,14 @@ type PayosWebhookValidationStage =
   | 'verification-start';
 
 interface PayosWebhookLogContext {
+  bodyCodePresent: boolean;
   bodyDataPresent: boolean;
+  bodyDescPresent: boolean;
   bodySignaturePresent: boolean;
+  bodySuccessPresent: boolean;
+  bodyType: string;
   bodyTopLevelKeys: string[];
+  bodyWebhookUrlPresent: boolean;
   checksumHeaderPresent: boolean;
   contentType?: string;
   method?: string;
@@ -320,6 +326,8 @@ export class PaymentsService {
       return this.acknowledgePayosWebhookDashboardPing(logContext);
     }
 
+    this.logPayosWebhookStage('payment-shaped', logContext);
+
     let credentials!: PayosCredentials;
     let webhook!: Webhook;
     let verifiedData!: WebhookData;
@@ -328,7 +336,7 @@ export class PaymentsService {
       webhook = this.assertWebhookPayload(body);
     } catch (error) {
       this.logPayosWebhookStage(
-        'malformed-envelope',
+        'malformed-payment-envelope',
         logContext,
         {
           ...this.toSafeWebhookErrorSummary(error),
@@ -690,9 +698,11 @@ export class PaymentsService {
   handlePayosWebhookDashboardPing(
     request: RequestWithId,
   ): PayosWebhookResult {
-    return this.acknowledgePayosWebhookDashboardPing(
-      this.getPayosWebhookLogContext(request),
-    );
+    const logContext = this.getPayosWebhookLogContext(request);
+
+    this.logPayosWebhookStage('received', logContext);
+
+    return this.acknowledgePayosWebhookDashboardPing(logContext);
   }
 
   async getPayosDisplayStatus(
@@ -734,7 +744,7 @@ export class PaymentsService {
   private acknowledgePayosWebhookDashboardPing(
     logContext: PayosWebhookLogContext,
   ): PayosWebhookResult {
-    this.logPayosWebhookStage('dashboard-ping-detected', logContext, {
+    this.logPayosWebhookStage('dashboard-ping', logContext, {
       processed: false,
       reason: 'PAYOS_WEBHOOK_DASHBOARD_PING',
     });
@@ -804,7 +814,12 @@ export class PaymentsService {
         request.ip ?? request.socket.remoteAddress,
         80,
       ),
+      bodyType: this.getWebhookBodyType(body),
       bodyTopLevelKeys: this.getTopLevelKeysForLog(body),
+      bodyCodePresent: this.hasOwnWebhookField(body, 'code'),
+      bodyDescPresent: this.hasOwnWebhookField(body, 'desc'),
+      bodySuccessPresent: this.hasOwnWebhookField(body, 'success'),
+      bodyWebhookUrlPresent: this.hasOwnWebhookField(body, 'webhookUrl'),
       bodySignaturePresent: this.isBodySignaturePresent(body),
       bodyDataPresent: this.isRecord(body) && this.isRecord(body.data),
       signatureHeaderPresent:
@@ -835,15 +850,25 @@ export class PaymentsService {
     const payload = {
       requestId: context.requestId,
       provider: PAYMENT_PROVIDER,
+      classification: stage,
       validationStage: stage,
       method: context.method,
       path: context.path,
       contentType: context.contentType,
       userAgent: context.userAgent,
       remoteIp: context.remoteIp,
+      bodyType: context.bodyType,
       bodyTopLevelKeys: context.bodyTopLevelKeys,
+      hasCodeField: context.bodyCodePresent,
+      hasDescField: context.bodyDescPresent,
+      hasSuccessField: context.bodySuccessPresent,
+      hasDataField: context.bodyDataPresent,
+      hasSignatureField: context.bodySignaturePresent,
+      hasWebhookUrlField: context.bodyWebhookUrlPresent,
       bodyDataPresent: context.bodyDataPresent,
       bodySignaturePresent: context.bodySignaturePresent,
+      hasSignatureHeader: context.signatureHeaderPresent,
+      hasChecksumHeader: context.checksumHeaderPresent,
       signatureHeaderPresent: context.signatureHeaderPresent,
       checksumHeaderPresent: context.checksumHeaderPresent,
       signaturePresent:
@@ -852,35 +877,39 @@ export class PaymentsService {
       ...extra,
     };
 
-    this.logger[level](JSON.stringify(this.stripUndefinedValues(payload)));
+    this.logger[level](
+      `[payos-webhook] ${stage} ${JSON.stringify(
+        this.stripUndefinedValues(payload),
+      )}`,
+    );
   }
 
   private toSafeWebhookErrorSummary(error: unknown): {
-    errorCode: string;
-    errorMessage: string;
+    safeErrorCode: string;
+    safeErrorMessageSummary: string;
   } {
     if (error instanceof HttpException) {
       const response = error.getResponse();
 
       if (this.isRecord(response)) {
         return {
-          errorCode:
+          safeErrorCode:
             typeof response.code === 'string'
               ? response.code
               : error.name || 'HTTP_EXCEPTION',
-          errorMessage: this.getSafeErrorMessage(response.message),
+          safeErrorMessageSummary: this.getSafeErrorMessage(response.message),
         };
       }
 
       return {
-        errorCode: error.name || 'HTTP_EXCEPTION',
-        errorMessage: this.getSafeErrorMessage(response),
+        safeErrorCode: error.name || 'HTTP_EXCEPTION',
+        safeErrorMessageSummary: this.getSafeErrorMessage(response),
       };
     }
 
     return {
-      errorCode: error instanceof Error ? error.name : 'UNKNOWN_ERROR',
-      errorMessage: 'Webhook handling failed.',
+      safeErrorCode: error instanceof Error ? error.name : 'UNKNOWN_ERROR',
+      safeErrorMessageSummary: 'Webhook handling failed.',
     };
   }
 
@@ -903,6 +932,26 @@ export class PaymentsService {
     return Object.keys(body)
       .slice(0, 20)
       .map((key) => key.replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 64));
+  }
+
+  private getWebhookBodyType(body: unknown): string {
+    if (body === undefined) {
+      return 'undefined';
+    }
+
+    if (body === null) {
+      return 'null';
+    }
+
+    if (Array.isArray(body)) {
+      return 'array';
+    }
+
+    return typeof body;
+  }
+
+  private hasOwnWebhookField(body: unknown, field: string): boolean {
+    return this.isRecord(body) && Object.prototype.hasOwnProperty.call(body, field);
   }
 
   private isBodySignaturePresent(body: unknown): boolean {
