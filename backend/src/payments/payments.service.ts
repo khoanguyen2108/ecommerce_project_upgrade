@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -20,6 +21,7 @@ import { Prisma } from '../generated/prisma/client';
 import {
   OrderStatus,
   PaymentProvider,
+  PaymentReconciliationIssueType,
   PaymentStatus,
   UserRole,
 } from '../generated/prisma/enums';
@@ -33,6 +35,8 @@ const PAYOS_DESCRIPTION_PREFIX = 'Belikeme';
 const PAYOS_WEBHOOK_ENDPOINT_PATH = '/payments/payos/webhook';
 const WEBHOOK_STATUS_PROCESSED = 'PROCESSED';
 const WEBHOOK_STATUS_IGNORED = 'IGNORED';
+const WEBHOOK_STATUS_RECONCILIATION_REQUIRED = 'RECONCILIATION_REQUIRED';
+const MAX_POSTGRES_INT = 2_147_483_647;
 
 const paymentSelect = {
   id: true,
@@ -146,6 +150,7 @@ export interface PayosWebhookResult {
   duplicate: boolean;
   payment?: PaymentRecord;
   processed?: boolean;
+  reconciliationRequired?: boolean;
   reason?: string;
   received: boolean;
   status?: string;
@@ -168,8 +173,11 @@ export class PaymentsService {
     const order = await this.getOrderForPayment(user, dto.orderId);
 
     this.assertOrderPayable(order, new Date());
-    const config = this.getPayosCheckoutConfig();
+    this.assertGuestPaymentUnavailable(order);
+    await this.assertNoReconciliationIssue(order.id);
     const payment = await this.getOrCreatePendingPayosPayment(order);
+    await this.assertNoReconciliationIssue(order.id, payment.id);
+    const config = this.getPayosCheckoutConfig();
 
     if (payment.checkoutUrl) {
       return this.toCreatePaymentResponse(payment, order.expiresAt);
@@ -180,11 +188,15 @@ export class PaymentsService {
       order,
       payment,
     );
+    await this.assertNoReconciliationIssue(order.id, payment.id);
     this.assertPayosPaymentLink(payment, paymentLink);
     const updateResult = await this.prismaService.payment.updateMany({
       where: {
         id: payment.id,
         status: PaymentStatus.PENDING,
+        reconciliationIssues: {
+          none: {},
+        },
         order: {
           status: OrderStatus.PENDING_PAYMENT,
           OR: [
@@ -234,9 +246,11 @@ export class PaymentsService {
     const credentials = this.getPayosCredentials();
     const webhook = this.assertWebhookPayload(body);
     const verifiedData = await this.verifyPayosWebhook(credentials, webhook);
+    this.assertVerifiedWebhookData(verifiedData);
     const signatureHash = this.hashValue(webhook.signature);
     const eventKey = this.buildWebhookEventKey(verifiedData, signatureHash);
     const metadata = this.sanitizeWebhookMetadata(webhook, verifiedData);
+    const classification = this.classifyPayosWebhook(webhook, verifiedData);
 
     try {
       const result: PayosWebhookResult = await this.prismaService.$transaction(async (tx) => {
@@ -303,7 +317,104 @@ export class PaymentsService {
           },
         });
 
-        const classification = this.classifyPayosWebhook(webhook, verifiedData);
+        if (classification === PaymentStatus.PAID) {
+          const existingReconciliationIssue =
+            await tx.paymentReconciliationIssue.findFirst({
+              where: {
+                paymentId: payment.id,
+              },
+              orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+              select: {
+                type: true,
+              },
+            });
+
+          if (existingReconciliationIssue) {
+            await this.markWebhookEventProcessed(tx, event.id, {
+              processingStatus: WEBHOOK_STATUS_RECONCILIATION_REQUIRED,
+            });
+
+            return {
+              received: true,
+              duplicate: false,
+              processed: true,
+              reconciliationRequired: true,
+              payment: this.toSafePayment(payment),
+              reason: existingReconciliationIssue.type,
+            };
+          }
+
+          const validationFailureReason = this.getPaidWebhookValidationFailure(
+            payment,
+            verifiedData,
+          );
+
+          if (validationFailureReason) {
+            return this.createProviderPaidReconciliationIssue(
+              tx,
+              event.id,
+              payment,
+              verifiedData,
+              PaymentReconciliationIssueType.PROVIDER_LOCAL_STATUS_MISMATCH,
+              validationFailureReason,
+            );
+          }
+
+          if (
+            await this.isProviderLinkOwnedByAnotherPayment(
+              tx,
+              payment,
+              verifiedData.paymentLinkId,
+            )
+          ) {
+            return this.createProviderPaidReconciliationIssue(
+              tx,
+              event.id,
+              payment,
+              verifiedData,
+              PaymentReconciliationIssueType.PROVIDER_LOCAL_STATUS_MISMATCH,
+              'PAYOS_PAYMENT_LINK_OWNED_BY_ANOTHER_PAYMENT',
+            );
+          }
+
+          if (
+            payment.status === PaymentStatus.PAID &&
+            payment.order.status === OrderStatus.PAID
+          ) {
+            await this.markWebhookEventProcessed(tx, event.id, {
+              processingStatus: WEBHOOK_STATUS_IGNORED,
+            });
+
+            return {
+              received: true,
+              duplicate: false,
+              processed: false,
+              payment: this.toSafePayment(payment),
+              reason: 'PAYOS_PAID_ALREADY_FINALIZED',
+            };
+          }
+
+          if (
+            payment.status !== PaymentStatus.PENDING ||
+            payment.order.status !== OrderStatus.PENDING_PAYMENT
+          ) {
+            return this.createProviderPaidReconciliationIssue(
+              tx,
+              event.id,
+              payment,
+              verifiedData,
+              this.getLatePaidIssueType(payment),
+              this.getLatePaidSafeReason(payment),
+            );
+          }
+
+          return this.processPaidWebhook(
+            tx,
+            event.id,
+            payment,
+            verifiedData,
+          );
+        }
 
         if (
           payment.status === PaymentStatus.PAID ||
@@ -339,15 +450,6 @@ export class PaymentsService {
           };
         }
 
-        if (classification === PaymentStatus.PAID) {
-          return this.processPaidWebhook(
-            tx,
-            event.id,
-            payment,
-            verifiedData,
-          );
-        }
-
         return this.processNonPaidWebhook(
           tx,
           event.id,
@@ -374,22 +476,74 @@ export class PaymentsService {
       return result;
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
-        this.logger.log(
+        const uniqueTarget = this.getUniqueConstraintTarget(error);
+        const existingEvent = await this.prismaService.paymentWebhookEvent.findUnique({
+          where: {
+            provider_eventKey: {
+              provider: PAYMENT_PROVIDER,
+              eventKey,
+            },
+          },
+          select: {
+            processingStatus: true,
+          },
+        });
+
+        if (
+          existingEvent &&
+          (this.isWebhookEventUniqueConstraintTarget(uniqueTarget) ||
+            !uniqueTarget)
+        ) {
+          this.logger.log(
+            JSON.stringify({
+              requestId,
+              provider: PAYMENT_PROVIDER,
+              orderCode: verifiedData.orderCode,
+              duplicate: true,
+              processed: false,
+              reason: 'PAYOS_WEBHOOK_DUPLICATE_RACE',
+              prismaTarget: uniqueTarget || 'CONFIRMED_BY_EVENT_KEY',
+            }),
+          );
+
+          return {
+            received: true,
+            duplicate: true,
+            status: existingEvent.processingStatus,
+          };
+        }
+
+        const payment = await this.prismaService.payment.findUnique({
+          where: {
+            providerOrderCode: verifiedData.orderCode,
+          },
+          select: paymentWebhookSelect,
+        });
+
+        this.logger.warn(
           JSON.stringify({
             requestId,
             provider: PAYMENT_PROVIDER,
             orderCode: verifiedData.orderCode,
-            duplicate: true,
-            processed: false,
-            reason: 'PAYOS_WEBHOOK_DUPLICATE_RACE',
+            paymentId: payment?.id,
+            orderId: payment?.orderId,
+            prismaTarget: uniqueTarget || 'UNKNOWN',
+            reason: 'PAYOS_WEBHOOK_UNRELATED_UNIQUE_CONFLICT',
           }),
         );
 
-        return {
-          received: true,
-          duplicate: true,
-          status: WEBHOOK_STATUS_PROCESSED,
-        };
+        if (classification === PaymentStatus.PAID && payment) {
+          return this.preservePaidUniqueConflictReconciliation(
+            payment,
+            verifiedData,
+            uniqueTarget,
+          );
+        }
+
+        throw new ServiceUnavailableException({
+          code: 'PAYOS_WEBHOOK_PROCESSING_RETRY',
+          message: 'payOS webhook processing should be retried.',
+        });
       }
 
       throw error;
@@ -438,84 +592,114 @@ export class PaymentsService {
     payment: PaymentWebhookRecord,
     verifiedData: WebhookData,
   ) {
-    const validationFailureReason = this.getPaidWebhookValidationFailure(
-      payment,
-      verifiedData,
-    );
-
-    if (validationFailureReason) {
-      const failedPayment = await this.failPaymentAndCancelOrder(
-        tx,
-        payment,
-        validationFailureReason,
-        verifiedData,
-      );
-
-      if (!failedPayment) {
-        return this.ignoreWebhookForTerminalState(tx, eventId, payment);
-      }
-
-      await this.markWebhookEventProcessed(tx, eventId, {
-        processingStatus: WEBHOOK_STATUS_PROCESSED,
-      });
-
-      return {
-        received: true,
-        duplicate: false,
-        processed: true,
-        payment: failedPayment,
-        reason: validationFailureReason,
-      };
-    }
-
     if (payment.order.items.length === 0) {
-      const failedPayment = await this.failPaymentAndCancelOrder(
+      return this.createProviderPaidReconciliationIssue(
         tx,
+        eventId,
         payment,
-        'ORDER_ITEMS_MISSING',
         verifiedData,
+        PaymentReconciliationIssueType.PROVIDER_LOCAL_STATUS_MISMATCH,
+        'ORDER_ITEMS_MISSING',
       );
+    }
 
-      if (!failedPayment) {
-        return this.ignoreWebhookForTerminalState(tx, eventId, payment);
-      }
+    await this.lockPaidOrderStock(tx, payment);
+    const latestPayment = await tx.payment.findUnique({
+      where: {
+        id: payment.id,
+      },
+      select: paymentWebhookSelect,
+    });
 
+    if (!latestPayment) {
+      throw this.paymentNotFoundException();
+    }
+
+    const latestReconciliationIssue =
+      await tx.paymentReconciliationIssue.findFirst({
+        where: {
+          paymentId: payment.id,
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        select: {
+          type: true,
+        },
+      });
+
+    if (latestReconciliationIssue) {
       await this.markWebhookEventProcessed(tx, eventId, {
-        processingStatus: WEBHOOK_STATUS_PROCESSED,
+        processingStatus: WEBHOOK_STATUS_RECONCILIATION_REQUIRED,
       });
 
       return {
         received: true,
         duplicate: false,
         processed: true,
-        payment: failedPayment,
-        reason: 'ORDER_ITEMS_MISSING',
+        reconciliationRequired: true,
+        payment: this.toSafePayment(latestPayment),
+        reason: latestReconciliationIssue.type,
       };
     }
+
+    if (
+      await this.isProviderLinkOwnedByAnotherPayment(
+        tx,
+        latestPayment,
+        verifiedData.paymentLinkId,
+      )
+    ) {
+      return this.createProviderPaidReconciliationIssue(
+        tx,
+        eventId,
+        latestPayment,
+        verifiedData,
+        PaymentReconciliationIssueType.PROVIDER_LOCAL_STATUS_MISMATCH,
+        'PAYOS_PAYMENT_LINK_OWNED_BY_ANOTHER_PAYMENT',
+      );
+    }
+
+    if (
+      latestPayment.status === PaymentStatus.PAID &&
+      latestPayment.order.status === OrderStatus.PAID
+    ) {
+      await this.markWebhookEventProcessed(tx, eventId, {
+        processingStatus: WEBHOOK_STATUS_IGNORED,
+      });
+
+      return {
+        received: true,
+        duplicate: false,
+        processed: false,
+        payment: this.toSafePayment(latestPayment),
+        reason: 'PAYOS_PAID_ALREADY_FINALIZED',
+      };
+    }
+
+    if (
+      latestPayment.status !== PaymentStatus.PENDING ||
+      latestPayment.order.status !== OrderStatus.PENDING_PAYMENT
+    ) {
+      return this.createProviderPaidReconciliationIssue(
+        tx,
+        eventId,
+        latestPayment,
+        verifiedData,
+        this.getLatePaidIssueType(latestPayment),
+        this.getLatePaidSafeReason(latestPayment),
+      );
+    }
+
+    payment = latestPayment;
 
     if (!(await this.hasEnoughStockForPaidOrder(tx, payment))) {
-      const failedPayment = await this.failPaymentAndCancelOrder(
+      return this.createProviderPaidReconciliationIssue(
         tx,
+        eventId,
         payment,
-        'INSUFFICIENT_STOCK_AT_PAYMENT',
         verifiedData,
+        PaymentReconciliationIssueType.PAID_STOCK_SHORTAGE,
+        'Provider confirmed payment, but local stock is insufficient.',
       );
-
-      if (!failedPayment) {
-        return this.ignoreWebhookForTerminalState(tx, eventId, payment);
-      }
-
-      await this.markWebhookEventProcessed(tx, eventId, {
-        processingStatus: WEBHOOK_STATUS_PROCESSED,
-      });
-
-      return {
-        received: true,
-        duplicate: false,
-        processed: true,
-        payment: failedPayment,
-        reason: 'INSUFFICIENT_STOCK_AT_PAYMENT',
-      };
     }
 
     const paidAt = new Date();
@@ -531,7 +715,14 @@ export class PaymentsService {
     });
 
     if (orderUpdate.count !== 1) {
-      return this.ignoreWebhookForTerminalState(tx, eventId, payment);
+      return this.createProviderPaidReconciliationIssue(
+        tx,
+        eventId,
+        payment,
+        verifiedData,
+        PaymentReconciliationIssueType.LATE_PROVIDER_PAID,
+        'Provider confirmed payment while local order state changed concurrently.',
+      );
     }
 
     const paymentUpdate = await tx.payment.updateMany({
@@ -558,17 +749,17 @@ export class PaymentsService {
       });
     }
 
-    for (const item of payment.order.items) {
+    for (const [variantId, quantity] of this.getRequiredStockByVariant(payment)) {
       const stockUpdate = await tx.productVariant.updateMany({
         where: {
-          id: item.variantId,
+          id: variantId,
           stock: {
-            gte: item.quantity,
+            gte: quantity,
           },
         },
         data: {
           stock: {
-            decrement: item.quantity,
+            decrement: quantity,
           },
         },
       });
@@ -602,6 +793,142 @@ export class PaymentsService {
       processed: true,
       payment: updatedPayment,
     };
+  }
+
+  private async createProviderPaidReconciliationIssue(
+    tx: Prisma.TransactionClient,
+    eventId: string,
+    payment: PaymentWebhookRecord,
+    verifiedData: WebhookData,
+    type: PaymentReconciliationIssueType,
+    safeReason: string,
+  ) {
+    await tx.paymentReconciliationIssue.upsert({
+      where: {
+        paymentId_type: {
+          paymentId: payment.id,
+          type,
+        },
+      },
+      create: {
+        orderId: payment.orderId,
+        paymentId: payment.id,
+        type,
+        provider: PAYMENT_PROVIDER,
+        providerOrderCode: payment.providerOrderCode,
+        providerPaymentLinkId:
+          verifiedData.paymentLinkId || payment.providerPaymentLinkId,
+        providerTransactionReference: this.truncateProviderReference(
+          verifiedData.reference,
+        ),
+        amount: verifiedData.amount,
+        currency: verifiedData.currency,
+        safeReason: safeReason.slice(0, 160),
+      },
+      update: {},
+    });
+
+    await this.markWebhookEventProcessed(tx, eventId, {
+      processingStatus: WEBHOOK_STATUS_RECONCILIATION_REQUIRED,
+    });
+
+    return {
+      received: true,
+      duplicate: false,
+      processed: true,
+      reconciliationRequired: true,
+      payment: this.toSafePayment(payment),
+      reason: type,
+    };
+  }
+
+  private async preservePaidUniqueConflictReconciliation(
+    payment: PaymentWebhookRecord,
+    verifiedData: WebhookData,
+    uniqueTarget: string,
+  ): Promise<PayosWebhookResult> {
+    const safeReason = uniqueTarget
+      ? `PAYOS_UNIQUE_CONFLICT_${uniqueTarget}`
+      : 'PAYOS_UNIQUE_CONFLICT_UNKNOWN';
+
+    await this.prismaService.paymentReconciliationIssue.upsert({
+      where: {
+        paymentId_type: {
+          paymentId: payment.id,
+          type: PaymentReconciliationIssueType.PROVIDER_LOCAL_STATUS_MISMATCH,
+        },
+      },
+      create: {
+        orderId: payment.orderId,
+        paymentId: payment.id,
+        type: PaymentReconciliationIssueType.PROVIDER_LOCAL_STATUS_MISMATCH,
+        provider: PAYMENT_PROVIDER,
+        providerOrderCode: payment.providerOrderCode,
+        providerPaymentLinkId:
+          verifiedData.paymentLinkId || payment.providerPaymentLinkId,
+        providerTransactionReference: this.truncateProviderReference(
+          verifiedData.reference,
+        ),
+        amount: verifiedData.amount,
+        currency: verifiedData.currency,
+        safeReason: safeReason.slice(0, 160),
+      },
+      update: {},
+    });
+
+    return {
+      received: true,
+      duplicate: false,
+      processed: true,
+      reconciliationRequired: true,
+      payment: this.toSafePayment(payment),
+      reason: PaymentReconciliationIssueType.PROVIDER_LOCAL_STATUS_MISMATCH,
+    };
+  }
+
+  private async isProviderLinkOwnedByAnotherPayment(
+    tx: Prisma.TransactionClient,
+    payment: PaymentWebhookRecord,
+    providerPaymentLinkId: string | undefined,
+  ): Promise<boolean> {
+    if (!providerPaymentLinkId) {
+      return false;
+    }
+
+    const linkOwner = await tx.payment.findUnique({
+      where: {
+        providerPaymentLinkId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return Boolean(linkOwner && linkOwner.id !== payment.id);
+  }
+
+  private getLatePaidIssueType(
+    payment: PaymentWebhookRecord,
+  ): PaymentReconciliationIssueType {
+    if (
+      payment.order.status === OrderStatus.EXPIRED ||
+      payment.status === PaymentStatus.EXPIRED
+    ) {
+      return PaymentReconciliationIssueType.PAID_AFTER_LOCAL_EXPIRED;
+    }
+
+    if (
+      payment.order.status === OrderStatus.CANCELLED ||
+      payment.status === PaymentStatus.CANCELLED
+    ) {
+      return PaymentReconciliationIssueType.PAID_AFTER_LOCAL_CANCELLED;
+    }
+
+    return PaymentReconciliationIssueType.LATE_PROVIDER_PAID;
+  }
+
+  private getLatePaidSafeReason(payment: PaymentWebhookRecord): string {
+    return `Provider confirmed payment after local order ${payment.order.status} / payment ${payment.status}.`;
   }
 
   private async processNonPaidWebhook(
@@ -678,66 +1005,6 @@ export class PaymentsService {
     };
   }
 
-  private async failPaymentAndCancelOrder(
-    tx: Prisma.TransactionClient,
-    payment: PaymentWebhookRecord,
-    failureReason: string,
-    verifiedData: WebhookData,
-  ): Promise<PaymentRecord | null> {
-    const cancelledAt = new Date();
-    const orderUpdate = await tx.order.updateMany({
-      where: {
-        id: payment.orderId,
-        status: OrderStatus.PENDING_PAYMENT,
-      },
-      data: {
-        status: OrderStatus.CANCELLED,
-        cancelledAt,
-      },
-    });
-
-    if (orderUpdate.count !== 1) {
-      return null;
-    }
-
-    const paymentUpdate = await tx.payment.updateMany({
-      where: {
-        id: payment.id,
-        status: PaymentStatus.PENDING,
-      },
-      data: {
-        status: PaymentStatus.FAILED,
-        providerPaymentLinkId:
-          verifiedData.paymentLinkId || payment.providerPaymentLinkId,
-        providerTransactionReference: this.truncateProviderReference(
-          verifiedData.reference,
-        ),
-        failureReason,
-        cancelledAt,
-      },
-    });
-
-    if (paymentUpdate.count !== 1) {
-      throw new ServiceUnavailableException({
-        code: 'PAYMENT_FINALIZATION_RETRY',
-        message: 'Payment finalization should be retried.',
-      });
-    }
-
-    const updatedPayment = await tx.payment.findUnique({
-      where: {
-        id: payment.id,
-      },
-      select: paymentSelect,
-    });
-
-    if (!updatedPayment) {
-      throw this.paymentNotFoundException();
-    }
-
-    return updatedPayment;
-  }
-
   private async hasEnoughStockForPaidOrder(
     tx: Prisma.TransactionClient,
     payment: PaymentWebhookRecord,
@@ -757,11 +1024,41 @@ export class PaymentsService {
       stockRows.map((stockRow) => [stockRow.id, stockRow.stock]),
     );
 
-    return payment.order.items.every((item) => {
-      const currentStock = stockByVariantId.get(item.variantId);
+    return [...this.getRequiredStockByVariant(payment)].every(
+      ([variantId, quantity]) => {
+        const currentStock = stockByVariantId.get(variantId);
 
-      return currentStock !== undefined && currentStock >= item.quantity;
-    });
+        return currentStock !== undefined && currentStock >= quantity;
+      },
+    );
+  }
+
+  private async lockPaidOrderStock(
+    tx: Prisma.TransactionClient,
+    payment: PaymentWebhookRecord,
+  ): Promise<void> {
+    const variantIds = [...this.getRequiredStockByVariant(payment).keys()];
+
+    await tx.$queryRaw(
+      Prisma.sql`SELECT "id" FROM "ProductVariant" WHERE "id" IN (${Prisma.join(
+        variantIds,
+      )}) ORDER BY "id" FOR UPDATE`,
+    );
+  }
+
+  private getRequiredStockByVariant(
+    payment: PaymentWebhookRecord,
+  ): Map<string, number> {
+    const required = new Map<string, number>();
+
+    for (const item of payment.order.items) {
+      required.set(
+        item.variantId,
+        (required.get(item.variantId) ?? 0) + item.quantity,
+      );
+    }
+
+    return required;
   }
 
   private async markWebhookEventProcessed(
@@ -822,8 +1119,48 @@ export class PaymentsService {
     return order;
   }
 
+  private assertGuestPaymentUnavailable(order: OrderForPayment): void {
+    if (order.userId !== null) {
+      return;
+    }
+
+    throw new BadRequestException({
+      code: 'GUEST_PAYMENT_NOT_AVAILABLE',
+      message: 'Online payment is not available for guest orders.',
+    });
+  }
+
+  private async assertNoReconciliationIssue(
+    orderId: string,
+    paymentId?: string,
+  ): Promise<void> {
+    const issue = await this.prismaService.paymentReconciliationIssue.findFirst({
+      where: {
+        orderId,
+        ...(paymentId ? { paymentId } : {}),
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!issue) {
+      return;
+    }
+
+    throw new ConflictException({
+      code: 'PAYMENT_RECONCILIATION_REQUIRED',
+      message: 'Payment requires manual review. Please contact support.',
+    });
+  }
+
   private queuePayosWebhookEmail(result: PayosWebhookResult) {
-    if (result.duplicate || result.processed !== true || !result.payment) {
+    if (
+      result.duplicate ||
+      result.reconciliationRequired ||
+      result.processed !== true ||
+      !result.payment
+    ) {
       return;
     }
 
@@ -940,6 +1277,11 @@ export class PaymentsService {
         message: 'Payment is not pending.',
       });
     }
+
+    await this.assertNoReconciliationIssue(
+      latestPayment.order.id,
+      latestPayment.id,
+    );
 
     throw new ServiceUnavailableException({
       code: 'PAYOS_CHECKOUT_LINK_RACE',
@@ -1253,6 +1595,24 @@ export class PaymentsService {
     return body as Webhook;
   }
 
+  private assertVerifiedWebhookData(verifiedData: WebhookData): void {
+    if (
+      !Number.isSafeInteger(verifiedData.orderCode) ||
+      verifiedData.orderCode < 1 ||
+      verifiedData.orderCode > MAX_POSTGRES_INT ||
+      !Number.isSafeInteger(verifiedData.amount) ||
+      verifiedData.amount < 0 ||
+      verifiedData.amount > MAX_POSTGRES_INT ||
+      typeof verifiedData.currency !== 'string' ||
+      !/^[A-Z]{3}$/.test(verifiedData.currency)
+    ) {
+      throw new BadRequestException({
+        code: 'PAYOS_WEBHOOK_DATA_INVALID',
+        message: 'Verified payOS webhook data is invalid.',
+      });
+    }
+  }
+
   private sanitizeWebhookMetadata(
     webhook: Webhook,
     verifiedData: WebhookData,
@@ -1418,6 +1778,39 @@ export class PaymentsService {
     return (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
+    );
+  }
+
+  private getUniqueConstraintTarget(error: unknown): string {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+      return '';
+    }
+
+    const target = error.meta?.target;
+    const rawTarget = Array.isArray(target)
+      ? target.join(',')
+      : typeof target === 'string'
+        ? target
+        : '';
+
+    return rawTarget.replace(/[^A-Za-z0-9_,.-]/g, '').slice(0, 160);
+  }
+
+  private isWebhookEventUniqueConstraintTarget(target: string): boolean {
+    if (!target) {
+      return false;
+    }
+
+    const normalized = target.toLowerCase();
+    const fields = new Set(
+      normalized.split(',').map((field) => field.trim()).filter(Boolean),
+    );
+
+    return (
+      normalized.includes(
+        'paymentwebhookevent_provider_eventkey_key',
+      ) ||
+      (fields.has('provider') && fields.has('eventkey'))
     );
   }
 }

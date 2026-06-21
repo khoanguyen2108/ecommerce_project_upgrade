@@ -56,6 +56,26 @@ const adminPaymentWebhookEventSummarySelect = {
   processingStatus: true,
 } as const satisfies Prisma.PaymentWebhookEventSelect;
 
+const adminPaymentReconciliationIssueSelect = {
+  id: true,
+  orderId: true,
+  paymentId: true,
+  type: true,
+  status: true,
+  provider: true,
+  providerOrderCode: true,
+  providerPaymentLinkId: true,
+  providerTransactionReference: true,
+  amount: true,
+  currency: true,
+  safeReason: true,
+  createdAt: true,
+  updatedAt: true,
+  resolvedAt: true,
+  resolvedBy: true,
+  adminNote: true,
+} as const satisfies Prisma.PaymentReconciliationIssueSelect;
+
 const adminPaymentListSelect = {
   id: true,
   orderId: true,
@@ -73,6 +93,10 @@ const adminPaymentListSelect = {
   cancelledAt: true,
   order: {
     select: adminPaymentOrderWithUserSelect,
+  },
+  reconciliationIssues: {
+    orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    select: adminPaymentReconciliationIssueSelect,
   },
 } as const satisfies Prisma.PaymentSelect;
 
@@ -377,6 +401,7 @@ export class AdminPaymentsService {
       providerPaymentLinkId: payment.providerPaymentLinkId,
       providerTransactionReference: payment.providerTransactionReference,
       failureReason: payment.failureReason,
+      reconciliationIssues: payment.reconciliationIssues,
       order: this.toOrderSummary(payment.order),
       user: payment.order.user,
       createdAt: payment.createdAt,

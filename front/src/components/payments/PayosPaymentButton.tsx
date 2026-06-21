@@ -18,6 +18,10 @@ const PAYMENT_ERROR_MESSAGES: Record<string, string> = {
   ORDER_TOTAL_INVALID: "This order total cannot be paid.",
   PAYMENT_AMOUNT_MISMATCH: "The saved payment amount no longer matches the order.",
   PAYMENT_NOT_PENDING: "This payment is no longer pending.",
+  PAYMENT_RECONCILIATION_REQUIRED:
+    "Payment requires manual review. Please contact support.",
+  GUEST_PAYMENT_NOT_AVAILABLE:
+    "Online payment is not available for guest orders.",
   PAYOS_CONFIGURATION_ERROR: "Online payment is temporarily unavailable.",
   PAYOS_ORDER_EXPIRED: "This order has expired and can no longer be paid.",
   PAYOS_PROVIDER_ERROR: "payOS could not create a checkout link. Please retry.",

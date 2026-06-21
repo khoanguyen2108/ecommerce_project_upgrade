@@ -37,6 +37,23 @@ enum PaymentProvider {
   PAYOS
 }
 
+enum PaymentReconciliationIssueType {
+  LATE_PROVIDER_PAID
+  PAID_AFTER_LOCAL_CANCELLED
+  PAID_AFTER_LOCAL_EXPIRED
+  PAID_STOCK_SHORTAGE
+  PROVIDER_LOCAL_STATUS_MISMATCH
+}
+
+enum PaymentReconciliationIssueStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  REFUND_REQUIRED
+  REFUNDED
+  FULFILLMENT_REQUIRED
+}
+
 enum VoucherDiscountType {
   PERCENT
   FIXED
@@ -238,6 +255,7 @@ model Order {
   items          OrderItem[]
   payments       Payment[]
   webhookEvents  PaymentWebhookEvent[]
+  paymentReconciliationIssues PaymentReconciliationIssue[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -285,11 +303,39 @@ model Payment {
   paidAt                       DateTime?
   cancelledAt                  DateTime?
   webhookEvents                PaymentWebhookEvent[]
+  reconciliationIssues         PaymentReconciliationIssue[]
 
   @@unique([orderId, provider])
   @@index([orderId])
   @@index([provider, status])
   @@index([createdAt])
+}
+
+model PaymentReconciliationIssue {
+  id                           String                           @id @default(uuid()) @db.Uuid
+  orderId                      String                           @db.Uuid
+  order                        Order                            @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  paymentId                    String                           @db.Uuid
+  payment                      Payment                          @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  type                         PaymentReconciliationIssueType
+  status                       PaymentReconciliationIssueStatus @default(OPEN)
+  provider                     PaymentProvider
+  providerOrderCode            Int
+  providerPaymentLinkId        String?                          @db.VarChar(120)
+  providerTransactionReference String?                          @db.VarChar(120)
+  amount                       Int
+  currency                     String                           @db.VarChar(3)
+  safeReason                   String                           @db.VarChar(160)
+  createdAt                    DateTime                         @default(now())
+  updatedAt                    DateTime                         @updatedAt
+  resolvedAt                   DateTime?
+  resolvedBy                   String?                          @db.Uuid
+  adminNote                    String?                          @db.VarChar(1000)
+
+  @@unique([paymentId, type])
+  @@index([orderId, status])
+  @@index([provider, providerOrderCode])
+  @@index([status, createdAt])
 }
 
 model PaymentWebhookEvent {

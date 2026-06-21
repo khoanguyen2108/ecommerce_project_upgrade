@@ -13,6 +13,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiCreatedResponse,
+  ApiConflictResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -45,7 +46,7 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'Create or reuse a payOS checkout link for an order',
     description:
-      'Creates a provider checkout link from backend-calculated order data for an authenticated owner (or an admin under the existing role rules). Guest orders are not accepted because no secure guest payment token exists. This endpoint never marks the order or payment as paid.',
+      'Creates a provider checkout link from backend-calculated order data for an authenticated owner (or an admin under the existing role rules). Guest orders are rejected because no secure guest payment token exists. Orders or payments with reconciliation history are blocked until a dedicated recovery workflow exists. This endpoint never marks the order or payment as paid.',
   })
   @ApiCreatedResponse(
     envelopeResponse('payOS checkout link created.', payosPaymentDataExample),
@@ -55,6 +56,13 @@ export class PaymentsController {
       'Order is not payable.',
       'ORDER_NOT_PENDING_PAYMENT',
       'Order is not pending payment.',
+    ),
+  )
+  @ApiConflictResponse(
+    errorEnvelopeResponse(
+      'Payment requires manual reconciliation review.',
+      'PAYMENT_RECONCILIATION_REQUIRED',
+      'Payment requires manual review. Please contact support.',
     ),
   )
   @ApiUnauthorizedResponse(
@@ -90,7 +98,7 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'Receive a payOS webhook',
     description:
-      'Public HTTP endpoint. The payload is verified with payOS before any payment, order, or stock state is mutated. Duplicate verified events are idempotent.',
+      'Public HTTP endpoint. The payload is verified with payOS before any payment, order, stock, or reconciliation state is mutated. A verified paid event finalizes a normal pending order only when local data and stock are valid; terminal-state, stock-shortage, and provider/local mismatch cases create an idempotent manual-review reconciliation issue. Paid authority remains verified-webhook-only.',
   })
   @ApiBody({
     schema: {

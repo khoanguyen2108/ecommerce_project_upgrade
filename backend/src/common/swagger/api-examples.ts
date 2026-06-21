@@ -451,6 +451,26 @@ const adminWebhookEventSummaryExample = {
   processingStatus: 'PROCESSED',
 };
 
+const paymentReconciliationIssueExample = {
+  id: '6e2f09c7-c633-4592-9d4c-91b0fe25dd76',
+  orderId: orderExample.id,
+  paymentId: paymentExample.id,
+  type: 'PAID_STOCK_SHORTAGE',
+  status: 'OPEN',
+  provider: 'PAYOS',
+  providerOrderCode: paymentExample.providerOrderCode,
+  providerPaymentLinkId: paymentExample.providerPaymentLinkId,
+  providerTransactionReference: 'TF230204212323',
+  amount: paymentExample.amount,
+  currency: paymentExample.currency,
+  safeReason: 'Provider confirmed payment, but local stock is insufficient.',
+  createdAt: '2026-06-14T10:36:01.000Z',
+  updatedAt: '2026-06-14T10:36:01.000Z',
+  resolvedAt: null,
+  resolvedBy: null,
+  adminNote: null,
+};
+
 export const adminOrderSummaryExample = {
   id: orderExample.id,
   user: adminOrderUserSummaryExample,
@@ -472,6 +492,7 @@ export const adminOrderDetailExample = {
   items: [orderItemExample],
   payments: [paymentExample],
   webhookEvents: [adminWebhookEventSummaryExample],
+  paymentReconciliationIssues: [paymentReconciliationIssueExample],
 };
 
 export const adminOrderDataExample = {
@@ -498,6 +519,7 @@ export const adminPaymentSummaryExample = {
   providerPaymentLinkId: paymentExample.providerPaymentLinkId,
   providerTransactionReference: paymentExample.providerTransactionReference,
   failureReason: paymentExample.failureReason,
+  reconciliationIssues: [paymentReconciliationIssueExample],
   order: {
     id: orderExample.id,
     userId: orderExample.userId,

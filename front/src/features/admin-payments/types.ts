@@ -7,6 +7,7 @@ import type { Pagination } from "@/lib/api/types";
 import type {
   AdminOrderCustomer,
   AdminWebhookEventSummary,
+  PaymentReconciliationIssue,
 } from "@/features/admin-orders/types";
 
 export type AdminPaymentSort = "createdAt" | "updatedAt" | "paidAt" | "amount";
@@ -28,7 +29,7 @@ export interface AdminPaymentQuery {
 
 export interface AdminPaymentOrderSummary {
   id: string;
-  userId: string;
+  userId: string | null;
   status: OrderStatus;
   subtotalAmount: number;
   totalAmount: number;
@@ -52,7 +53,8 @@ export interface AdminPaymentSummary {
   providerTransactionReference: string | null;
   failureReason: string | null;
   order: AdminPaymentOrderSummary;
-  user: AdminOrderCustomer;
+  user: AdminOrderCustomer | null;
+  reconciliationIssues: PaymentReconciliationIssue[];
   createdAt: string;
   updatedAt: string;
   paidAt: string | null;

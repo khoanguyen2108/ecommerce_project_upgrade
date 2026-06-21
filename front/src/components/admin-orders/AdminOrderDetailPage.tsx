@@ -135,6 +135,12 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
         </tbody></table></div>
       </DetailSection>
 
+      <DetailSection eyebrow="Payment reconciliation required" title="Manual review issues" meta={`${order.paymentReconciliationIssues.length} records`}>
+        <div className="admin-table-wrap admin-table-wrap--commerce"><table className="admin-table"><thead><tr><th>Issue type</th><th>Status</th><th>Reason</th><th>Amount</th><th>Provider order code</th><th>Created</th></tr></thead><tbody>
+          {order.paymentReconciliationIssues.length === 0 ? <tr><td className="admin-table__state" colSpan={6}>No payment reconciliation issue is recorded for this order.</td></tr> : order.paymentReconciliationIssues.map((issue) => <tr key={issue.id}><td><strong>{issue.type}</strong></td><td>{issue.status}</td><td>{issue.safeReason}</td><td>{formatCurrency(issue.amount, issue.currency)}</td><td>{formatOrderCode(issue.providerOrderCode)}</td><td>{formatDateTime(issue.createdAt)}</td></tr>)}
+        </tbody></table></div>
+      </DetailSection>
+
       <DetailSection eyebrow="Reduced processing data" title="Webhook processing summaries" meta={`${order.webhookEvents.length} records`}>
         <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Event</th><th>Provider</th><th>Status</th><th>Received</th><th>Processed</th></tr></thead><tbody>
           {order.webhookEvents.length === 0 ? <tr><td className="admin-table__state" colSpan={5}>No webhook processing summaries were returned. Raw metadata and signature hashes are never shown here.</td></tr> : order.webhookEvents.map((event) => <tr key={event.id}><td><span className="admin-code">{event.id}</span></td><td>{event.provider}</td><td>{event.processingStatus}</td><td>{formatDateTime(event.receivedAt)}</td><td>{formatDateTime(event.processedAt)}</td></tr>)}

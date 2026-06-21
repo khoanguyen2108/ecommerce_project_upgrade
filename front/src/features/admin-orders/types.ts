@@ -74,6 +74,41 @@ export interface AdminWebhookEventSummary {
   processingStatus: string;
 }
 
+export type PaymentReconciliationIssueType =
+  | "LATE_PROVIDER_PAID"
+  | "PAID_AFTER_LOCAL_CANCELLED"
+  | "PAID_AFTER_LOCAL_EXPIRED"
+  | "PAID_STOCK_SHORTAGE"
+  | "PROVIDER_LOCAL_STATUS_MISMATCH";
+
+export type PaymentReconciliationIssueStatus =
+  | "OPEN"
+  | "REVIEWING"
+  | "RESOLVED"
+  | "REFUND_REQUIRED"
+  | "REFUNDED"
+  | "FULFILLMENT_REQUIRED";
+
+export interface PaymentReconciliationIssue {
+  id: string;
+  orderId: string;
+  paymentId: string;
+  type: PaymentReconciliationIssueType;
+  status: PaymentReconciliationIssueStatus;
+  provider: PaymentProvider;
+  providerOrderCode: number;
+  providerPaymentLinkId: string | null;
+  providerTransactionReference: string | null;
+  amount: number;
+  currency: string;
+  safeReason: string;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  adminNote: string | null;
+}
+
 export interface AdminOrderBase {
   id: string;
   userId: string | null;
@@ -114,6 +149,7 @@ export interface AdminOrder extends AdminOrderBase {
   items: AdminOrderItem[];
   payments: AdminOrderPayment[];
   webhookEvents: AdminWebhookEventSummary[];
+  paymentReconciliationIssues: PaymentReconciliationIssue[];
 }
 
 export interface AdminOrdersListResponse {
