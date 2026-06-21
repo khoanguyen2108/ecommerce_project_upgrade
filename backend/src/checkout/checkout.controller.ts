@@ -17,7 +17,9 @@ import {
   envelopeResponse,
   errorEnvelopeResponse,
   orderDataExample,
+  payosPaymentDataExample,
 } from '../common/swagger/api-examples';
+import { PaymentsService } from '../payments/payments.service';
 import { CheckoutService } from './checkout.service';
 import { CheckoutVoucherDto } from './dto/checkout-voucher.dto';
 import { CreateCheckoutOrderDto } from './dto/create-checkout-order.dto';
@@ -90,7 +92,10 @@ export class CheckoutController {
 @ApiTags('checkout')
 @Controller('checkout/guest')
 export class GuestCheckoutController {
-  constructor(private readonly checkoutService: CheckoutService) {}
+  constructor(
+    private readonly checkoutService: CheckoutService,
+    private readonly paymentsService: PaymentsService,
+  ) {}
 
   @ApiOperation({
     summary: 'Preview checkout for a guest cart',
@@ -130,5 +135,36 @@ export class GuestCheckoutController {
   @Post('orders')
   createOrder(@Body() dto: CreateGuestCheckoutOrderDto) {
     return this.checkoutService.createGuestOrder(dto);
+  }
+
+  @ApiOperation({
+    summary: 'Create a guest order and start payOS checkout',
+    description:
+      'Accepts the complete guest cart, shipping, email, and optional voucher payload. It creates an unclaimed guest order as PENDING_PAYMENT, then creates or reuses its payOS link internally. It does not accept an order ID for public payment, expose guest order details after redirect, reserve or decrement stock, or mark paid. Only the verified payOS webhook can finalize payment.',
+  })
+  @ApiCreatedResponse(
+    envelopeResponse('Guest payOS checkout created.', {
+      order: orderDataExample.order,
+      ...payosPaymentDataExample,
+    }),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Guest cart, shipping information, voucher, or payment request is invalid.',
+      'CHECKOUT_ITEM_STOCK_UNAVAILABLE',
+      'Requested quantity is not available for this item.',
+    ),
+  )
+  @Post('pay')
+  async createPayment(@Body() dto: CreateGuestCheckoutOrderDto) {
+    const { order } = await this.checkoutService.createGuestOrder(dto);
+    const payment = await this.paymentsService.createPayosPaymentForGuestOrder(
+      order.id,
+    );
+
+    return {
+      order,
+      ...payment,
+    };
   }
 }

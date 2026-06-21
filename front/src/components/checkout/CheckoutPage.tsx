@@ -2,7 +2,6 @@
 
 import {
   AlertCircle,
-  CheckCircle2,
   Info,
   RefreshCw,
 } from "lucide-react";
@@ -12,10 +11,9 @@ import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
 import { getSafeCheckoutUrl } from "@/components/payments/PayosPaymentButton";
-import { formatCurrency } from "@/components/orders/order-format";
 import {
   createCheckoutOrder,
-  createGuestCheckoutOrder,
+  createGuestCheckoutPayment,
   getCheckoutSummary,
   getGuestCheckoutSummary,
 } from "@/features/checkout/api";
@@ -28,7 +26,6 @@ import type {
   CheckoutSummary as CheckoutSummaryModel,
   GuestCheckoutItemRequest,
 } from "@/features/checkout/types";
-import type { Order } from "@/features/orders/types";
 import { createPayosPayment } from "@/features/payments/api";
 import { listAddresses } from '@/features/addresses/api';
 import type { Address, AddressInput } from '@/features/addresses/types';
@@ -43,7 +40,6 @@ export function CheckoutPage() {
   const [checkoutMode, setCheckoutMode] = useState<CheckoutMode>();
   const [guestItems, setGuestItems] = useState<GuestCheckoutItemRequest[]>([]);
   const [summary, setSummary] = useState<CheckoutSummaryModel>();
-  const [createdGuestOrder, setCreatedGuestOrder] = useState<Order>();
   const [paymentRecoveryOrderId, setPaymentRecoveryOrderId] = useState<string>();
   const [voucherInput, setVoucherInput] = useState("");
   const [requestedVoucherCode, setRequestedVoucherCode] = useState<string>();
@@ -217,25 +213,17 @@ export function CheckoutPage() {
     setPaymentRecoveryOrderId(undefined);
 
     let authenticatedOrderId: string | undefined;
+    let guestOrderCode: number | undefined;
 
     try {
       const normalizedShipping = normalizeAddressInput(shippingInfo);
-      const response = checkoutMode === "AUTHENTICATED"
-        ? await createCheckoutOrder({
+      if (checkoutMode === "AUTHENTICATED") {
+        const response = await createCheckoutOrder({
             ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
             ...(selectedAddressId === 'new'
               ? { shippingInfo: { ...normalizedShipping, saveAddress, setDefault: saveAddress && setDefault } }
               : { addressId: selectedAddressId }),
-          })
-        : await createGuestCheckoutOrder({
-            items: guestItems,
-            ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
-            shippingInfo: {
-              ...normalizedShipping,
-              email: normalizedGuestEmail,
-            },
           });
-      if (checkoutMode === "AUTHENTICATED") {
         authenticatedOrderId = response.order.id;
         void refreshCart().catch(() => undefined);
 
@@ -254,9 +242,26 @@ export function CheckoutPage() {
         return;
       }
 
-      setCreatedGuestOrder(response.order);
-      setSummary(undefined);
+      const response = await createGuestCheckoutPayment({
+        items: guestItems,
+        ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
+        shippingInfo: {
+          ...normalizedShipping,
+          email: normalizedGuestEmail,
+        },
+      });
+      guestOrderCode = response.payment.providerOrderCode;
+      const checkoutUrl = getSafeCheckoutUrl(
+        response.checkoutUrl || response.paymentUrl,
+      );
+
+      if (!checkoutUrl) {
+        throw new Error("PAYOS_CHECKOUT_URL_MISSING");
+      }
+
+      window.location.assign(checkoutUrl);
       clearGuestCart();
+      return;
     } catch (submitError) {
       const submitErrorCode = getCheckoutErrorCode(submitError);
 
@@ -267,6 +272,21 @@ export function CheckoutPage() {
           submitErrorCode === "PAYMENT_RECONCILIATION_REQUIRED"
             ? "Payment requires manual review. Please contact support."
             : "Payment link could not be created. Please retry from your order.",
+        );
+      } else if (checkoutMode === "GUEST" && guestOrderCode) {
+        setError(
+          `Payment could not be started. Contact support with order code ${guestOrderCode}.`,
+        );
+      } else if (checkoutMode === "GUEST") {
+        const checkoutMessage = getCheckoutErrorMessage(
+          submitError,
+          "Payment could not be started. Please retry or contact support.",
+        );
+        setError(
+          submitErrorCode?.startsWith("CHECKOUT_") ||
+            submitErrorCode === "VALIDATION_ERROR"
+            ? checkoutMessage
+            : "Payment could not be started. Please retry or contact support.",
         );
       } else {
         setError(
@@ -286,10 +306,6 @@ export function CheckoutPage() {
     }
   }
 
-  if (createdGuestOrder) {
-    return <GuestCheckoutSuccess order={createdGuestOrder} />;
-  }
-
   const isEmpty = !isLoading && errorCode === "CHECKOUT_CART_EMPTY";
 
   return (
@@ -298,7 +314,7 @@ export function CheckoutPage() {
         subtitle={
           checkoutMode === "AUTHENTICATED"
             ? "You will be redirected to payOS to complete your payment."
-            : "Review your cart before creating an order that waits for payment confirmation."
+            : "You will be redirected to payOS to complete payment."
         }
         title="Review your order"
       />
@@ -346,7 +362,7 @@ export function CheckoutPage() {
 
       {summary ? (
         <CheckoutSummary
-          isDirectPay={checkoutMode === "AUTHENTICATED"}
+          isDirectPay
           isLoading={isLoading}
           isSubmitting={isSubmitting}
           onApplyVoucher={handleApplyVoucher}
@@ -479,88 +495,6 @@ function CheckoutStepper({ current }: { current: "review" | "pending" }) {
         })}
       </ol>
     </nav>
-  );
-}
-
-function GuestCheckoutSuccess({ order }: { order: Order }) {
-  return (
-    <main className="customer-page checkout-page checkout-page--success">
-      <CheckoutIntro
-        subtitle="Your order is saved and is now waiting for payment confirmation."
-        title="Order created"
-      />
-      <CheckoutStepper current="pending" />
-
-      <section
-        aria-labelledby="checkout-success-heading"
-        className="checkout-success-panel"
-        role="status"
-      >
-        <div className="checkout-success-panel__mark">
-          <CheckCircle2 aria-hidden="true" size={28} strokeWidth={1.7} />
-        </div>
-        <div className="checkout-success-panel__heading">
-          <p className="eyebrow">Order status</p>
-          <h2 id="checkout-success-heading">{order.status}</h2>
-        </div>
-
-        <dl className="checkout-success-details">
-          <div>
-            <dt>Order ID</dt>
-            <dd>{order.id}</dd>
-          </div>
-          <div>
-            <dt>Subtotal</dt>
-            <dd>{formatCurrency(order.subtotalAmount, order.currency)}</dd>
-          </div>
-          <div>
-            <dt>Discount</dt>
-            <dd>{formatCurrency(order.discountAmount, order.currency)}</dd>
-          </div>
-          {order.voucherCodeSnapshot ? (
-            <div>
-              <dt>Voucher</dt>
-              <dd>{order.voucherCodeSnapshot}</dd>
-            </div>
-          ) : null}
-          <div>
-            <dt>Final total</dt>
-            <dd>{formatCurrency(order.totalAmount, order.currency)}</dd>
-          </div>
-        </dl>
-
-        {order.shippingRecipientName ? (
-          <div className="checkout-success-shipping">
-            <p className="eyebrow">Customer and shipping</p>
-            {order.guestEmail ? <span>Email: {order.guestEmail}</span> : null}
-            <strong>{order.shippingRecipientName}</strong>
-            <span>{order.shippingPhone}</span>
-            <span>{[
-              order.shippingAddressLine,
-              order.shippingWard,
-              order.shippingDistrict,
-              order.shippingProvince,
-            ].filter(Boolean).join(", ")}</span>
-            {order.shippingNote ? <span>{order.shippingNote}</span> : null}
-          </div>
-        ) : null}
-
-        <div className="checkout-pending-note" role="note">
-          <Info aria-hidden="true" size={18} />
-          <span>
-            Guest online payment is deferred because this order has no secure
-            guest access token. The order remains pending and is not attached
-            to an account.
-          </span>
-        </div>
-
-        <div className="checkout-success-actions">
-          <Link className="button button--secondary" href="/products">
-            Continue shopping
-          </Link>
-        </div>
-      </section>
-    </main>
   );
 }
 

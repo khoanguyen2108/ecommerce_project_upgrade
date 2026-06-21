@@ -7,6 +7,7 @@ import { PaymentsService } from './payments.service';
 @Module({
   imports: [AuthModule, EmailModule],
   controllers: [PaymentsController],
+  exports: [PaymentsService],
   providers: [PaymentsService],
 })
 export class PaymentsModule {}

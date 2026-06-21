@@ -1,4 +1,5 @@
 import type { OrderResponse } from "@/features/orders/types";
+import type { PayosPaymentResponse } from "@/features/payments/types";
 import type { AddressInput } from '@/features/addresses/types';
 
 export interface CheckoutSummaryItem {
@@ -84,4 +85,8 @@ export interface GuestCheckoutShippingInfo extends AddressInput {
 export interface CreateGuestCheckoutOrderRequest
   extends GuestCheckoutSummaryRequest {
   shippingInfo: GuestCheckoutShippingInfo;
+}
+
+export interface GuestCheckoutPaymentResponse extends PayosPaymentResponse {
+  order: OrderResponse["order"];
 }
