@@ -97,5 +97,12 @@ if [ "$migrate_exit" -ne 0 ]; then
 fi
 
 echo "[prisma] migrate deploy succeeded"
+echo "[prisma] generating Prisma client..."
+npm run prisma:generate
+
 echo "[startup] starting NestJS app..."
-exec npm run start:prod
+if [ "$#" -eq 0 ]; then
+  exec npm run start:prod
+fi
+
+exec "$@"
