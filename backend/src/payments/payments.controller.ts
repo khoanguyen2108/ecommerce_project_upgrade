@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Head,
   HttpCode,
   Post,
   Query,
@@ -142,7 +143,19 @@ export class PaymentsController {
   @Post('webhook')
   @HttpCode(200)
   handlePayosWebhook(@Body() body: unknown, @Req() request: RequestWithId) {
-    return this.paymentsService.handlePayosWebhook(body, request.requestId);
+    return this.paymentsService.handlePayosWebhook(body, request);
+  }
+
+  @Get('webhook')
+  @HttpCode(200)
+  handlePayosWebhookGet(@Req() request: RequestWithId) {
+    return this.paymentsService.handlePayosWebhookDashboardPing(request);
+  }
+
+  @Head('webhook')
+  @HttpCode(200)
+  handlePayosWebhookHead(@Req() request: RequestWithId) {
+    return this.paymentsService.handlePayosWebhookDashboardPing(request);
   }
 
   @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)

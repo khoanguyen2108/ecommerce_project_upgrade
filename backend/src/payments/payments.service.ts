@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -16,6 +17,7 @@ import {
 } from '@payos/node';
 import { createHash } from 'node:crypto';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user';
+import type { RequestWithId } from '../common/types/request-with-id';
 import { OrderEmailService } from '../email/order-email.service';
 import { Prisma } from '../generated/prisma/client';
 import {
@@ -37,6 +39,23 @@ const WEBHOOK_STATUS_PROCESSED = 'PROCESSED';
 const WEBHOOK_STATUS_IGNORED = 'IGNORED';
 const WEBHOOK_STATUS_RECONCILIATION_REQUIRED = 'RECONCILIATION_REQUIRED';
 const MAX_POSTGRES_INT = 2_147_483_647;
+const PAYOS_WEBHOOK_ENVELOPE_KEYS = new Set([
+  'code',
+  'data',
+  'desc',
+  'signature',
+  'success',
+]);
+const PAYOS_WEBHOOK_PAYMENT_KEYS = new Set([
+  'accountNumber',
+  'amount',
+  'currency',
+  'description',
+  'orderCode',
+  'paymentLinkId',
+  'reference',
+  'transactionDateTime',
+]);
 
 const paymentSelect = {
   id: true,
@@ -147,6 +166,7 @@ type PayosWebhookClassification = Exclude<
 >;
 
 export interface PayosWebhookResult {
+  dashboardPing?: boolean;
   duplicate: boolean;
   payment?: PaymentRecord;
   processed?: boolean;
@@ -154,6 +174,31 @@ export interface PayosWebhookResult {
   reason?: string;
   received: boolean;
   status?: string;
+}
+
+type PayosWebhookValidationStage =
+  | 'dashboard-ping-detected'
+  | 'malformed-envelope'
+  | 'processed'
+  | 'received'
+  | 'rejected'
+  | 'verification-failed'
+  | 'verification-passed'
+  | 'verification-start';
+
+interface PayosWebhookLogContext {
+  bodyDataPresent: boolean;
+  bodySignaturePresent: boolean;
+  bodyTopLevelKeys: string[];
+  checksumHeaderPresent: boolean;
+  contentType?: string;
+  method?: string;
+  path?: string;
+  providerOrderCode?: number;
+  remoteIp?: string;
+  requestId?: string;
+  signatureHeaderPresent: boolean;
+  userAgent?: string;
 }
 
 @Injectable()
@@ -265,12 +310,78 @@ export class PaymentsService {
 
   async handlePayosWebhook(
     body: unknown,
-    requestId?: string,
+    request: RequestWithId,
   ): Promise<PayosWebhookResult> {
-    const credentials = this.getPayosCredentials();
-    const webhook = this.assertWebhookPayload(body);
-    const verifiedData = await this.verifyPayosWebhook(credentials, webhook);
-    this.assertVerifiedWebhookData(verifiedData);
+    const logContext = this.getPayosWebhookLogContext(request, body);
+
+    this.logPayosWebhookStage('received', logContext);
+
+    if (this.isDashboardActivationPing(body)) {
+      return this.acknowledgePayosWebhookDashboardPing(logContext);
+    }
+
+    let credentials!: PayosCredentials;
+    let webhook!: Webhook;
+    let verifiedData!: WebhookData;
+
+    try {
+      webhook = this.assertWebhookPayload(body);
+    } catch (error) {
+      this.logPayosWebhookStage(
+        'malformed-envelope',
+        logContext,
+        {
+          ...this.toSafeWebhookErrorSummary(error),
+        },
+        'warn',
+      );
+      throw error;
+    }
+
+    try {
+      credentials = this.getPayosCredentials();
+    } catch (error) {
+      this.logPayosWebhookStage('rejected', logContext, {
+        ...this.toSafeWebhookErrorSummary(error),
+      });
+      throw error;
+    }
+
+    this.logPayosWebhookStage('verification-start', logContext);
+
+    try {
+      verifiedData = await this.verifyPayosWebhook(credentials, webhook);
+    } catch (error) {
+      this.logPayosWebhookStage(
+        'verification-failed',
+        logContext,
+        {
+          ...this.toSafeWebhookErrorSummary(error),
+        },
+        'warn',
+      );
+      throw error;
+    }
+
+    this.logPayosWebhookStage('verification-passed', logContext, {
+      providerOrderCode: verifiedData.orderCode,
+    });
+
+    try {
+      this.assertVerifiedWebhookData(verifiedData);
+    } catch (error) {
+      this.logPayosWebhookStage(
+        'rejected',
+        logContext,
+        {
+          providerOrderCode: verifiedData.orderCode,
+          ...this.toSafeWebhookErrorSummary(error),
+        },
+        'warn',
+      );
+      throw error;
+    }
+
     const signatureHash = this.hashValue(webhook.signature);
     const eventKey = this.buildWebhookEventKey(verifiedData, signatureHash);
     const metadata = this.sanitizeWebhookMetadata(webhook, verifiedData);
@@ -484,18 +595,14 @@ export class PaymentsService {
       });
 
       this.queuePayosWebhookEmail(result);
-      this.logger.log(
-        JSON.stringify({
-          requestId,
-          provider: PAYMENT_PROVIDER,
-          orderCode: verifiedData.orderCode,
-          orderId: result.payment?.orderId,
-          duplicate: result.duplicate,
-          processed: result.processed ?? false,
-          paymentStatus: result.payment?.status,
-          reason: result.reason,
-        }),
-      );
+      this.logPayosWebhookStage('processed', logContext, {
+        orderCode: verifiedData.orderCode,
+        orderId: result.payment?.orderId,
+        duplicate: result.duplicate,
+        processed: result.processed ?? false,
+        paymentStatus: result.payment?.status,
+        reason: result.reason,
+      });
 
       return result;
     } catch (error) {
@@ -518,17 +625,13 @@ export class PaymentsService {
           (this.isWebhookEventUniqueConstraintTarget(uniqueTarget) ||
             !uniqueTarget)
         ) {
-          this.logger.log(
-            JSON.stringify({
-              requestId,
-              provider: PAYMENT_PROVIDER,
-              orderCode: verifiedData.orderCode,
-              duplicate: true,
-              processed: false,
-              reason: 'PAYOS_WEBHOOK_DUPLICATE_RACE',
-              prismaTarget: uniqueTarget || 'CONFIRMED_BY_EVENT_KEY',
-            }),
-          );
+          this.logPayosWebhookStage('processed', logContext, {
+            orderCode: verifiedData.orderCode,
+            duplicate: true,
+            processed: false,
+            reason: 'PAYOS_WEBHOOK_DUPLICATE_RACE',
+            prismaTarget: uniqueTarget || 'CONFIRMED_BY_EVENT_KEY',
+          });
 
           return {
             received: true,
@@ -544,16 +647,17 @@ export class PaymentsService {
           select: paymentWebhookSelect,
         });
 
-        this.logger.warn(
-          JSON.stringify({
-            requestId,
-            provider: PAYMENT_PROVIDER,
+        this.logPayosWebhookStage(
+          'rejected',
+          logContext,
+          {
             orderCode: verifiedData.orderCode,
             paymentId: payment?.id,
             orderId: payment?.orderId,
             prismaTarget: uniqueTarget || 'UNKNOWN',
             reason: 'PAYOS_WEBHOOK_UNRELATED_UNIQUE_CONFLICT',
-          }),
+          },
+          'warn',
         );
 
         if (classification === PaymentStatus.PAID && payment) {
@@ -570,8 +674,25 @@ export class PaymentsService {
         });
       }
 
+      this.logPayosWebhookStage(
+        'rejected',
+        logContext,
+        {
+          providerOrderCode: verifiedData.orderCode,
+          ...this.toSafeWebhookErrorSummary(error),
+        },
+        'warn',
+      );
       throw error;
     }
+  }
+
+  handlePayosWebhookDashboardPing(
+    request: RequestWithId,
+  ): PayosWebhookResult {
+    return this.acknowledgePayosWebhookDashboardPing(
+      this.getPayosWebhookLogContext(request),
+    );
   }
 
   async getPayosDisplayStatus(
@@ -608,6 +729,238 @@ export class PaymentsService {
       order: payment.order,
       payment: this.toSafePayment(payment),
     };
+  }
+
+  private acknowledgePayosWebhookDashboardPing(
+    logContext: PayosWebhookLogContext,
+  ): PayosWebhookResult {
+    this.logPayosWebhookStage('dashboard-ping-detected', logContext, {
+      processed: false,
+      reason: 'PAYOS_WEBHOOK_DASHBOARD_PING',
+    });
+
+    return {
+      received: true,
+      duplicate: false,
+      processed: false,
+      dashboardPing: true,
+      reason: 'PAYOS_WEBHOOK_DASHBOARD_PING',
+    };
+  }
+
+  private isDashboardActivationPing(body: unknown): boolean {
+    if (body === undefined || body === null) {
+      return true;
+    }
+
+    if (!this.isRecord(body)) {
+      return false;
+    }
+
+    const keys = Object.keys(body);
+
+    if (keys.length === 0) {
+      return true;
+    }
+
+    if (this.hasPayosWebhookSignal(body)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private hasPayosWebhookSignal(record: Record<string, unknown>): boolean {
+    const keys = Object.keys(record);
+
+    if (
+      keys.some(
+        (key) =>
+          PAYOS_WEBHOOK_ENVELOPE_KEYS.has(key) ||
+          PAYOS_WEBHOOK_PAYMENT_KEYS.has(key),
+      )
+    ) {
+      return true;
+    }
+
+    return this.isRecord(record.data)
+      ? Object.keys(record.data).some((key) =>
+          PAYOS_WEBHOOK_PAYMENT_KEYS.has(key),
+        )
+      : false;
+  }
+
+  private getPayosWebhookLogContext(
+    request: RequestWithId,
+    body?: unknown,
+  ): PayosWebhookLogContext {
+    return {
+      requestId: request.requestId,
+      method: this.sanitizeLogString(request.method, 16),
+      path: this.sanitizeLogString(request.path, 180),
+      contentType: this.sanitizeLogString(request.header('content-type'), 120),
+      userAgent: this.sanitizeLogString(request.header('user-agent'), 180),
+      remoteIp: this.sanitizeLogString(
+        request.ip ?? request.socket.remoteAddress,
+        80,
+      ),
+      bodyTopLevelKeys: this.getTopLevelKeysForLog(body),
+      bodySignaturePresent: this.isBodySignaturePresent(body),
+      bodyDataPresent: this.isRecord(body) && this.isRecord(body.data),
+      signatureHeaderPresent:
+        Boolean(request.header('x-signature')) ||
+        Boolean(request.header('x-payos-signature')) ||
+        Boolean(request.header('payos-signature')) ||
+        Boolean(request.header('signature')),
+      checksumHeaderPresent:
+        Boolean(request.header('x-checksum')) ||
+        Boolean(request.header('x-payos-checksum')) ||
+        Boolean(request.header('payos-checksum')),
+      providerOrderCode: this.getSafeProviderOrderCode(body),
+    };
+  }
+
+  private logPayosWebhookStage(
+    stage: PayosWebhookValidationStage,
+    context: PayosWebhookLogContext,
+    extra: Record<string, unknown> = {},
+    level: 'log' | 'warn' = 'log',
+  ): void {
+    const providerOrderCode =
+      typeof extra.providerOrderCode === 'number'
+        ? extra.providerOrderCode
+        : typeof extra.orderCode === 'number'
+          ? extra.orderCode
+          : context.providerOrderCode;
+    const payload = {
+      requestId: context.requestId,
+      provider: PAYMENT_PROVIDER,
+      validationStage: stage,
+      method: context.method,
+      path: context.path,
+      contentType: context.contentType,
+      userAgent: context.userAgent,
+      remoteIp: context.remoteIp,
+      bodyTopLevelKeys: context.bodyTopLevelKeys,
+      bodyDataPresent: context.bodyDataPresent,
+      bodySignaturePresent: context.bodySignaturePresent,
+      signatureHeaderPresent: context.signatureHeaderPresent,
+      checksumHeaderPresent: context.checksumHeaderPresent,
+      signaturePresent:
+        context.bodySignaturePresent || context.signatureHeaderPresent,
+      providerOrderCode,
+      ...extra,
+    };
+
+    this.logger[level](JSON.stringify(this.stripUndefinedValues(payload)));
+  }
+
+  private toSafeWebhookErrorSummary(error: unknown): {
+    errorCode: string;
+    errorMessage: string;
+  } {
+    if (error instanceof HttpException) {
+      const response = error.getResponse();
+
+      if (this.isRecord(response)) {
+        return {
+          errorCode:
+            typeof response.code === 'string'
+              ? response.code
+              : error.name || 'HTTP_EXCEPTION',
+          errorMessage: this.getSafeErrorMessage(response.message),
+        };
+      }
+
+      return {
+        errorCode: error.name || 'HTTP_EXCEPTION',
+        errorMessage: this.getSafeErrorMessage(response),
+      };
+    }
+
+    return {
+      errorCode: error instanceof Error ? error.name : 'UNKNOWN_ERROR',
+      errorMessage: 'Webhook handling failed.',
+    };
+  }
+
+  private getSafeErrorMessage(message: unknown): string {
+    if (Array.isArray(message)) {
+      return this.sanitizeLogString(message.join('; '), 240) ?? 'Request failed.';
+    }
+
+    return this.sanitizeLogString(
+      typeof message === 'string' ? message : undefined,
+      240,
+    ) ?? 'Request failed.';
+  }
+
+  private getTopLevelKeysForLog(body: unknown): string[] {
+    if (!this.isRecord(body)) {
+      return [];
+    }
+
+    return Object.keys(body)
+      .slice(0, 20)
+      .map((key) => key.replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 64));
+  }
+
+  private isBodySignaturePresent(body: unknown): boolean {
+    return (
+      this.isRecord(body) &&
+      typeof body.signature === 'string' &&
+      body.signature.trim().length > 0
+    );
+  }
+
+  private getSafeProviderOrderCode(body: unknown): number | undefined {
+    if (!this.isRecord(body)) {
+      return undefined;
+    }
+
+    const dataOrderCode = this.isRecord(body.data)
+      ? body.data.orderCode
+      : undefined;
+    const rawOrderCode = dataOrderCode ?? body.orderCode;
+    const orderCode =
+      typeof rawOrderCode === 'number'
+        ? rawOrderCode
+        : typeof rawOrderCode === 'string' && /^\d+$/.test(rawOrderCode)
+          ? Number(rawOrderCode)
+          : undefined;
+
+    if (
+      orderCode === undefined ||
+      !Number.isSafeInteger(orderCode) ||
+      orderCode < 1 ||
+      orderCode > MAX_POSTGRES_INT
+    ) {
+      return undefined;
+    }
+
+    return orderCode;
+  }
+
+  private sanitizeLogString(
+    value: string | undefined,
+    maxLength: number,
+  ): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    return value
+      .replace(/[\r\n\t]/g, ' ')
+      .replace(/[^\x20-\x7E]/g, '?')
+      .slice(0, maxLength);
+  }
+
+  private stripUndefinedValues(
+    value: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return Object.fromEntries(
+      Object.entries(value).filter(([, entry]) => entry !== undefined),
+    );
   }
 
   private async processPaidWebhook(
