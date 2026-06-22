@@ -1,16 +1,21 @@
 "use client";
 
-import { Eye, RefreshCw, RotateCcw, Search } from "lucide-react";
+import {
+  AlertCircle,
+  Eye,
+  Inbox,
+  RefreshCw,
+  RotateCcw,
+  Search,
+} from "lucide-react";
 import Link from "next/link";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import {
   AdminFeedback,
-  AdminOrderStatusBadge,
   AdminPagination,
   AdminPaymentSafetyNote,
   AdminPaymentStatusBadge,
-  AdminTableSkeleton,
 } from "@/components/admin/AdminCommerceUi";
 import {
   cancelAdminOrder,
@@ -27,11 +32,21 @@ import type {
   AdminOrderSortDirection,
   AdminOrderSummary,
 } from "@/features/admin-orders/types";
-import type { OrderStatus } from "@/features/orders/types";
+import type {
+  OrderFulfillmentStatus,
+  OrderStatus,
+} from "@/features/orders/types";
+import { ApiClientError } from "@/lib/errors/api-error";
 import type { Pagination } from "@/lib/api/types";
 import {
   formatCurrency,
   formatDateTime,
+  formatNumber,
+  formatOrderDisplayId,
+  getFulfillmentStatusClass,
+  getFulfillmentStatusLabel,
+  getOrderStatusClass,
+  getOrderStatusLabel,
 } from "@/components/orders/order-format";
 
 const LIMIT = 8;
@@ -41,8 +56,19 @@ const ORDER_STATUSES: OrderStatus[] = [
   "CANCELLED",
   "EXPIRED",
 ];
+const FULFILLMENT_STATUSES: OrderFulfillmentStatus[] = [
+  "PENDING",
+  "PICKED_UP",
+  "IN_TRANSIT",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+];
 
-export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuery }) {
+export function AdminOrdersPage({
+  initialQuery,
+}: {
+  initialQuery: AdminOrderQuery;
+}) {
   const [query, setQuery] = useState<AdminOrderQuery>({
     ...initialQuery,
     limit: LIMIT,
@@ -59,6 +85,7 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
   const [isLoading, setIsLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<string>();
   const [error, setError] = useState<string>();
+  const [errorCode, setErrorCode] = useState<string>();
   const [requestId, setRequestId] = useState<string>();
   const [success, setSuccess] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -69,6 +96,7 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
     async function load() {
       setIsLoading(true);
       setError(undefined);
+      setErrorCode(undefined);
       setRequestId(undefined);
 
       try {
@@ -96,6 +124,9 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
               "Admin orders could not be loaded right now.",
             ),
           );
+          setErrorCode(
+            loadError instanceof ApiClientError ? loadError.code : undefined,
+          );
           setRequestId(getAdminOrderRequestId(loadError));
         }
       } finally {
@@ -104,6 +135,7 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
     }
 
     void load();
+
     return () => {
       active = false;
     };
@@ -123,7 +155,10 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
     setQuery({ limit: LIMIT, order: "desc", page: 1, sort: "createdAt" });
   }
 
-  async function transition(order: AdminOrderSummary, action: "cancel" | "expire") {
+  async function transition(
+    order: AdminOrderSummary,
+    action: "cancel" | "expire",
+  ) {
     if (order.status !== "PENDING_PAYMENT") return;
 
     const verb = action === "cancel" ? "cancel" : "expire";
@@ -134,20 +169,30 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
 
     setBusyAction(`${order.id}:${action}`);
     setError(undefined);
+    setErrorCode(undefined);
     setSuccess(undefined);
     setRequestId(undefined);
 
     try {
       if (action === "cancel") await cancelAdminOrder(order.id);
       else await expireAdminOrder(order.id);
-      setSuccess(`Order ${order.id} was ${action === "cancel" ? "cancelled" : "expired"}.`);
+      setSuccess(
+        `Order ${formatOrderDisplayId(order.id)} was ${
+          action === "cancel" ? "cancelled" : "expired"
+        }.`,
+      );
       setRefreshKey((current) => current + 1);
     } catch (actionError) {
       setError(
         getAdminOrderErrorMessage(
           actionError,
-          `The order could not be ${action === "cancel" ? "cancelled" : "expired"}.`,
+          `The order could not be ${
+            action === "cancel" ? "cancelled" : "expired"
+          }.`,
         ),
+      );
+      setErrorCode(
+        actionError instanceof ApiClientError ? actionError.code : undefined,
       );
       setRequestId(getAdminOrderRequestId(actionError));
     } finally {
@@ -156,15 +201,22 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
   }
 
   const hasFilters = Boolean(
-    query.status || query.search || query.from || query.to ||
-      query.sort !== "createdAt" || query.order !== "desc",
+    query.status ||
+      query.fulfillmentStatus ||
+      query.search ||
+      query.from ||
+      query.to ||
+      query.sort !== "createdAt" ||
+      query.order !== "desc",
   );
+  const metrics = getPageMetrics(orders, pagination.total);
+  const isAccessDenied = errorCode === "FORBIDDEN";
 
   return (
-    <div className="admin-resource admin-resource--full-width">
-      <section className="admin-resource__header" aria-labelledby="admin-orders-heading">
+    <div className="admin-resource admin-resource--full-width admin-orders-management">
+      <section className="admin-orders-hero" aria-labelledby="admin-orders-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">Commerce operations</p>
+          <p className="admin-page-intro__eyebrow">COMMERCE OPERATIONS</p>
           <h1 id="admin-orders-heading">Orders Management</h1>
           <p>Review order, customer, payment, and fulfillment state.</p>
         </div>
@@ -174,15 +226,27 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
           onClick={() => setRefreshKey((current) => current + 1)}
           type="button"
         >
-          <RefreshCw aria-hidden="true" className={isLoading ? "spin" : undefined} size={17} />
+          <RefreshCw
+            aria-hidden="true"
+            className={isLoading ? "spin" : undefined}
+            size={17}
+          />
           Refresh
         </button>
       </section>
 
       <AdminPaymentSafetyNote includeTransition />
 
-      <section className="admin-resource__toolbar admin-resource__toolbar--compact" aria-label="Order filters">
-        <form className="admin-search" onSubmit={submitSearch}>
+      <section className="admin-orders-kpis" aria-label="Current order summary">
+        <MetricCard label="Total orders" meta="Matching filters" value={metrics.total} />
+        <MetricCard label="Paid orders" meta="Current page" value={metrics.paid} />
+        <MetricCard label="Pending payment" meta="Current page" value={metrics.pending} />
+        <MetricCard label="Needs fulfillment" meta="Current page" value={metrics.inProgress} />
+        <MetricCard label="Delivered" meta="Current page" value={metrics.delivered} />
+      </section>
+
+      <section className="admin-orders-filter-panel" aria-label="Order filters">
+        <form className="admin-orders-search" onSubmit={submitSearch}>
           <label htmlFor="admin-order-search">Search</label>
           <div>
             <input
@@ -194,70 +258,387 @@ export function AdminOrdersPage({ initialQuery }: { initialQuery: AdminOrderQuer
               value={searchInput}
             />
             <button className="button button--primary" type="submit">
-              <Search aria-hidden="true" size={17} /> Search
+              <Search aria-hidden="true" size={17} />
+              Search
             </button>
           </div>
         </form>
 
-        <div className="admin-filter-grid admin-filter-grid--commerce">
-          <FilterSelect label="Status" value={query.status || ""} onChange={(value) => updateQuery({ status: (value || undefined) as OrderStatus | undefined })}>
+        <div className="admin-orders-filters">
+          <FilterSelect
+            label="Status"
+            onChange={(value) =>
+              updateQuery({
+                status: (value || undefined) as OrderStatus | undefined,
+              })
+            }
+            value={query.status || ""}
+          >
             <option value="">All statuses</option>
-            {ORDER_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+            {ORDER_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {getOrderStatusLabel(status)}
+              </option>
+            ))}
           </FilterSelect>
-          <DateFilter label="From" value={query.from || ""} onChange={(value) => updateQuery({ from: value || undefined })} />
-          <DateFilter label="To" value={query.to || ""} onChange={(value) => updateQuery({ to: value || undefined })} />
-          <FilterSelect label="Sort" value={query.sort || "createdAt"} onChange={(value) => updateQuery({ sort: value as AdminOrderSort })}>
-            <option value="createdAt">Created</option><option value="updatedAt">Updated</option><option value="totalAmount">Total</option><option value="paidAt">Paid time</option>
+          <FilterSelect
+            label="Fulfillment"
+            onChange={(value) =>
+              updateQuery({
+                fulfillmentStatus: (value || undefined) as
+                  | OrderFulfillmentStatus
+                  | undefined,
+              })
+            }
+            value={query.fulfillmentStatus || ""}
+          >
+            <option value="">All fulfillment</option>
+            {FULFILLMENT_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {getFulfillmentStatusLabel(status)}
+              </option>
+            ))}
           </FilterSelect>
-          <FilterSelect label="Order" value={query.order || "desc"} onChange={(value) => updateQuery({ order: value as AdminOrderSortDirection })}>
-            <option value="desc">Descending</option><option value="asc">Ascending</option>
+          <DateFilter
+            label="From"
+            onChange={(value) => updateQuery({ from: value || undefined })}
+            value={query.from || ""}
+          />
+          <DateFilter
+            label="To"
+            onChange={(value) => updateQuery({ to: value || undefined })}
+            value={query.to || ""}
+          />
+          <FilterSelect
+            label="Sort field"
+            onChange={(value) => updateQuery({ sort: value as AdminOrderSort })}
+            value={query.sort || "createdAt"}
+          >
+            <option value="createdAt">Created</option>
+            <option value="updatedAt">Updated</option>
+            <option value="totalAmount">Total</option>
+            <option value="paidAt">Paid time</option>
           </FilterSelect>
-          <button className="button button--secondary" disabled={!hasFilters || isLoading} onClick={resetFilters} type="button">
-            <RotateCcw aria-hidden="true" size={17} /> Reset
+          <FilterSelect
+            label="Sort order"
+            onChange={(value) =>
+              updateQuery({ order: value as AdminOrderSortDirection })
+            }
+            value={query.order || "desc"}
+          >
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </FilterSelect>
+          <button
+            className="button button--secondary"
+            disabled={!hasFilters || isLoading}
+            onClick={resetFilters}
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" size={17} />
+            Reset
           </button>
         </div>
       </section>
 
       {success ? <AdminFeedback message={success} tone="success" /> : null}
-      {error ? <AdminFeedback message={error} requestId={requestId} tone="error" /> : null}
+      {isAccessDenied ? (
+        <AccessDeniedState message={error} requestId={requestId} />
+      ) : error ? (
+        <AdminFeedback message={error} requestId={requestId} tone="error" />
+      ) : null}
 
-      <div className="admin-table-wrap admin-table-wrap--commerce">
-        <table className="admin-table admin-table--commerce">
-          <thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Payment</th><th>Total</th><th>Items</th><th>Created</th><th>Actions</th></tr></thead>
-          <tbody>
-            {isLoading ? <AdminTableSkeleton columns={8} rows={6} /> : null}
-            {!isLoading && !error && orders.length === 0 ? <tr><td className="admin-table__state" colSpan={8}>No orders match the current filters.</td></tr> : null}
-            {!isLoading && !error ? orders.map((order) => (
-              <tr key={order.id}>
-                <td><span className="admin-code">{order.id}</span></td>
-                <td><strong>{order.customerEmail || "Not set"}</strong><small className="admin-table__secondary">{[order.customerType === "GUEST" ? "Guest" : "Registered", order.customerName, order.customerPhone].filter(Boolean).join(" · ")}</small></td>
-                <td><AdminOrderStatusBadge status={order.status} /></td>
-                <td>{order.latestPayment ? <AdminPaymentStatusBadge status={order.latestPayment.status} /> : <span className="admin-table__muted">Not set</span>}</td>
-                <td>{formatCurrency(order.totalAmount, order.currency)}</td>
-                <td>{order.itemCount}</td>
-                <td>{formatDateTime(order.createdAt)}</td>
-                <td><div className="admin-row-actions admin-row-actions--commerce">
-                  <Link aria-label={`View order ${order.id}`} className="icon-button admin-icon-button" href={`/admin/orders/${encodeURIComponent(order.id)}`} title="View order"><Eye aria-hidden="true" size={17} /></Link>
-                  {order.status === "PENDING_PAYMENT" ? <>
-                    <button className="admin-link-button" disabled={Boolean(busyAction)} onClick={() => void transition(order, "cancel")} type="button">Cancel</button>
-                    <button className="admin-link-button" disabled={Boolean(busyAction)} onClick={() => void transition(order, "expire")} type="button">Expire</button>
-                  </> : null}
-                </div></td>
-              </tr>
-            )) : null}
-          </tbody>
-        </table>
-      </div>
+      <section className="admin-orders-list" aria-label="Admin orders list">
+        <div className="admin-orders-list__head" aria-hidden="true">
+          <span>Order</span>
+          <span>Customer</span>
+          <span>Fulfillment</span>
+          <span>Payment</span>
+          <span>Total</span>
+          <span>Items</span>
+          <span>Created</span>
+          <span>Actions</span>
+        </div>
 
-      <AdminPagination isLoading={isLoading} noun="orders" onPageChange={(page) => setQuery((current) => ({ ...current, page }))} pagination={pagination} />
+        {isLoading ? <OrderListSkeleton rows={6} /> : null}
+
+        {!isLoading && !error && orders.length === 0 ? (
+          <EmptyOrdersState disabled={!hasFilters} onReset={resetFilters} />
+        ) : null}
+
+        {!isLoading && !error
+          ? orders.map((order) => (
+              <OrderRow
+                busyAction={busyAction}
+                key={order.id}
+                onTransition={transition}
+                order={order}
+              />
+            ))
+          : null}
+      </section>
+
+      <AdminPagination
+        isLoading={isLoading}
+        noun="orders"
+        onPageChange={(page) => setQuery((current) => ({ ...current, page }))}
+        pagination={pagination}
+      />
     </div>
   );
 }
 
-function FilterSelect({ children, label, onChange, value }: { children: ReactNode; label: string; onChange: (value: string) => void; value: string }) {
-  return <label><span>{label}</span><select onChange={(event) => onChange(event.target.value)} value={value}>{children}</select></label>;
+function OrderRow({
+  busyAction,
+  onTransition,
+  order,
+}: {
+  busyAction?: string;
+  onTransition: (
+    order: AdminOrderSummary,
+    action: "cancel" | "expire",
+  ) => Promise<void>;
+  order: AdminOrderSummary;
+}) {
+  const customerLabel =
+    order.customerName || order.customerEmail || order.shippingRecipientName || "Not set";
+  const customerMeta = [
+    order.customerType === "GUEST" ? "Guest" : "Registered",
+    order.customerEmail,
+    order.customerPhone,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <article className="admin-orders-row">
+      <div className="admin-orders-cell admin-orders-cell--order">
+        <span className="admin-orders-mobile-label">Order</span>
+        <strong>{formatOrderDisplayId(order.id)}</strong>
+        <AdminOrderLabelBadge status={order.status} />
+      </div>
+      <div className="admin-orders-cell">
+        <span className="admin-orders-mobile-label">Customer</span>
+        <strong>{customerLabel}</strong>
+        <small>{customerMeta || "Customer details unavailable"}</small>
+      </div>
+      <div className="admin-orders-cell">
+        <span className="admin-orders-mobile-label">Fulfillment</span>
+        <AdminFulfillmentStatusBadge status={order.fulfillmentStatus} />
+      </div>
+      <div className="admin-orders-cell">
+        <span className="admin-orders-mobile-label">Payment</span>
+        {order.latestPayment ? (
+          <>
+            <AdminPaymentStatusBadge status={order.latestPayment.status} />
+            <small>payOS {order.latestPayment.providerOrderCode}</small>
+          </>
+        ) : (
+          <span className="admin-table__muted">Not set</span>
+        )}
+      </div>
+      <div className="admin-orders-cell">
+        <span className="admin-orders-mobile-label">Total</span>
+        <strong>{formatCurrency(order.totalAmount, order.currency)}</strong>
+      </div>
+      <div className="admin-orders-cell">
+        <span className="admin-orders-mobile-label">Items</span>
+        <span>{formatNumber(order.itemCount)}</span>
+      </div>
+      <div className="admin-orders-cell">
+        <span className="admin-orders-mobile-label">Created</span>
+        <time dateTime={order.createdAt}>{formatDateTime(order.createdAt)}</time>
+      </div>
+      <div className="admin-orders-actions">
+        <Link
+          aria-label={`View order ${order.id}`}
+          className="button button--secondary admin-orders-view"
+          href={`/admin/orders/${encodeURIComponent(order.id)}`}
+        >
+          <Eye aria-hidden="true" size={17} />
+          View details
+        </Link>
+        {order.status === "PENDING_PAYMENT" ? (
+          <div className="admin-orders-inline-actions">
+            <button
+              className="admin-link-button"
+              disabled={Boolean(busyAction)}
+              onClick={() => void onTransition(order, "cancel")}
+              type="button"
+            >
+              {busyAction === `${order.id}:cancel` ? "Cancelling" : "Cancel"}
+            </button>
+            <button
+              className="admin-link-button"
+              disabled={Boolean(busyAction)}
+              onClick={() => void onTransition(order, "expire")}
+              type="button"
+            >
+              {busyAction === `${order.id}:expire` ? "Expiring" : "Expire"}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </article>
+  );
 }
 
-function DateFilter({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {
-  return <label><span>{label}</span><input aria-label={label} onChange={(event) => onChange(event.target.value)} type="date" value={value} /></label>;
+function MetricCard({
+  label,
+  meta,
+  value,
+}: {
+  label: string;
+  meta: string;
+  value: number;
+}) {
+  return (
+    <article className="admin-orders-kpi">
+      <span>{label}</span>
+      <strong>{formatNumber(value)}</strong>
+      <small>{meta}</small>
+    </article>
+  );
+}
+
+function EmptyOrdersState({
+  disabled,
+  onReset,
+}: {
+  disabled: boolean;
+  onReset: () => void;
+}) {
+  return (
+    <div className="admin-orders-empty">
+      <span aria-hidden="true">
+        <Inbox size={28} />
+      </span>
+      <div>
+        <h2>No orders found</h2>
+        <p>Try adjusting your filters or search terms.</p>
+      </div>
+      <button
+        className="button button--secondary"
+        disabled={disabled}
+        onClick={onReset}
+        type="button"
+      >
+        <RotateCcw aria-hidden="true" size={17} />
+        Reset filters
+      </button>
+    </div>
+  );
+}
+
+function AccessDeniedState({
+  message,
+  requestId,
+}: {
+  message?: string;
+  requestId?: string;
+}) {
+  return (
+    <div className="admin-orders-access" role="alert">
+      <AlertCircle aria-hidden="true" size={20} />
+      <div>
+        <strong>Admin role required</strong>
+        <p>{message || "This account is not allowed to access admin orders."}</p>
+        {requestId ? <small>Request {requestId}</small> : null}
+      </div>
+    </div>
+  );
+}
+
+function OrderListSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className="admin-orders-skeleton" role="status" aria-label="Loading orders">
+      {Array.from({ length: rows }, (_, index) => (
+        <div className="admin-orders-row admin-orders-row--skeleton" key={index}>
+          {Array.from({ length: 8 }, (_, cellIndex) => (
+            <span className="admin-skeleton-line" key={cellIndex} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminOrderLabelBadge({ status }: { status: OrderStatus }) {
+  return (
+    <span className={`order-status-badge ${getOrderStatusClass(status)}`}>
+      {getOrderStatusLabel(status)}
+    </span>
+  );
+}
+
+function AdminFulfillmentStatusBadge({
+  status,
+}: {
+  status: OrderFulfillmentStatus;
+}) {
+  return (
+    <span
+      className={`fulfillment-status-badge ${getFulfillmentStatusClass(status)}`}
+    >
+      {getFulfillmentStatusLabel(status)}
+    </span>
+  );
+}
+
+function FilterSelect({
+  children,
+  label,
+  onChange,
+  value,
+}: {
+  children: ReactNode;
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <select onChange={(event) => onChange(event.target.value)} value={value}>
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function DateFilter({
+  label,
+  onChange,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <input
+        aria-label={label}
+        onChange={(event) => onChange(event.target.value)}
+        type="date"
+        value={value}
+      />
+    </label>
+  );
+}
+
+function getPageMetrics(orders: AdminOrderSummary[], total: number) {
+  return {
+    delivered: orders.filter(
+      (order) => order.fulfillmentStatus === "DELIVERED",
+    ).length,
+    inProgress: orders.filter(
+      (order) =>
+        order.status === "PAID" && order.fulfillmentStatus !== "DELIVERED",
+    ).length,
+    paid: orders.filter((order) => order.status === "PAID").length,
+    pending: orders.filter((order) => order.status === "PENDING_PAYMENT").length,
+    total,
+  };
 }

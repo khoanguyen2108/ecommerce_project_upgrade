@@ -12,7 +12,10 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { OrderStatus } from '../../generated/prisma/enums';
+import {
+  OrderFulfillmentStatus,
+  OrderStatus,
+} from '../../generated/prisma/enums';
 
 export const ADMIN_ORDER_SORT_OPTIONS = [
   'createdAt',
@@ -57,6 +60,14 @@ export class AdminOrderQueryDto {
   @IsOptional()
   @IsEnum(OrderStatus)
   status?: OrderStatus;
+
+  @ApiPropertyOptional({
+    enum: OrderFulfillmentStatus,
+    example: OrderFulfillmentStatus.IN_TRANSIT,
+  })
+  @IsOptional()
+  @IsEnum(OrderFulfillmentStatus)
+  fulfillmentStatus?: OrderFulfillmentStatus;
 
   @ApiPropertyOptional({
     description:

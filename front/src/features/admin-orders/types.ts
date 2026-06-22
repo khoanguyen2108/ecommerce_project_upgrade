@@ -17,6 +17,7 @@ export interface AdminOrderQuery {
   page?: number;
   limit?: number;
   status?: OrderStatus;
+  fulfillmentStatus?: OrderFulfillmentStatus;
   search?: string;
   userId?: string;
   from?: string;

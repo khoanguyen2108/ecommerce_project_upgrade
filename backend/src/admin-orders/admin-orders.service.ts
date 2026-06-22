@@ -421,6 +421,10 @@ export class AdminOrdersService {
       where.status = query.status;
     }
 
+    if (query.fulfillmentStatus) {
+      where.fulfillmentStatus = query.fulfillmentStatus;
+    }
+
     if (query.userId) {
       where.userId = query.userId;
     }
