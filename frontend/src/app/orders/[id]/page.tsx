@@ -3,7 +3,6 @@ import { AuthenticatedRouteGuard } from "@/components/auth/AuthenticatedRouteGua
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { OrderDetailPage } from "@/components/orders/OrderDetailPage";
-import "@/components/orders/OrderDetailPage.css";
 
 export const metadata: Metadata = {
   title: "Order detail",

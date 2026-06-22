@@ -1,12 +1,21 @@
 "use client";
 
-import { AlertCircle, RefreshCw } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  Clock3,
+  CreditCard,
+  MapPin,
+  Package,
+  RefreshCw,
+  ShieldCheck,
+  Truck,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getOrder } from "@/features/orders/api";
-import type { Order, PaymentSummary } from "@/features/orders/types";
 import { OrderItemImage } from "@/components/orders/OrderItemImage";
-import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
 import {
   FulfillmentStatusBadge,
   OrderStatusBadge,
@@ -14,16 +23,37 @@ import {
 } from "@/components/orders/OrdersPage";
 import {
   formatCurrency,
+  formatDate,
   formatDateTime,
   formatNumber,
   formatOrderCode,
+  formatOrderDisplayId,
+  getFulfillmentStatusLabel,
+  getLatestPayment,
   getOrderErrorMessage,
   getOrderRequestId,
 } from "@/components/orders/order-format";
+import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
+import { getOrder } from "@/features/orders/api";
+import type {
+  Order,
+  OrderFulfillmentStatus,
+  PaymentSummary,
+} from "@/features/orders/types";
 
 interface OrderDetailPageProps {
   orderId: string;
 }
+const FULFILLMENT_STEPS: Array<{
+  label: string;
+  status: OrderFulfillmentStatus;
+}> = [
+  { label: "Preparing", status: "PENDING" },
+  { label: "Picked up", status: "PICKED_UP" },
+  { label: "In transit", status: "IN_TRANSIT" },
+  { label: "Out for delivery", status: "OUT_FOR_DELIVERY" },
+  { label: "Delivered", status: "DELIVERED" },
+];
 
 export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const [order, setOrder] = useState<Order>();
@@ -43,11 +73,9 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       try {
         const response = await getOrder(orderId);
 
-        if (!isMounted) {
-          return;
+        if (isMounted) {
+          setOrder(response.order);
         }
-
-        setOrder(response.order);
       } catch (loadError) {
         if (!isMounted) {
           return;
@@ -76,275 +104,469 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   }, [orderId, refreshKey]);
 
   if (isLoading && !order) {
-    return (
-      <main className="customer-page">
-        <section className="customer-hero customer-hero--compact">
-          <p className="eyebrow">Order detail</p>
-          <h1>Loading order</h1>
-          <p>Reading the backend order record.</p>
-        </section>
-        <div className="order-detail-loading" role="status">
-          <span className="customer-skeleton-line customer-skeleton-line--wide" />
-          <span className="customer-skeleton-line" />
-          <span className="customer-skeleton-line customer-skeleton-line--wide" />
-        </div>
-      </main>
-    );
+    return <OrderDetailLoading />;
   }
 
   if (error || !order) {
-    return (
-      <main className="customer-page">
-        <section className="customer-hero customer-hero--compact">
-          <p className="eyebrow">Order detail</p>
-          <h1>Order unavailable</h1>
-        </section>
-        <div className="customer-feedback customer-feedback--error" role="alert">
-          <AlertCircle aria-hidden="true" size={19} />
-          <span>
-            {error || "This order was not found for the current account."}
-          </span>
-          {requestId ? <small>Request {requestId}</small> : null}
-        </div>
-        <div className="customer-actions">
-          <Link className="button button--primary" href="/orders">
-            Back to orders
-          </Link>
-          <Link className="button button--secondary" href="/products">
-            Back to products
-          </Link>
-        </div>
-      </main>
-    );
+    return <OrderDetailError error={error} requestId={requestId} />;
   }
 
-  return (
-    <main className="customer-page">
-      <section className="customer-hero customer-hero--compact" aria-labelledby="order-heading">
-        <div>
-          <p className="eyebrow">Order detail</p>
-          <h1 id="order-heading">Order {order.id}</h1>
-        </div>
-        <button
-          className="button button--secondary"
-          disabled={isLoading}
-          onClick={() => setRefreshKey((current) => current + 1)}
-          type="button"
-        >
-          <RefreshCw
-            aria-hidden="true"
-            className={isLoading ? "spin" : undefined}
-            size={17}
-          />
-          Refresh
-        </button>
-      </section>
+  const latestPayment = getLatestPayment(order);
+  const canRetryPayment = order.status === "PENDING_PAYMENT";
 
-      <section className="order-detail-grid" aria-label="Order summary">
-        <article className="order-summary-panel">
-          <p className="eyebrow">Backend order status</p>
-          <div className="order-status-stack">
+  return (
+    <main className="customer-page order-detail-page">
+      <Link className="order-detail-back" href="/orders">
+        <ArrowLeft aria-hidden="true" size={17} />
+        Back to orders
+      </Link>
+
+      <header className="order-detail-heading" aria-labelledby="order-heading">
+        <div className="order-detail-heading__copy">
+          <p className="eyebrow">Order detail</p>
+          <h1 id="order-heading">
+            Order {formatOrderDisplayId(order.id)}
+          </h1>
+          <p>Placed on {formatDate(order.createdAt)}</p>
+        </div>
+        <div className="order-detail-heading__aside">
+          <div className="order-detail-badges" aria-label="Order statuses">
             <OrderStatusBadge status={order.status} />
+            {latestPayment ? (
+              <PaymentStatusBadge status={latestPayment.status} />
+            ) : (
+              <span className="payment-status-badge payment-status-badge--unset">
+                No payment
+              </span>
+            )}
             <FulfillmentStatusBadge status={order.fulfillmentStatus} />
           </div>
-          <dl className="order-summary-list">
-            <div>
-              <dt>Subtotal</dt>
-              <dd>{formatCurrency(order.subtotalAmount, order.currency)}</dd>
-            </div>
-            <div>
-              <dt>Discount</dt>
-              <dd>{formatCurrency(order.discountAmount, order.currency)}</dd>
-            </div>
-            {order.voucherCodeSnapshot ? (
-              <div>
-                <dt>Voucher</dt>
-                <dd>
-                  {order.voucherCodeSnapshot}
-                  {order.voucherNameSnapshot
-                    ? ` — ${order.voucherNameSnapshot}`
-                    : ""}
-                </dd>
-              </div>
-            ) : null}
-            <div>
-              <dt>Final total</dt>
-              <dd>{formatCurrency(order.totalAmount, order.currency)}</dd>
-            </div>
-            <div>
-              <dt>Created</dt>
-              <dd>{formatDateTime(order.createdAt)}</dd>
-            </div>
-            <div>
-              <dt>Updated</dt>
-              <dd>{formatDateTime(order.updatedAt)}</dd>
-            </div>
-            <div>
-              <dt>Paid at</dt>
-              <dd>{formatDateTime(order.paidAt)}</dd>
-            </div>
-            <div>
-              <dt>Delivered at</dt>
-              <dd>{formatDateTime(order.fulfilledAt)}</dd>
-            </div>
-            <div>
-              <dt>Cancelled at</dt>
-              <dd>{formatDateTime(order.cancelledAt)}</dd>
-            </div>
-            <div>
-              <dt>Expires at</dt>
-              <dd>{formatDateTime(order.expiresAt)}</dd>
-            </div>
-          </dl>
-        </article>
+          <button
+            className="order-detail-refresh"
+            disabled={isLoading}
+            onClick={() => setRefreshKey((current) => current + 1)}
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={isLoading ? "spin" : undefined}
+              size={16}
+            />
+            {isLoading ? "Refreshing" : "Refresh"}
+          </button>
+        </div>
+      </header>
 
-        <PaymentSummaryPanel
-          currency={order.currency}
-          payments={order.payments}
-        />
-        <article className="order-summary-panel">
-          <p className="eyebrow">Delivery information</p>
-          {order.shippingRecipientName ? (
-            <dl className="order-summary-list">
-              <div><dt>Recipient</dt><dd>{order.shippingRecipientName}</dd></div>
-              <div><dt>Phone</dt><dd>{order.shippingPhone || 'Not set'}</dd></div>
-              <div><dt>Address</dt><dd>{formatShippingAddress(order)}</dd></div>
-              {order.shippingNote ? <div><dt>Note</dt><dd>{order.shippingNote}</dd></div> : null}
-            </dl>
-          ) : <div className="order-summary-empty">Delivery information is unavailable for this historical order.</div>}
-        </article>
-      </section>
+      <StatusPanel
+        canRetryPayment={canRetryPayment}
+        latestPayment={latestPayment}
+        order={order}
+      />
 
-      <section className="customer-section" aria-labelledby="order-items-heading">
-        <div className="customer-section__header">
-          <div>
-            <p className="eyebrow">Item snapshots</p>
-            <h2 id="order-items-heading">Items</h2>
-          </div>
-          <span>{formatNumber(order.items.length)} items</span>
+      <div className="order-detail-layout">
+        <div className="order-detail-main">
+          <FulfillmentProgress order={order} />
+          <OrderItems order={order} />
         </div>
 
-        <div className="order-table-wrap">
-          <table className="order-table order-table--items">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Variant</th>
-                <th>SKU</th>
-                <th>Unit price</th>
-                <th>Quantity</th>
-                <th>Line total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.items.length === 0 ? (
-                <tr>
-                  <td className="order-table__state" colSpan={6}>
-                    No item snapshots were returned for this order.
-                  </td>
-                </tr>
-              ) : (
-                order.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div className="order-item-product">
-                        <OrderItemImage
-                          alt={item.productName}
-                          imageUrl={item.imageUrl}
-                        />
-                        <strong>{item.productName}</strong>
-                      </div>
-                    </td>
-                    <td>
-                      {item.size} / {item.color}
-                    </td>
-                    <td>{item.sku || "Not set"}</td>
-                    <td>{formatCurrency(item.unitPrice, order.currency)}</td>
-                    <td>{formatNumber(item.quantity)}</td>
-                    <td>{formatCurrency(item.lineTotal, order.currency)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <div className="customer-actions">
-        {order.status === "PENDING_PAYMENT" ? (
-          <PayosPaymentButton label="Continue payment with payOS" orderId={order.id} />
-        ) : null}
-        <Link className="button button--primary" href="/orders">
-          Back to orders
-        </Link>
-        <Link className="button button--secondary" href="/products">
-          Back to products
-        </Link>
+        <aside className="order-detail-sidebar" aria-label="Order information">
+          <OrderTotals order={order} />
+          <ShippingAddress order={order} />
+          <PaymentDetails currency={order.currency} payment={latestPayment} />
+        </aside>
       </div>
     </main>
   );
 }
 
-function formatShippingAddress(order: Order): string {
-  return [order.shippingAddressLine, order.shippingWard, order.shippingDistrict, order.shippingProvince].filter(Boolean).join(', ') || 'Not set';
+function StatusPanel({
+  canRetryPayment,
+  latestPayment,
+  order,
+}: {
+  canRetryPayment: boolean;
+  latestPayment?: PaymentSummary;
+  order: Order;
+}) {
+  const content = getStatusContent(order);
+  const StatusIcon = content.icon;
+
+  return (
+    <section
+      className={`order-detail-status order-detail-status--${content.tone}`}
+      aria-labelledby="current-status-heading"
+    >
+      <span className="order-detail-status__icon">
+        <StatusIcon aria-hidden="true" size={24} />
+      </span>
+      <div className="order-detail-status__copy">
+        <p className="eyebrow">Current status</p>
+        <h2 id="current-status-heading">{content.title}</h2>
+        <p>{content.description}</p>
+        <div className="order-detail-status__meta">
+          {order.paidAt ? <span>Paid {formatDateTime(order.paidAt)}</span> : null}
+          {order.fulfilledAt ? (
+            <span>Delivered {formatDateTime(order.fulfilledAt)}</span>
+          ) : null}
+          {order.cancelledAt ? (
+            <span>Cancelled {formatDateTime(order.cancelledAt)}</span>
+          ) : null}
+          {order.status === "EXPIRED" && order.expiresAt ? (
+            <span>Expired {formatDateTime(order.expiresAt)}</span>
+          ) : null}
+          {latestPayment?.provider ? (
+            <span>Payment provider {latestPayment.provider}</span>
+          ) : null}
+        </div>
+      </div>
+      {canRetryPayment ? (
+        <PayosPaymentButton
+          className="button order-detail-pay-button"
+          label="Continue payment"
+          orderId={order.id}
+        />
+      ) : null}
+    </section>
+  );
 }
 
-function PaymentSummaryPanel({
-  currency,
-  payments,
-}: {
-  currency: string;
-  payments: PaymentSummary[];
-}) {
+function getStatusContent(order: Order) {
+  if (order.status === "PAID") {
+    return order.fulfillmentStatus === "DELIVERED"
+      ? {
+          description:
+            "Your order has arrived. We hope it feels even better than it looked.",
+          icon: Package,
+          title: "Order delivered",
+          tone: "success",
+        }
+      : {
+          description:
+            "Your payment is confirmed. We'll keep this page updated as your order moves.",
+          icon: ShieldCheck,
+          title: "Payment confirmed",
+          tone: "success",
+        };
+  }
+
+  if (order.status === "PENDING_PAYMENT") {
+    return {
+      description:
+        "Complete payment to confirm your order. Its status comes directly from our secure payment record.",
+      icon: Clock3,
+      title: "Waiting for payment",
+      tone: "attention",
+    };
+  }
+
+  if (order.status === "CANCELLED") {
+    return {
+      description:
+        "This order is no longer active and cannot be paid from this page.",
+      icon: X,
+      title: "Order cancelled",
+      tone: "inactive",
+    };
+  }
+
+  return {
+    description:
+      "The payment window for this order has closed. No further payment can be made.",
+    icon: Clock3,
+    title: "Order expired",
+    tone: "inactive",
+  };
+}
+
+function FulfillmentProgress({ order }: { order: Order }) {
+  const activeIndex = FULFILLMENT_STEPS.findIndex(
+    (step) => step.status === order.fulfillmentStatus,
+  );
+  const isInactive = order.status === "CANCELLED" || order.status === "EXPIRED";
+
   return (
-    <article className="order-summary-panel">
-      <p className="eyebrow">Payment summary</p>
-      {payments.length === 0 ? (
-        <div className="order-summary-empty" role="status">
-          No payment summary was returned for this order.
+    <section className="order-detail-card" aria-labelledby="shipping-progress-heading">
+      <div className="order-detail-card__heading">
+        <div>
+          <p className="eyebrow">Shipping progress</p>
+          <h2 id="shipping-progress-heading">
+            {isInactive
+              ? "Fulfillment stopped"
+              : getFulfillmentStatusLabel(order.fulfillmentStatus)}
+          </h2>
+        </div>
+        <Truck aria-hidden="true" size={22} />
+      </div>
+      <p className="order-detail-card__intro">
+        {isInactive
+          ? "This timeline is retained for reference. The order is no longer active."
+          : "Fulfillment updates are read-only and come directly from our shipping team."}
+      </p>
+      <ol className={`fulfillment-progress${isInactive ? " is-inactive" : ""}`}>
+        {FULFILLMENT_STEPS.map((step, index) => {
+          const isComplete = !isInactive && index < activeIndex;
+          const isCurrent = !isInactive && index === activeIndex;
+
+          return (
+            <li
+              className={
+                isComplete ? "is-complete" : isCurrent ? "is-current" : ""
+              }
+              key={step.status}
+            >
+              <span className="fulfillment-progress__marker">
+                {isComplete ? (
+                  <Check aria-hidden="true" size={14} strokeWidth={2.5} />
+                ) : isCurrent ? (
+                  <Truck aria-hidden="true" size={14} />
+                ) : (
+                  <span aria-hidden="true" />
+                )}
+              </span>
+              <span className="fulfillment-progress__label">{step.label}</span>
+              <small>
+                {isComplete
+                  ? "Complete"
+                  : isCurrent
+                    ? step.status === "DELIVERED" && order.fulfilledAt
+                      ? formatDate(order.fulfilledAt)
+                      : "Current"
+                    : "Pending"}
+              </small>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function OrderItems({ order }: { order: Order }) {
+  return (
+    <section className="order-detail-card" aria-labelledby="order-items-heading">
+      <div className="order-detail-card__heading">
+        <div>
+          <p className="eyebrow">Your pieces</p>
+          <h2 id="order-items-heading">Items in this order</h2>
+        </div>
+        <span className="order-detail-count">
+          {formatNumber(order.items.length)} {order.items.length === 1 ? "item" : "items"}
+        </span>
+      </div>
+
+      {order.items.length === 0 ? (
+        <div className="order-detail-empty" role="status">
+          <Package aria-hidden="true" size={24} />
+          <strong>No items to show</strong>
+          <span>No item snapshots were returned for this order.</span>
         </div>
       ) : (
-        <div className="payment-summary-list">
-          {payments.map((payment) => (
-            <section className="payment-summary-item" key={payment.id}>
-              <div className="payment-summary-item__header">
-                <strong>{payment.provider}</strong>
-                <PaymentStatusBadge status={payment.status} />
+        <div className="order-detail-items">
+          {order.items.map((item) => (
+            <article className="order-detail-item" key={item.id}>
+              <OrderItemImage alt={item.productName} imageUrl={item.imageUrl} />
+              <div className="order-detail-item__info">
+                <h3>{item.productName}</h3>
+                <p>
+                  <span>{item.color || "Color not set"}</span>
+                  <span>{item.size || "Size not set"}</span>
+                </p>
+                {item.sku ? <small>SKU {item.sku}</small> : null}
               </div>
-              <dl className="order-summary-list">
-                <div>
-                  <dt>Amount</dt>
-                  <dd>{formatCurrency(payment.amount, payment.currency || currency)}</dd>
-                </div>
-                <div>
-                  <dt>payOS order code</dt>
-                  <dd>{formatOrderCode(payment.providerOrderCode)}</dd>
-                </div>
-                <div>
-                  <dt>Checkout link</dt>
-                  <dd>{payment.checkoutUrl ? "Recorded by backend" : "Not set"}</dd>
-                </div>
-                <div>
-                  <dt>Created</dt>
-                  <dd>{formatDateTime(payment.createdAt)}</dd>
-                </div>
-                <div>
-                  <dt>Updated</dt>
-                  <dd>{formatDateTime(payment.updatedAt)}</dd>
-                </div>
-                <div>
-                  <dt>Paid at</dt>
-                  <dd>{formatDateTime(payment.paidAt)}</dd>
-                </div>
-                <div>
-                  <dt>Cancelled at</dt>
-                  <dd>{formatDateTime(payment.cancelledAt)}</dd>
-                </div>
-              </dl>
-            </section>
+              <div className="order-detail-item__quantity">
+                <span>Quantity</span>
+                <strong>{formatNumber(item.quantity)}</strong>
+              </div>
+              <div className="order-detail-item__price">
+                <span>{formatCurrency(item.unitPrice, order.currency)} each</span>
+                <strong>{formatCurrency(item.lineTotal, order.currency)}</strong>
+              </div>
+            </article>
           ))}
         </div>
       )}
-    </article>
+    </section>
+  );
+}
+
+function OrderTotals({ order }: { order: Order }) {
+  return (
+    <section className="order-detail-card order-detail-totals" aria-labelledby="totals-heading">
+      <div className="order-detail-card__heading">
+        <h2 id="totals-heading">Order summary</h2>
+      </div>
+      <dl>
+        <div>
+          <dt>Subtotal</dt>
+          <dd>{formatCurrency(order.subtotalAmount, order.currency)}</dd>
+        </div>
+        <div>
+          <dt>Discount</dt>
+          <dd className={order.discountAmount > 0 ? "is-discount" : undefined}>
+            {order.discountAmount > 0 ? "-" : ""}
+            {formatCurrency(order.discountAmount, order.currency)}
+          </dd>
+        </div>
+        {order.voucherCodeSnapshot ? (
+          <div className="order-detail-voucher">
+            <dt>Voucher</dt>
+            <dd>{order.voucherCodeSnapshot}</dd>
+          </div>
+        ) : null}
+        <div className="order-detail-total">
+          <dt>Total</dt>
+          <dd>{formatCurrency(order.totalAmount, order.currency)}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+function ShippingAddress({ order }: { order: Order }) {
+  const address = [
+    order.shippingAddressLine,
+    order.shippingWard,
+    order.shippingDistrict,
+    order.shippingProvince,
+  ].filter(Boolean);
+
+  return (
+    <section className="order-detail-card" aria-labelledby="shipping-address-heading">
+      <div className="order-detail-card__heading order-detail-card__heading--icon">
+        <span>
+          <MapPin aria-hidden="true" size={18} />
+        </span>
+        <h2 id="shipping-address-heading">Shipping address</h2>
+      </div>
+      {order.shippingRecipientName ? (
+        <address className="order-detail-address">
+          <strong>{order.shippingRecipientName}</strong>
+          {address.map((line) => (
+            <span key={line}>{line}</span>
+          ))}
+          {order.shippingPhone ? <span>{order.shippingPhone}</span> : null}
+          {order.shippingNote ? (
+            <span className="order-detail-address__note">
+              Note: {order.shippingNote}
+            </span>
+          ) : null}
+        </address>
+      ) : (
+        <div className="order-detail-empty order-detail-empty--compact">
+          Delivery information is unavailable for this historical order.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PaymentDetails({
+  currency,
+  payment,
+}: {
+  currency: string;
+  payment?: PaymentSummary;
+}) {
+  return (
+    <section className="order-detail-card" aria-labelledby="payment-details-heading">
+      <div className="order-detail-card__heading order-detail-card__heading--icon">
+        <span>
+          <CreditCard aria-hidden="true" size={18} />
+        </span>
+        <h2 id="payment-details-heading">Payment</h2>
+      </div>
+      {!payment ? (
+        <div className="order-detail-empty order-detail-empty--compact">
+          No payment record is available yet.
+        </div>
+      ) : (
+        <dl className="order-detail-payment-list">
+          <div>
+            <dt>Provider</dt>
+            <dd>{payment.provider}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>
+              <PaymentStatusBadge status={payment.status} />
+            </dd>
+          </div>
+          <div>
+            <dt>Amount</dt>
+            <dd>{formatCurrency(payment.amount, payment.currency || currency)}</dd>
+          </div>
+          <div>
+            <dt>Order code</dt>
+            <dd>{formatOrderCode(payment.providerOrderCode)}</dd>
+          </div>
+          {payment.paidAt ? (
+            <div>
+              <dt>Paid at</dt>
+              <dd>{formatDateTime(payment.paidAt)}</dd>
+            </div>
+          ) : null}
+        </dl>
+      )}
+    </section>
+  );
+}
+
+function OrderDetailLoading() {
+  return (
+    <main className="customer-page order-detail-page" aria-busy="true">
+      <div className="order-detail-loading-back" />
+      <section className="order-detail-loading-shell" role="status">
+        <span className="sr-only">Loading order details</span>
+        <div className="order-detail-loading-title">
+          <span />
+          <span />
+        </div>
+        <div className="order-detail-loading-status" />
+        <div className="order-detail-loading-grid">
+          <div>
+            <span />
+            <span />
+          </div>
+          <div>
+            <span />
+            <span />
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function OrderDetailError({
+  error,
+  requestId,
+}: {
+  error?: string;
+  requestId?: string;
+}) {
+  return (
+    <main className="customer-page order-detail-page">
+      <Link className="order-detail-back" href="/orders">
+        <ArrowLeft aria-hidden="true" size={17} />
+        Back to orders
+      </Link>
+      <section className="order-detail-error" role="alert">
+        <span className="order-detail-error__icon">
+          <AlertCircle aria-hidden="true" size={28} />
+        </span>
+        <p className="eyebrow">Order detail</p>
+        <h1>Order unavailable</h1>
+        <p>{error || "This order was not found for the current account."}</p>
+        {requestId ? <small>Request {requestId}</small> : null}
+        <div className="order-detail-error__actions">
+          <Link className="button button--primary" href="/orders">
+            View my orders
+          </Link>
+          <Link className="button button--secondary" href="/products">
+            Continue shopping
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }
