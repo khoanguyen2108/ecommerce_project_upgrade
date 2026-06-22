@@ -165,9 +165,13 @@ type PayosWebhookClassification = Exclude<
   typeof PaymentStatus.PENDING
 >;
 
+type PayosWebhookEnvelope = Omit<Webhook, 'success'> &
+  Partial<Pick<Webhook, 'success'>>;
+
 export interface PayosWebhookResult {
   dashboardPing?: boolean;
   duplicate: boolean;
+  ok?: boolean;
   payment?: PaymentRecord;
   processed?: boolean;
   reconciliationRequired?: boolean;
@@ -177,7 +181,7 @@ export interface PayosWebhookResult {
 }
 
 type PayosWebhookValidationStage =
-  | 'dashboard-ping'
+  | 'dashboard-ping-detected'
   | 'malformed-payment-envelope'
   | 'payment-shaped'
   | 'processed'
@@ -185,7 +189,8 @@ type PayosWebhookValidationStage =
   | 'rejected'
   | 'verification-failed'
   | 'verification-passed'
-  | 'verification-start';
+  | 'verification-start'
+  | 'verified-sample-or-unknown-order';
 
 interface PayosWebhookLogContext {
   bodyCodePresent: boolean;
@@ -329,7 +334,7 @@ export class PaymentsService {
     this.logPayosWebhookStage('payment-shaped', logContext);
 
     let credentials!: PayosCredentials;
-    let webhook!: Webhook;
+    let webhook!: PayosWebhookEnvelope;
     let verifiedData!: WebhookData;
 
     try {
@@ -408,10 +413,50 @@ export class PaymentsService {
             id: true,
             processedAt: true,
             processingStatus: true,
+            paymentId: true,
           },
         });
 
         if (existingEvent) {
+          if (!existingEvent.paymentId) {
+            const existingPayment = await tx.payment.findUnique({
+              where: {
+                providerOrderCode: verifiedData.orderCode,
+              },
+              select: {
+                id: true,
+              },
+            });
+
+            if (existingPayment) {
+              return {
+                received: true,
+                duplicate: true,
+                status: existingEvent.processingStatus,
+              };
+            }
+
+            this.logPayosWebhookStage(
+              'verified-sample-or-unknown-order',
+              logContext,
+              {
+                providerOrderCode: verifiedData.orderCode,
+                duplicate: true,
+                processed: false,
+                reason: 'PAYOS_WEBHOOK_VERIFIED_UNKNOWN_ORDER',
+              },
+            );
+
+            return {
+              received: true,
+              duplicate: true,
+              ok: true,
+              processed: false,
+              status: existingEvent.processingStatus,
+              reason: 'PAYOS_WEBHOOK_VERIFIED_UNKNOWN_ORDER',
+            };
+          }
+
           return {
             received: true,
             duplicate: true,
@@ -442,11 +487,22 @@ export class PaymentsService {
             processingStatus: WEBHOOK_STATUS_IGNORED,
           });
 
+          this.logPayosWebhookStage(
+            'verified-sample-or-unknown-order',
+            logContext,
+            {
+              providerOrderCode: verifiedData.orderCode,
+              processed: false,
+              reason: 'PAYOS_WEBHOOK_VERIFIED_UNKNOWN_ORDER',
+            },
+          );
+
           return {
             received: true,
             duplicate: false,
+            ok: true,
             processed: false,
-            reason: 'PAYMENT_NOT_FOUND',
+            reason: 'PAYOS_WEBHOOK_VERIFIED_UNKNOWN_ORDER',
           };
         }
 
@@ -744,7 +800,7 @@ export class PaymentsService {
   private acknowledgePayosWebhookDashboardPing(
     logContext: PayosWebhookLogContext,
   ): PayosWebhookResult {
-    this.logPayosWebhookStage('dashboard-ping', logContext, {
+    this.logPayosWebhookStage('dashboard-ping-detected', logContext, {
       processed: false,
       reason: 'PAYOS_WEBHOOK_DASHBOARD_PING',
     });
@@ -1860,12 +1916,12 @@ export class PaymentsService {
 
   private async verifyPayosWebhook(
     credentials: PayosCredentials,
-    webhook: Webhook,
+    webhook: PayosWebhookEnvelope,
   ): Promise<WebhookData> {
     const payos = this.createPayosClient(credentials);
 
     try {
-      return await payos.webhooks.verify(webhook);
+      return await payos.webhooks.verify(webhook as Webhook);
     } catch {
       throw new BadRequestException({
         code: 'PAYOS_WEBHOOK_INVALID',
@@ -1910,7 +1966,7 @@ export class PaymentsService {
   }
 
   private classifyPayosWebhook(
-    webhook: Webhook,
+    webhook: PayosWebhookEnvelope,
     verifiedData: WebhookData,
   ): PayosWebhookClassification {
     const webhookCode = webhook.code?.toUpperCase() ?? '';
@@ -1995,7 +2051,7 @@ export class PaymentsService {
     };
   }
 
-  private assertWebhookPayload(body: unknown): Webhook {
+  private assertWebhookPayload(body: unknown): PayosWebhookEnvelope {
     if (!this.isRecord(body)) {
       throw new BadRequestException({
         code: 'PAYOS_WEBHOOK_INVALID',
@@ -2008,7 +2064,7 @@ export class PaymentsService {
     if (
       typeof body.code !== 'string' ||
       typeof body.desc !== 'string' ||
-      typeof body.success !== 'boolean' ||
+      (body.success !== undefined && typeof body.success !== 'boolean') ||
       typeof body.signature !== 'string' ||
       !this.isRecord(data)
     ) {
@@ -2040,7 +2096,7 @@ export class PaymentsService {
   }
 
   private sanitizeWebhookMetadata(
-    webhook: Webhook,
+    webhook: PayosWebhookEnvelope,
     verifiedData: WebhookData,
   ): Prisma.InputJsonObject {
     const metadata: Record<string, string | number | boolean> = {
@@ -2050,10 +2106,13 @@ export class PaymentsService {
       desc: verifiedData.desc,
       orderCode: verifiedData.orderCode,
       paymentLinkId: verifiedData.paymentLinkId,
-      success: webhook.success,
       webhookCode: webhook.code,
       webhookDesc: webhook.desc,
     };
+
+    if (webhook.success !== undefined) {
+      metadata.success = webhook.success;
+    }
 
     if (verifiedData.reference) {
       metadata.referenceHash = this.hashValue(verifiedData.reference);
