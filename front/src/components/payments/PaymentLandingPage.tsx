@@ -51,7 +51,7 @@ export function PaymentLandingPage({
         </p>
         <h1 id="payment-heading">Payment verification in progress</h1>
         <p>
-          Payment received by payOS is being verified. Please check your email
+          If you completed payment, we are verifying it. Please check your email
           or contact support with your order code.
         </p>
         <p>

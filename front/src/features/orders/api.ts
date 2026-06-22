@@ -46,6 +46,7 @@ export async function listOrders(
     withQuery("/orders", query),
     {
       auth: true,
+      cache: "no-store",
       credentials: "include",
       method: "GET",
     },
@@ -62,6 +63,7 @@ export async function getOrder(id: string): Promise<OrderResponse> {
     `/orders/${encodeURIComponent(id)}`,
     {
       auth: true,
+      cache: "no-store",
       credentials: "include",
       method: "GET",
     },

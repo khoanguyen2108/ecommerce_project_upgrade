@@ -786,12 +786,28 @@ export class PaymentsService {
       throw this.paymentNotFoundException();
     }
 
+    const reconciliationRequired =
+      await this.hasPaymentReconciliationIssue(payment.orderId);
+    const retryEligible = this.isStatusRetryEligible(
+      payment,
+      reconciliationRequired,
+    );
+
     return {
       source,
       displayOnly: true,
       message:
         'Payment return and cancel pages are display-only. Final status is set only by verified payOS webhook.',
       statusMessage: this.getDisplayStatusMessage(payment, source),
+      orderStatus: payment.order.status,
+      paymentStatus: payment.status,
+      paidAt: payment.paidAt ?? payment.order.paidAt,
+      providerOrderCode: payment.providerOrderCode,
+      orderId: payment.orderId,
+      amount: payment.amount,
+      currency: payment.currency,
+      reconciliationRequired,
+      retryEligible,
       order: payment.order,
       payment: this.toSafePayment(payment),
     };
@@ -2029,6 +2045,31 @@ export class PaymentsService {
     payment: PaymentDisplayRecord,
   ): boolean {
     return user.role === UserRole.ADMIN || payment.order.userId === user.id;
+  }
+
+  private async hasPaymentReconciliationIssue(orderId: string): Promise<boolean> {
+    const issue = await this.prismaService.paymentReconciliationIssue.findFirst({
+      where: {
+        orderId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return Boolean(issue);
+  }
+
+  private isStatusRetryEligible(
+    payment: PaymentDisplayRecord,
+    reconciliationRequired: boolean,
+  ): boolean {
+    return (
+      !reconciliationRequired &&
+      payment.order.status === OrderStatus.PENDING_PAYMENT &&
+      payment.status === PaymentStatus.PENDING &&
+      !this.isOrderExpired(payment.order, new Date())
+    );
   }
 
   private toSafePayment(payment: PaymentRecord): PaymentRecord {

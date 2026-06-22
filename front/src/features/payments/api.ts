@@ -25,6 +25,7 @@ export function getPayosReturnStatus(
     withQuery("/payments/payos/return/status", query),
     {
       auth: true,
+      cache: "no-store",
       credentials: "include",
       method: "GET",
     },
@@ -38,6 +39,7 @@ export function getPayosCancelStatus(
     withQuery("/payments/payos/cancel/status", query),
     {
       auth: true,
+      cache: "no-store",
       credentials: "include",
       method: "GET",
     },

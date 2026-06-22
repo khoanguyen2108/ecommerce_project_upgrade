@@ -6605,6 +6605,19 @@ img {
   color: var(--color-success);
 }
 
+.payment-read-note--review,
+.payment-read-note--non-paid {
+  background: #fff1ef;
+  border-color: #f0b4ad;
+  color: var(--color-danger);
+}
+
+.payment-read-note--timed-out {
+  background: #fff8e6;
+  border-color: #e5c66b;
+  color: #7a5600;
+}
+
 .order-status-badge--cancelled,
 .payment-status-badge--cancelled,
 .payment-status-badge--failed {
@@ -7450,12 +7463,43 @@ img {
   width: 100%;
 }
 
+.payment-status-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.payment-paid-at {
+  color: var(--color-success);
+  font-weight: 750;
+}
+
 .payment-read-note {
   background: var(--color-surface);
   border-color: var(--color-border);
   color: var(--color-text-muted);
   max-width: 1080px;
   width: 100%;
+}
+
+.payment-read-note.payment-read-note--paid {
+  background: #edf7ef;
+  border-color: #aed7bb;
+  color: var(--color-success);
+}
+
+.payment-read-note.payment-read-note--review,
+.payment-read-note.payment-read-note--non-paid {
+  background: #fff1ef;
+  border-color: #f0b4ad;
+  color: var(--color-danger);
+}
+
+.payment-read-note.payment-read-note--timed-out {
+  background: #fff8e6;
+  border-color: #e5c66b;
+  color: #7a5600;
 }
 
 .spin {

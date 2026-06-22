@@ -638,6 +638,15 @@ export const payosStatusDataExample = {
   message:
     'Payment return and cancel pages are display-only. Final status is set only by verified payOS webhook.',
   statusMessage: 'Payment is pending until a verified payOS webhook updates it.',
+  orderStatus: orderExample.status,
+  paymentStatus: paymentExample.status,
+  paidAt: null,
+  providerOrderCode: paymentExample.providerOrderCode,
+  orderId: orderExample.id,
+  amount: paymentExample.amount,
+  currency: paymentExample.currency,
+  reconciliationRequired: false,
+  retryEligible: true,
   order: {
     id: orderExample.id,
     userId: orderExample.userId,
