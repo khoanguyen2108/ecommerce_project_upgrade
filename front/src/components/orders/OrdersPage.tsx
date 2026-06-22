@@ -19,6 +19,8 @@ import {
   formatDate,
   formatNumber,
   formatOrderDisplayId,
+  getFulfillmentStatusClass,
+  getFulfillmentStatusLabel,
   getLatestPayment,
   getOrderErrorMessage,
   getOrderRequestId,
@@ -244,6 +246,7 @@ function OrderCard({ order }: { order: Order }) {
         <p>{itemSummary}</p>
         <div className="customer-order-card__badges" aria-label="Order states">
           <OrderStatusBadge status={order.status} />
+          <FulfillmentStatusBadge status={order.fulfillmentStatus} />
           {latestPayment ? (
             <PaymentStatusBadge status={latestPayment.status} />
           ) : (
@@ -317,6 +320,18 @@ export function PaymentStatusBadge({
   return (
     <span className={`payment-status-badge ${getPaymentStatusClass(status)}`}>
       {getPaymentStatusLabel(status)}
+    </span>
+  );
+}
+
+export function FulfillmentStatusBadge({
+  status,
+}: {
+  status: Order["fulfillmentStatus"];
+}) {
+  return (
+    <span className={`fulfillment-status-badge ${getFulfillmentStatusClass(status)}`}>
+      {getFulfillmentStatusLabel(status)}
     </span>
   );
 }

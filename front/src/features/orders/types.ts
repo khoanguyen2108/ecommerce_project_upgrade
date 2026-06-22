@@ -5,6 +5,12 @@ export type OrderStatus =
   | "PAID"
   | "CANCELLED"
   | "EXPIRED";
+export type OrderFulfillmentStatus =
+  | "PENDING"
+  | "PICKED_UP"
+  | "IN_TRANSIT"
+  | "OUT_FOR_DELIVERY"
+  | "DELIVERED";
 export type PaymentStatus =
   | "PENDING"
   | "PAID"
@@ -65,6 +71,7 @@ export interface Order {
   userId: string | null;
   guestEmail: string | null;
   status: OrderStatus;
+  fulfillmentStatus: OrderFulfillmentStatus;
   subtotalAmount: number;
   discountAmount: number;
   totalAmount: number;
@@ -82,6 +89,7 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   paidAt: string | null;
+  fulfilledAt: string | null;
   cancelledAt: string | null;
   expiresAt: string | null;
   items: OrderItem[];

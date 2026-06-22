@@ -1,5 +1,6 @@
 import type {
   Order,
+  OrderFulfillmentStatus,
   OrderStatus,
   PaymentStatus,
   PaymentSummary,
@@ -132,6 +133,10 @@ export function getPaymentStatusClass(status: PaymentStatus): string {
   return `payment-status-badge--${status.toLowerCase()}`;
 }
 
+export function getFulfillmentStatusClass(status: OrderFulfillmentStatus): string {
+  return `fulfillment-status-badge--${status.toLowerCase().replaceAll("_", "-")}`;
+}
+
 export function getOrderStatusLabel(status: OrderStatus): string {
   const labels: Record<OrderStatus, string> = {
     CANCELLED: "Cancelled",
@@ -150,6 +155,20 @@ export function getPaymentStatusLabel(status: PaymentStatus): string {
     FAILED: "Failed",
     PAID: "Paid",
     PENDING: "Pending",
+  };
+
+  return labels[status];
+}
+
+export function getFulfillmentStatusLabel(
+  status: OrderFulfillmentStatus,
+): string {
+  const labels: Record<OrderFulfillmentStatus, string> = {
+    DELIVERED: "Delivered",
+    IN_TRANSIT: "In transit",
+    OUT_FOR_DELIVERY: "Out for delivery",
+    PENDING: "Preparing",
+    PICKED_UP: "Picked up",
   };
 
   return labels[status];

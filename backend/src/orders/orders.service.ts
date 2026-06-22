@@ -59,6 +59,7 @@ const orderSelect = {
   userId: true,
   guestEmail: true,
   status: true,
+  fulfillmentStatus: true,
   subtotalAmount: true,
   discountAmount: true,
   totalAmount: true,
@@ -76,6 +77,7 @@ const orderSelect = {
   createdAt: true,
   updatedAt: true,
   paidAt: true,
+  fulfilledAt: true,
   cancelledAt: true,
   expiresAt: true,
   items: {

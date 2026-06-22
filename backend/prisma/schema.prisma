@@ -25,6 +25,14 @@ enum OrderStatus {
   EXPIRED
 }
 
+enum OrderFulfillmentStatus {
+  PENDING
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -232,6 +240,7 @@ model Order {
   user           User?       @relation(fields: [userId], references: [id], onDelete: Restrict)
   guestEmail     String?     @db.VarChar(320)
   status         OrderStatus @default(PENDING_PAYMENT)
+  fulfillmentStatus OrderFulfillmentStatus @default(PENDING)
   subtotalAmount Int
   discountAmount Int         @default(0)
   totalAmount    Int
@@ -250,6 +259,7 @@ model Order {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   paidAt         DateTime?
+  fulfilledAt    DateTime?
   cancelledAt    DateTime?
   expiresAt      DateTime?
   items          OrderItem[]

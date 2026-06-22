@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
@@ -10,6 +11,7 @@ import {
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -32,6 +34,7 @@ import {
 import { UserRole } from '../generated/prisma/enums';
 import { AdminOrdersService } from './admin-orders.service';
 import { AdminOrderQueryDto } from './dto/admin-order-query.dto';
+import { UpdateOrderFulfillmentStatusDto } from './dto/update-order-fulfillment-status.dto';
 
 @ApiTags('admin-orders')
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
@@ -155,5 +158,47 @@ export class AdminOrdersController {
   @Patch(':id/expire')
   expireOrder(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.adminOrdersService.expireOrder(id);
+  }
+
+  @ApiOperation({
+    summary: 'Update delivery fulfillment status as an admin',
+    description:
+      'Updates fulfillment/shipping progress only for PAID orders. This does not mutate Payment.status, mark orders paid, call payOS, or send payment emails.',
+  })
+  @ApiParam({
+    description: 'Order UUID.',
+    name: 'id',
+  })
+  @ApiBody({ type: UpdateOrderFulfillmentStatusDto })
+  @ApiOkResponse(
+    envelopeResponse('Admin order fulfillment status updated.', adminOrderDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Fulfillment status validation failed.',
+      'VALIDATION_ERROR',
+      'fulfillmentStatus must be one of the allowed values.',
+    ),
+  )
+  @ApiNotFoundResponse(
+    errorEnvelopeResponse(
+      'Order was not found.',
+      'ADMIN_ORDER_NOT_FOUND',
+      'Order was not found.',
+    ),
+  )
+  @ApiConflictResponse(
+    errorEnvelopeResponse(
+      'Order status does not allow fulfillment updates.',
+      'ADMIN_ORDER_FULFILLMENT_REQUIRES_PAID_ORDER',
+      'Fulfillment status can be updated after payment is confirmed.',
+    ),
+  )
+  @Patch(':id/fulfillment-status')
+  updateFulfillmentStatus(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateOrderFulfillmentStatusDto,
+  ) {
+    return this.adminOrdersService.updateFulfillmentStatus(id, dto);
   }
 }

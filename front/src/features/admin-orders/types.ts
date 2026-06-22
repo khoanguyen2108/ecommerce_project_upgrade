@@ -1,4 +1,5 @@
 import type {
+  OrderFulfillmentStatus,
   OrderStatus,
   PaymentProvider,
   PaymentStatus,
@@ -55,6 +56,7 @@ export interface AdminOrderItem {
   productId: string;
   variantId: string;
   productName: string;
+  imageUrl: string | null;
   sku: string | null;
   size: string;
   color: string;
@@ -119,6 +121,7 @@ export interface AdminOrderBase {
   customerName: string | null;
   customerPhone: string | null;
   status: OrderStatus;
+  fulfillmentStatus: OrderFulfillmentStatus;
   subtotalAmount: number;
   discountAmount: number;
   totalAmount: number;
@@ -137,6 +140,7 @@ export interface AdminOrderBase {
   createdAt: string;
   updatedAt: string;
   paidAt: string | null;
+  fulfilledAt: string | null;
   cancelledAt: string | null;
   expiresAt: string | null;
 }

@@ -8,6 +8,7 @@ import type { Order, PaymentSummary } from "@/features/orders/types";
 import { OrderItemImage } from "@/components/orders/OrderItemImage";
 import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
 import {
+  FulfillmentStatusBadge,
   OrderStatusBadge,
   PaymentStatusBadge,
 } from "@/components/orders/OrdersPage";
@@ -142,7 +143,10 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       <section className="order-detail-grid" aria-label="Order summary">
         <article className="order-summary-panel">
           <p className="eyebrow">Backend order status</p>
-          <OrderStatusBadge status={order.status} />
+          <div className="order-status-stack">
+            <OrderStatusBadge status={order.status} />
+            <FulfillmentStatusBadge status={order.fulfillmentStatus} />
+          </div>
           <dl className="order-summary-list">
             <div>
               <dt>Subtotal</dt>
@@ -178,6 +182,10 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
             <div>
               <dt>Paid at</dt>
               <dd>{formatDateTime(order.paidAt)}</dd>
+            </div>
+            <div>
+              <dt>Delivered at</dt>
+              <dd>{formatDateTime(order.fulfilledAt)}</dd>
             </div>
             <div>
               <dt>Cancelled at</dt>

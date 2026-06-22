@@ -3,6 +3,7 @@ import type {
   AdminOrderResponse,
   AdminOrdersListResponse,
 } from "@/features/admin-orders/types";
+import type { OrderFulfillmentStatus } from "@/features/orders/types";
 import { apiRequest } from "@/lib/api/client";
 import { withQuery } from "@/lib/api/query";
 
@@ -34,5 +35,20 @@ export function expireAdminOrder(id: string): Promise<AdminOrderResponse> {
   return apiRequest<AdminOrderResponse>(
     `/admin/orders/${encodeURIComponent(id)}/expire`,
     { auth: true, credentials: "include", method: "PATCH" },
+  );
+}
+
+export function updateAdminOrderFulfillmentStatus(
+  id: string,
+  fulfillmentStatus: OrderFulfillmentStatus,
+): Promise<AdminOrderResponse> {
+  return apiRequest<AdminOrderResponse>(
+    `/admin/orders/${encodeURIComponent(id)}/fulfillment-status`,
+    {
+      auth: true,
+      body: { fulfillmentStatus },
+      credentials: "include",
+      method: "PATCH",
+    },
   );
 }

@@ -6,13 +6,19 @@ import {
 } from '@nestjs/common';
 import { OrderEmailService } from '../email/order-email.service';
 import { Prisma } from '../generated/prisma/client';
-import { OrderStatus, PaymentStatus } from '../generated/prisma/enums';
+import {
+  OrderFulfillmentStatus,
+  OrderStatus,
+  PaymentStatus,
+} from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { getFirstProductImage } from '../orders/order-item-image';
 import type {
   AdminOrderOrder,
   AdminOrderQueryDto,
   AdminOrderSort,
 } from './dto/admin-order-query.dto';
+import type { UpdateOrderFulfillmentStatusDto } from './dto/update-order-fulfillment-status.dto';
 
 const DEFAULT_ADMIN_ORDER_LIMIT = 20;
 const MAX_ADMIN_ORDER_LIMIT = 100;
@@ -56,6 +62,11 @@ const adminOrderItemSelect = {
   quantity: true,
   lineTotal: true,
   createdAt: true,
+  product: {
+    select: {
+      imageUrls: true,
+    },
+  },
 } as const satisfies Prisma.OrderItemSelect;
 
 const adminOrderWebhookEventSummarySelect = {
@@ -96,6 +107,7 @@ const adminOrderListSelect = {
     select: adminOrderUserSummarySelect,
   },
   status: true,
+  fulfillmentStatus: true,
   subtotalAmount: true,
   discountAmount: true,
   totalAmount: true,
@@ -123,6 +135,7 @@ const adminOrderListSelect = {
   createdAt: true,
   updatedAt: true,
   paidAt: true,
+  fulfilledAt: true,
   cancelledAt: true,
   expiresAt: true,
 } as const satisfies Prisma.OrderSelect;
@@ -135,6 +148,7 @@ const adminOrderDetailSelect = {
     select: adminOrderUserSummarySelect,
   },
   status: true,
+  fulfillmentStatus: true,
   subtotalAmount: true,
   discountAmount: true,
   totalAmount: true,
@@ -172,6 +186,7 @@ const adminOrderDetailSelect = {
   createdAt: true,
   updatedAt: true,
   paidAt: true,
+  fulfilledAt: true,
   cancelledAt: true,
   expiresAt: true,
 } as const satisfies Prisma.OrderSelect;
@@ -249,6 +264,56 @@ export class AdminOrdersService {
 
   async expireOrder(id: string) {
     return this.transitionPendingOrder(id, 'expire');
+  }
+
+  async updateFulfillmentStatus(
+    id: string,
+    dto: UpdateOrderFulfillmentStatusDto,
+  ) {
+    const order = await this.prismaService.$transaction(async (tx) => {
+      const currentOrder = await tx.order.findUnique({
+        where: { id },
+        select: {
+          fulfillmentStatus: true,
+          status: true,
+        },
+      });
+
+      if (!currentOrder) {
+        throw this.orderNotFoundException();
+      }
+
+      this.assertOrderCanUpdateFulfillment(currentOrder.status);
+
+      if (currentOrder.fulfillmentStatus === dto.fulfillmentStatus) {
+        return tx.order.findUnique({
+          where: { id },
+          select: adminOrderDetailSelect,
+        });
+      }
+
+      const fulfilledAt =
+        dto.fulfillmentStatus === OrderFulfillmentStatus.DELIVERED
+          ? new Date()
+          : null;
+
+      return tx.order.update({
+        where: { id },
+        data: {
+          fulfilledAt,
+          fulfillmentStatus: dto.fulfillmentStatus,
+        },
+        select: adminOrderDetailSelect,
+      });
+    });
+
+    if (!order) {
+      throw this.orderNotFoundException();
+    }
+
+    return {
+      order: this.toOrderDetail(order),
+    };
   }
 
   private async transitionPendingOrder(
@@ -489,6 +554,7 @@ export class AdminOrdersService {
       customerName: order.userId ? (order.user?.name ?? null) : order.shippingRecipientName,
       customerPhone: order.userId ? (order.user?.phone ?? null) : order.shippingPhone,
       status: order.status,
+      fulfillmentStatus: order.fulfillmentStatus,
       subtotalAmount: order.subtotalAmount,
       discountAmount: order.discountAmount,
       totalAmount: order.totalAmount,
@@ -508,6 +574,7 @@ export class AdminOrdersService {
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       paidAt: order.paidAt,
+      fulfilledAt: order.fulfilledAt,
       cancelledAt: order.cancelledAt,
       expiresAt: order.expiresAt,
     };
@@ -524,6 +591,7 @@ export class AdminOrdersService {
       customerName: order.userId ? (order.user?.name ?? null) : order.shippingRecipientName,
       customerPhone: order.userId ? (order.user?.phone ?? null) : order.shippingPhone,
       status: order.status,
+      fulfillmentStatus: order.fulfillmentStatus,
       subtotalAmount: order.subtotalAmount,
       discountAmount: order.discountAmount,
       totalAmount: order.totalAmount,
@@ -542,9 +610,13 @@ export class AdminOrdersService {
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       paidAt: order.paidAt,
+      fulfilledAt: order.fulfilledAt,
       cancelledAt: order.cancelledAt,
       expiresAt: order.expiresAt,
-      items: order.items,
+      items: order.items.map(({ product, ...item }) => ({
+        ...item,
+        imageUrl: getFirstProductImage(product),
+      })),
       payments: order.payments,
       webhookEvents: order.webhookEvents,
       paymentReconciliationIssues: order.paymentReconciliationIssues,
@@ -578,6 +650,35 @@ export class AdminOrdersService {
       throw new ConflictException({
         code: 'ADMIN_ORDER_ALREADY_EXPIRED',
         message: 'Order has already expired.',
+      });
+    }
+
+    throw this.orderStatusInvalidException();
+  }
+
+  private assertOrderCanUpdateFulfillment(status: OrderStatus) {
+    if (status === OrderStatus.PAID) {
+      return;
+    }
+
+    if (status === OrderStatus.PENDING_PAYMENT) {
+      throw new ConflictException({
+        code: 'ADMIN_ORDER_FULFILLMENT_REQUIRES_PAID_ORDER',
+        message: 'Fulfillment status can be updated after payment is confirmed.',
+      });
+    }
+
+    if (status === OrderStatus.CANCELLED) {
+      throw new ConflictException({
+        code: 'ADMIN_ORDER_CANCELLED_FULFILLMENT_LOCKED',
+        message: 'Cancelled orders cannot be updated for fulfillment.',
+      });
+    }
+
+    if (status === OrderStatus.EXPIRED) {
+      throw new ConflictException({
+        code: 'ADMIN_ORDER_EXPIRED_FULFILLMENT_LOCKED',
+        message: 'Expired orders cannot be updated for fulfillment.',
       });
     }
 
