@@ -77,8 +77,39 @@ export function formatDateTime(value: string | null | undefined): string {
   }).format(date);
 }
 
+export function formatDate(value: string | null | undefined): string {
+  if (!value) {
+    return "Not set";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not available";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+  }).format(date);
+}
+
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+export function formatOrderDisplayId(value: string): string {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return "#ORDER";
+  }
+
+  const shortValue =
+    normalizedValue.length > 8
+      ? normalizedValue.slice(-8).toUpperCase()
+      : normalizedValue.toUpperCase();
+
+  return `#${shortValue}`;
 }
 
 export function formatOrderCode(value: number | null | undefined): string {
@@ -99,4 +130,27 @@ export function getOrderStatusClass(status: OrderStatus): string {
 
 export function getPaymentStatusClass(status: PaymentStatus): string {
   return `payment-status-badge--${status.toLowerCase()}`;
+}
+
+export function getOrderStatusLabel(status: OrderStatus): string {
+  const labels: Record<OrderStatus, string> = {
+    CANCELLED: "Cancelled",
+    EXPIRED: "Expired",
+    PAID: "Paid",
+    PENDING_PAYMENT: "Pending payment",
+  };
+
+  return labels[status];
+}
+
+export function getPaymentStatusLabel(status: PaymentStatus): string {
+  const labels: Record<PaymentStatus, string> = {
+    CANCELLED: "Cancelled",
+    EXPIRED: "Expired",
+    FAILED: "Failed",
+    PAID: "Paid",
+    PENDING: "Pending",
+  };
+
+  return labels[status];
 }
