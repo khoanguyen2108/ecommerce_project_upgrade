@@ -23,38 +23,6 @@ export function CartPage() {
 
   return (
     <main className="customer-page cart-page">
-      <section className="customer-hero" aria-labelledby="cart-heading">
-        <div>
-          <p className="eyebrow">Shopping cart</p>
-          <h1 id="cart-heading">Cart</h1>
-          <p>Review saved items before creating a pending-payment order.</p>
-        </div>
-        <div className="customer-toolbar__actions">
-          <button
-            className="button button--secondary"
-            disabled={isLoading || isSaving}
-            onClick={() => void refreshCart().catch(() => undefined)}
-            type="button"
-          >
-            <RefreshCw
-              aria-hidden="true"
-              className={isLoading ? "spin" : undefined}
-              size={17}
-            />
-            Refresh
-          </button>
-          <button
-            className="button button--secondary"
-            disabled={!hasItems || isLoading || isSaving}
-            onClick={() => void clearCart().catch(() => undefined)}
-            type="button"
-          >
-            <Trash2 aria-hidden="true" size={17} />
-            Clear
-          </button>
-        </div>
-      </section>
-
       {error ? (
         <div className="customer-feedback customer-feedback--error" role="alert">
           <AlertCircle aria-hidden="true" size={19} />
@@ -75,7 +43,31 @@ export function CartPage() {
                 <p className="eyebrow">Items</p>
                 <h2>Current cart</h2>
               </div>
-              <span>{cart.totalQuantity} total quantity</span>
+              <div className="customer-toolbar__actions">
+                <span>{cart.totalQuantity} total quantity</span>
+                <button
+                  className="button button--secondary"
+                  disabled={isLoading || isSaving}
+                  onClick={() => void refreshCart().catch(() => undefined)}
+                  type="button"
+                >
+                  <RefreshCw
+                    aria-hidden="true"
+                    className={isLoading ? "spin" : undefined}
+                    size={17}
+                  />
+                  Refresh
+                </button>
+                <button
+                  className="button button--secondary"
+                  disabled={!hasItems || isLoading || isSaving}
+                  onClick={() => void clearCart().catch(() => undefined)}
+                  type="button"
+                >
+                  <Trash2 aria-hidden="true" size={17} />
+                  Clear
+                </button>
+              </div>
             </div>
 
             <div className="cart-item-list">

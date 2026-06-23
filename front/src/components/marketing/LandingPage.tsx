@@ -98,7 +98,6 @@ export function LandingPage() {
 
       <section className="section section--categories" id="categories">
         <div className="section-heading section-heading--center">
-          <p className="eyebrow">Shop by edit</p>
           <h2>Featured categories</h2>
         </div>
         <div className="category-grid">

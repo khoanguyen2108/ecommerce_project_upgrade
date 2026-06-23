@@ -148,28 +148,9 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
   const hasActiveFilters = Boolean(
     query.categorySlug || query.search || (query.sort && query.sort !== "newest"),
   );
-  const productCountLabel = isProductLoading
-    ? "Loading products"
-    : productError
-      ? "Catalog unavailable"
-      : `${pagination.total} ${pagination.total === 1 ? "product" : "products"}`;
 
   return (
     <main className="catalog-page catalog-page--shop">
-      <section className="catalog-intro" aria-labelledby="shop-heading">
-        <div>
-          <p className="eyebrow">Shop</p>
-          <h1 id="shop-heading">Shop the collection</h1>
-          <p>
-            Considered everyday pieces, clean silhouettes, and easy layers for
-            your wardrobe.
-          </p>
-        </div>
-        <p aria-live="polite" className="catalog-product-count">
-          {productCountLabel}
-        </p>
-      </section>
-
       <section className="catalog-shell" aria-label="Product catalog">
         <form className="catalog-controls" onSubmit={handleSearchSubmit}>
           <div className="catalog-control catalog-control--search">

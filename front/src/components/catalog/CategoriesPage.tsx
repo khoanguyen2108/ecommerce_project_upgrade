@@ -61,22 +61,6 @@ export function CategoriesPage() {
 
   return (
     <main className="categories-page">
-      <section className="categories-intro" aria-labelledby="categories-heading">
-        <div>
-          <p className="eyebrow">Categories</p>
-          <h1 id="categories-heading">Browse by category</h1>
-          <p>
-            Find the Belikeme pieces that fit your wardrobe, organized into
-            simple edits for easier browsing.
-          </p>
-        </div>
-        {!state.isLoading && !state.error ? (
-          <p className="categories-count" aria-live="polite">
-            {categories.length} {categories.length === 1 ? "category" : "categories"}
-          </p>
-        ) : null}
-      </section>
-
       <section aria-label="All categories">
         {state.isLoading ? (
           <div

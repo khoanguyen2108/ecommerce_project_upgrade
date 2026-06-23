@@ -12,31 +12,12 @@ export function WishlistPage() {
 
   return (
     <main className="customer-page wishlist-page">
-      <section className="customer-hero" aria-labelledby="wishlist-heading">
-        <div>
-          <p className="eyebrow">Local wishlist</p>
-          <h1 id="wishlist-heading">Wishlist</h1>
-          <p>
-            Saved products stay on this device only. They are not synced to an
-            account.
-          </p>
-        </div>
-        <Link className="button button--secondary" href="/products">
-          Continue shopping
-        </Link>
-      </section>
-
       {!isLoaded ? <WishlistSkeleton /> : null}
 
       {isLoaded && count === 0 ? <WishlistEmptyState /> : null}
 
       {isLoaded && count > 0 ? (
-        <section className="wishlist-section" aria-label="Saved products">
-          <div className="customer-section__header">
-            <h2>Saved products</h2>
-            <span>{count === 1 ? "1 item" : `${count} items`}</span>
-          </div>
-
+        <section className="wishlist-section" aria-label="Wishlist items">
           <div className="wishlist-grid">
             {items.map((item) => (
               <WishlistListItem
@@ -116,10 +97,6 @@ function WishlistEmptyState() {
 function WishlistSkeleton() {
   return (
     <section className="wishlist-section" aria-busy="true" aria-live="polite">
-      <div className="customer-section__header">
-        <span className="customer-skeleton-line customer-skeleton-line--wide" />
-        <span className="customer-skeleton-line" />
-      </div>
       <div className="wishlist-grid">
         {Array.from({ length: 3 }, (_, index) => (
           <div aria-hidden="true" className="wishlist-item" key={index}>
