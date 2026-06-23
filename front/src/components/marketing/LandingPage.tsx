@@ -106,7 +106,7 @@ export function LandingPage() {
 
       <section className="section section--categories" id="categories">
         <div className="section-heading section-heading--center">
-          <h2>Featured categories</h2>
+          <h2>Featured Categories</h2>
         </div>
         <div className="category-grid">
           {catalog.isLoading ? <CatalogSkeleton count={3} /> : null}
@@ -128,7 +128,7 @@ export function LandingPage() {
         <div className="section-heading section-heading--split">
           <div>
             <p className="eyebrow">Just landed</p>
-            <h2>New arrivals</h2>
+            <h2>New Arrivals</h2>
           </div>
           <Link className="text-link" href="/products">
             View all
