@@ -18,6 +18,7 @@ interface LandingCatalogState {
 }
 
 const LANDING_HERO_IMAGE_SRC = "/images/landing/landing-hero.webp";
+const LANDING_HERO_VIDEO_SRC = "/images/landing/landing-hero.mp4";
 const LANDING_EDITORIAL_IMAGE_SRC = "/images/landing/landing-editorial.jpg";
 const LANDING_HERO_COPY = {
   heroEyebrow: "New season essentials",
@@ -76,11 +77,17 @@ export function LandingPage() {
   return (
     <main>
       <section className="hero-section" aria-labelledby="hero-heading">
-        <img
-          alt="Belikeme model in a clean monochrome look"
+        <video
+          aria-hidden="true"
+          autoPlay
           className="hero-section__image"
-          src={LANDING_HERO_IMAGE_SRC}
-        />
+          loop
+          muted
+          playsInline
+          poster={LANDING_HERO_IMAGE_SRC}
+        >
+          <source src={LANDING_HERO_VIDEO_SRC} type="video/mp4" />
+        </video>
         <div className="hero-section__shade" />
         <div className="hero-section__content">
           <p className="eyebrow">{LANDING_HERO_COPY.heroEyebrow}</p>
