@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, Loader2, TicketPercent, X } from "lucide-react";
+import { Loader2, TicketPercent, X } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
@@ -230,24 +230,6 @@ export function CheckoutSummary({
             ))}
           </div>
         ) : null}
-
-        <div className="checkout-pending-note" role="note">
-          <Info aria-hidden="true" size={18} />
-          <div>
-            {isDirectPay ? (
-              <>
-                <span>You will be redirected to payOS to complete payment.</span>
-                <span>Your order is confirmed only after payment is verified.</span>
-                <span>Do not close the page until payOS redirects you back.</span>
-              </>
-            ) : (
-              <span>
-                Your order will be created as <strong>PENDING_PAYMENT</strong>.
-                Payment is not completed at this step.
-              </span>
-            )}
-          </div>
-        </div>
 
         <button
           className="button button--primary button--full checkout-create-button"

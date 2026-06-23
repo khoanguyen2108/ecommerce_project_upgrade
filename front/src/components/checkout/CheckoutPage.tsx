@@ -346,7 +346,6 @@ export function CheckoutPage() {
         }
         title="CHECKOUT"
       />
-      <CheckoutStepper current="shipping" />
 
       {error && !isEmpty ? (
         <div className="customer-feedback customer-feedback--error" role="alert">
@@ -634,37 +633,6 @@ function CheckoutIntro({ subtitle, title }: { subtitle: string; title: string })
       <h1 id="checkout-heading">{title}</h1>
       <p>{subtitle}</p>
     </section>
-  );
-}
-
-function CheckoutStepper({ current }: { current: "shipping" | "payment" }) {
-  const steps = [
-    { id: "cart", label: "Cart" },
-    { id: "shipping", label: "Shipping" },
-    { id: "payment", label: "Payment" },
-  ] as const;
-  const currentIndex = current === "shipping" ? 1 : 2;
-
-  return (
-    <nav className="checkout-stepper" aria-label="Checkout progress">
-      <ol>
-        {steps.map((step, index) => {
-          const isCurrent = step.id === current;
-          const isComplete = index < currentIndex;
-
-          return (
-            <li
-              aria-current={isCurrent ? "step" : undefined}
-              className={`${isCurrent ? "is-current" : ""} ${isComplete ? "is-complete" : ""}`}
-              key={step.id}
-            >
-              <span aria-hidden="true">{index + 1}</span>
-              <strong>{step.label}</strong>
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
   );
 }
 
