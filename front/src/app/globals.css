@@ -1838,8 +1838,13 @@ img {
 }
 
 .product-detail-actions {
-  display: grid;
+  display: flex;
   gap: var(--space-3);
+}
+
+.product-detail-actions > * {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .product-facts {

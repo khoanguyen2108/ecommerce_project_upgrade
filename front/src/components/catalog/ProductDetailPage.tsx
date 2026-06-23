@@ -509,6 +509,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           ) : null}
 
           <div className="product-detail-actions">
+            <WishlistButton item={wishlistItem} />
             <button
               className="button button--primary button--full"
               disabled={addToCartDisabled}
@@ -527,7 +528,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                 totalStock,
               })}
             </button>
-            <WishlistButton item={wishlistItem} />
           </div>
 
           <dl className="product-facts">
