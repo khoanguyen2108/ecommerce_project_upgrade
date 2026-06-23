@@ -956,7 +956,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
       <section className="admin-resource__body admin-resource__body--full-width">
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table className="admin-table admin-table--products">
             <thead>
               <tr>
                 <th>Image</th>
