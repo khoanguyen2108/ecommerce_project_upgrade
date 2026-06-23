@@ -152,7 +152,6 @@ export function LandingPage() {
 
       <section className="campaign-band" id="delivery">
         <div className="campaign-band__copy">
-          <p className="eyebrow">Belikeme edit</p>
           <h2>Made for the days you become yourself</h2>
           <p>
             Clean pieces, easy layers, and small details that move with your
