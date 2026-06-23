@@ -15,6 +15,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import {
+  MAX_PRODUCT_VARIANTS,
+  PRODUCT_VARIANT_LIMIT_MESSAGE,
+} from '../catalog.constants';
 import { CreateProductVariantDto } from './create-product-variant.dto';
 
 export class CreateProductDto {
@@ -100,10 +104,14 @@ export class CreateProductDto {
 
   @ApiPropertyOptional({
     description: 'Variants created atomically with the product.',
+    maxItems: MAX_PRODUCT_VARIANTS,
     type: [CreateProductVariantDto],
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(MAX_PRODUCT_VARIANTS, {
+    message: PRODUCT_VARIANT_LIMIT_MESSAGE,
+  })
   @ValidateNested({ each: true })
   @Type(() => CreateProductVariantDto)
   variants?: CreateProductVariantDto[];

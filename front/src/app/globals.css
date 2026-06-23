@@ -4382,7 +4382,11 @@ img {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  max-height: min(360px, 44svh);
   min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .admin-variant-grid__empty {

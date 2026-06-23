@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  MAX_PRODUCT_VARIANTS,
+  PRODUCT_VARIANT_LIMIT_MESSAGE,
+} from './catalog.constants';
 import type {
   AdminCategoryOrder,
   AdminCategoryQueryDto,
@@ -693,6 +697,7 @@ export class CatalogService {
     const categoryIds = this.normalizeCategoryIds(dto.categoryIds, dto.categoryId);
     await this.assertActiveCategoriesExist(categoryIds);
     await this.assertProductSlugAvailable(slug);
+    this.assertVariantLimit(dto.variants?.length ?? 0);
     const variants = (dto.variants ?? []).map((variant) => ({
       sku: this.normalizeOptionalSku(variant.sku),
       size: this.normalizeSize(variant.size),
@@ -907,6 +912,7 @@ export class CatalogService {
 
   async createProductVariant(productId: string, dto: CreateProductVariantDto) {
     await this.getProductForAdmin(productId);
+    await this.assertProductVariantCapacity(productId);
 
     const sku = this.normalizeOptionalSku(dto.sku);
     const size = this.normalizeSize(dto.size);
@@ -1509,6 +1515,20 @@ export class CatalogService {
     }
   }
 
+  private assertVariantLimit(nextVariantCount: number) {
+    if (nextVariantCount > MAX_PRODUCT_VARIANTS) {
+      throw this.productVariantLimitExceededException();
+    }
+  }
+
+  private async assertProductVariantCapacity(productId: string) {
+    const variantCount = await this.prismaService.productVariant.count({
+      where: { productId },
+    });
+
+    this.assertVariantLimit(variantCount + 1);
+  }
+
   private normalizeRequiredText(
     value: string | null | undefined,
     fieldName: string,
@@ -1876,6 +1896,13 @@ export class CatalogService {
     return new ConflictException({
       code: 'PRODUCT_VARIANT_OPTION_EXISTS',
       message: 'A variant with this size and color already exists for this product.',
+    });
+  }
+
+  private productVariantLimitExceededException() {
+    return new BadRequestException({
+      code: 'PRODUCT_VARIANT_LIMIT_EXCEEDED',
+      message: PRODUCT_VARIANT_LIMIT_MESSAGE,
     });
   }
 

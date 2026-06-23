@@ -60,6 +60,8 @@ import {
 const PRODUCT_LIMIT = 8;
 const CATEGORY_OPTION_LIMIT = 100;
 const MAX_PRODUCT_IMAGES = 4;
+const MAX_PRODUCT_VARIANTS = 50;
+const PRODUCT_VARIANT_LIMIT_MESSAGE = "Maximum 50 variants per product.";
 
 const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
   AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
@@ -78,6 +80,7 @@ const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
   PRODUCT_VARIANT_NOT_FOUND: "That variant no longer exists.",
   PRODUCT_VARIANT_OPTION_EXISTS:
     "A variant with this size and color already exists for this product.",
+  PRODUCT_VARIANT_LIMIT_EXCEEDED: PRODUCT_VARIANT_LIMIT_MESSAGE,
   PRODUCT_VARIANT_SKU_EXISTS: "Another variant already uses this SKU.",
   VALIDATION_ERROR: "Some catalog fields are invalid. Review the form and try again.",
 };
@@ -568,6 +571,15 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       return;
     }
 
+    const currentVariantCount =
+      panelMode === "create"
+        ? draftVariants.length
+        : (selectedProduct?.variants.length ?? 0);
+    if (!editingVariantId && currentVariantCount >= MAX_PRODUCT_VARIANTS) {
+      setActionError(PRODUCT_VARIANT_LIMIT_MESSAGE);
+      return;
+    }
+
     const editingVariant = editingVariantId && selectedProduct
       ? selectedProduct.variants.find((variant) => variant.id === editingVariantId)
       : undefined;
@@ -783,6 +795,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
           ...variant,
           isDraft: false as const,
         }));
+  const isVariantLimitReached = displayedVariants.length >= MAX_PRODUCT_VARIANTS;
   const hasUnsavedChanges = isModalOpen
     ? !areProductFormsEqual(productForm, productFormBaseline) ||
       !areVariantFormsEqual(variantForm, variantFormBaseline) ||
@@ -1368,7 +1381,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               <div>
                 <p className="eyebrow">Variants</p>
                 <h3 id="product-variants-heading">Product variants</h3>
-                <p className="admin-variants__helper">Manage SKU, size, color, stock, and optional price overrides.</p>
+                <p className="admin-variants__helper">
+                  {displayedVariants.length} of {MAX_PRODUCT_VARIANTS} variants.
+                  Manage SKU, size, color, stock, and optional price overrides.
+                </p>
               </div>
               {editingVariantId ? (
                 <button
@@ -1471,6 +1487,11 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     ))
                   )}
                 </div>
+                {isVariantLimitReached && !editingVariantId ? (
+                  <p className="admin-form-inline-state" role="status">
+                    {PRODUCT_VARIANT_LIMIT_MESSAGE}
+                  </p>
+                ) : null}
 
                 <form className="admin-form admin-form--variant" onSubmit={handleVariantSave}>
                   <div className="admin-form__split">
@@ -1594,7 +1615,11 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
                   <button
                     className="button button--primary button--full"
-                    disabled={isSavingVariant}
+                    disabled={
+                      isSavingVariant ||
+                      isPanelLoading ||
+                      (!editingVariantId && isVariantLimitReached)
+                    }
                     type="submit"
                   >
                     <Save aria-hidden="true" size={17} />
