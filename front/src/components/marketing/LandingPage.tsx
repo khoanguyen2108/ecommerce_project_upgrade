@@ -17,7 +17,8 @@ interface LandingCatalogState {
   isLoading: boolean;
 }
 
-const LANDING_HERO_IMAGE_SRC = "/images/landing/hero.jpg";
+const LANDING_HERO_IMAGE_SRC = "/images/landing/landing-hero.webp";
+const LANDING_EDITORIAL_IMAGE_SRC = "/images/landing/landing-editorial.jpg";
 const LANDING_HERO_COPY = {
   heroEyebrow: "New season essentials",
   heroTitle: "Elevate your everyday",
@@ -76,7 +77,7 @@ export function LandingPage() {
     <main>
       <section className="hero-section" aria-labelledby="hero-heading">
         <img
-          alt="Black and white abstract graffiti collage"
+          alt="Belikeme model in a clean monochrome look"
           className="hero-section__image"
           src={LANDING_HERO_IMAGE_SRC}
         />
@@ -143,17 +144,25 @@ export function LandingPage() {
       </section>
 
       <section className="campaign-band" id="delivery">
-        <div>
-          <p className="eyebrow">Weekend edit</p>
-          <h2>Soft structure for long city days</h2>
+        <div className="campaign-band__copy">
+          <p className="eyebrow">Belikeme edit</p>
+          <h2>Made for the days you become yourself</h2>
           <p>
-            Layer quiet textures, neutral tones, and reliable cuts without
-            making the outfit feel overworked.
+            Clean pieces, easy layers, and small details that move with your
+            real life, from first plans to late-night walks.
           </p>
+          <Link className="button button--light" href="/products">
+            Shop the edit
+          </Link>
         </div>
-        <Link className="button button--light" href="/products">
-          Shop the edit
-        </Link>
+        <div className="campaign-band__image-wrap">
+          <img
+            alt="Belikeme editorial collage with monochrome youth styling"
+            className="campaign-band__image"
+            loading="lazy"
+            src={LANDING_EDITORIAL_IMAGE_SRC}
+          />
+        </div>
       </section>
 
       <section className="landing-about" id="about" aria-labelledby="about-heading">
