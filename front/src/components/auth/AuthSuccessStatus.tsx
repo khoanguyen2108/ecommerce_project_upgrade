@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { getPostLoginRedirectPath, isAdminUser } from "@/features/auth/roles";
 
 type Status = "checking" | "confirmed" | "unconfirmed";
 
@@ -17,7 +18,7 @@ const wait = (delayMs: number) =>
 
 export function AuthSuccessStatus() {
   const router = useRouter();
-  const { setAuthenticatedUser } = useAuthSession();
+  const { currentUser, setAuthenticatedUser } = useAuthSession();
   const [status, setStatus] = useState<Status>("checking");
 
   useEffect(() => {
@@ -35,7 +36,10 @@ export function AuthSuccessStatus() {
 
           setAuthenticatedUser(response.user);
           setStatus("confirmed");
-          redirectTimer = window.setTimeout(() => router.replace("/"), 1400);
+          redirectTimer = window.setTimeout(
+            () => router.replace(getPostLoginRedirectPath(response.user, "/")),
+            1400,
+          );
           return;
         } catch {
           if (attempt < SESSION_CONFIRMATION_ATTEMPTS) {
@@ -75,7 +79,10 @@ export function AuthSuccessStatus() {
       <div className="status-panel" role="status">
         <CheckCircle2 size={30} />
         <h1>Signed in successfully</h1>
-        <p>Redirecting you back to the store.</p>
+        <p>
+          Redirecting you to{" "}
+          {isAdminUser(currentUser) ? "the admin workspace" : "the store"}.
+        </p>
       </div>
     );
   }

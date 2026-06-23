@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { isAdminUser } from "@/features/auth/roles";
 import { useWishlist } from "@/features/wishlist/useWishlist";
 
 interface SiteHeaderProps {
@@ -27,6 +28,8 @@ export function SiteHeader({ active }: SiteHeaderProps) {
   const { currentUser, isAuthenticated, isLoading, logout } = useAuthSession();
   const { cartCount, openCart } = useCart();
   const { count: wishlistCount, isLoaded: isWishlistLoaded } = useWishlist();
+  const isAdmin = isAdminUser(currentUser);
+  const showCustomerActions = !isLoading && !isAdmin;
   const wishlistLabel =
     isWishlistLoaded && wishlistCount > 0
       ? `Wishlist, ${wishlistCount} saved ${
@@ -63,58 +66,74 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         </nav>
 
         <div className="site-actions">
-          <Link
-            aria-label={wishlistLabel}
-            className={`icon-button ${active === "wishlist" ? "is-active" : ""}`}
-            href="/wishlist"
-            title="Wishlist"
-          >
-            <Heart size={20} strokeWidth={1.8} />
-            {isWishlistLoaded && wishlistCount > 0 ? (
-              <span className="icon-button__badge">{wishlistCount}</span>
-            ) : null}
-          </Link>
-          {isAuthenticated ? (
-            <button
-              aria-label={cartLabel}
-              className={`icon-button ${active === "cart" ? "is-active" : ""}`}
-              onClick={openCart}
-              title="Cart"
-              type="button"
+          {showCustomerActions ? (
+            <Link
+              aria-label={wishlistLabel}
+              className={`icon-button ${active === "wishlist" ? "is-active" : ""}`}
+              href="/wishlist"
+              title="Wishlist"
             >
-              <ShoppingBag size={20} strokeWidth={1.8} />
-              {cartCount > 0 ? (
-                <span className="icon-button__badge">{cartCount}</span>
+              <Heart size={20} strokeWidth={1.8} />
+              {isWishlistLoaded && wishlistCount > 0 ? (
+                <span className="icon-button__badge">{wishlistCount}</span>
               ) : null}
-            </button>
-          ) : (
-            <Link
-              aria-label="Cart"
-              className={`icon-button ${active === "cart" ? "is-active" : ""}`}
-              href="/cart"
-              title="Cart"
-            >
-              <ShoppingBag size={20} strokeWidth={1.8} />
-            </Link>
-          )}
-          {isAuthenticated ? (
-            <Link
-              aria-label="Profile"
-              className={`icon-button ${active === "account" ? "is-active" : ""}`}
-              href="/profile"
-              title="Profile"
-            >
-              <User size={20} strokeWidth={1.8} />
             </Link>
           ) : null}
-          {isAuthenticated ? (
+          {showCustomerActions ? (
+            isAuthenticated ? (
+              <button
+                aria-label={cartLabel}
+                className={`icon-button ${active === "cart" ? "is-active" : ""}`}
+                onClick={openCart}
+                title="Cart"
+                type="button"
+              >
+                <ShoppingBag size={20} strokeWidth={1.8} />
+                {cartCount > 0 ? (
+                  <span className="icon-button__badge">{cartCount}</span>
+                ) : null}
+              </button>
+            ) : (
+              <Link
+                aria-label="Cart"
+                className={`icon-button ${active === "cart" ? "is-active" : ""}`}
+                href="/cart"
+                title="Cart"
+              >
+                <ShoppingBag size={20} strokeWidth={1.8} />
+              </Link>
+            )
+          ) : null}
+          {showCustomerActions && isAuthenticated ? (
+            <>
+              <Link
+                aria-label="Profile"
+                className={`icon-button ${
+                  active === "account" ? "is-active" : ""
+                }`}
+                href="/profile"
+                title="Profile"
+              >
+                <User size={20} strokeWidth={1.8} />
+              </Link>
+              <Link
+                aria-label="Orders"
+                className={`icon-button ${active === "orders" ? "is-active" : ""}`}
+                href="/orders"
+                title="Orders"
+              >
+                <ReceiptText size={20} strokeWidth={1.8} />
+              </Link>
+            </>
+          ) : null}
+          {showCustomerActions && !isAuthenticated ? (
             <Link
-              aria-label="Orders"
-              className={`icon-button ${active === "orders" ? "is-active" : ""}`}
-              href="/orders"
-              title="Orders"
+              aria-label="Account"
+              className={`icon-button ${active === "account" ? "is-active" : ""}`}
+              href="/login"
+              title="Account"
             >
-              <ReceiptText size={20} strokeWidth={1.8} />
+              <User size={20} strokeWidth={1.8} />
             </Link>
           ) : null}
           {isAuthenticated ? (
@@ -128,17 +147,8 @@ export function SiteHeader({ active }: SiteHeaderProps) {
             >
               <LogOut size={20} strokeWidth={1.8} />
             </button>
-          ) : (
-            <Link
-              aria-label="Account"
-              className={`icon-button ${active === "account" ? "is-active" : ""}`}
-              href="/login"
-              title="Account"
-            >
-              <User size={20} strokeWidth={1.8} />
-            </Link>
-          )}
-          {!isLoading && currentUser?.role === "ADMIN" ? (
+          ) : null}
+          {!isLoading && isAdmin ? (
             <Link
               aria-label="Admin"
               className="icon-button"

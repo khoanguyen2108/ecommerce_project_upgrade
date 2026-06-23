@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { AdminState } from "@/components/admin/AdminState";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { isAdminUser } from "@/features/auth/roles";
 
 export function AdminRouteGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -41,7 +42,7 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  if (currentUser?.role !== "ADMIN") {
+  if (!isAdminUser(currentUser)) {
     return (
       <AdminState
         actions={[

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { startGoogleLogin, loginUser } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { getPostLoginRedirectPath } from "@/features/auth/roles";
 import { ApiClientError } from "@/lib/errors/api-error";
 import { FieldError } from "@/components/ui/FieldError";
 import { GoogleMark } from "@/components/ui/GoogleMark";
@@ -49,7 +50,7 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
         password,
       });
       setAuthenticatedSession(response);
-      router.push(nextPath || "/");
+      router.push(getPostLoginRedirectPath(response.user, nextPath || "/"));
     } catch (error) {
       setFormError(getSafeErrorMessage(error));
     } finally {
