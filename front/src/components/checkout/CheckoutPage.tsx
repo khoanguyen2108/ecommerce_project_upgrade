@@ -3,10 +3,13 @@
 import {
   AlertCircle,
   Info,
+  MapPin,
   RefreshCw,
+  UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import type { User } from "@/features/auth/types";
 import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
@@ -27,16 +30,24 @@ import type {
   GuestCheckoutItemRequest,
 } from "@/features/checkout/types";
 import { createPayosPayment } from "@/features/payments/api";
-import { listAddresses } from '@/features/addresses/api';
-import type { Address, AddressInput } from '@/features/addresses/types';
-import { AddressFields, emptyAddressInput, normalizeAddressInput, validateAddress } from '@/components/profile/AddressFields';
-import { MapPin } from 'lucide-react';
+import { listAddresses } from "@/features/addresses/api";
+import type { Address, AddressInput } from "@/features/addresses/types";
+import {
+  AddressFields,
+  emptyAddressInput,
+  normalizeAddressInput,
+  validateAddress,
+} from "@/components/profile/AddressFields";
 
 type CheckoutMode = "AUTHENTICATED" | "GUEST";
 
 export function CheckoutPage() {
   const { clearGuestCart, getGuestCartItems, refreshCart } = useCart();
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuthSession();
+  const {
+    currentUser,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+  } = useAuthSession();
   const [checkoutMode, setCheckoutMode] = useState<CheckoutMode>();
   const [guestItems, setGuestItems] = useState<GuestCheckoutItemRequest[]>([]);
   const [summary, setSummary] = useState<CheckoutSummaryModel>();
@@ -50,8 +61,9 @@ export function CheckoutPage() {
   const [requestId, setRequestId] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState('new');
-  const [shippingInfo, setShippingInfo] = useState<AddressInput>(emptyAddressInput);
+  const [selectedAddressId, setSelectedAddressId] = useState("new");
+  const [shippingInfo, setShippingInfo] =
+    useState<AddressInput>(emptyAddressInput);
   const [guestEmail, setGuestEmail] = useState("");
   const [saveAddress, setSaveAddress] = useState(false);
   const [setDefault, setSetDefault] = useState(false);
@@ -78,7 +90,7 @@ export function CheckoutPage() {
   useEffect(() => {
     if (checkoutMode !== "AUTHENTICATED") {
       setAddresses([]);
-      setSelectedAddressId('new');
+      setSelectedAddressId("new");
       return;
     }
 
@@ -87,11 +99,17 @@ export function CheckoutPage() {
       .then((response) => {
         if (!active) return;
         setAddresses(response.addresses);
-        const preferred = response.addresses.find((address) => address.isDefault) || response.addresses[0];
+        const preferred =
+          response.addresses.find((address) => address.isDefault) ||
+          response.addresses[0];
         if (preferred) setSelectedAddressId(preferred.id);
       })
-      .catch(() => { if (active) setSelectedAddressId('new'); });
-    return () => { active = false; };
+      .catch(() => {
+        if (active) setSelectedAddressId("new");
+      });
+    return () => {
+      active = false;
+    };
   }, [checkoutMode]);
 
   useEffect(() => {
@@ -193,9 +211,13 @@ export function CheckoutPage() {
 
     if (!checkoutMode) return;
 
-    if (checkoutMode === "GUEST" || selectedAddressId === 'new') {
+    if (checkoutMode === "GUEST" || selectedAddressId === "new") {
       const shippingError = validateAddress(shippingInfo);
-      if (shippingError) { setError(shippingError); setErrorCode('CHECKOUT_SHIPPING_INVALID'); return; }
+      if (shippingError) {
+        setError(shippingError);
+        setErrorCode("CHECKOUT_SHIPPING_INVALID");
+        return;
+      }
     }
 
     const normalizedGuestEmail = guestEmail.trim().toLowerCase();
@@ -219,11 +241,17 @@ export function CheckoutPage() {
       const normalizedShipping = normalizeAddressInput(shippingInfo);
       if (checkoutMode === "AUTHENTICATED") {
         const response = await createCheckoutOrder({
-            ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
-            ...(selectedAddressId === 'new'
-              ? { shippingInfo: { ...normalizedShipping, saveAddress, setDefault: saveAddress && setDefault } }
-              : { addressId: selectedAddressId }),
-          });
+          ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
+          ...(selectedAddressId === "new"
+            ? {
+                shippingInfo: {
+                  ...normalizedShipping,
+                  saveAddress,
+                  setDefault: saveAddress && setDefault,
+                },
+              }
+            : { addressId: selectedAddressId }),
+        });
         authenticatedOrderId = response.order.id;
         void refreshCart().catch(() => undefined);
 
@@ -313,12 +341,12 @@ export function CheckoutPage() {
       <CheckoutIntro
         subtitle={
           checkoutMode === "AUTHENTICATED"
-            ? "You will be redirected to payOS to complete your payment."
+            ? "Review your saved details, delivery address, voucher, and order total before payOS."
             : "You will be redirected to payOS to complete payment."
         }
-        title="Review your order"
+        title="CHECKOUT"
       />
-      <CheckoutStepper current="review" />
+      <CheckoutStepper current="shipping" />
 
       {error && !isEmpty ? (
         <div className="customer-feedback customer-feedback--error" role="alert">
@@ -362,6 +390,15 @@ export function CheckoutPage() {
 
       {summary ? (
         <CheckoutSummary
+          contactSection={
+            <CheckoutContact
+              currentUser={currentUser}
+              disabled={isSubmitting}
+              guestEmail={guestEmail}
+              isGuest={checkoutMode === "GUEST"}
+              onGuestEmailChange={setGuestEmail}
+            />
+          }
           isDirectPay
           isLoading={isLoading}
           isSubmitting={isSubmitting}
@@ -375,11 +412,12 @@ export function CheckoutPage() {
             <CheckoutShipping
               addresses={addresses}
               disabled={isSubmitting}
-              guestEmail={guestEmail}
               isGuest={checkoutMode === "GUEST"}
               onAddressChange={setShippingInfo}
-              onGuestEmailChange={setGuestEmail}
-              onSaveAddressChange={(checked) => { setSaveAddress(checked); if (!checked) setSetDefault(false); }}
+              onSaveAddressChange={(checked) => {
+                setSaveAddress(checked);
+                if (!checked) setSetDefault(false);
+              }}
               onSelectedAddressChange={setSelectedAddressId}
               onSetDefaultChange={setSetDefault}
               saveAddress={saveAddress}
@@ -394,13 +432,89 @@ export function CheckoutPage() {
   );
 }
 
-function CheckoutShipping({ addresses, disabled, guestEmail, isGuest, onAddressChange, onGuestEmailChange, onSaveAddressChange, onSelectedAddressChange, onSetDefaultChange, saveAddress, selectedAddressId, setDefault, shippingInfo }: {
-  addresses: Address[];
+function CheckoutContact({
+  currentUser,
+  disabled,
+  guestEmail,
+  isGuest,
+  onGuestEmailChange,
+}: {
+  currentUser?: User;
   disabled: boolean;
   guestEmail: string;
   isGuest: boolean;
-  onAddressChange: (value: AddressInput) => void;
   onGuestEmailChange: (value: string) => void;
+}) {
+  return (
+    <section
+      className="checkout-contact"
+      aria-labelledby="checkout-contact-heading"
+    >
+      <header className="checkout-section-heading">
+        <div>
+          <p className="eyebrow">Contact</p>
+          <h2 id="checkout-contact-heading">Contact / account</h2>
+        </div>
+        <UserRound aria-hidden="true" size={22} />
+      </header>
+
+      {isGuest ? (
+        <div className="form-field checkout-guest-email">
+          <label htmlFor="checkout-guest-email">Email address</label>
+          <input
+            autoComplete="email"
+            disabled={disabled}
+            id="checkout-guest-email"
+            maxLength={320}
+            onChange={(event) => onGuestEmailChange(event.target.value)}
+            placeholder="guest@example.com"
+            required
+            type="email"
+            value={guestEmail}
+          />
+          <small>Required for order updates.</small>
+        </div>
+      ) : (
+        <div className="checkout-account-card">
+          <div>
+            <span>Signed in as</span>
+            <strong>{currentUser?.email || "Authenticated customer"}</strong>
+          </div>
+          {currentUser?.name ? (
+            <div>
+              <span>Name</span>
+              <strong>{currentUser.name}</strong>
+            </div>
+          ) : null}
+          {currentUser?.phone ? (
+            <div>
+              <span>Phone</span>
+              <strong>{currentUser.phone}</strong>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CheckoutShipping({
+  addresses,
+  disabled,
+  isGuest,
+  onAddressChange,
+  onSaveAddressChange,
+  onSelectedAddressChange,
+  onSetDefaultChange,
+  saveAddress,
+  selectedAddressId,
+  setDefault,
+  shippingInfo,
+}: {
+  addresses: Address[];
+  disabled: boolean;
+  isGuest: boolean;
+  onAddressChange: (value: AddressInput) => void;
   onSaveAddressChange: (value: boolean) => void;
   onSelectedAddressChange: (value: string) => void;
   onSetDefaultChange: (value: boolean) => void;
@@ -410,46 +524,102 @@ function CheckoutShipping({ addresses, disabled, guestEmail, isGuest, onAddressC
   shippingInfo: AddressInput;
 }) {
   return (
-    <section className="checkout-shipping" aria-labelledby="checkout-shipping-heading">
-      <header className="checkout-section-heading"><div><p className="eyebrow">Delivery</p><h2 id="checkout-shipping-heading">Shipping information</h2></div><MapPin aria-hidden="true" size={22} /></header>
+    <section
+      className="checkout-shipping"
+      aria-labelledby="checkout-shipping-heading"
+    >
+      <header className="checkout-section-heading">
+        <div>
+          <p className="eyebrow">Shipping</p>
+          <h2 id="checkout-shipping-heading">Shipping address</h2>
+        </div>
+        <MapPin aria-hidden="true" size={22} />
+      </header>
       {addresses.length > 0 ? (
         <div className="checkout-address-options">
           {addresses.map((address) => (
-            <label className={`checkout-address-option ${selectedAddressId === address.id ? 'is-selected' : ''}`} key={address.id}>
-              <input checked={selectedAddressId === address.id} disabled={disabled} name="shipping-source" onChange={() => onSelectedAddressChange(address.id)} type="radio" />
-              <span><strong>{address.recipientName}{address.isDefault ? <small>Default</small> : null}</strong><span>{address.phone}</span><span>{[address.addressLine, address.ward, address.district, address.province].join(', ')}</span></span>
+            <label
+              className={`checkout-address-option ${
+                selectedAddressId === address.id ? "is-selected" : ""
+              }`}
+              key={address.id}
+            >
+              <input
+                checked={selectedAddressId === address.id}
+                disabled={disabled}
+                name="shipping-source"
+                onChange={() => onSelectedAddressChange(address.id)}
+                type="radio"
+              />
+              <span>
+                <strong>
+                  {address.recipientName}
+                  {address.isDefault ? <small>Default</small> : null}
+                </strong>
+                <span>{address.phone}</span>
+                <span>
+                  {[
+                    address.addressLine,
+                    address.ward,
+                    address.district,
+                    address.province,
+                  ].join(", ")}
+                </span>
+              </span>
             </label>
           ))}
-          <label className={`checkout-address-option ${selectedAddressId === 'new' ? 'is-selected' : ''}`}>
-            <input checked={selectedAddressId === 'new'} disabled={disabled} name="shipping-source" onChange={() => onSelectedAddressChange('new')} type="radio" /><span><strong>Use a new address</strong><span>Enter delivery details below.</span></span>
+          <label
+            className={`checkout-address-option ${
+              selectedAddressId === "new" ? "is-selected" : ""
+            }`}
+          >
+            <input
+              checked={selectedAddressId === "new"}
+              disabled={disabled}
+              name="shipping-source"
+              onChange={() => onSelectedAddressChange("new")}
+              type="radio"
+            />
+            <span>
+              <strong>Use a new address</strong>
+              <span>Enter delivery details below.</span>
+            </span>
           </label>
         </div>
       ) : null}
-      {selectedAddressId === 'new' ? (
+      {selectedAddressId === "new" ? (
         <div className="checkout-new-address">
-          {isGuest ? (
-            <div className="form-field checkout-guest-email">
-              <label htmlFor="checkout-guest-email">Email</label>
-              <input
-                autoComplete="email"
-                disabled={disabled}
-                id="checkout-guest-email"
-                maxLength={320}
-                onChange={(event) => onGuestEmailChange(event.target.value)}
-                placeholder="guest@example.com"
-                required
-                type="email"
-                value={guestEmail}
-              />
-              <small>We will use this email only for this order update.</small>
-            </div>
-          ) : null}
-          <AddressFields disabled={disabled} idPrefix="checkout-shipping" onChange={onAddressChange} value={shippingInfo} />
+          <AddressFields
+            disabled={disabled}
+            idPrefix="checkout-shipping"
+            onChange={onAddressChange}
+            value={shippingInfo}
+          />
           {!isGuest ? (
-          <div className="checkout-address-checks">
-            <label className="address-checkbox"><input checked={saveAddress} disabled={disabled} onChange={(event) => onSaveAddressChange(event.target.checked)} type="checkbox" />Save this address</label>
-            <label className="address-checkbox"><input checked={setDefault} disabled={disabled || !saveAddress} onChange={(event) => onSetDefaultChange(event.target.checked)} type="checkbox" />Set as default</label>
-          </div>
+            <div className="checkout-address-checks">
+              <label className="address-checkbox">
+                <input
+                  checked={saveAddress}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onSaveAddressChange(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                Save this address
+              </label>
+              <label className="address-checkbox">
+                <input
+                  checked={setDefault}
+                  disabled={disabled || !saveAddress}
+                  onChange={(event) =>
+                    onSetDefaultChange(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                Set as default
+              </label>
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -467,13 +637,13 @@ function CheckoutIntro({ subtitle, title }: { subtitle: string; title: string })
   );
 }
 
-function CheckoutStepper({ current }: { current: "review" | "pending" }) {
+function CheckoutStepper({ current }: { current: "shipping" | "payment" }) {
   const steps = [
     { id: "cart", label: "Cart" },
-    { id: "review", label: "Review" },
-    { id: "pending", label: "Payment" },
+    { id: "shipping", label: "Shipping" },
+    { id: "payment", label: "Payment" },
   ] as const;
-  const currentIndex = current === "review" ? 1 : 2;
+  const currentIndex = current === "shipping" ? 1 : 2;
 
   return (
     <nav className="checkout-stepper" aria-label="Checkout progress">

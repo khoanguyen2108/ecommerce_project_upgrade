@@ -2,7 +2,7 @@
 
 import { Info, Loader2, TicketPercent, X } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
 import {
   formatCurrency,
   formatNumber,
@@ -10,6 +10,7 @@ import {
 import type { CheckoutSummary as CheckoutSummaryModel } from "@/features/checkout/types";
 
 interface CheckoutSummaryProps {
+  contactSection: ReactNode;
   isDirectPay: boolean;
   isLoading: boolean;
   isSubmitting: boolean;
@@ -23,6 +24,7 @@ interface CheckoutSummaryProps {
 }
 
 export function CheckoutSummary({
+  contactSection,
   isDirectPay,
   isLoading,
   isSubmitting,
@@ -36,61 +38,76 @@ export function CheckoutSummary({
 }: CheckoutSummaryProps) {
   return (
     <section className="checkout-layout" aria-label="Checkout review">
-      <section className="checkout-items" aria-labelledby="checkout-items-heading">
+      <div className="checkout-main-column">
+        {contactSection}
         {shippingSection}
-        <header className="checkout-section-heading">
-          <div>
-            <p className="eyebrow">Order details</p>
-            <h2 id="checkout-items-heading">Your items</h2>
+
+        <section
+          className="checkout-items"
+          aria-labelledby="checkout-items-heading"
+        >
+          <header className="checkout-section-heading">
+            <div>
+              <p className="eyebrow">Order details</p>
+              <h2 id="checkout-items-heading">Order items</h2>
+            </div>
+            <span className="checkout-section-count">
+              {formatNumber(summary.totalQuantity)}{" "}
+              {summary.totalQuantity === 1 ? "item" : "items"}
+            </span>
+          </header>
+
+          <div className="checkout-item-list">
+            {summary.items.map((item) => {
+              const productHref = `/products/${encodeURIComponent(item.productSlug)}`;
+
+              return (
+                <article className="checkout-item" key={item.cartItemId}>
+                  <Link
+                    aria-label={`View ${item.productName}`}
+                    className="checkout-item__image"
+                    href={productHref}
+                  >
+                    {item.imageUrl ? (
+                      <img
+                        alt={item.productName}
+                        loading="lazy"
+                        src={item.imageUrl}
+                      />
+                    ) : (
+                      <span>No image</span>
+                    )}
+                  </Link>
+                  <div className="checkout-item__body">
+                    <p className="cart-item-row__category">
+                      {item.categoryName}
+                    </p>
+                    <h3>
+                      <Link href={productHref}>{item.productName}</Link>
+                    </h3>
+                    <p>
+                      Size {item.size} / Color {item.color}
+                      {item.sku ? ` / ${item.sku}` : ""}
+                    </p>
+                    <p>{item.availableStock} available</p>
+                  </div>
+                  <div className="checkout-item__totals">
+                    <span>Qty {formatNumber(item.quantity)}</span>
+                    <span>
+                      {formatCurrency(item.currentUnitPrice, summary.currency)}{" "}
+                      each
+                    </span>
+                    <strong>
+                      <small>Subtotal</small>
+                      {formatCurrency(item.currentLineTotal, summary.currency)}
+                    </strong>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-          <span>
-            {formatNumber(summary.totalQuantity)} {summary.totalQuantity === 1 ? "item" : "items"}
-          </span>
-        </header>
-
-        <div className="checkout-item-list">
-          {summary.items.map((item) => {
-            const productHref = `/products/${encodeURIComponent(item.productSlug)}`;
-
-            return (
-              <article className="checkout-item" key={item.cartItemId}>
-                <Link
-                  aria-label={`View ${item.productName}`}
-                  className="checkout-item__image"
-                  href={productHref}
-                >
-                  {item.imageUrl ? (
-                    <img alt={item.productName} loading="lazy" src={item.imageUrl} />
-                  ) : (
-                    <span>No image</span>
-                  )}
-                </Link>
-                <div className="checkout-item__body">
-                  <p className="cart-item-row__category">{item.categoryName}</p>
-                  <h3>
-                    <Link href={productHref}>{item.productName}</Link>
-                  </h3>
-                  <p>
-                    Size {item.size} · Color {item.color}
-                    {item.sku ? ` · ${item.sku}` : ""}
-                  </p>
-                  <p>{item.availableStock} available</p>
-                </div>
-                <div className="checkout-item__totals">
-                  <span>Quantity {formatNumber(item.quantity)}</span>
-                  <span>
-                    Unit {formatCurrency(item.currentUnitPrice, summary.currency)}
-                  </span>
-                  <strong>
-                    <small>Line total</small>
-                    {formatCurrency(item.currentLineTotal, summary.currency)}
-                  </strong>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+        </section>
+      </div>
 
       <aside
         className="checkout-order-summary"
@@ -148,7 +165,7 @@ export function CheckoutSummary({
               <div>
                 <strong>{summary.appliedVoucher.code}</strong>
                 <span>
-                  −{formatCurrency(summary.discountAmount, summary.currency)}
+                  -{formatCurrency(summary.discountAmount, summary.currency)}
                 </span>
               </div>
               <button
@@ -195,7 +212,7 @@ export function CheckoutSummary({
           </div>
           <div>
             <dt>Discount</dt>
-            <dd>−{formatCurrency(summary.discountAmount, summary.currency)}</dd>
+            <dd>-{formatCurrency(summary.discountAmount, summary.currency)}</dd>
           </div>
           <div className="checkout-totals__total">
             <dt>Total</dt>
@@ -216,19 +233,20 @@ export function CheckoutSummary({
 
         <div className="checkout-pending-note" role="note">
           <Info aria-hidden="true" size={18} />
-          <span>
+          <div>
             {isDirectPay ? (
               <>
-                You will be redirected to payOS to complete your payment. Your
-                order is confirmed only after payment is verified.
+                <span>You will be redirected to payOS to complete payment.</span>
+                <span>Your order is confirmed only after payment is verified.</span>
+                <span>Do not close the page until payOS redirects you back.</span>
               </>
             ) : (
-              <>
+              <span>
                 Your order will be created as <strong>PENDING_PAYMENT</strong>.
                 Payment is not completed at this step.
-              </>
+              </span>
             )}
-          </span>
+          </div>
         </div>
 
         <button
