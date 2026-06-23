@@ -4,14 +4,11 @@ import {
   AlertCircle,
   ArrowLeft,
   Check,
-  Clock3,
   CreditCard,
   MapPin,
   Package,
   RefreshCw,
-  ShieldCheck,
   Truck,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -33,7 +30,6 @@ import {
   getOrderErrorMessage,
   getOrderRequestId,
 } from "@/components/orders/order-format";
-import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
 import { getOrder } from "@/features/orders/api";
 import type {
   Order,
@@ -112,7 +108,6 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   }
 
   const latestPayment = getLatestPayment(order);
-  const canRetryPayment = order.status === "PENDING_PAYMENT";
 
   return (
     <main className="customer-page order-detail-page">
@@ -150,12 +145,6 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         </div>
       </header>
 
-      <StatusPanel
-        canRetryPayment={canRetryPayment}
-        latestPayment={latestPayment}
-        order={order}
-      />
-
       <div className="order-detail-layout">
         <div className="order-detail-main">
           <FulfillmentProgress order={order} />
@@ -170,105 +159,6 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       </div>
     </main>
   );
-}
-
-function StatusPanel({
-  canRetryPayment,
-  latestPayment,
-  order,
-}: {
-  canRetryPayment: boolean;
-  latestPayment?: PaymentSummary;
-  order: Order;
-}) {
-  const content = getStatusContent(order);
-  const StatusIcon = content.icon;
-
-  return (
-    <section
-      className={`order-detail-status order-detail-status--${content.tone}`}
-      aria-labelledby="current-status-heading"
-    >
-      <span className="order-detail-status__icon">
-        <StatusIcon aria-hidden="true" size={24} />
-      </span>
-      <div className="order-detail-status__copy">
-        <p className="eyebrow">Current status</p>
-        <h2 id="current-status-heading">{content.title}</h2>
-        <p>{content.description}</p>
-        <div className="order-detail-status__meta">
-          {order.paidAt ? <span>Paid {formatDateTime(order.paidAt)}</span> : null}
-          {order.fulfilledAt ? (
-            <span>Delivered {formatDateTime(order.fulfilledAt)}</span>
-          ) : null}
-          {order.cancelledAt ? (
-            <span>Cancelled {formatDateTime(order.cancelledAt)}</span>
-          ) : null}
-          {order.status === "EXPIRED" && order.expiresAt ? (
-            <span>Expired {formatDateTime(order.expiresAt)}</span>
-          ) : null}
-          {latestPayment?.provider ? (
-            <span>Payment provider {latestPayment.provider}</span>
-          ) : null}
-        </div>
-      </div>
-      {canRetryPayment ? (
-        <PayosPaymentButton
-          className="button order-detail-pay-button"
-          label="Continue payment"
-          orderId={order.id}
-        />
-      ) : null}
-    </section>
-  );
-}
-
-function getStatusContent(order: Order) {
-  if (order.status === "PAID") {
-    return order.fulfillmentStatus === "DELIVERED"
-      ? {
-          description:
-            "Your order has arrived. We hope it feels even better than it looked.",
-          icon: Package,
-          title: "Order delivered",
-          tone: "success",
-        }
-      : {
-          description:
-            "Your payment is confirmed. We'll keep this page updated as your order moves.",
-          icon: ShieldCheck,
-          title: "Payment confirmed",
-          tone: "success",
-        };
-  }
-
-  if (order.status === "PENDING_PAYMENT") {
-    return {
-      description:
-        "Complete payment to confirm your order. Its status comes directly from our secure payment record.",
-      icon: Clock3,
-      title: "Waiting for payment",
-      tone: "attention",
-    };
-  }
-
-  if (order.status === "CANCELLED") {
-    return {
-      description:
-        "This order is no longer active and cannot be paid from this page.",
-      icon: X,
-      title: "Order cancelled",
-      tone: "inactive",
-    };
-  }
-
-  return {
-    description:
-      "The payment window for this order has closed. No further payment can be made.",
-    icon: Clock3,
-    title: "Order expired",
-    tone: "inactive",
-  };
 }
 
 function FulfillmentProgress({ order }: { order: Order }) {
@@ -514,7 +404,6 @@ function OrderDetailLoading() {
           <span />
           <span />
         </div>
-        <div className="order-detail-loading-status" />
         <div className="order-detail-loading-grid">
           <div>
             <span />
