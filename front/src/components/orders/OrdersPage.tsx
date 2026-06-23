@@ -21,7 +21,6 @@ import {
   formatOrderDisplayId,
   getFulfillmentStatusClass,
   getFulfillmentStatusLabel,
-  getLatestPayment,
   getOrderErrorMessage,
   getOrderRequestId,
   getOrderStatusClass,
@@ -228,7 +227,6 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
 }
 
 function OrderCard({ order }: { order: Order }) {
-  const latestPayment = getLatestPayment(order);
   const itemCount = getOrderItemCount(order);
   const itemSummary = getOrderItemSummary(order);
   const createdDate = formatDate(order.createdAt);
@@ -247,13 +245,6 @@ function OrderCard({ order }: { order: Order }) {
         <div className="customer-order-card__badges" aria-label="Order states">
           <OrderStatusBadge status={order.status} />
           <FulfillmentStatusBadge status={order.fulfillmentStatus} />
-          {latestPayment ? (
-            <PaymentStatusBadge status={latestPayment.status} />
-          ) : (
-            <span className="payment-status-badge payment-status-badge--unset">
-              Payment not set
-            </span>
-          )}
         </div>
       </div>
 

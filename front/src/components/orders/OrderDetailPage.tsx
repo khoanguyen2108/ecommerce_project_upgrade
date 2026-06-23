@@ -132,13 +132,6 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         <div className="order-detail-heading__aside">
           <div className="order-detail-badges" aria-label="Order statuses">
             <OrderStatusBadge status={order.status} />
-            {latestPayment ? (
-              <PaymentStatusBadge status={latestPayment.status} />
-            ) : (
-              <span className="payment-status-badge payment-status-badge--unset">
-                No payment
-              </span>
-            )}
             <FulfillmentStatusBadge status={order.fulfillmentStatus} />
           </div>
           <button
