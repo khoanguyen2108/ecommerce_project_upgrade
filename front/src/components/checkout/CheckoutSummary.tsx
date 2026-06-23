@@ -48,7 +48,6 @@ export function CheckoutSummary({
         >
           <header className="checkout-section-heading">
             <div>
-              <p className="eyebrow">Order details</p>
               <h2 id="checkout-items-heading">Order items</h2>
             </div>
             <span className="checkout-section-count">
@@ -114,7 +113,6 @@ export function CheckoutSummary({
         aria-labelledby="checkout-total-heading"
       >
         <header>
-          <p className="eyebrow">Summary</p>
           <h2 id="checkout-total-heading">Order summary</h2>
         </header>
 

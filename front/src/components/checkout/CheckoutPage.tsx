@@ -378,7 +378,6 @@ export function CheckoutPage() {
       {isEmpty ? (
         <section className="checkout-empty" aria-labelledby="checkout-empty-heading">
           <Info aria-hidden="true" size={34} strokeWidth={1.6} />
-          <p className="eyebrow">Checkout</p>
           <h2 id="checkout-empty-heading">Your cart is empty</h2>
           <p>Add an in-stock size and color before returning to checkout.</p>
           <Link className="button button--primary" href="/products">
@@ -451,7 +450,6 @@ function CheckoutContact({
     >
       <header className="checkout-section-heading">
         <div>
-          <p className="eyebrow">Contact</p>
           <h2 id="checkout-contact-heading">Contact / account</h2>
         </div>
         <UserRound aria-hidden="true" size={22} />
@@ -529,7 +527,6 @@ function CheckoutShipping({
     >
       <header className="checkout-section-heading">
         <div>
-          <p className="eyebrow">Shipping</p>
           <h2 id="checkout-shipping-heading">Shipping address</h2>
         </div>
         <MapPin aria-hidden="true" size={22} />
@@ -629,7 +626,6 @@ function CheckoutShipping({
 function CheckoutIntro({ subtitle, title }: { subtitle: string; title: string }) {
   return (
     <section className="checkout-intro" aria-labelledby="checkout-heading">
-      <p className="eyebrow">Checkout</p>
       <h1 id="checkout-heading">{title}</h1>
       <p>{subtitle}</p>
     </section>
