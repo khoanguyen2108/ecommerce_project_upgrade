@@ -2,10 +2,8 @@
 
 import {
   ClipboardList,
-  CreditCard,
   LayoutDashboard,
   Package,
-  ShieldCheck,
   Tags,
   TicketPercent,
   Users,
@@ -44,16 +42,6 @@ const adminNavItems = [
     icon: ClipboardList,
     label: "Orders",
   },
-  {
-    href: "/admin/payments",
-    icon: CreditCard,
-    label: "Payments",
-  },
-  {
-    href: "/admin/payments/payos/readiness",
-    icon: ShieldCheck,
-    label: "payOS Readiness",
-  },
 ] as const;
 
 export function AdminNav() {
@@ -84,13 +72,6 @@ export function AdminNav() {
 function isActiveAdminPath(pathname: string, href: string): boolean {
   if (href === "/admin") {
     return pathname === "/admin";
-  }
-
-  if (
-    href === "/admin/payments" &&
-    pathname.startsWith("/admin/payments/payos/readiness")
-  ) {
-    return false;
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
