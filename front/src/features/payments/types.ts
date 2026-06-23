@@ -1,6 +1,7 @@
 import type {
   OrderStatus,
   PaymentProvider,
+  OrderFulfillmentStatus,
   PaymentStatus,
   PaymentSummary,
 } from "@/features/orders/types";
@@ -37,6 +38,7 @@ export interface PayosDisplayOrder {
   id: string;
   userId: string | null;
   status: OrderStatus;
+  fulfillmentStatus: OrderFulfillmentStatus;
   totalAmount: number;
   currency: string;
   createdAt: string;

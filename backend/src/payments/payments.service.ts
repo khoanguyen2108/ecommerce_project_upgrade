@@ -82,6 +82,7 @@ const paymentDisplaySelect = {
       id: true,
       userId: true,
       status: true,
+      fulfillmentStatus: true,
       totalAmount: true,
       currency: true,
       createdAt: true,

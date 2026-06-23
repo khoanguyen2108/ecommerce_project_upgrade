@@ -655,6 +655,7 @@ export const payosStatusDataExample = {
     id: orderExample.id,
     userId: orderExample.userId,
     status: orderExample.status,
+    fulfillmentStatus: orderExample.fulfillmentStatus,
     totalAmount: orderExample.totalAmount,
     currency: orderExample.currency,
     createdAt: orderExample.createdAt,

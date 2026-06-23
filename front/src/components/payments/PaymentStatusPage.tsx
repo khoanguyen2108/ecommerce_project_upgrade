@@ -28,6 +28,7 @@ import {
 } from "@/components/orders/order-format";
 import { ApiClientError } from "@/lib/errors/api-error";
 import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
+import { PaymentThankYou } from "@/components/payments/PaymentThankYou";
 
 type PaymentStatusSource = "return" | "cancel";
 type PaymentStatusViewKind =
@@ -207,6 +208,10 @@ export function PaymentStatusPage({
         </section>
       </main>
     );
+  }
+
+  if (isPaidStatus(status)) {
+    return <PaymentThankYou status={status} />;
   }
 
   const view = getPaymentStatusView(status, source, hasPollingTimedOut);
