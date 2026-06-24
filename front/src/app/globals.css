@@ -1159,16 +1159,18 @@ img {
 
 .catalog-controls {
   align-items: end;
-  border-bottom: 1px solid var(--color-border);
-  border-top: 1px solid var(--color-border);
+  background: #f8f8f6;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(17, 17, 17, 0.04);
   display: grid;
-  gap: var(--space-4);
+  gap: 18px;
   grid-template-columns:
-    minmax(280px, 1.7fr)
-    minmax(180px, 0.8fr)
+    minmax(320px, 1.65fr)
     minmax(190px, 0.8fr)
-    auto;
-  padding: var(--space-5, 20px) 0;
+    minmax(190px, 0.8fr)
+    minmax(112px, auto);
+  padding: 18px;
 }
 
 .catalog-control {
@@ -1180,29 +1182,41 @@ img {
 .catalog-control > label,
 .catalog-control > span {
   color: var(--color-text);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 
 .catalog-search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
 }
 
 .catalog-control input,
 .catalog-control select {
   appearance: none;
-  background: var(--color-surface);
+  background: #ffffff;
   border: 1px solid var(--color-border);
-  border-radius: 0;
+  border-radius: 8px;
   color: var(--color-text);
-  min-height: 48px;
+  font-size: 0.96rem;
+  min-height: 54px;
   min-width: 0;
   outline: none;
-  padding: 11px 13px;
+  padding: 13px 16px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
   width: 100%;
+}
+
+.catalog-search-row input {
+  border-bottom-right-radius: 0;
+  border-right: 0;
+  border-top-right-radius: 0;
 }
 
 .catalog-control select {
@@ -1210,21 +1224,21 @@ img {
     linear-gradient(45deg, transparent 50%, var(--color-text) 50%),
     linear-gradient(135deg, var(--color-text) 50%, transparent 50%);
   background-position:
-    calc(100% - 17px) 21px,
-    calc(100% - 12px) 21px;
+    calc(100% - 21px) 24px,
+    calc(100% - 15px) 24px;
   background-repeat: no-repeat;
   background-size: 5px 5px, 5px 5px;
-  padding-right: 36px;
+  padding-right: 44px;
 }
 
 .catalog-control input:focus,
 .catalog-control select:focus {
   border-color: var(--color-border-strong);
-  box-shadow: 0 0 0 1px var(--color-border-strong);
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
 }
 
 .catalog-control input::placeholder {
-  color: #777777;
+  color: #7a7a74;
 }
 
 .catalog-control select:disabled {
@@ -1235,35 +1249,48 @@ img {
 .catalog-search-button,
 .catalog-reset {
   align-items: center;
-  border-radius: 0;
+  border-radius: 8px;
   display: inline-flex;
   font-size: 0.74rem;
   font-weight: 800;
   gap: var(--space-2);
   justify-content: center;
-  min-height: 48px;
-  padding: 11px 16px;
+  min-height: 54px;
+  padding: 13px 18px;
   text-transform: uppercase;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .catalog-search-button {
   background: var(--color-text);
   border: 1px solid var(--color-text);
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 0;
   color: #ffffff;
+  min-width: 134px;
 }
 
 .catalog-search-button:hover {
   background: var(--color-brand-hover);
+  transform: translateY(-1px);
 }
 
 .catalog-reset {
-  background: transparent;
-  border: 1px solid var(--color-border-strong);
+  background: #ffffff;
+  border: 1px solid var(--color-border);
   color: var(--color-text);
+  min-width: 112px;
 }
 
 .catalog-reset:hover:not(:disabled) {
-  background: var(--color-surface-muted);
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: #ffffff;
+  transform: translateY(-1px);
 }
 
 .catalog-reset:disabled {
