@@ -2,7 +2,6 @@
 
 import {
   AlertCircle,
-  Check,
   ImageOff,
   Loader2,
   Minus,
@@ -368,10 +367,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                 </Link>
               ))}
             </div>
-            <span className="product-status">
-              <Check aria-hidden="true" size={14} />
-              {product.isActive ? "Active" : "Inactive"}
-            </span>
           </div>
 
           <div className="product-detail-copy__heading">
@@ -382,15 +377,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           <p className="product-detail-copy__description">
             {product.description || "Product details are being prepared for this item."}
           </p>
-
-          <div className="stock-summary" role="status">
-            <span>{totalStock > 0 ? "Available" : "Out of stock"}</span>
-            <strong>
-              {totalStock > 0
-                ? `${totalStock} item${totalStock === 1 ? "" : "s"} across all variants`
-                : "No purchasable variants"}
-            </strong>
-          </div>
 
           <section className="variant-panel" aria-labelledby="variants-heading">
             <div className="product-option-heading">
