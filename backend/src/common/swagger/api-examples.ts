@@ -613,6 +613,26 @@ export const adminPayosReadinessDataExample = {
   },
 };
 
+export const adminEmailReadinessDataExample = {
+  readiness: {
+    configured: true,
+    emailProvider: 'smtp',
+    emailProviderPresent: true,
+    emailProviderSupported: true,
+    orderEmailReady: true,
+    orderEmailsEnabled: true,
+    orderEmailsEnabledKeyPresent: true,
+    orderEmailsEnabledState: 'enabled',
+    smtpAuthConfigured: true,
+    smtpFromPresent: true,
+    smtpHostPresent: true,
+    smtpPassPresent: true,
+    smtpPortPresent: true,
+    smtpPortValid: true,
+    smtpUserPresent: true,
+  },
+};
+
 export const payosPaymentDataExample = {
   paymentId: paymentExample.id,
   orderId: paymentExample.orderId,

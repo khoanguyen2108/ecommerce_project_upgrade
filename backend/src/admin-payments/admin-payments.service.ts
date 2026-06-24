@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OrderEmailService } from '../email/order-email.service';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
@@ -142,6 +143,7 @@ interface UrlConfigState extends ConfigState {
 export class AdminPaymentsService {
   constructor(
     private readonly configService: ConfigService,
+    private readonly orderEmailService: OrderEmailService,
     private readonly prismaService: PrismaService,
   ) {}
 
@@ -248,6 +250,12 @@ export class AdminPaymentsService {
         webhookEndpointPath: PAYOS_WEBHOOK_ENDPOINT_PATH,
         warnings,
       },
+    };
+  }
+
+  getEmailReadiness() {
+    return {
+      readiness: this.orderEmailService.getReadiness(),
     };
   }
 

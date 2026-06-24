@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { SWAGGER_BEARER_AUTH_NAME } from '../common/swagger/api-docs.constants';
 import {
+  adminEmailReadinessDataExample,
   adminPaymentDataExample,
   adminPaymentListDataExample,
   adminPayosReadinessDataExample,
@@ -81,6 +82,22 @@ export class AdminPaymentsController {
   @Get('payos/readiness')
   getPayosReadiness() {
     return this.adminPaymentsService.getPayosReadiness();
+  }
+
+  @ApiOperation({
+    summary: 'Check order email admin readiness',
+    description:
+      'Returns safe booleans for order email configuration readiness. It does not send email or expose SMTP secret values.',
+  })
+  @ApiOkResponse(
+    envelopeResponse(
+      'Order email readiness returned.',
+      adminEmailReadinessDataExample,
+    ),
+  )
+  @Get('email/readiness')
+  getEmailReadiness() {
+    return this.adminPaymentsService.getEmailReadiness();
   }
 
   @ApiOperation({

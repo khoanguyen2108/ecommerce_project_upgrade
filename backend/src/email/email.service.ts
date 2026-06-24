@@ -9,19 +9,52 @@ import {
 const SMTP_PROVIDER = 'smtp';
 const SMTP_SECURE_PORT = 465;
 
+export interface EmailReadiness {
+  configured: boolean;
+  emailProvider: string;
+  emailProviderPresent: boolean;
+  emailProviderSupported: boolean;
+  smtpAuthConfigured: boolean;
+  smtpFromPresent: boolean;
+  smtpHostPresent: boolean;
+  smtpPassPresent: boolean;
+  smtpPortPresent: boolean;
+  smtpPortValid: boolean;
+  smtpUserPresent: boolean;
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly transporter?: Transporter;
   private readonly from?: string;
+  private readonly readiness: EmailReadiness;
 
   constructor(private readonly configService: ConfigService) {
     const provider = this.getConfigValue('EMAIL_PROVIDER')?.toLowerCase();
     const host = this.getConfigValue('SMTP_HOST');
-    const port = this.getSmtpPort();
+    const rawPort = this.getConfigValue('SMTP_PORT');
+    const port = this.parseSmtpPort(rawPort);
     const from = this.getConfigValue('SMTP_FROM');
+    const user = this.getConfigValue('SMTP_USER');
+    const pass = this.getConfigValue('SMTP_PASS');
+    const providerSupported = !provider || provider === SMTP_PROVIDER;
 
-    if (provider && provider !== SMTP_PROVIDER) {
+    this.readiness = {
+      configured: Boolean(providerSupported && host && port && from),
+      emailProvider: provider || SMTP_PROVIDER,
+      emailProviderPresent: Boolean(provider),
+      emailProviderSupported: providerSupported,
+      smtpAuthConfigured: Boolean(user && pass),
+      smtpFromPresent: Boolean(from),
+      smtpHostPresent: Boolean(host),
+      smtpPassPresent: Boolean(pass),
+      smtpPortPresent: Boolean(rawPort),
+      smtpPortValid: Boolean(port),
+      smtpUserPresent: Boolean(user),
+    };
+
+    if (!providerSupported) {
       this.logger.warn('Email provider is not supported by this backend.');
       return;
     }
@@ -29,9 +62,6 @@ export class EmailService {
     if (!host || !port || !from) {
       return;
     }
-
-    const user = this.getConfigValue('SMTP_USER');
-    const pass = this.getConfigValue('SMTP_PASS');
 
     this.from = from;
     this.transporter = createTransport({
@@ -46,6 +76,13 @@ export class EmailService {
     return Boolean(this.transporter && this.from);
   }
 
+  getReadiness(): EmailReadiness {
+    return {
+      ...this.readiness,
+      configured: this.isConfigured(),
+    };
+  }
+
   async sendTransactionalEmail(options: {
     html?: string;
     subject: string;
@@ -56,6 +93,7 @@ export class EmailService {
       options,
       'Transactional email was not sent because SMTP email is not configured.',
       'Transactional email could not be sent.',
+      'TRANSACTIONAL',
     );
   }
 
@@ -73,6 +111,7 @@ export class EmailService {
       },
       'Password reset email was not sent because SMTP email is not configured.',
       'Password reset email could not be sent.',
+      'PASSWORD_RESET_OTP',
     );
   }
 
@@ -80,8 +119,13 @@ export class EmailService {
     options: Omit<SendMailOptions, 'from'>,
     notConfiguredMessage: string,
     failedMessage: string,
+    emailType: 'PASSWORD_RESET_OTP' | 'TRANSACTIONAL',
   ): Promise<boolean> {
     if (!this.transporter || !this.from) {
+      this.log('warn', 'SMTP_NOT_CONFIGURED', {
+        emailType,
+        readiness: this.getReadiness(),
+      });
       this.logger.warn(notConfiguredMessage);
       return false;
     }
@@ -93,7 +137,11 @@ export class EmailService {
       });
 
       return true;
-    } catch {
+    } catch (error) {
+      this.log('warn', 'EMAIL_SEND_FAILED', {
+        emailType,
+        error: this.toSafeEmailErrorSummary(error),
+      });
       this.logger.warn(failedMessage);
       return false;
     }
@@ -105,9 +153,7 @@ export class EmailService {
     return value ? value : undefined;
   }
 
-  private getSmtpPort(): number | undefined {
-    const rawPort = this.getConfigValue('SMTP_PORT');
-
+  private parseSmtpPort(rawPort: string | undefined): number | undefined {
     if (!rawPort) {
       return undefined;
     }
@@ -115,5 +161,47 @@ export class EmailService {
     const port = Number(rawPort);
 
     return Number.isInteger(port) && port > 0 ? port : undefined;
+  }
+
+  private toSafeEmailErrorSummary(error: unknown) {
+    const record = this.isRecord(error) ? error : {};
+    const code = typeof record.code === 'string' ? record.code : undefined;
+    const command =
+      typeof record.command === 'string' ? record.command : undefined;
+    const responseCode =
+      typeof record.responseCode === 'number'
+        ? record.responseCode
+        : undefined;
+
+    return {
+      code,
+      command,
+      name: error instanceof Error ? error.name : 'UnknownError',
+      responseCode,
+      safeMessageSummary:
+        'SMTP send failed before the provider accepted the message.',
+    };
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+  }
+
+  private log(
+    level: 'log' | 'warn',
+    code: string,
+    data: Record<string, unknown>,
+  ) {
+    const message = JSON.stringify({
+      code,
+      ...data,
+    });
+
+    if (level === 'log') {
+      this.logger.log(message);
+      return;
+    }
+
+    this.logger.warn(message);
   }
 }

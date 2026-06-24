@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../generated/prisma/client';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
-import { EmailService } from './email.service';
+import { EmailService, type EmailReadiness } from './email.service';
 
 const FALSE_CONFIG_VALUES = new Set(['0', 'false', 'no', 'off']);
 const TRUE_CONFIG_VALUES = new Set(['1', 'true', 'yes', 'on']);
@@ -73,10 +73,23 @@ type OrderEmailEvent =
   | 'ORDER_CANCELLED'
   | 'ORDER_EXPIRED';
 
+type OrderEmailsEnabledState =
+  | 'auto'
+  | 'disabled'
+  | 'enabled'
+  | 'unrecognized_auto';
+
 interface EmailContent {
   html: string;
   subject: string;
   text: string;
+}
+
+export interface OrderEmailReadiness extends EmailReadiness {
+  orderEmailReady: boolean;
+  orderEmailsEnabled: boolean;
+  orderEmailsEnabledKeyPresent: boolean;
+  orderEmailsEnabledState: OrderEmailsEnabledState;
 }
 
 @Injectable()
@@ -88,6 +101,25 @@ export class OrderEmailService {
     private readonly emailService: EmailService,
     private readonly prismaService: PrismaService,
   ) {}
+
+  getReadiness(): OrderEmailReadiness {
+    const emailReadiness = this.emailService.getReadiness();
+    const orderEmailFlag = this.getOrderEmailsEnabledFlagState();
+    const orderEmailsEnabled =
+      orderEmailFlag.state === 'disabled'
+        ? false
+        : orderEmailFlag.state === 'enabled'
+          ? true
+          : emailReadiness.configured;
+
+    return {
+      ...emailReadiness,
+      orderEmailReady: orderEmailsEnabled && emailReadiness.configured,
+      orderEmailsEnabled,
+      orderEmailsEnabledKeyPresent: orderEmailFlag.keyPresent,
+      orderEmailsEnabledState: orderEmailFlag.state,
+    };
+  }
 
   async sendOrderCreatedEmail(orderId: string): Promise<boolean> {
     return this.sendOrderEmail('ORDER_CREATED', orderId, undefined, (order) => {
@@ -250,6 +282,7 @@ export class OrderEmailService {
           event,
           orderId,
           paymentId,
+          ...this.getSafeLogReadiness(),
         });
         return false;
       }
@@ -265,6 +298,7 @@ export class OrderEmailService {
           paymentStatus: paymentId
             ? this.getPayment(order, paymentId)?.status ?? null
             : undefined,
+          ...this.getSafeLogReadiness(),
         });
         return false;
       }
@@ -275,9 +309,21 @@ export class OrderEmailService {
           event,
           orderId,
           paymentId,
+          recipientPresent: false,
+          ...this.getSafeLogReadiness(),
         });
         return false;
       }
+
+      const logContext = {
+        event,
+        orderId,
+        paymentId,
+        recipientPresent: true,
+        ...this.getSafeLogReadiness(),
+      };
+
+      this.log('log', 'ORDER_EMAIL_ATTEMPT', logContext);
 
       const sent = await this.emailService.sendTransactionalEmail({
         to: recipientEmail,
@@ -286,11 +332,14 @@ export class OrderEmailService {
         html: content.html,
       });
 
-      this.log(sent ? 'log' : 'warn', sent ? 'ORDER_EMAIL_SENT' : 'ORDER_EMAIL_NOT_SENT', {
-        event,
-        orderId,
-        paymentId,
-      });
+      this.log(
+        sent ? 'log' : 'warn',
+        sent ? 'ORDER_EMAIL_SENT' : 'ORDER_EMAIL_NOT_SENT',
+        {
+          ...logContext,
+          failure: sent ? undefined : this.getNotSentFailureSummary(),
+        },
+      );
 
       return sent;
     } catch (error) {
@@ -298,7 +347,11 @@ export class OrderEmailService {
         event,
         orderId,
         paymentId,
-        error: error instanceof Error ? error.name : 'UnknownError',
+        error: {
+          name: error instanceof Error ? error.name : 'UnknownError',
+          safeMessageSummary: 'Order email attempt failed before SMTP send.',
+        },
+        ...this.getSafeLogReadiness(),
       });
       return false;
     }
@@ -309,24 +362,19 @@ export class OrderEmailService {
     orderId: string,
     paymentId: string | undefined,
   ): boolean {
-    const rawValue = this.configService.get<string | boolean>(
-      'ORDER_EMAILS_ENABLED',
-    );
-    const normalized =
-      rawValue === undefined || rawValue === null
-        ? undefined
-        : String(rawValue).trim().toLowerCase();
+    const orderEmailFlag = this.getOrderEmailsEnabledFlagState();
 
-    if (normalized && FALSE_CONFIG_VALUES.has(normalized)) {
+    if (orderEmailFlag.state === 'disabled') {
       this.log('warn', 'ORDER_EMAIL_SKIPPED_DISABLED', {
         event,
         orderId,
         paymentId,
+        ...this.getSafeLogReadiness(),
       });
       return false;
     }
 
-    if (normalized && TRUE_CONFIG_VALUES.has(normalized)) {
+    if (orderEmailFlag.state === 'enabled') {
       return true;
     }
 
@@ -335,11 +383,83 @@ export class OrderEmailService {
         event,
         orderId,
         paymentId,
+        ...this.getSafeLogReadiness(),
       });
       return false;
     }
 
     return true;
+  }
+
+  private getOrderEmailsEnabledFlagState(): {
+    keyPresent: boolean;
+    state: OrderEmailsEnabledState;
+  } {
+    const rawValue = this.configService.get<string | boolean>(
+      'ORDER_EMAILS_ENABLED',
+    );
+    const keyPresent = rawValue !== undefined && rawValue !== null;
+    const normalized = keyPresent
+      ? String(rawValue).trim().toLowerCase()
+      : undefined;
+
+    if (!normalized) {
+      return {
+        keyPresent,
+        state: 'auto',
+      };
+    }
+
+    if (FALSE_CONFIG_VALUES.has(normalized)) {
+      return {
+        keyPresent,
+        state: 'disabled',
+      };
+    }
+
+    if (TRUE_CONFIG_VALUES.has(normalized)) {
+      return {
+        keyPresent,
+        state: 'enabled',
+      };
+    }
+
+    return {
+      keyPresent,
+      state: 'unrecognized_auto',
+    };
+  }
+
+  private getSafeLogReadiness(): Record<string, unknown> {
+    const readiness = this.getReadiness();
+
+    return {
+      emailProvider: readiness.emailProvider,
+      emailProviderPresent: readiness.emailProviderPresent,
+      emailProviderSupported: readiness.emailProviderSupported,
+      orderEmailReady: readiness.orderEmailReady,
+      orderEmailsEnabled: readiness.orderEmailsEnabled,
+      orderEmailsEnabledKeyPresent: readiness.orderEmailsEnabledKeyPresent,
+      orderEmailsEnabledState: readiness.orderEmailsEnabledState,
+      smtpAuthConfigured: readiness.smtpAuthConfigured,
+      smtpConfigured: readiness.configured,
+      smtpFromPresent: readiness.smtpFromPresent,
+      smtpHostPresent: readiness.smtpHostPresent,
+      smtpPassPresent: readiness.smtpPassPresent,
+      smtpPortPresent: readiness.smtpPortPresent,
+      smtpPortValid: readiness.smtpPortValid,
+      smtpUserPresent: readiness.smtpUserPresent,
+    };
+  }
+
+  private getNotSentFailureSummary() {
+    return {
+      code: this.emailService.isConfigured()
+        ? 'SMTP_SEND_FAILED'
+        : 'SMTP_NOT_CONFIGURED',
+      safeMessageSummary:
+        'Transactional email was not accepted for delivery by the configured SMTP path.',
+    };
   }
 
   private buildTextEmail(
