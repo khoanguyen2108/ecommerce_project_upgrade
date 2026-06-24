@@ -3,13 +3,15 @@ import type { OrderStatus, PaymentStatus } from "@/features/orders/types";
 import type { Pagination } from "@/lib/api/types";
 import {
   getOrderStatusClass,
+  getOrderStatusLabel,
   getPaymentStatusClass,
+  getPaymentStatusLabel,
 } from "@/components/orders/order-format";
 
 export function AdminOrderStatusBadge({ status }: { status: OrderStatus }) {
   return (
     <span className={`order-status-badge ${getOrderStatusClass(status)}`}>
-      {status}
+      {getOrderStatusLabel(status)}
     </span>
   );
 }
@@ -17,7 +19,7 @@ export function AdminOrderStatusBadge({ status }: { status: OrderStatus }) {
 export function AdminPaymentStatusBadge({ status }: { status: PaymentStatus }) {
   return (
     <span className={`payment-status-badge ${getPaymentStatusClass(status)}`}>
-      {status}
+      {getPaymentStatusLabel(status)}
     </span>
   );
 }

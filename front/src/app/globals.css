@@ -7308,7 +7308,7 @@ img {
 .payment-status-badge,
 .fulfillment-status-badge {
   align-items: center;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   display: inline-flex;
   gap: 5px;
@@ -7321,25 +7321,43 @@ img {
 }
 
 .order-status-badge--pending-payment,
-.payment-status-badge--pending,
-.fulfillment-status-badge--pending {
-  background: #e8e8e8;
-  color: #1a1c1c;
+.payment-status-badge--pending {
+  background: #fff7d6;
+  border-color: #e4bc41;
+  color: #6d4b00;
 }
 
 .order-status-badge--paid,
 .payment-status-badge--paid,
 .fulfillment-status-badge--delivered,
 .payment-read-note--paid {
-  background: #e8f5ec;
-  color: var(--color-success);
+  background: #e7f7ed;
+  border-color: #88c99d;
+  color: #176b34;
 }
 
-.fulfillment-status-badge--picked-up,
-.fulfillment-status-badge--in-transit,
+.fulfillment-status-badge--pending {
+  background: #eef3f8;
+  border-color: #c6d3df;
+  color: #334155;
+}
+
+.fulfillment-status-badge--picked-up {
+  background: #e7f2ff;
+  border-color: #9ec5ee;
+  color: #1e5f9e;
+}
+
+.fulfillment-status-badge--in-transit {
+  background: #e8efff;
+  border-color: #9fb6f0;
+  color: #2f4f9f;
+}
+
 .fulfillment-status-badge--out-for-delivery {
-  background: #eee9ff;
-  color: #451ebb;
+  background: #f1eaff;
+  border-color: #c6b1f2;
+  color: #5b35a4;
 }
 
 .payment-read-note--review,
@@ -7358,16 +7376,18 @@ img {
 .order-status-badge--cancelled,
 .payment-status-badge--cancelled,
 .payment-status-badge--failed {
-  background: #fff1ef;
-  color: var(--color-danger);
+  background: #fff1f2;
+  border-color: #f3a6ad;
+  color: #b42335;
 }
 
 .order-status-badge--expired,
 .payment-status-badge--expired,
 .payment-status-badge--unset,
 .fulfillment-status-badge--unset {
-  background: var(--color-surface-muted);
-  color: var(--color-text-muted);
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 .customer-pagination {
