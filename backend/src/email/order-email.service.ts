@@ -110,11 +110,11 @@ export class OrderEmailService {
         ? false
         : orderEmailFlag.state === 'enabled'
           ? true
-          : emailReadiness.configured;
+          : emailReadiness.emailProviderReady;
 
     return {
       ...emailReadiness,
-      orderEmailReady: orderEmailsEnabled && emailReadiness.configured,
+      orderEmailReady: orderEmailsEnabled && emailReadiness.emailProviderReady,
       orderEmailsEnabled,
       orderEmailsEnabledKeyPresent: orderEmailFlag.keyPresent,
       orderEmailsEnabledState: orderEmailFlag.state,
@@ -349,7 +349,8 @@ export class OrderEmailService {
         paymentId,
         error: {
           name: error instanceof Error ? error.name : 'UnknownError',
-          safeMessageSummary: 'Order email attempt failed before SMTP send.',
+          safeMessageSummary:
+            'Order email attempt failed before provider send.',
         },
         ...this.getSafeLogReadiness(),
       });
@@ -379,7 +380,13 @@ export class OrderEmailService {
     }
 
     if (!this.emailService.isConfigured()) {
-      this.log('warn', 'ORDER_EMAIL_SKIPPED_SMTP_NOT_CONFIGURED', {
+      this.log('warn', 'EMAIL_PROVIDER_NOT_CONFIGURED', {
+        emailType: event,
+        orderId,
+        paymentId,
+        ...this.getSafeLogReadiness(),
+      });
+      this.log('warn', 'ORDER_EMAIL_SKIPPED_EMAIL_PROVIDER_NOT_CONFIGURED', {
         event,
         orderId,
         paymentId,
@@ -434,15 +441,18 @@ export class OrderEmailService {
     const readiness = this.getReadiness();
 
     return {
+      emailFromPresent: readiness.emailFromPresent,
       emailProvider: readiness.emailProvider,
       emailProviderPresent: readiness.emailProviderPresent,
+      emailProviderReady: readiness.emailProviderReady,
       emailProviderSupported: readiness.emailProviderSupported,
       orderEmailReady: readiness.orderEmailReady,
       orderEmailsEnabled: readiness.orderEmailsEnabled,
       orderEmailsEnabledKeyPresent: readiness.orderEmailsEnabledKeyPresent,
       orderEmailsEnabledState: readiness.orderEmailsEnabledState,
+      resendApiKeyPresent: readiness.resendApiKeyPresent,
       smtpAuthConfigured: readiness.smtpAuthConfigured,
-      smtpConfigured: readiness.configured,
+      smtpConfigured: readiness.smtpConfigured,
       smtpFromPresent: readiness.smtpFromPresent,
       smtpHostPresent: readiness.smtpHostPresent,
       smtpPassPresent: readiness.smtpPassPresent,
@@ -453,12 +463,14 @@ export class OrderEmailService {
   }
 
   private getNotSentFailureSummary() {
+    const readiness = this.emailService.getReadiness();
+
     return {
       code: this.emailService.isConfigured()
-        ? 'SMTP_SEND_FAILED'
-        : 'SMTP_NOT_CONFIGURED',
+        ? `${readiness.emailProvider.toUpperCase()}_SEND_FAILED`
+        : 'EMAIL_PROVIDER_NOT_CONFIGURED',
       safeMessageSummary:
-        'Transactional email was not accepted for delivery by the configured SMTP path.',
+        'Transactional email was not accepted for delivery by the configured email provider.',
     };
   }
 
