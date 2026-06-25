@@ -52,15 +52,22 @@ export function AdminChatsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const socketRef = useRef<ChatSocket | undefined>(undefined);
   const selectedIdRef = useRef<string | undefined>(undefined);
+  const messagesViewportRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const shouldStickToLatestRef = useRef(true);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
+    shouldStickToLatestRef.current = true;
   }, [selectedId]);
 
   useEffect(() => {
+    if (!shouldStickToLatestRef.current) {
+      return;
+    }
+
     messagesEndRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, selectedId]);
+  }, [messages, selectedId, isDetailLoading]);
 
   useEffect(() => {
     let isMounted = true;
@@ -345,22 +352,35 @@ export function AdminChatsPage() {
     void sendReply();
   }
 
+  function handleMessagesScroll() {
+    const viewport = messagesViewportRef.current;
+
+    if (!viewport) {
+      return;
+    }
+
+    const distanceFromBottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+
+    shouldStickToLatestRef.current = distanceFromBottom < 96;
+  }
+
   const selectedCustomerLabel =
     selectedConversation?.customer.name ||
     selectedConversation?.customer.email ||
     "Customer";
   const connectionLabel =
     connectionState === "connected"
-      ? "Online"
+      ? "ONLINE"
       : connectionState === "connecting"
-        ? "Reconnecting"
-        : "Offline";
+        ? "CONNECTING"
+        : "OFFLINE";
 
   return (
     <div className="admin-resource admin-resource--full-width admin-chats-page">
       <section className="admin-resource__header" aria-labelledby="admin-chats-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">Support inbox</p>
+          <p className="admin-page-intro__eyebrow">SUPPORT INBOX</p>
           <h1 id="admin-chats-heading">Chats</h1>
           <p>Reply to customer questions about orders, sizing, and delivery.</p>
         </div>
@@ -385,7 +405,10 @@ export function AdminChatsPage() {
       <section className="admin-chats-layout" aria-label="Customer support chats">
         <aside className="admin-chats-list" aria-label="Conversations">
           <div className="admin-chats-list__header">
-            <strong>Conversations</strong>
+            <div>
+              <strong>Conversations</strong>
+              <span>{conversations.length} total</span>
+            </div>
             <span
               className={`admin-chats-connection admin-chats-connection--${connectionState}`}
             >
@@ -414,32 +437,42 @@ export function AdminChatsPage() {
                     onClick={() => setSelectedId(conversation.id)}
                     type="button"
                   >
-                    <span className="admin-chat-list-item__topline">
-                      <strong>
-                        {conversation.customer.name ||
-                          conversation.customer.email}
-                      </strong>
-                      <small>
-                        {formatNullableTime(
-                          conversation.lastMessageAt || conversation.updatedAt,
-                        )}
-                      </small>
+                    <span
+                      aria-hidden="true"
+                      className="admin-chat-list-item__avatar"
+                    >
+                      {getCustomerInitials(conversation.customer.name, conversation.customer.email)}
                     </span>
-                    <span className="admin-chat-list-item__email">
-                      {conversation.customer.email}
-                    </span>
-                    <span className="admin-chat-list-item__preview">
-                      {conversation.lastMessage?.body || "No messages yet."}
-                    </span>
-                    <span className="admin-chat-list-item__meta">
-                      <span className="admin-badge admin-badge--neutral">
-                        {conversation.status}
+                    <span className="admin-chat-list-item__content">
+                      <span className="admin-chat-list-item__topline">
+                        <strong>
+                          {conversation.customer.name ||
+                            conversation.customer.email}
+                        </strong>
+                        <small>
+                          {formatNullableTime(
+                            conversation.lastMessageAt || conversation.updatedAt,
+                          )}
+                        </small>
                       </span>
-                      {conversation.unreadCount > 0 ? (
-                        <span className="admin-chat-list-item__unread">
-                          {conversation.unreadCount}
+                      <span className="admin-chat-list-item__email">
+                        {conversation.customer.email}
+                      </span>
+                      <span className="admin-chat-list-item__preview">
+                        {conversation.lastMessage?.body || "No messages yet."}
+                      </span>
+                      <span className="admin-chat-list-item__meta">
+                        <span
+                          className={`admin-chat-status admin-chat-status--${conversation.status.toLowerCase()}`}
+                        >
+                          {conversation.status}
                         </span>
-                      ) : null}
+                        {conversation.unreadCount > 0 ? (
+                          <span className="admin-chat-list-item__unread">
+                            {conversation.unreadCount}
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
                   </button>
                 ))
@@ -451,15 +484,28 @@ export function AdminChatsPage() {
           {selectedConversation ? (
             <>
               <header className="admin-chat-thread__header">
-                <div>
-                  <p className="admin-page-intro__eyebrow">Conversation</p>
+                <div className="admin-chat-thread__identity">
+                  <span aria-hidden="true" className="admin-chat-thread__avatar">
+                    {getCustomerInitials(
+                      selectedConversation.customer.name,
+                      selectedConversation.customer.email,
+                    )}
+                  </span>
+                  <div>
                   <h2>{selectedCustomerLabel}</h2>
-                  <span>{selectedConversation.customer.email}</span>
+                    <span>{selectedConversation.customer.email}</span>
+                  </div>
                 </div>
                 <dl>
                   <div>
                     <dt>Status</dt>
-                    <dd>{selectedConversation.status}</dd>
+                    <dd>
+                      <span
+                        className={`admin-chat-status admin-chat-status--${selectedConversation.status.toLowerCase()}`}
+                      >
+                        {selectedConversation.status}
+                      </span>
+                    </dd>
                   </div>
                   <div>
                     <dt>Last activity</dt>
@@ -470,10 +516,19 @@ export function AdminChatsPage() {
                       )}
                     </dd>
                   </div>
+                  <div>
+                    <dt>ID</dt>
+                    <dd>{formatConversationId(selectedConversation.id)}</dd>
+                  </div>
                 </dl>
               </header>
 
-              <div className="admin-chat-thread__messages" role="log">
+              <div
+                className="admin-chat-thread__messages"
+                onScroll={handleMessagesScroll}
+                ref={messagesViewportRef}
+                role="log"
+              >
                 {isDetailLoading ? <AdminChatMessageSkeleton /> : null}
                 {!isDetailLoading && messages.length === 0 ? (
                   <div className="admin-chat-thread__empty" role="status">
@@ -495,19 +550,21 @@ export function AdminChatsPage() {
 
               <form className="admin-chat-composer" onSubmit={handleSend}>
                 <label htmlFor="admin-chat-reply">Reply</label>
-                <textarea
-                  disabled={isSending || selectedConversation.status === "CLOSED"}
-                  id="admin-chat-reply"
-                  maxLength={2000}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={handleComposerKeyDown}
-                  placeholder="Type your reply..."
-                  rows={3}
-                  value={draft}
-                />
+                <div className="admin-chat-composer__field">
+                  <textarea
+                    disabled={isSending || selectedConversation.status === "CLOSED"}
+                    id="admin-chat-reply"
+                    maxLength={2000}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={handleComposerKeyDown}
+                    placeholder="Type your reply..."
+                    rows={2}
+                    value={draft}
+                  />
+                </div>
                 <button
                   aria-label="Send reply"
-                  className="button button--primary"
+                  className="admin-chat-composer__send"
                   disabled={
                     !draft.trim() ||
                     isSending ||
@@ -516,7 +573,7 @@ export function AdminChatsPage() {
                   type="submit"
                 >
                   <Send aria-hidden="true" size={17} />
-                  {isSending ? "Sending" : "Send"}
+                  <span>{isSending ? "Sending" : "Send"}</span>
                 </button>
               </form>
             </>
@@ -647,4 +704,26 @@ function formatNullableTime(value: string | null | undefined): string {
   }
 
   return formatAdminDate(value);
+}
+
+function getCustomerInitials(name: string | null | undefined, email: string): string {
+  const source = name || email;
+  const words = source
+    .replace(/@.*/, "")
+    .split(/[\s._-]+/)
+    .filter(Boolean);
+
+  if (words.length === 0) {
+    return "C";
+  }
+
+  return words
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+}
+
+function formatConversationId(id: string): string {
+  return `#${id.slice(0, 8).toUpperCase()}`;
 }
