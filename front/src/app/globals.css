@@ -3779,7 +3779,6 @@ img {
 
 .admin-orders-list__head,
 .admin-orders-row {
-  align-items: center;
   display: grid;
   gap: var(--space-3);
   grid-template-columns:
@@ -3794,6 +3793,7 @@ img {
 }
 
 .admin-orders-list__head {
+  align-items: center;
   background: var(--color-surface-muted);
   color: var(--color-text-muted);
   font-size: 0.72rem;
@@ -3803,6 +3803,7 @@ img {
 }
 
 .admin-orders-row {
+  align-items: start;
   border-top: 1px solid var(--color-border);
   padding: 16px 14px;
 }
@@ -3816,6 +3817,7 @@ img {
 }
 
 .admin-orders-cell {
+  align-content: start;
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -3839,7 +3841,7 @@ img {
 }
 
 .admin-orders-actions {
-  align-items: center;
+  align-items: start;
   display: grid;
   gap: var(--space-2);
   justify-items: start;

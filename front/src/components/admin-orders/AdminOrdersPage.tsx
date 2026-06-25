@@ -14,7 +14,6 @@ import { useEffect, useState } from "react";
 import {
   AdminFeedback,
   AdminPagination,
-  AdminPaymentSafetyNote,
   AdminPaymentStatusBadge,
 } from "@/components/admin/AdminCommerceUi";
 import {
@@ -45,7 +44,6 @@ import {
   formatOrderDisplayId,
   getFulfillmentStatusClass,
   getFulfillmentStatusLabel,
-  getOrderStatusClass,
   getOrderStatusLabel,
 } from "@/components/orders/order-format";
 
@@ -235,8 +233,6 @@ export function AdminOrdersPage({
         </button>
       </section>
 
-      <AdminPaymentSafetyNote includeTransition />
-
       <section className="admin-orders-kpis" aria-label="Current order summary">
         <MetricCard label="Total orders" meta="Matching filters" value={metrics.total} />
         <MetricCard label="Paid orders" meta="Current page" value={metrics.paid} />
@@ -415,7 +411,6 @@ function OrderRow({
       <div className="admin-orders-cell admin-orders-cell--order">
         <span className="admin-orders-mobile-label">Order</span>
         <strong>{formatOrderDisplayId(order.id)}</strong>
-        <AdminOrderLabelBadge status={order.status} />
       </div>
       <div className="admin-orders-cell">
         <span className="admin-orders-mobile-label">Customer</span>
@@ -560,14 +555,6 @@ function OrderListSkeleton({ rows }: { rows: number }) {
         </div>
       ))}
     </div>
-  );
-}
-
-function AdminOrderLabelBadge({ status }: { status: OrderStatus }) {
-  return (
-    <span className={`order-status-badge ${getOrderStatusClass(status)}`}>
-      {getOrderStatusLabel(status)}
-    </span>
   );
 }
 
