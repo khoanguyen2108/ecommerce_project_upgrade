@@ -3978,25 +3978,19 @@ img {
 }
 
 .admin-order-overview-table {
-  min-width: 760px;
+  min-width: 640px;
 }
 
 .admin-order-overview-table th:first-child,
 .admin-order-overview-table td:first-child {
-  width: 150px;
-}
-
-.admin-order-overview-table th:nth-child(2),
-.admin-order-overview-table td:nth-child(2) {
-  width: 180px;
+  width: 220px;
 }
 
 .admin-order-overview-table td {
   vertical-align: top;
 }
 
-.admin-order-overview-table td:first-child,
-.admin-order-overview-table td:nth-child(2) {
+.admin-order-overview-table td:first-child {
   color: var(--color-text-muted);
   font-size: 0.72rem;
   font-weight: 800;

@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import {
   AdminFeedback,
   AdminOrderStatusBadge,
-  AdminPaymentSafetyNote,
   AdminPaymentStatusBadge,
 } from "@/components/admin/AdminCommerceUi";
 import {
@@ -269,7 +268,6 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
         </div>
       </section>
 
-      <AdminPaymentSafetyNote includeTransition />
       {success ? <AdminFeedback message={success} tone="success" /> : null}
       {error ? (
         <AdminFeedback message={error} requestId={requestId} tone="error" />
@@ -391,20 +389,12 @@ function OrderSummaryTable({
   const customerPhone = order.customerPhone || order.shippingPhone || "Not set";
   const shippingAddress = formatShippingAddress(order);
   const hasDelivery = Boolean(order.shippingRecipientName || shippingAddress !== "Not set");
-  const hasDifferentRecipient = Boolean(
-    order.shippingRecipientName && order.shippingRecipientName !== customerName,
-  );
-  const hasDifferentDeliveryPhone = Boolean(
-    order.shippingPhone && order.shippingPhone !== customerPhone,
-  );
+  const hasDiscount = order.discountAmount > 0;
 
   return (
     <section className="admin-order-overview" aria-labelledby="admin-order-summary-heading">
       <div className="admin-detail-section__header admin-order-overview__header">
-        <div>
-          <p className="eyebrow">Order snapshot</p>
-          <h2 id="admin-order-summary-heading">Order Summary</h2>
-        </div>
+        <h2 id="admin-order-summary-heading">Order Summary</h2>
         {hasDelivery ? (
           <button
             className="admin-link-button"
@@ -420,77 +410,33 @@ function OrderSummaryTable({
         <table className="admin-table admin-order-overview-table">
           <thead>
             <tr>
-              <th>Group</th>
               <th>Field</th>
               <th>Value</th>
             </tr>
           </thead>
           <tbody>
-            <SummaryRow group="Customer" label="Name" value={customerName} />
-            <SummaryRow
-              group="Customer"
-              label="Type"
-              value={order.customerType === "GUEST" ? "Guest" : "Registered customer"}
-            />
-            <SummaryRow
-              group="Customer"
-              label="Email"
-              value={order.customerEmail || "Not set"}
-            />
-            <SummaryRow group="Customer" label="Phone" value={customerPhone} />
-            {hasDifferentRecipient ? (
-              <SummaryRow
-                group="Delivery"
-                label="Recipient"
-                value={order.shippingRecipientName || "Not set"}
-              />
-            ) : null}
-            {hasDifferentDeliveryPhone ? (
-              <SummaryRow
-                group="Delivery"
-                label="Delivery phone"
-                value={order.shippingPhone || "Not set"}
-              />
-            ) : null}
-            <SummaryRow group="Delivery" label="Address" value={shippingAddress} />
+            <SummaryRow label="Customer" value={customerName} />
+            <SummaryRow label="Email" value={order.customerEmail || "Not set"} />
+            <SummaryRow label="Phone" value={customerPhone} />
+            <SummaryRow label="Delivery address" value={shippingAddress} />
             {order.shippingNote ? (
-              <SummaryRow group="Delivery" label="Note" value={order.shippingNote} />
+              <SummaryRow label="Delivery note" value={order.shippingNote} />
             ) : null}
-            <SummaryRow
-              group="Payment"
-              label="Total"
-              value={formatCurrency(order.totalAmount, order.currency)}
-            />
-            <SummaryRow
-              group="Payment"
-              label="Subtotal"
-              value={formatCurrency(order.subtotalAmount, order.currency)}
-            />
-            <SummaryRow
-              group="Payment"
-              label="Discount"
-              value={formatCurrency(order.discountAmount, order.currency)}
-            />
-            {order.voucherCodeSnapshot ? (
+            <SummaryRow label="Total" value={formatCurrency(order.totalAmount, order.currency)} />
+            {hasDiscount ? (
               <SummaryRow
-                group="Payment"
-                label="Voucher"
-                value={`${order.voucherCodeSnapshot}${
-                  order.voucherNameSnapshot ? ` - ${order.voucherNameSnapshot}` : ""
-                }`}
+                label="Discount"
+                value={formatCurrency(order.discountAmount, order.currency)}
               />
             ) : null}
+            {order.voucherCodeSnapshot ? (
+              <SummaryRow label="Voucher" value={order.voucherCodeSnapshot} />
+            ) : null}
             <SummaryRow
-              group="Payment"
-              label="Item quantity"
-              value={String(order.itemCount)}
+              label="Items"
+              value={`${order.itemCount} ${order.itemCount === 1 ? "item" : "items"}`}
             />
-            <SummaryRow group="Payment" label="Paid" value={formatDateTime(order.paidAt)} />
-            <SummaryRow
-              group="Payment"
-              label="Fulfilled"
-              value={formatDateTime(order.fulfilledAt)}
-            />
+            <SummaryRow label="Paid at" value={formatDateTime(order.paidAt)} />
           </tbody>
         </table>
       </div>
@@ -562,17 +508,14 @@ function AdminFulfillmentStatusBadge({
 }
 
 function SummaryRow({
-  group,
   label,
   value,
 }: {
-  group: string;
   label: string;
   value: string;
 }) {
   return (
     <tr>
-      <td>{group}</td>
       <td>{label}</td>
       <td>{value}</td>
     </tr>
