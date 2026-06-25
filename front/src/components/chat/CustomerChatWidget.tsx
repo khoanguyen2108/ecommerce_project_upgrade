@@ -33,6 +33,9 @@ const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
   "/forgot-password",
 ] as const;
 
+const CUSTOMER_CHAT_WELCOME_MESSAGE =
+  "Hi there! 👋 Welcome to Belikeme. How can we help you elevate your style today?";
+
 export function CustomerChatWidget() {
   const pathname = usePathname() || "/";
   const { accessToken, currentUser, isAuthenticated, isLoading: isSessionLoading } =
@@ -341,7 +344,10 @@ export function CustomerChatWidget() {
             ) : isLoading ? (
               <ChatMessageSkeleton />
             ) : messages.length === 0 ? (
-              <ChatPanelState message="Ask us anything about your order, sizing, or delivery." />
+              <div className="customer-chat-messages" role="log">
+                <ChatWelcomeMessage />
+                <div ref={messagesEndRef} />
+              </div>
             ) : (
               <div className="customer-chat-messages" role="log">
                 {messages.map((message) => (
@@ -405,6 +411,19 @@ export function CustomerChatWidget() {
         ) : null}
       </button>
     </div>
+  );
+}
+
+function ChatWelcomeMessage() {
+  return (
+    <article
+      className="customer-chat-message customer-chat-message--support customer-chat-message--welcome"
+      key="virtual-welcome-message"
+    >
+      <span className="customer-chat-message__day">Today</span>
+      <span className="customer-chat-message__sender">Belikeme Support</span>
+      <p>{CUSTOMER_CHAT_WELCOME_MESSAGE}</p>
+    </article>
   );
 }
 

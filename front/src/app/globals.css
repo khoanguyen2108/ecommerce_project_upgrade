@@ -9693,6 +9693,11 @@ img {
   max-width: 82%;
 }
 
+.customer-chat-message--welcome {
+  gap: 6px;
+  max-width: 88%;
+}
+
 .customer-chat-message p,
 .admin-chat-message p {
   margin: 0;
@@ -9706,8 +9711,29 @@ img {
   font-size: 0.72rem;
 }
 
+.customer-chat-message__day {
+  align-self: start;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 5px 9px;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.customer-chat-message__sender {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .customer-chat-message p {
   border: 1px solid var(--color-border);
+  border-radius: 8px;
   padding: 10px 12px;
 }
 
