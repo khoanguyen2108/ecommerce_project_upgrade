@@ -21,6 +21,8 @@ const authUserSelect = {
   phone: true,
   role: true,
   authProvider: true,
+  createdAt: true,
+  updatedAt: true,
   isActive: true,
 } as const;
 

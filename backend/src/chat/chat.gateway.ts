@@ -38,6 +38,8 @@ const socketUserSelect = {
   phone: true,
   role: true,
   authProvider: true,
+  createdAt: true,
+  updatedAt: true,
   isActive: true,
 } as const;
 
@@ -273,6 +275,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       name: user.name,
       phone: user.phone,
       role: user.role,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
   }
 

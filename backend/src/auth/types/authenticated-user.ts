@@ -8,6 +8,8 @@ export interface AuthenticatedUser {
   phone: string | null;
   role: UserRole;
   authProvider: AuthProvider;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface AuthenticatedRequest extends RequestWithId {

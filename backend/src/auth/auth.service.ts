@@ -236,7 +236,7 @@ export class AuthService {
     return { success: true };
   }
 
-  async getMe(user: AuthenticatedUser): Promise<{ user: AuthenticatedUser }> {
+  async getMe(user: AuthenticatedUser): Promise<{ user: PublicUserResponse }> {
     return { user };
   }
 

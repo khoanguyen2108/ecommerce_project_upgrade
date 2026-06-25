@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, ReceiptText } from "lucide-react";
+import { Info } from "lucide-react";
 import Link from "next/link";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { ProfileForm } from "@/components/profile/ProfileForm";
@@ -42,10 +42,6 @@ export function ProfilePage() {
             <h1 id="profile-heading">Account Details</h1>
             <p>Manage your contact details and delivery addresses.</p>
           </div>
-          <Link className="button button--secondary" href="/orders">
-            <ReceiptText aria-hidden="true" size={17} />
-            Orders
-          </Link>
         </header>
 
         <ProfileForm user={currentUser} />
