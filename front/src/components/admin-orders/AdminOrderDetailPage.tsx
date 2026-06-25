@@ -275,80 +275,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
         <AdminFeedback message={error} requestId={requestId} tone="error" />
       ) : null}
 
-      <section className="admin-order-summary-grid" aria-label="Order and customer summary">
-        <article className="admin-detail-card admin-order-summary-card">
-          <p className="eyebrow">Customer</p>
-          <strong>{order.customerName || order.shippingRecipientName || "Not set"}</strong>
-          <dl className="admin-detail-list admin-detail-list--compact">
-            <Row
-              label="Type"
-              value={order.customerType === "GUEST" ? "Guest" : "Registered customer"}
-            />
-            <Row label="Email" value={order.customerEmail || "Not set"} />
-            <Row
-              label="Phone"
-              value={order.customerPhone || order.shippingPhone || "Not set"}
-            />
-            {order.userId ? <Row label="User ID" value={order.userId} code /> : null}
-          </dl>
-        </article>
-
-        <article className="admin-detail-card admin-order-summary-card">
-          <div className="admin-detail-card__heading">
-            <p className="eyebrow">Shipping Address</p>
-            {order.shippingRecipientName ? (
-              <button
-                className="admin-link-button"
-                onClick={() => void copyDelivery()}
-                type="button"
-              >
-                {copied ? <Check size={15} /> : <Copy size={15} />}
-                {copied ? "Copied" : "Copy"}
-              </button>
-            ) : null}
-          </div>
-          {order.shippingRecipientName ? (
-            <dl className="admin-detail-list admin-detail-list--compact">
-              <Row label="Recipient" value={order.shippingRecipientName} />
-              <Row label="Phone" value={order.shippingPhone || "Not set"} />
-              <Row label="Address" value={formatShippingAddress(order)} />
-              {order.shippingNote ? (
-                <Row label="Note" value={order.shippingNote} />
-              ) : null}
-            </dl>
-          ) : (
-            <p className="admin-detail-empty">
-              Delivery information is unavailable for this historical order.
-            </p>
-          )}
-        </article>
-
-        <article className="admin-detail-card admin-order-summary-card">
-          <p className="eyebrow">Payment Summary</p>
-          <strong>{formatCurrency(order.totalAmount, order.currency)}</strong>
-          <dl className="admin-detail-list admin-detail-list--compact">
-            <Row
-              label="Subtotal"
-              value={formatCurrency(order.subtotalAmount, order.currency)}
-            />
-            <Row
-              label="Discount"
-              value={formatCurrency(order.discountAmount, order.currency)}
-            />
-            {order.voucherCodeSnapshot ? (
-              <Row
-                label="Voucher"
-                value={`${order.voucherCodeSnapshot}${
-                  order.voucherNameSnapshot ? ` - ${order.voucherNameSnapshot}` : ""
-                }`}
-              />
-            ) : null}
-            <Row label="Item quantity" value={String(order.itemCount)} />
-            <Row label="Paid" value={formatDateTime(order.paidAt)} />
-            <Row label="Fulfilled" value={formatDateTime(order.fulfilledAt)} />
-          </dl>
-        </article>
-      </section>
+      <OrderSummaryTable copied={copied} onCopyDelivery={copyDelivery} order={order} />
 
       <FulfillmentStatusSection
         busy={busyAction === "fulfillment"}
@@ -444,95 +371,130 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
         </div>
       </DetailSection>
 
-      <DetailSection
-        eyebrow="Payment reconciliation required"
-        meta={`${order.paymentReconciliationIssues.length} records`}
-        title="Manual review issues"
-      >
-        <div className="admin-table-wrap admin-table-wrap--commerce">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Issue type</th>
-                <th>Status</th>
-                <th>Reason</th>
-                <th>Amount</th>
-                <th>Provider order code</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.paymentReconciliationIssues.length === 0 ? (
-                <tr>
-                  <td className="admin-table__state" colSpan={6}>
-                    No payment reconciliation issue is recorded for this order.
-                  </td>
-                </tr>
-              ) : (
-                order.paymentReconciliationIssues.map((issue) => (
-                  <tr key={issue.id}>
-                    <td>
-                      <strong>{issue.type}</strong>
-                    </td>
-                    <td>{issue.status}</td>
-                    <td>{issue.safeReason}</td>
-                    <td>{formatCurrency(issue.amount, issue.currency)}</td>
-                    <td>{formatOrderCode(issue.providerOrderCode)}</td>
-                    <td>{formatDateTime(issue.createdAt)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </DetailSection>
-
-      <DetailSection
-        eyebrow="Reduced processing data"
-        meta={`${order.webhookEvents.length} records`}
-        title="Webhook processing summaries"
-      >
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Event</th>
-                <th>Provider</th>
-                <th>Status</th>
-                <th>Received</th>
-                <th>Processed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.webhookEvents.length === 0 ? (
-                <tr>
-                  <td className="admin-table__state" colSpan={5}>
-                    No webhook processing summaries were returned. Raw metadata and
-                    signature hashes are never shown here.
-                  </td>
-                </tr>
-              ) : (
-                order.webhookEvents.map((event) => (
-                  <tr key={event.id}>
-                    <td>
-                      <span className="admin-code">{event.id}</span>
-                    </td>
-                    <td>{event.provider}</td>
-                    <td>{event.processingStatus}</td>
-                    <td>{formatDateTime(event.receivedAt)}</td>
-                    <td>{formatDateTime(event.processedAt)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </DetailSection>
-
       <Link className="button button--secondary admin-back-link" href="/admin/orders">
         Back to orders
       </Link>
     </div>
+  );
+}
+
+function OrderSummaryTable({
+  copied,
+  onCopyDelivery,
+  order,
+}: {
+  copied: boolean;
+  onCopyDelivery: () => Promise<void>;
+  order: AdminOrder;
+}) {
+  const customerName = order.customerName || order.shippingRecipientName || "Not set";
+  const customerPhone = order.customerPhone || order.shippingPhone || "Not set";
+  const shippingAddress = formatShippingAddress(order);
+  const hasDelivery = Boolean(order.shippingRecipientName || shippingAddress !== "Not set");
+  const hasDifferentRecipient = Boolean(
+    order.shippingRecipientName && order.shippingRecipientName !== customerName,
+  );
+  const hasDifferentDeliveryPhone = Boolean(
+    order.shippingPhone && order.shippingPhone !== customerPhone,
+  );
+
+  return (
+    <section className="admin-order-overview" aria-labelledby="admin-order-summary-heading">
+      <div className="admin-detail-section__header admin-order-overview__header">
+        <div>
+          <p className="eyebrow">Order snapshot</p>
+          <h2 id="admin-order-summary-heading">Order Summary</h2>
+        </div>
+        {hasDelivery ? (
+          <button
+            className="admin-link-button"
+            onClick={() => void onCopyDelivery()}
+            type="button"
+          >
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+            {copied ? "Copied" : "Copy delivery"}
+          </button>
+        ) : null}
+      </div>
+      <div className="admin-table-wrap admin-order-overview__table-wrap">
+        <table className="admin-table admin-order-overview-table">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Field</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <SummaryRow group="Customer" label="Name" value={customerName} />
+            <SummaryRow
+              group="Customer"
+              label="Type"
+              value={order.customerType === "GUEST" ? "Guest" : "Registered customer"}
+            />
+            <SummaryRow
+              group="Customer"
+              label="Email"
+              value={order.customerEmail || "Not set"}
+            />
+            <SummaryRow group="Customer" label="Phone" value={customerPhone} />
+            {hasDifferentRecipient ? (
+              <SummaryRow
+                group="Delivery"
+                label="Recipient"
+                value={order.shippingRecipientName || "Not set"}
+              />
+            ) : null}
+            {hasDifferentDeliveryPhone ? (
+              <SummaryRow
+                group="Delivery"
+                label="Delivery phone"
+                value={order.shippingPhone || "Not set"}
+              />
+            ) : null}
+            <SummaryRow group="Delivery" label="Address" value={shippingAddress} />
+            {order.shippingNote ? (
+              <SummaryRow group="Delivery" label="Note" value={order.shippingNote} />
+            ) : null}
+            <SummaryRow
+              group="Payment"
+              label="Total"
+              value={formatCurrency(order.totalAmount, order.currency)}
+            />
+            <SummaryRow
+              group="Payment"
+              label="Subtotal"
+              value={formatCurrency(order.subtotalAmount, order.currency)}
+            />
+            <SummaryRow
+              group="Payment"
+              label="Discount"
+              value={formatCurrency(order.discountAmount, order.currency)}
+            />
+            {order.voucherCodeSnapshot ? (
+              <SummaryRow
+                group="Payment"
+                label="Voucher"
+                value={`${order.voucherCodeSnapshot}${
+                  order.voucherNameSnapshot ? ` - ${order.voucherNameSnapshot}` : ""
+                }`}
+              />
+            ) : null}
+            <SummaryRow
+              group="Payment"
+              label="Item quantity"
+              value={String(order.itemCount)}
+            />
+            <SummaryRow group="Payment" label="Paid" value={formatDateTime(order.paidAt)} />
+            <SummaryRow
+              group="Payment"
+              label="Fulfilled"
+              value={formatDateTime(order.fulfilledAt)}
+            />
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -599,20 +561,21 @@ function AdminFulfillmentStatusBadge({
   );
 }
 
-function Row({
-  code = false,
+function SummaryRow({
+  group,
   label,
   value,
 }: {
-  code?: boolean;
+  group: string;
   label: string;
   value: string;
 }) {
   return (
-    <div>
-      <dt>{label}</dt>
-      <dd className={code ? "admin-code" : undefined}>{value}</dd>
-    </div>
+    <tr>
+      <td>{group}</td>
+      <td>{label}</td>
+      <td>{value}</td>
+    </tr>
   );
 }
 
