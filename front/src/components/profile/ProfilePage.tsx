@@ -39,7 +39,6 @@ export function ProfilePage() {
       <section className="unified-profile-panel" aria-labelledby="profile-heading">
         <header className="unified-profile-panel__header">
           <div>
-            <p className="eyebrow">Account</p>
             <h1 id="profile-heading">Account Details</h1>
             <p>Manage your contact details and delivery addresses.</p>
           </div>

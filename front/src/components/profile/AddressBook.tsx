@@ -163,7 +163,6 @@ export function AddressBook() {
     >
       <div className="profile-subsection__header">
         <div>
-          <p className="eyebrow">Delivery</p>
           <h2 id="address-book-heading">Delivery Addresses</h2>
           <p>Choose where you would like your orders delivered.</p>
         </div>

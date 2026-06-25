@@ -89,7 +89,6 @@ export function ProfileForm({ user }: ProfileFormProps) {
     >
       <div className="profile-subsection__header">
         <div>
-          <p className="eyebrow">Account information</p>
           <h2 id="profile-details-heading">Account information</h2>
         </div>
         <span>Email details are read only</span>
