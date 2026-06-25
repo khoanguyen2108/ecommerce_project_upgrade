@@ -1,6 +1,6 @@
 "use client";
 
-import { LogIn, MessageCircle, Minus, Send, WifiOff, X } from "lucide-react";
+import { LogIn, MessageCircle, Send, WifiOff, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { FormEvent, KeyboardEvent } from "react";
@@ -348,15 +348,6 @@ export function CustomerChatWidget() {
             </div>
             <div className="customer-chat-panel__controls">
               <button
-                aria-label="Minimize support chat"
-                className="customer-chat-panel__control"
-                onClick={() => setIsOpen(false)}
-                title="Minimize support chat"
-                type="button"
-              >
-                <Minus aria-hidden="true" size={18} />
-              </button>
-              <button
                 aria-label="Close support chat"
                 className="customer-chat-panel__control"
                 onClick={() => setIsOpen(false)}
@@ -456,21 +447,23 @@ export function CustomerChatWidget() {
         </section>
       ) : null}
 
-      <button
-        aria-expanded={isOpen}
-        aria-label="Open Belikeme support chat"
-        className="customer-chat-widget__launcher"
-        onClick={() => setIsOpen((current) => !current)}
-        title="Belikeme Support"
-        type="button"
-      >
-        <MessageCircle aria-hidden="true" size={24} />
-        {unreadAdminCount ? (
-          <span className="customer-chat-widget__badge">
-            {Math.min(unreadAdminCount, 9)}
-          </span>
-        ) : null}
-      </button>
+      {!isOpen ? (
+        <button
+          aria-expanded="false"
+          aria-label="Open Belikeme support chat"
+          className="customer-chat-widget__launcher"
+          onClick={() => setIsOpen(true)}
+          title="Belikeme Support"
+          type="button"
+        >
+          <MessageCircle aria-hidden="true" size={24} />
+          {unreadAdminCount ? (
+            <span className="customer-chat-widget__badge">
+              {Math.min(unreadAdminCount, 9)}
+            </span>
+          ) : null}
+        </button>
+      ) : null}
     </div>
   );
 }
