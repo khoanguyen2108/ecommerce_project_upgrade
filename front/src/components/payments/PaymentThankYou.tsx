@@ -6,6 +6,7 @@ import {
   FulfillmentStatusBadge,
   PaymentStatusBadge,
 } from "@/components/orders/OrdersPage";
+import { OrderItemImage } from "@/components/orders/OrderItemImage";
 import {
   formatCurrency,
   formatDateTime,
@@ -13,6 +14,7 @@ import {
   formatOrderDisplayId,
 } from "@/components/orders/order-format";
 import type { PayosDisplayStatusResponse } from "@/features/payments/types";
+import { isNoSize } from "@/features/catalog/sizes";
 
 interface PaymentThankYouProps {
   status: PayosDisplayStatusResponse;
@@ -20,6 +22,7 @@ interface PaymentThankYouProps {
 
 export function PaymentThankYou({ status }: PaymentThankYouProps) {
   const paidAt = status.paidAt || status.payment.paidAt || status.order.paidAt;
+  const orderItems = status.order.items ?? [];
   const orderHref = `/orders/${encodeURIComponent(status.order.id)}`;
 
   return (
@@ -29,7 +32,7 @@ export function PaymentThankYou({ status }: PaymentThankYouProps) {
         aria-labelledby="payment-thank-you-heading"
       >
         <div className="payment-thank-you__mark" aria-hidden="true">
-          <Check size={44} strokeWidth={1.8} />
+          <Check size={34} strokeWidth={1.8} />
         </div>
 
         <p className="eyebrow">Payment confirmed</p>
@@ -60,6 +63,29 @@ export function PaymentThankYou({ status }: PaymentThankYouProps) {
             </div>
             <span className="payment-thank-you__paid-label">Paid</span>
           </header>
+
+          {orderItems.length > 0 ? (
+            <div className="payment-thank-you__items">
+              <h3>Purchased products</h3>
+              <ul>
+                {orderItems.map((item) => (
+                  <li key={item.id}>
+                    <OrderItemImage
+                      alt={item.productName}
+                      imageUrl={item.imageUrl}
+                      size="compact"
+                    />
+                    <div>
+                      <strong>{item.productName}</strong>
+                      <span>{formatOrderItemOptions(item.size, item.color)}</span>
+                    </div>
+                    <span>x{item.quantity}</span>
+                    <strong>{formatCurrency(item.lineTotal, status.currency)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <dl className="payment-thank-you__details">
             <div>
@@ -104,4 +130,10 @@ export function PaymentThankYou({ status }: PaymentThankYouProps) {
       </section>
     </main>
   );
+}
+
+function formatOrderItemOptions(size: string, color: string): string {
+  const sizeLabel = isNoSize(size) ? "One size" : size;
+
+  return `${sizeLabel} / ${color}`;
 }

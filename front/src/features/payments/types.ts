@@ -2,6 +2,7 @@ import type {
   OrderStatus,
   PaymentProvider,
   OrderFulfillmentStatus,
+  OrderItem,
   PaymentStatus,
   PaymentSummary,
 } from "@/features/orders/types";
@@ -46,6 +47,7 @@ export interface PayosDisplayOrder {
   paidAt: string | null;
   cancelledAt: string | null;
   expiresAt: string | null;
+  items: OrderItem[];
 }
 
 export interface PayosDisplayStatusResponse {

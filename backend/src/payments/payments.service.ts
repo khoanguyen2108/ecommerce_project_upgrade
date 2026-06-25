@@ -27,6 +27,7 @@ import {
   PaymentStatus,
   UserRole,
 } from '../generated/prisma/enums';
+import { getFirstProductImage } from '../orders/order-item-image';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreatePayosPaymentDto } from './dto/create-payos-payment.dto';
 import type { PayosStatusQueryDto } from './dto/payos-status-query.dto';
@@ -90,6 +91,30 @@ const paymentDisplaySelect = {
       paidAt: true,
       cancelledAt: true,
       expiresAt: true,
+      items: {
+        orderBy: {
+          createdAt: 'asc',
+        },
+        select: {
+          id: true,
+          orderId: true,
+          productId: true,
+          variantId: true,
+          productName: true,
+          sku: true,
+          size: true,
+          color: true,
+          unitPrice: true,
+          quantity: true,
+          lineTotal: true,
+          createdAt: true,
+          product: {
+            select: {
+              imageUrls: true,
+            },
+          },
+        },
+      },
     },
   },
 } as const satisfies Prisma.PaymentSelect;
@@ -809,7 +834,13 @@ export class PaymentsService {
       currency: payment.currency,
       reconciliationRequired,
       retryEligible,
-      order: payment.order,
+      order: {
+        ...payment.order,
+        items: payment.order.items.map(({ product, ...item }) => ({
+          ...item,
+          imageUrl: getFirstProductImage(product),
+        })),
+      },
       payment: this.toSafePayment(payment),
     };
   }
