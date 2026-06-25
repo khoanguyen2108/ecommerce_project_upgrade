@@ -17,6 +17,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
+import { AUTH_ACCESS_TOKEN_COOKIE } from '../auth/auth-cookie.constants';
 import { AuthProvider, UserRole } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
@@ -52,6 +53,8 @@ interface SocketErrorPayload {
   message: string;
 }
 
+type SocketCorsOriginCallback = (error: Error | null, allow?: boolean) => void;
+
 function getSocketCorsOrigins(): string[] | false {
   const origins = (process.env.CORS_ORIGIN ?? '')
     .split(',')
@@ -67,10 +70,29 @@ function getSocketCorsOrigins(): string[] | false {
   return origins.length > 0 ? origins : false;
 }
 
+function isSocketCorsOriginAllowed(
+  origin: string | undefined,
+  callback: SocketCorsOriginCallback,
+) {
+  const corsOrigins = getSocketCorsOrigins();
+
+  if (!origin) {
+    callback(null, true);
+    return;
+  }
+
+  if (corsOrigins === false) {
+    callback(null, false);
+    return;
+  }
+
+  callback(null, corsOrigins.includes(origin));
+}
+
 @WebSocketGateway({
   cors: {
     credentials: true,
-    origin: getSocketCorsOrigins(),
+    origin: isSocketCorsOriginAllowed,
   },
   namespace: CHAT_NAMESPACE,
 })
@@ -257,7 +279,41 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private extractSocketToken(client: ChatSocket): string | undefined {
     const token = client.handshake.auth?.token;
 
-    return typeof token === 'string' && token.trim() ? token.trim() : undefined;
+    if (typeof token === 'string' && token.trim()) {
+      return token.trim();
+    }
+
+    return this.getCookie(
+      client.handshake.headers.cookie,
+      AUTH_ACCESS_TOKEN_COOKIE,
+    );
+  }
+
+  private getCookie(
+    cookieHeader: string | string[] | undefined,
+    name: string,
+  ): string | undefined {
+    const header = Array.isArray(cookieHeader)
+      ? cookieHeader.join(';')
+      : cookieHeader;
+
+    if (!header) {
+      return undefined;
+    }
+
+    for (const cookie of header.split(';')) {
+      const [rawName, ...rawValue] = cookie.trim().split('=');
+
+      if (rawName === name) {
+        try {
+          return decodeURIComponent(rawValue.join('='));
+        } catch {
+          return undefined;
+        }
+      }
+    }
+
+    return undefined;
   }
 
   private async verifyToken(token: string): Promise<AccessTokenPayload> {

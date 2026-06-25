@@ -288,7 +288,7 @@ export class ChatService {
       throw this.conversationNotFoundException();
     }
 
-    return this.toConversationDetailConversationDto(conversation, 0);
+    return this.toConversationDto(conversation);
   }
 
   async sendAdminMessage(

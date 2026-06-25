@@ -40,7 +40,7 @@ export type ChatSocket = Socket<
   ClientToServerChatEvents
 >;
 
-export function createChatSocket(accessToken: string): ChatSocket {
+export function createChatSocket(accessToken?: string): ChatSocket {
   if (!API_BASE_URL) {
     throw new ApiClientError(
       "Belikeme API is not configured. Set NEXT_PUBLIC_API_BASE_URL and try again.",
@@ -49,9 +49,8 @@ export function createChatSocket(accessToken: string): ChatSocket {
   }
 
   return io(`${API_BASE_URL}/chat`, {
-    auth: {
-      token: accessToken,
-    },
+    auth: accessToken ? { token: accessToken } : {},
+    transports: ["websocket", "polling"],
     withCredentials: true,
   });
 }

@@ -58,7 +58,7 @@ export function CustomerChatWidget() {
   }, [messages, isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !isAuthenticated || !accessToken || isAdmin) {
+    if (!isOpen || !isAuthenticated || isAdmin) {
       socketRef.current?.disconnect();
       socketRef.current = undefined;
       setConnectionState("offline");
@@ -117,9 +117,21 @@ export function CustomerChatWidget() {
           setConnectionState("offline");
         }
       });
+      socket.on("connect_error", (connectError) => {
+        if (isMounted) {
+          setConnectionState("offline");
+          setError(getChatErrorMessage(connectError));
+        }
+      });
       socket.io.on("reconnect_attempt", () => {
         if (isMounted) {
           setConnectionState("connecting");
+        }
+      });
+      socket.io.on("reconnect_error", (connectError) => {
+        if (isMounted) {
+          setConnectionState("offline");
+          setError(getChatErrorMessage(connectError));
         }
       });
       socket.io.on("reconnect", () => {

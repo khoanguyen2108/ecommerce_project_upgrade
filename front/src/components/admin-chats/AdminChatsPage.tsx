@@ -151,7 +151,7 @@ export function AdminChatsPage() {
   }, [selectedId]);
 
   useEffect(() => {
-    if (!accessToken || !isAdminUser(currentUser)) {
+    if (!isAdminUser(currentUser)) {
       socketRef.current?.disconnect();
       socketRef.current = undefined;
       setConnectionState("offline");
@@ -160,9 +160,10 @@ export function AdminChatsPage() {
 
     let isMounted = true;
     let socket: ChatSocket | undefined;
+    const activeAccessToken = accessToken;
 
     try {
-      socket = createChatSocket(accessToken);
+      socket = createChatSocket(activeAccessToken);
       socketRef.current = socket;
       setConnectionState("connecting");
     } catch (connectError) {
@@ -182,9 +183,21 @@ export function AdminChatsPage() {
         setConnectionState("offline");
       }
     });
+    socket.on("connect_error", (connectError) => {
+      if (isMounted) {
+        setConnectionState("offline");
+        setSocketError(getChatErrorMessage(connectError));
+      }
+    });
     socket.io.on("reconnect_attempt", () => {
       if (isMounted) {
         setConnectionState("connecting");
+      }
+    });
+    socket.io.on("reconnect_error", (connectError) => {
+      if (isMounted) {
+        setConnectionState("offline");
+        setSocketError(getChatErrorMessage(connectError));
       }
     });
     socket.io.on("reconnect", () => {
