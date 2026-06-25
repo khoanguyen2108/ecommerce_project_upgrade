@@ -381,7 +381,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           <section className="variant-panel" aria-labelledby="variants-heading">
             <div className="product-option-heading">
               <h2 id="variants-heading">Color</h2>
-              <span>{selectedColor || "Select a color"}</span>
             </div>
             <div className="variant-choice-list">
               {colors.map((color) => {
@@ -406,10 +405,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
               <>
                 <div className="product-option-heading product-option-heading--secondary">
                   <h2>Size</h2>
-                  <span>
-                    {selectedSize ||
-                      (selectedColor ? "Select a size" : "Select a color first")}
-                  </span>
                 </div>
                 <div className="variant-choice-list">
                   {sizesForSelectedColor.map((size) => {

@@ -1715,11 +1715,6 @@ img {
   justify-content: space-between;
 }
 
-.product-option-heading span {
-  color: var(--color-text-muted);
-  font-size: 0.78rem;
-}
-
 .product-option-heading--secondary {
   margin-top: var(--space-2);
 }
