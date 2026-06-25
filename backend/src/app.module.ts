@@ -10,6 +10,7 @@ import { AdminVouchersModule } from './admin-vouchers/admin-vouchers.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { AuthModule } from './auth/auth.module';
 import { CartModule } from './cart/cart.module';
+import { ChatModule } from './chat/chat.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { HealthModule } from './health/health.module';
@@ -63,6 +64,7 @@ const getPositiveNumber = (
     CatalogModule,
     LandingPageModule,
     CartModule,
+    ChatModule,
     CheckoutModule,
     OrderExpiryModule,
     OrdersModule,

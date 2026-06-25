@@ -18,6 +18,16 @@ enum AuthProvider {
   GOOGLE
 }
 
+enum ChatStatus {
+  OPEN
+  CLOSED
+}
+
+enum ChatSenderRole {
+  CUSTOMER
+  ADMIN
+}
+
 enum OrderStatus {
   PENDING_PAYMENT
   PAID
@@ -86,6 +96,8 @@ model User {
   orders                Order[]
   addresses             Address[]
   cart                  Cart?
+  customerChatConversations ChatConversation[] @relation("CustomerChatConversations")
+  chatMessages          ChatMessage[] @relation("UserChatMessages")
 
   @@index([role])
   @@index([isActive])
@@ -127,6 +139,36 @@ model PasswordResetOtp {
   @@index([userId])
   @@index([expiresAt])
   @@index([email, usedAt, expiresAt])
+}
+
+model ChatConversation {
+  id             String        @id @default(uuid()) @db.Uuid
+  customerId     String        @db.Uuid
+  customer       User          @relation("CustomerChatConversations", fields: [customerId], references: [id])
+  status         ChatStatus    @default(OPEN)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  lastMessageAt  DateTime?
+  messages       ChatMessage[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+model ChatMessage {
+  id              String             @id @default(uuid()) @db.Uuid
+  conversationId  String             @db.Uuid
+  conversation    ChatConversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId        String             @db.Uuid
+  sender          User               @relation("UserChatMessages", fields: [senderId], references: [id])
+  senderRole      ChatSenderRole
+  body            String             @db.VarChar(2000)
+  readAt          DateTime?
+  createdAt       DateTime           @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
 }
 
 model Category {

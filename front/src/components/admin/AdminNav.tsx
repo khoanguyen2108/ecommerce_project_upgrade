@@ -3,6 +3,7 @@
 import {
   ClipboardList,
   LayoutDashboard,
+  MessageCircle,
   Package,
   Tags,
   TicketPercent,
@@ -36,6 +37,11 @@ const adminNavItems = [
     href: "/admin/vouchers",
     icon: TicketPercent,
     label: "Vouchers",
+  },
+  {
+    href: "/admin/chats",
+    icon: MessageCircle,
+    label: "Chats",
   },
   {
     href: "/admin/orders",
