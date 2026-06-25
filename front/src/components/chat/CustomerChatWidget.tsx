@@ -1,6 +1,6 @@
 "use client";
 
-import { LogIn, MessageCircle, Send, WifiOff, X } from "lucide-react";
+import { LogIn, MessageCircle, Minus, Send, WifiOff, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { FormEvent, KeyboardEvent } from "react";
@@ -36,6 +36,21 @@ const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
 const CUSTOMER_CHAT_WELCOME_MESSAGE =
   "Hi there! 👋 Welcome to Belikeme. How can we help you elevate your style today?";
 
+const CUSTOMER_CHAT_QUICK_ACTIONS = [
+  {
+    label: "Track Order",
+    message: "I need help tracking my order.",
+  },
+  {
+    label: "Return Policy",
+    message: "Can you tell me about the return policy?",
+  },
+  {
+    label: "Sizing Guide",
+    message: "I need help choosing the right size.",
+  },
+] as const;
+
 export function CustomerChatWidget() {
   const pathname = usePathname() || "/";
   const { accessToken, currentUser, isAuthenticated, isLoading: isSessionLoading } =
@@ -57,6 +72,7 @@ export function CustomerChatWidget() {
   const isOpenRef = useRef(isOpen);
   const socketRef = useRef<ChatSocket | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -68,7 +84,7 @@ export function CustomerChatWidget() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, isOpen]);
+  }, [isLoading, isOpen, messages]);
 
   useEffect(() => {
     if (!isOpen || !isAuthenticated || isAdmin) {
@@ -213,14 +229,14 @@ export function CustomerChatWidget() {
     }
 
     if (connectionState === "connected") {
-      return "Online";
+      return "Online • Usually responds in minutes";
     }
 
     if (connectionState === "connecting") {
-      return "Reconnecting";
+      return "Reconnecting • Usually responds in minutes";
     }
 
-    return "Offline";
+    return "Offline • We will reconnect shortly";
   }, [connectionState, isAuthenticated]);
 
   if (shouldHide || isAdmin) {
@@ -299,6 +315,11 @@ export function CustomerChatWidget() {
     void sendMessage();
   }
 
+  function handleQuickAction(message: string) {
+    setDraft(message);
+    textareaRef.current?.focus();
+  }
+
   return (
     <div className="customer-chat-widget">
       {isOpen ? (
@@ -308,26 +329,43 @@ export function CustomerChatWidget() {
           role="dialog"
         >
           <header className="customer-chat-panel__header">
-            <div>
-              <h2>Belikeme Support</h2>
-              <span
-                className={`customer-chat-panel__status customer-chat-panel__status--${connectionState}`}
-              >
-                {connectionState === "offline" ? (
-                  <WifiOff aria-hidden="true" size={13} />
-                ) : null}
-                {connectionLabel}
-              </span>
+            <div className="customer-chat-panel__identity">
+              <div aria-hidden="true" className="customer-chat-panel__avatar">
+                B
+                <span />
+              </div>
+              <div>
+                <h2>Belikeme Support</h2>
+                <span
+                  className={`customer-chat-panel__status customer-chat-panel__status--${connectionState}`}
+                >
+                  {connectionState === "offline" ? (
+                    <WifiOff aria-hidden="true" size={13} />
+                  ) : null}
+                  {connectionLabel}
+                </span>
+              </div>
             </div>
-            <button
-              aria-label="Close support chat"
-              className="customer-chat-panel__close"
-              onClick={() => setIsOpen(false)}
-              title="Close support chat"
-              type="button"
-            >
-              <X aria-hidden="true" size={18} />
-            </button>
+            <div className="customer-chat-panel__controls">
+              <button
+                aria-label="Minimize support chat"
+                className="customer-chat-panel__control"
+                onClick={() => setIsOpen(false)}
+                title="Minimize support chat"
+                type="button"
+              >
+                <Minus aria-hidden="true" size={18} />
+              </button>
+              <button
+                aria-label="Close support chat"
+                className="customer-chat-panel__control"
+                onClick={() => setIsOpen(false)}
+                title="Close support chat"
+                type="button"
+              >
+                <X aria-hidden="true" size={18} />
+              </button>
+            </div>
           </header>
 
           <div className="customer-chat-panel__body">
@@ -369,28 +407,51 @@ export function CustomerChatWidget() {
           ) : null}
 
           {isAuthenticated ? (
-            <form className="customer-chat-composer" onSubmit={handleSend}>
-              <label htmlFor="customer-chat-message">Message</label>
-              <textarea
-                disabled={isSending}
-                id="customer-chat-message"
-                maxLength={2000}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                placeholder="Type your message..."
-                rows={2}
-                value={draft}
-              />
-              <button
-                aria-label="Send message"
-                className="customer-chat-composer__send"
-                disabled={!draft.trim() || isSending}
-                title="Send message"
-                type="submit"
+            <>
+              <div
+                aria-label="Quick messages"
+                className="customer-chat-quick-actions"
+                role="group"
               >
-                <Send aria-hidden="true" size={17} />
-              </button>
-            </form>
+                {CUSTOMER_CHAT_QUICK_ACTIONS.map((action) => (
+                  <button
+                    className="customer-chat-quick-actions__chip"
+                    disabled={isSending}
+                    key={action.label}
+                    onClick={() => handleQuickAction(action.message)}
+                    type="button"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+              <form className="customer-chat-composer" onSubmit={handleSend}>
+                <label htmlFor="customer-chat-message">Message</label>
+                <div className="customer-chat-composer__field">
+                  <textarea
+                    aria-label="Type your message"
+                    disabled={isSending}
+                    id="customer-chat-message"
+                    maxLength={2000}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={handleComposerKeyDown}
+                    placeholder="Type your message..."
+                    ref={textareaRef}
+                    rows={1}
+                    value={draft}
+                  />
+                  <button
+                    aria-label="Send message"
+                    className="customer-chat-composer__send"
+                    disabled={!draft.trim() || isSending}
+                    title="Send message"
+                    type="submit"
+                  >
+                    <Send aria-hidden="true" size={17} />
+                  </button>
+                </div>
+              </form>
+            </>
           ) : null}
         </section>
       ) : null}
@@ -416,14 +477,16 @@ export function CustomerChatWidget() {
 
 function ChatWelcomeMessage() {
   return (
-    <article
-      className="customer-chat-message customer-chat-message--support customer-chat-message--welcome"
-      key="virtual-welcome-message"
-    >
+    <>
       <span className="customer-chat-message__day">Today</span>
-      <span className="customer-chat-message__sender">Belikeme Support</span>
-      <p>{CUSTOMER_CHAT_WELCOME_MESSAGE}</p>
-    </article>
+      <article
+        className="customer-chat-message customer-chat-message--support customer-chat-message--welcome"
+        id="virtual-welcome-message"
+      >
+        <span className="customer-chat-message__sender">Belikeme Support</span>
+        <p>{CUSTOMER_CHAT_WELCOME_MESSAGE}</p>
+      </article>
+    </>
   );
 }
 
