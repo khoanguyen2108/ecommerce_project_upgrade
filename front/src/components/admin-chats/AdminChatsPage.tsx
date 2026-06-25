@@ -8,7 +8,7 @@ import {
   Send,
   WifiOff,
 } from "lucide-react";
-import type { FormEvent } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { AdminFeedback } from "@/components/admin/AdminCommerceUi";
 import { formatAdminDate } from "@/components/admin/admin-format";
@@ -211,12 +211,17 @@ export function AdminChatsPage() {
         return;
       }
 
-      setConversations((current) => upsertConversation(current, conversation));
+      const isSelectedConversation = selectedIdRef.current === conversation.id;
+      const nextConversation = isSelectedConversation
+        ? { ...conversation, unreadCount: 0 }
+        : conversation;
 
-      if (selectedIdRef.current === conversation.id) {
+      setConversations((current) => upsertConversation(current, nextConversation));
+
+      if (isSelectedConversation) {
         setSelectedConversation((current) => ({
-          ...(current ?? conversation),
-          ...conversation,
+          ...(current ?? nextConversation),
+          ...nextConversation,
           unreadCount: 0,
         }));
       }
@@ -255,13 +260,16 @@ export function AdminChatsPage() {
     };
   }, [connectionState, selectedId]);
 
-  async function handleSend(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function sendReply() {
     const body = draft.trim();
     const activeConversationId = selectedId;
 
-    if (!activeConversationId || !body || isSending) {
+    if (
+      !activeConversationId ||
+      !body ||
+      isSending ||
+      selectedConversation?.status === "CLOSED"
+    ) {
       return;
     }
 
@@ -317,6 +325,24 @@ export function AdminChatsPage() {
     } finally {
       setIsSending(false);
     }
+  }
+
+  function handleSend(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void sendReply();
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    void sendReply();
   }
 
   const selectedCustomerLabel =
@@ -474,6 +500,7 @@ export function AdminChatsPage() {
                   id="admin-chat-reply"
                   maxLength={2000}
                   onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
                   placeholder="Type your reply..."
                   rows={3}
                   value={draft}

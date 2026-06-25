@@ -48,10 +48,20 @@ export function CustomerChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string>();
+  const [unreadAdminCount, setUnreadAdminCount] = useState(0);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("offline");
+  const isOpenRef = useRef(isOpen);
   const socketRef = useRef<ChatSocket | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+
+    if (isOpen) {
+      setUnreadAdminCount(0);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
@@ -59,15 +69,11 @@ export function CustomerChatWidget() {
 
   useEffect(() => {
     if (!isOpen || !isAuthenticated || isAdmin) {
-      socketRef.current?.disconnect();
-      socketRef.current = undefined;
-      setConnectionState("offline");
+      setIsLoading(false);
       return;
     }
 
     let isMounted = true;
-    let socket: ChatSocket | undefined;
-    const activeAccessToken = accessToken;
 
     async function loadHistory() {
       setIsLoading(true);
@@ -82,6 +88,7 @@ export function CustomerChatWidget() {
 
         setConversation(response.conversation);
         setMessages(response.messages);
+        setUnreadAdminCount(0);
       } catch (loadError) {
         if (!isMounted) {
           return;
@@ -94,6 +101,25 @@ export function CustomerChatWidget() {
         }
       }
     }
+
+    void loadHistory();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAdmin, isAuthenticated, isOpen]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isAdmin) {
+      socketRef.current?.disconnect();
+      socketRef.current = undefined;
+      setConnectionState("offline");
+      return;
+    }
+
+    let isMounted = true;
+    let socket: ChatSocket | undefined;
+    const activeAccessToken = accessToken;
 
     function connectSocket() {
       try {
@@ -137,7 +163,6 @@ export function CustomerChatWidget() {
       socket.io.on("reconnect", () => {
         if (isMounted) {
           setConnectionState("connected");
-          void loadHistory();
         }
       });
       socket.on("chat:conversationUpdated", (nextConversation) => {
@@ -150,7 +175,18 @@ export function CustomerChatWidget() {
           return;
         }
 
-        setMessages((current) => appendMessage(current, message));
+        setMessages((current) => {
+          const alreadyExists = current.some((item) => item.id === message.id);
+
+          if (
+            !alreadyExists &&
+            shouldCountCustomerUnread(message, isOpenRef.current)
+          ) {
+            setUnreadAdminCount((count) => count + 1);
+          }
+
+          return appendMessage(current, message);
+        });
       });
       socket.on("chat:error", (socketError) => {
         if (isMounted) {
@@ -159,7 +195,6 @@ export function CustomerChatWidget() {
       });
     }
 
-    void loadHistory();
     connectSocket();
 
     return () => {
@@ -167,7 +202,7 @@ export function CustomerChatWidget() {
       socket?.disconnect();
       socketRef.current = undefined;
     };
-  }, [accessToken, isAdmin, isAuthenticated, isOpen]);
+  }, [accessToken, isAdmin, isAuthenticated]);
 
   const connectionLabel = useMemo(() => {
     if (!isAuthenticated) {
@@ -363,9 +398,9 @@ export function CustomerChatWidget() {
         type="button"
       >
         <MessageCircle aria-hidden="true" size={24} />
-        {conversation?.unreadCount ? (
+        {unreadAdminCount ? (
           <span className="customer-chat-widget__badge">
-            {Math.min(conversation.unreadCount, 9)}
+            {Math.min(unreadAdminCount, 9)}
           </span>
         ) : null}
       </button>
@@ -430,6 +465,21 @@ function appendMessage(
     (left, right) =>
       new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
   );
+}
+
+function shouldCountCustomerUnread(
+  message: ChatMessage,
+  isChatOpen: boolean,
+): boolean {
+  if (message.senderRole.toUpperCase() !== "ADMIN") {
+    return false;
+  }
+
+  if (!isChatOpen) {
+    return true;
+  }
+
+  return typeof document !== "undefined" && document.visibilityState !== "visible";
 }
 
 function getChatErrorMessage(error: unknown): string {
