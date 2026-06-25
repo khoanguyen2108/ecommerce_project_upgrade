@@ -3,7 +3,7 @@
 import { LogIn, MessageCircle, Send, WifiOff, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { FormEvent } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
@@ -189,9 +189,7 @@ export function CustomerChatWidget() {
     return null;
   }
 
-  async function handleSend(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function sendMessage() {
     const body = draft.trim();
 
     if (!body || !isAuthenticated || isSending) {
@@ -243,6 +241,24 @@ export function CustomerChatWidget() {
     } finally {
       setIsSending(false);
     }
+  }
+
+  function handleSend(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void sendMessage();
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    void sendMessage();
   }
 
   return (
@@ -319,6 +335,7 @@ export function CustomerChatWidget() {
                 id="customer-chat-message"
                 maxLength={2000}
                 onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
                 placeholder="Type your message..."
                 rows={2}
                 value={draft}
