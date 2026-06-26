@@ -201,12 +201,7 @@ export function LandingInspirationGallery() {
 function GalleryHeading() {
   return (
     <div className="landing-gallery__heading">
-      <p className="eyebrow">STYLE FILE</p>
       <h2 id="landing-gallery-heading">Looks worth saving</h2>
-      <p>
-        A rotating moodboard of pieces, movement, and everyday confidence from
-        Belikeme.
-      </p>
     </div>
   );
 }
