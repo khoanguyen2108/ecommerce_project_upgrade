@@ -500,8 +500,9 @@ img {
   overscroll-behavior-inline: contain;
   padding-bottom: var(--space-3);
   scroll-snap-type: inline mandatory;
-  scrollbar-color: #c4c7c7 transparent;
+  scrollbar-color: transparent transparent;
   scrollbar-width: thin;
+  transition: scrollbar-color 160ms ease;
 }
 
 .landing-gallery__track::-webkit-scrollbar {
@@ -513,6 +514,20 @@ img {
 }
 
 .landing-gallery__track::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background-color 160ms ease;
+}
+
+.landing-gallery:hover .landing-gallery__track,
+.landing-gallery__track:hover,
+.landing-gallery__track:focus-within {
+  scrollbar-color: #c4c7c7 transparent;
+}
+
+.landing-gallery:hover .landing-gallery__track::-webkit-scrollbar-thumb,
+.landing-gallery__track:hover::-webkit-scrollbar-thumb,
+.landing-gallery__track:focus-within::-webkit-scrollbar-thumb {
   background: #c4c7c7;
 }
 
@@ -568,7 +583,7 @@ img {
   align-items: center;
   display: flex;
   flex: 0 0 auto;
-  gap: 14px;
+  gap: 12px;
   padding-bottom: 2px;
 }
 
@@ -577,12 +592,12 @@ img {
   border: 0;
   border-radius: 999px;
   color: #111111;
-  height: 64px;
+  height: 54px;
   opacity: 1;
   transition:
     background-color 160ms ease,
     color 160ms ease;
-  width: 64px;
+  width: 54px;
 }
 
 .icon-button.landing-gallery__control:hover:not(:disabled) {

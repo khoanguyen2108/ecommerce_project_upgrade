@@ -150,7 +150,7 @@ export function LandingInspirationGallery() {
               title="Previous"
               type="button"
             >
-              <ChevronLeft aria-hidden="true" size={26} strokeWidth={1.8} />
+              <ChevronLeft aria-hidden="true" size={22} strokeWidth={1.9} />
             </button>
             <button
               aria-label="Next inspiration images"
@@ -160,7 +160,7 @@ export function LandingInspirationGallery() {
               title="Next"
               type="button"
             >
-              <ChevronRight aria-hidden="true" size={26} strokeWidth={1.8} />
+              <ChevronRight aria-hidden="true" size={22} strokeWidth={1.9} />
             </button>
           </div>
         ) : null}
