@@ -573,7 +573,10 @@ function GalleryForm({
               type="url"
               value={form.imageUrl}
             />
-            <small>Only URL-based image management is used for this MVP.</small>
+            <small>
+              Only URL-based image management is used for this MVP. Images display
+              in the same 3:4 frame as category tiles.
+            </small>
           </label>
         </div>
       </section>

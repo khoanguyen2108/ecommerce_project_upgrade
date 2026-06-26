@@ -103,8 +103,6 @@ export function LandingPage() {
         </div>
       </section>
 
-      <LandingInspirationGallery />
-
       <section className="section section--categories" id="categories">
         <div className="section-heading section-heading--center">
           <h2>Featured Categories</h2>
@@ -171,6 +169,8 @@ export function LandingPage() {
           />
         </div>
       </section>
+
+      <LandingInspirationGallery />
 
       <section className="landing-about" id="about" aria-labelledby="about-heading">
         <div className="landing-about__image-wrap">

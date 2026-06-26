@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { getLandingGallery } from "@/features/landing/api";
 import type { LandingGalleryImage } from "@/features/landing/types";
 
@@ -10,12 +11,21 @@ interface LandingGalleryState {
 }
 
 export function LandingInspirationGallery() {
+  const trackRef = useRef<HTMLDivElement>(null);
   const [gallery, setGallery] = useState<LandingGalleryState>({
     images: [],
     isLoading: true,
   });
+  const [scrollState, setScrollState] = useState({
+    canScrollLeft: false,
+    canScrollRight: false,
+  });
   const [failedImageIds, setFailedImageIds] = useState<Set<string>>(
     () => new Set(),
+  );
+
+  const visibleImages = gallery.images.filter(
+    (image) => !failedImageIds.has(image.id),
   );
 
   useEffect(() => {
@@ -55,6 +65,54 @@ export function LandingInspirationGallery() {
     };
   }, []);
 
+  useEffect(() => {
+    const updateTimer = window.setTimeout(updateScrollState, 0);
+
+    window.addEventListener("resize", updateScrollState);
+
+    return () => {
+      window.clearTimeout(updateTimer);
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [gallery.isLoading, visibleImages.length]);
+
+  function updateScrollState() {
+    const track = trackRef.current;
+
+    if (!track) {
+      setScrollState({
+        canScrollLeft: false,
+        canScrollRight: false,
+      });
+      return;
+    }
+
+    const maxScrollLeft = track.scrollWidth - track.clientWidth;
+
+    setScrollState({
+      canScrollLeft: track.scrollLeft > 4,
+      canScrollRight: track.scrollLeft < maxScrollLeft - 4,
+    });
+  }
+
+  function scrollGallery(direction: "previous" | "next") {
+    const track = trackRef.current;
+
+    if (!track) {
+      return;
+    }
+
+    track.scrollBy({
+      behavior: "smooth",
+      left:
+        direction === "next"
+          ? track.clientWidth * 0.82
+          : -track.clientWidth * 0.82,
+    });
+
+    window.setTimeout(updateScrollState, 280);
+  }
+
   if (gallery.isLoading) {
     return (
       <section
@@ -71,25 +129,49 @@ export function LandingInspirationGallery() {
     );
   }
 
-  const visibleImages = gallery.images.filter(
-    (image) => !failedImageIds.has(image.id),
-  );
-
   if (visibleImages.length === 0) {
     return null;
   }
 
   return (
     <section className="landing-gallery" aria-labelledby="landing-gallery-heading">
-      <GalleryHeading />
-      <div className="landing-gallery__track">
-        {visibleImages.slice(0, 10).map((image, index) => (
-          <figure
-            className={`landing-gallery__item ${
-              index === 0 ? "landing-gallery__item--feature" : ""
-            }`}
-            key={image.id}
+      <div className="landing-gallery__topline">
+        <GalleryHeading />
+        {visibleImages.length > 1 ? (
+          <div
+            className="landing-gallery__controls"
+            aria-label="Style file carousel controls"
           >
+            <button
+              aria-label="Previous inspiration images"
+              className="icon-button landing-gallery__control"
+              disabled={!scrollState.canScrollLeft}
+              onClick={() => scrollGallery("previous")}
+              title="Previous"
+              type="button"
+            >
+              <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.9} />
+            </button>
+            <button
+              aria-label="Next inspiration images"
+              className="icon-button landing-gallery__control"
+              disabled={!scrollState.canScrollRight}
+              onClick={() => scrollGallery("next")}
+              title="Next"
+              type="button"
+            >
+              <ArrowRight aria-hidden="true" size={18} strokeWidth={1.9} />
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <div
+        className="landing-gallery__track"
+        onScroll={updateScrollState}
+        ref={trackRef}
+      >
+        {visibleImages.slice(0, 10).map((image, index) => (
+          <figure className="landing-gallery__item" key={image.id}>
             <img
               alt={getImageAlt(image)}
               className="landing-gallery__image"
