@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getLandingGallery } from "@/features/landing/api";
 import type { LandingGalleryImage } from "@/features/landing/types";
@@ -150,7 +150,7 @@ export function LandingInspirationGallery() {
               title="Previous"
               type="button"
             >
-              <ArrowLeft aria-hidden="true" size={18} strokeWidth={1.9} />
+              <ChevronLeft aria-hidden="true" size={26} strokeWidth={1.8} />
             </button>
             <button
               aria-label="Next inspiration images"
@@ -160,7 +160,7 @@ export function LandingInspirationGallery() {
               title="Next"
               type="button"
             >
-              <ArrowRight aria-hidden="true" size={18} strokeWidth={1.9} />
+              <ChevronRight aria-hidden="true" size={26} strokeWidth={1.8} />
             </button>
           </div>
         ) : null}
@@ -201,7 +201,7 @@ export function LandingInspirationGallery() {
 function GalleryHeading() {
   return (
     <div className="landing-gallery__heading">
-      <h2 id="landing-gallery-heading">Looks worth saving</h2>
+      <h2 id="landing-gallery-heading">Outfit Inspo</h2>
     </div>
   );
 }
