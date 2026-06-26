@@ -14,6 +14,7 @@ import { ChatModule } from './chat/chat.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { HealthModule } from './health/health.module';
+import { LandingGalleryModule } from './landing-gallery/landing-gallery.module';
 import { LandingPageModule } from './landing-page/landing-page.module';
 import { OrderExpiryModule } from './order-expiry/order-expiry.module';
 import { OrdersModule } from './orders/orders.module';
@@ -62,6 +63,7 @@ const getPositiveNumber = (
     AdminVouchersModule,
     AdminStatsModule,
     CatalogModule,
+    LandingGalleryModule,
     LandingPageModule,
     CartModule,
     ChatModule,

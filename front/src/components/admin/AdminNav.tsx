@@ -2,6 +2,7 @@
 
 import {
   ClipboardList,
+  ImageIcon,
   LayoutDashboard,
   MessageCircle,
   Package,
@@ -32,6 +33,11 @@ const adminNavItems = [
     href: "/admin/categories",
     icon: Tags,
     label: "Categories",
+  },
+  {
+    href: "/admin/landing-gallery",
+    icon: ImageIcon,
+    label: "Landing Gallery",
   },
   {
     href: "/admin/vouchers",

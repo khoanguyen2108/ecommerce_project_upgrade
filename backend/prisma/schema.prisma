@@ -199,6 +199,21 @@ model LandingPageSetting {
   updatedAt      DateTime @updatedAt
 }
 
+model LandingGalleryImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  imageUrl  String   @db.VarChar(1000)
+  title     String?  @db.VarChar(80)
+  caption   String?  @db.VarChar(160)
+  altText   String?  @db.VarChar(160)
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
 model Product {
   id          String           @id @default(uuid()) @db.Uuid
   categoryId  String           @db.Uuid

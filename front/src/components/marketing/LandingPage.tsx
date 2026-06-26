@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
+import { LandingInspirationGallery } from "@/components/landing/LandingInspirationGallery";
 import { getProducts } from "@/features/catalog/api";
 import type { Product } from "@/features/catalog/types";
 import { getFeaturedCategories } from "@/features/landing/api";
@@ -101,6 +102,8 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+
+      <LandingInspirationGallery />
 
       <section className="section section--categories" id="categories">
         <div className="section-heading section-heading--center">
