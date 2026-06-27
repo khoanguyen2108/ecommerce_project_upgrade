@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { AiConfigService } from './ai-config.service';
 import {
+  RECOMMEND_PRODUCTS_SYSTEM_PROMPT,
+  buildRecommendProductsUserPrompt,
+} from './prompts/recommend-products.prompt';
+import {
   STYLE_ADVICE_SYSTEM_PROMPT,
   buildStyleAdviceUserPrompt,
 } from './prompts/style-advice.prompt';
 import type { AiCatalogContextProduct } from './ai-context.mapper';
+import type { NormalizedRecommendProductsRequest } from './dto/recommend-products.dto';
 import type { NormalizedStyleAdviceRequest } from './dto/style-advice.dto';
 
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
@@ -29,6 +34,26 @@ export class OpenRouterService {
     request: NormalizedStyleAdviceRequest,
     catalog: AiCatalogContextProduct[],
   ): Promise<string> {
+    return this.requestCompletion(
+      STYLE_ADVICE_SYSTEM_PROMPT,
+      buildStyleAdviceUserPrompt(request, catalog),
+    );
+  }
+
+  async requestProductRecommendations(
+    request: NormalizedRecommendProductsRequest,
+    catalog: AiCatalogContextProduct[],
+  ): Promise<string> {
+    return this.requestCompletion(
+      RECOMMEND_PRODUCTS_SYSTEM_PROMPT,
+      buildRecommendProductsUserPrompt(request, catalog),
+    );
+  }
+
+  private async requestCompletion(
+    systemPrompt: string,
+    userPrompt: string,
+  ): Promise<string> {
     const config = this.aiConfigService.getRuntimeConfig();
 
     if (!config.apiKey || !config.model) {
@@ -48,11 +73,8 @@ export class OpenRouterService {
         body: JSON.stringify({
           model: config.model,
           messages: [
-            { role: 'system', content: STYLE_ADVICE_SYSTEM_PROMPT },
-            {
-              role: 'user',
-              content: buildStyleAdviceUserPrompt(request, catalog),
-            },
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
           ],
           stream: false,
           temperature: config.temperature,

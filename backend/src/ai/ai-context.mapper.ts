@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import type { NormalizedRecommendProductsRequest } from './dto/recommend-products.dto';
 import type { NormalizedStyleAdviceRequest } from './dto/style-advice.dto';
 
 const MAX_CANDIDATES = 24;
 const MAX_CONTEXT_BYTES = 16 * 1024;
+const MAX_RECOMMENDATION_CANDIDATES = 30;
+const MAX_RECOMMENDATION_CONTEXT_BYTES = 20 * 1024;
 const MAX_DESCRIPTION_LENGTH = 240;
 const MAX_CATEGORIES = 3;
 const MAX_COLORS = 8;
 const MAX_SIZES = 8;
+const MAX_AVAILABLE_VARIANT_VALUES = 50;
 const DISALLOWED_CONTROL_CHARACTERS =
   /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
@@ -40,6 +44,15 @@ export interface AiGroundedProductRecord {
   variants: Array<{ priceOverride: number | null }>;
 }
 
+export interface AiRecommendationGroundedProductRecord {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrls: string[];
+  basePrice: number;
+  variants: AiVariantRecord[];
+}
+
 export interface AiCatalogContextProduct {
   ref: string;
   name: string;
@@ -64,6 +77,11 @@ export interface GroundedProduct {
   productName: string;
   imageUrl?: string;
   price: number;
+}
+
+export interface RecommendationGroundedProduct extends GroundedProduct {
+  availableColors: string[];
+  availableSizes: string[];
 }
 
 @Injectable()
@@ -130,6 +148,72 @@ export class AiContextMapper {
     return candidates;
   }
 
+  mapRecommendationCandidates(
+    products: AiCandidateProductRecord[],
+    request: NormalizedRecommendProductsRequest,
+  ): AiCatalogCandidate[] {
+    const candidates: AiCatalogCandidate[] = [];
+
+    for (const product of this.diversifyByPrimaryCategory(products)) {
+      if (candidates.length >= MAX_RECOMMENDATION_CANDIDATES) {
+        break;
+      }
+
+      const variants = product.variants.filter((variant) =>
+        this.variantMatchesRecommendationRequest(
+          variant,
+          product.basePrice,
+          request,
+        ),
+      );
+
+      if (variants.length === 0) {
+        continue;
+      }
+
+      const prices = variants.map(
+        (variant) => variant.priceOverride ?? product.basePrice,
+      );
+      const ref = `P${candidates.length + 1}`;
+      const description = this.normalizeText(product.description ?? '').slice(
+        0,
+        MAX_DESCRIPTION_LENGTH,
+      );
+      const context: AiCatalogContextProduct = {
+        ref,
+        name: this.normalizeText(product.name),
+        ...(description ? { description } : {}),
+        categories: this.mapCategories(product),
+        priceMin: Math.min(...prices),
+        priceMax: Math.max(...prices),
+        colors: this.uniqueNormalizedValues(
+          variants.map((variant) => variant.color),
+          MAX_COLORS,
+        ),
+        sizes: this.uniqueNormalizedValues(
+          variants.map((variant) => variant.size),
+          MAX_SIZES,
+        ),
+        inStock: true,
+      };
+      const nextCandidates = [
+        ...candidates.map((candidate) => candidate.context),
+        context,
+      ];
+
+      if (
+        Buffer.byteLength(JSON.stringify(nextCandidates), 'utf8') >
+        MAX_RECOMMENDATION_CONTEXT_BYTES
+      ) {
+        break;
+      }
+
+      candidates.push({ ref, productId: product.id, context });
+    }
+
+    return candidates;
+  }
+
   private diversifyByPrimaryCategory(
     products: AiCandidateProductRecord[],
   ): AiCandidateProductRecord[] {
@@ -179,6 +263,43 @@ export class AiContextMapper {
     };
   }
 
+  mapRecommendationGroundedProduct(
+    product: AiRecommendationGroundedProductRecord,
+    request: NormalizedRecommendProductsRequest,
+  ): RecommendationGroundedProduct | undefined {
+    const variants = product.variants.filter((variant) =>
+      this.variantMatchesRecommendationRequest(
+        variant,
+        product.basePrice,
+        request,
+      ),
+    );
+
+    if (variants.length === 0) {
+      return undefined;
+    }
+
+    const prices = variants.map(
+      (variant) => variant.priceOverride ?? product.basePrice,
+    );
+
+    return {
+      productId: product.id,
+      productSlug: product.slug,
+      productName: product.name,
+      ...(product.imageUrls[0] ? { imageUrl: product.imageUrls[0] } : {}),
+      price: Math.min(...prices),
+      availableColors: this.uniqueNormalizedValues(
+        product.variants.map((variant) => variant.color),
+        MAX_AVAILABLE_VARIANT_VALUES,
+      ),
+      availableSizes: this.uniqueNormalizedValues(
+        product.variants.map((variant) => variant.size),
+        MAX_AVAILABLE_VARIANT_VALUES,
+      ),
+    };
+  }
+
   private variantMatchesRequest(
     variant: AiVariantRecord,
     basePrice: number,
@@ -200,6 +321,32 @@ export class AiContextMapper {
     const matchesBudget = request.budget === undefined || price <= request.budget;
 
     return matchesColor && matchesSize && matchesBudget;
+  }
+
+  private variantMatchesRecommendationRequest(
+    variant: AiVariantRecord,
+    basePrice: number,
+    request: NormalizedRecommendProductsRequest,
+  ): boolean {
+    const normalizedColor = this.normalizeComparable(variant.color);
+    const normalizedSize = this.normalizeComparable(variant.size);
+    const matchesColor =
+      request.colors.length === 0 ||
+      request.colors.some(
+        (color) => this.normalizeComparable(color) === normalizedColor,
+      );
+    const matchesSize =
+      request.sizes.length === 0 ||
+      request.sizes.some(
+        (size) => this.normalizeComparable(size) === normalizedSize,
+      );
+    const price = variant.priceOverride ?? basePrice;
+    const matchesMinimum =
+      request.minBudget === undefined || price >= request.minBudget;
+    const matchesMaximum =
+      request.maxBudget === undefined || price <= request.maxBudget;
+
+    return matchesColor && matchesSize && matchesMinimum && matchesMaximum;
   }
 
   private mapCategories(product: AiCandidateProductRecord): AiCategoryRecord[] {

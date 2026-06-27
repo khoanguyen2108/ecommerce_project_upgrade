@@ -41,7 +41,12 @@ import {
   errorEnvelopeExample,
 } from '../common/swagger/api-examples';
 import { UserRole } from '../generated/prisma/enums';
+import { AiProductRecommendationService } from './ai-product-recommendation.service';
 import { AiService } from './ai.service';
+import {
+  RecommendProductsRequestDto,
+  RecommendProductsResponseDto,
+} from './dto/recommend-products.dto';
 import {
   StyleAdviceRequestDto,
   StyleAdviceResponseDto,
@@ -49,6 +54,8 @@ import {
 
 const STYLE_ADVICE_RATE_LIMIT_TTL_MS = 10 * 60 * 1000;
 const STYLE_ADVICE_RATE_LIMIT = 5;
+const RECOMMEND_PRODUCTS_RATE_LIMIT_TTL_MS = 10 * 60 * 1000;
+const RECOMMEND_PRODUCTS_RATE_LIMIT = 5;
 
 @Catch(ThrottlerException)
 class AiRateLimitExceptionFilter implements ExceptionFilter {
@@ -56,6 +63,9 @@ class AiRateLimitExceptionFilter implements ExceptionFilter {
     const context = host.switchToHttp();
     const request = context.getRequest<AuthenticatedRequest>();
     const response = context.getResponse<Response>();
+    const isProductRecommendationRoute = request.path.endsWith(
+      '/recommend-products',
+    );
 
     response.status(HttpStatus.TOO_MANY_REQUESTS).json({
       data: null,
@@ -64,7 +74,9 @@ class AiRateLimitExceptionFilter implements ExceptionFilter {
       },
       error: {
         code: 'AI_RATE_LIMITED',
-        message: 'Too many style assistant requests. Please try again later.',
+        message: isProductRecommendationRoute
+          ? 'Too many product recommendation requests. Please try again later.'
+          : 'Too many style assistant requests. Please try again later.',
       },
     });
   }
@@ -72,13 +84,126 @@ class AiRateLimitExceptionFilter implements ExceptionFilter {
 
 @ApiTags('ai')
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
-@ApiExtraModels(StyleAdviceResponseDto)
+@ApiExtraModels(StyleAdviceResponseDto, RecommendProductsResponseDto)
 @Controller('ai')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @UseFilters(AiRateLimitExceptionFilter)
 @Roles(UserRole.CUSTOMER)
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    private readonly aiProductRecommendationService: AiProductRecommendationService,
+  ) {}
+
+  @ApiOperation({
+    summary: 'Get grounded product recommendations',
+    description:
+      'Applies active-category, active-product, active in-stock variant, structured catalog, and effective-price filters before AI ranking. Returns canonical database product data or a clearly labelled catalog fallback.',
+  })
+  @ApiOkResponse({
+    description: 'Grounded product recommendations or catalog fallback returned.',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: getSchemaPath(RecommendProductsResponseDto) },
+        meta: {
+          type: 'object',
+          properties: {
+            requestId: { type: 'string' },
+          },
+        },
+        error: { type: 'null' },
+      },
+    },
+  })
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Request validation failed.',
+      'INVALID_RECOMMEND_PRODUCTS_REQUEST',
+      'minBudget must be less than or equal to maxBudget.',
+    ),
+  )
+  @ApiUnauthorizedResponse(
+    errorEnvelopeResponse(
+      'Authentication is required.',
+      'AUTH_REQUIRED',
+      'Authentication is required.',
+    ),
+  )
+  @ApiForbiddenResponse(
+    errorEnvelopeResponse(
+      'CUSTOMER role is required.',
+      'FORBIDDEN',
+      'You do not have permission to access this resource.',
+    ),
+  )
+  @ApiTooManyRequestsResponse(
+    errorEnvelopeResponse(
+      'The local AI route quota was exceeded.',
+      'AI_RATE_LIMITED',
+      'Too many product recommendation requests. Please try again later.',
+    ),
+  )
+  @ApiServiceUnavailableResponse({
+    description:
+      'AI is disabled, not configured, or unavailable. Disabled and transient provider failures normally return a catalog fallback when valid candidates exist.',
+    content: {
+      'application/json': {
+        examples: {
+          disabled: {
+            value: errorEnvelopeExample(
+              'AI_DISABLED',
+              'Product recommendations are disabled.',
+            ),
+          },
+          notConfigured: {
+            value: errorEnvelopeExample(
+              'AI_NOT_CONFIGURED',
+              'Product recommendations are not configured.',
+            ),
+          },
+          unavailable: {
+            value: errorEnvelopeExample(
+              'AI_UNAVAILABLE',
+              'Product recommendations are temporarily unavailable.',
+            ),
+          },
+        },
+      },
+    },
+  })
+  @ApiBadGatewayResponse(
+    errorEnvelopeResponse(
+      'The provider returned an invalid response and no fallback was available.',
+      'AI_INVALID_RESPONSE',
+      'Product recommendations returned an invalid response.',
+    ),
+  )
+  @Post('recommend-products')
+  @HttpCode(200)
+  @Throttle({
+    default: {
+      ttl: RECOMMEND_PRODUCTS_RATE_LIMIT_TTL_MS,
+      limit: RECOMMEND_PRODUCTS_RATE_LIMIT,
+      getTracker: (request: Record<string, unknown>) => {
+        const authenticatedRequest = request as unknown as AuthenticatedRequest;
+
+        return Promise.resolve(
+          authenticatedRequest.user?.id ?? authenticatedRequest.ip ?? 'unknown',
+        );
+      },
+    },
+  })
+  recommendProducts(
+    @Body() dto: RecommendProductsRequestDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.aiProductRecommendationService.recommendProducts(dto, {
+      requestId: request.requestId,
+      userId: user.id,
+    });
+  }
 
   @ApiOperation({
     summary: 'Get grounded clothing style advice',

@@ -5,6 +5,10 @@ const MAX_SUMMARY_LENGTH = 600;
 const MAX_RECOMMENDATION_TEXT_LENGTH = 240;
 const MAX_RECOMMENDATIONS = 4;
 const MAX_EXTRA_TIPS = 4;
+const MAX_PRODUCT_RECOMMENDATION_SUMMARY_LENGTH = 500;
+const MAX_PRODUCT_RECOMMENDATIONS = 8;
+const MAX_NO_MATCH_SUGGESTIONS = 4;
+const MAX_NO_MATCH_SUGGESTION_LENGTH = 160;
 const HTML_PATTERN = /<\/?[a-z][^>]*>/i;
 const MARKDOWN_PATTERN =
   /```|`[^`]+`|\[[^\]]+\]\([^)]+\)|(^|\n)\s{0,3}(?:#{1,6}\s|>\s|[-*+]\s|\d+\.\s)|\*\*[^*]+\*\*|__[^_]+__/m;
@@ -21,6 +25,17 @@ export interface ValidatedStyleAdviceOutput {
   summary: string;
   recommendations: ValidatedAiRecommendation[];
   extraTips: string[];
+}
+
+export interface ValidatedProductRecommendation {
+  ref: string;
+  reason: string;
+}
+
+export interface ValidatedProductRecommendationsOutput {
+  summary: string;
+  recommendations: ValidatedProductRecommendation[];
+  noMatchSuggestions: string[];
 }
 
 export class AiOutputValidationError extends Error {
@@ -119,6 +134,91 @@ export class AiOutputValidator {
     );
 
     return { summary, recommendations, extraTips };
+  }
+
+  validateProductRecommendations(
+    content: string,
+    allowedRefs: ReadonlySet<string>,
+    requestLimit: number,
+  ): ValidatedProductRecommendationsOutput {
+    const trimmedContent = content.trim();
+    const recommendationLimit = Math.min(
+      MAX_PRODUCT_RECOMMENDATIONS,
+      Math.max(1, requestLimit),
+    );
+
+    if (
+      !trimmedContent ||
+      trimmedContent.length > MAX_PROVIDER_CONTENT_LENGTH ||
+      trimmedContent.startsWith('```') ||
+      HTML_PATTERN.test(trimmedContent)
+    ) {
+      throw new AiOutputValidationError();
+    }
+
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(trimmedContent);
+    } catch {
+      throw new AiOutputValidationError();
+    }
+
+    if (
+      !this.isRecord(parsed) ||
+      !this.hasOnlyKeys(parsed, [
+        'summary',
+        'recommendations',
+        'noMatchSuggestions',
+      ])
+    ) {
+      throw new AiOutputValidationError();
+    }
+
+    if (
+      !Array.isArray(parsed.recommendations) ||
+      parsed.recommendations.length > recommendationLimit ||
+      !Array.isArray(parsed.noMatchSuggestions) ||
+      parsed.noMatchSuggestions.length > MAX_NO_MATCH_SUGGESTIONS
+    ) {
+      throw new AiOutputValidationError();
+    }
+
+    const summary = this.validatePlainText(
+      parsed.summary,
+      MAX_PRODUCT_RECOMMENDATION_SUMMARY_LENGTH,
+    );
+    const recommendations: ValidatedProductRecommendation[] = [];
+    const seenRefs = new Set<string>();
+
+    for (const recommendation of parsed.recommendations) {
+      if (
+        !this.isRecord(recommendation) ||
+        !this.hasOnlyKeys(recommendation, ['ref', 'reason']) ||
+        typeof recommendation.ref !== 'string'
+      ) {
+        throw new AiOutputValidationError();
+      }
+
+      const ref = recommendation.ref.trim();
+      const reason = this.validatePlainText(
+        recommendation.reason,
+        MAX_RECOMMENDATION_TEXT_LENGTH,
+      );
+
+      if (!allowedRefs.has(ref) || seenRefs.has(ref)) {
+        continue;
+      }
+
+      seenRefs.add(ref);
+      recommendations.push({ ref, reason });
+    }
+
+    const noMatchSuggestions = parsed.noMatchSuggestions.map((suggestion) =>
+      this.validatePlainText(suggestion, MAX_NO_MATCH_SUGGESTION_LENGTH),
+    );
+
+    return { summary, recommendations, noMatchSuggestions };
   }
 
   private validatePlainText(value: unknown, maxLength: number): string {
