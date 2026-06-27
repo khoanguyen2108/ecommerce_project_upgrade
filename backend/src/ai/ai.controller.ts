@@ -163,14 +163,14 @@ export class AiController {
   )
   @ApiTooManyRequestsResponse(
     errorEnvelopeResponse(
-      'The local AI support quota was exceeded.',
+      'The local route throttle, Redis daily quota, or per-user concurrency limit was exceeded.',
       'AI_RATE_LIMITED',
       'Too many AI support requests. Please try again later.',
     ),
   )
   @ApiServiceUnavailableResponse(
     errorEnvelopeResponse(
-      'AI was enabled without complete backend configuration.',
+      'AI configuration or Redis quota capacity is unavailable.',
       'AI_NOT_CONFIGURED',
       'Belikeme AI Support is not configured.',
     ),
@@ -246,7 +246,7 @@ export class AiController {
   )
   @ApiTooManyRequestsResponse(
     errorEnvelopeResponse(
-      'The local AI route quota was exceeded.',
+      'The local route throttle, Redis daily quota, or per-user concurrency limit was exceeded.',
       'AI_RATE_LIMITED',
       'Too many product recommendation requests. Please try again later.',
     ),
@@ -273,6 +273,12 @@ export class AiController {
             value: errorEnvelopeExample(
               'AI_UNAVAILABLE',
               'Product recommendations are temporarily unavailable.',
+            ),
+          },
+          quotaUnavailable: {
+            value: errorEnvelopeExample(
+              'AI_QUOTA_UNAVAILABLE',
+              'AI request capacity is temporarily unavailable. Please try again later.',
             ),
           },
         },
@@ -357,7 +363,7 @@ export class AiController {
   )
   @ApiTooManyRequestsResponse(
     errorEnvelopeResponse(
-      'The local AI route quota was exceeded.',
+      'The local route throttle, Redis daily quota, or per-user concurrency limit was exceeded.',
       'AI_RATE_LIMITED',
       'Too many style assistant requests. Please try again later.',
     ),
@@ -390,6 +396,12 @@ export class AiController {
             value: errorEnvelopeExample(
               'AI_PROVIDER_BUSY',
               'The style assistant is busy. Please try again shortly.',
+            ),
+          },
+          quotaUnavailable: {
+            value: errorEnvelopeExample(
+              'AI_QUOTA_UNAVAILABLE',
+              'AI request capacity is temporarily unavailable. Please try again later.',
             ),
           },
         },

@@ -13,7 +13,8 @@ export type SupportContentCategory =
   | 'general'
   | 'returns'
   | 'shipping'
-  | 'sizing';
+  | 'sizing'
+  | 'payment';
 
 export interface ApprovedSupportContent {
   id: string;
@@ -75,6 +76,14 @@ export class SupportKnowledgeService {
       /\b(size|sizes|sizing|measurement|measurements|fit|fits)\b/i.test(message)
     ) {
       categories.push('sizing');
+    }
+
+    if (
+      /\b(payment|paid|pay|charge|charged|debit|debited|webhook|reconciliation)\b/i.test(
+        message,
+      )
+    ) {
+      categories.push('payment');
     }
 
     return categories;
@@ -178,7 +187,8 @@ export class SupportKnowledgeService {
       value === 'general' ||
       value === 'returns' ||
       value === 'shipping' ||
-      value === 'sizing'
+      value === 'sizing' ||
+      value === 'payment'
     );
   }
 
@@ -190,4 +200,3 @@ export class SupportKnowledgeService {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }
-

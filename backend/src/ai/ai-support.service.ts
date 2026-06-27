@@ -20,6 +20,7 @@ import type {
   SupportSourceDto,
 } from './dto/support.dto';
 import { AiProviderError, OpenRouterService } from './openrouter.service';
+import { AiQuotaService } from './ai-quota.service';
 import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
 import type { SupportOrderPromptContext } from './prompts/support.prompt';
 import {
@@ -32,7 +33,7 @@ const DISALLOWED_CONTROL_CHARACTERS =
 const ORDER_RELATED_PATTERN =
   /\b(order|ordered|payment|paid|tracking|track|package|parcel|purchase|status)\b/i;
 const RISKY_SUPPORT_PATTERN =
-  /\b(refund|chargeback|dispute|cancel|cancellation|change (?:my |the )?address|legal|lawyer|privacy|personal data|delete my data|threat|abuse)\b/i;
+  /\b(refund|chargeback|dispute|charged(?:-| )but(?:-| )not(?:-| )paid|debited(?:-| )but(?:-| )not(?:-| )paid|charged but|debited but|failed webhook|reconciliation|cancel|cancellation|change (?:my |the )?address|address change|return eligibility|return eligible|eligible (?:for )?(?:a )?return|qualif(?:y|ies|ied) (?:for )?(?:a )?return|can i return|may i return|exception|exact measurements?|measurement chart|fit confirmation|guarantee(?:d)? fit|legal|lawyer|privacy|personal data|delete my data|threat|abuse)\b/i;
 const POSSIBLE_PII_PATTERN =
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|(?:\+?\d[\d .()-]{7,}\d)|\b(?:my name is|shipping address is|home address is)\b/i;
 const KNOWN_ORDER_STATUS_VALUES = [
@@ -82,6 +83,7 @@ export class AiSupportService {
     private readonly aiOutputValidator: AiOutputValidator,
     private readonly openRouterService: OpenRouterService,
     private readonly aiScopeService: AiScopeService,
+    private readonly aiQuotaService: AiQuotaService,
   ) {}
 
   async getSupport(
@@ -106,6 +108,12 @@ export class AiSupportService {
         return this.buildOutOfScopeResponse(scopeDecision.locale);
       }
 
+      const quotaLease = await this.aiQuotaService.acquire(
+        'support',
+        context.userId,
+      );
+
+      try {
       const config = this.aiConfigService.getRuntimeConfig();
 
       if (!config.enabled) {
@@ -238,7 +246,7 @@ export class AiSupportService {
           !orderPromptContext &&
           !output.handoff.required &&
           citedContent.every(
-            (item) => item.id === 'support-general-handoff',
+            (item) => item.id === 'support-human-handoff',
           )
         ) {
           return this.buildHandoff(
@@ -303,6 +311,9 @@ export class AiSupportService {
           'AI_INVALID_RESPONSE',
           'Belikeme AI Support could not produce a safe answer. Please contact Belikeme Support.',
         );
+      }
+      } finally {
+        await this.aiQuotaService.release(quotaLease);
       }
     } catch (error) {
       this.logEvent('AI_SUPPORT_FAILED', context, {

@@ -28,6 +28,7 @@ import type {
   StyleAdviceResponseDto,
 } from './dto/style-advice.dto';
 import { AiProviderError, OpenRouterService } from './openrouter.service';
+import { AiQuotaService } from './ai-quota.service';
 import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
 
 const MAX_CANDIDATE_PRODUCTS = 24;
@@ -51,6 +52,7 @@ export class AiService {
     private readonly aiOutputValidator: AiOutputValidator,
     private readonly openRouterService: OpenRouterService,
     private readonly aiScopeService: AiScopeService,
+    private readonly aiQuotaService: AiQuotaService,
   ) {}
 
   async getStyleAdvice(
@@ -80,6 +82,12 @@ export class AiService {
         return this.buildOutOfScopeResponse(scopeDecision.locale);
       }
 
+      const quotaLease = await this.aiQuotaService.acquire(
+        'style-advice',
+        context.userId,
+      );
+
+      try {
       const config = this.aiConfigService.getRuntimeConfig();
 
       if (config.enabled && !this.aiConfigService.isConfigured()) {
@@ -216,6 +224,9 @@ export class AiService {
       });
 
       return response;
+      } finally {
+        await this.aiQuotaService.release(quotaLease);
+      }
     } catch (error) {
       this.logEvent('AI_STYLE_ADVICE_FAILED', context, {
         candidateCount,

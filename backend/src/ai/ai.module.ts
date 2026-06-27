@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { AiConfigService } from './ai-config.service';
 import { AiContextMapper } from './ai-context.mapper';
 import { AiProductRecommendationService } from './ai-product-recommendation.service';
+import { AiQuotaService } from './ai-quota.service';
 import { AiScopeService } from './ai-scope.service';
 import { AiSupportService } from './ai-support.service';
 import { AiController } from './ai.controller';
@@ -19,6 +20,7 @@ import { SupportKnowledgeService } from './support-knowledge.service';
     AiContextMapper,
     AiOutputValidator,
     AiProductRecommendationService,
+    AiQuotaService,
     AiScopeService,
     AiSupportService,
     AiService,

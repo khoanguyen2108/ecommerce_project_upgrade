@@ -42,7 +42,7 @@ export class SupportRequestDto {
 }
 
 export class SupportSourceDto {
-  @ApiProperty({ example: 'support-general-handoff' })
+  @ApiProperty({ example: 'support-human-handoff' })
   id: string;
 
   @ApiProperty({ example: 'Human support handoff' })
@@ -100,4 +100,3 @@ export class SupportResponseDto {
   @ApiProperty({ type: SupportHandoffDto })
   handoff: SupportHandoffDto;
 }
-

@@ -56,4 +56,71 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     return (await this.client.ping()) === 'PONG';
   }
+
+  async incrementAiDailyQuota(
+    key: string,
+    limit: number,
+    ttlSeconds: number,
+  ): Promise<boolean> {
+    const client = this.getReadyClient();
+    const result = await client.eval(
+      `local current = redis.call('GET', KEYS[1])
+       if current and tonumber(current) >= tonumber(ARGV[1]) then
+         return 0
+       end
+       local next = redis.call('INCR', KEYS[1])
+       if next == 1 or redis.call('TTL', KEYS[1]) < 0 then
+         redis.call('EXPIRE', KEYS[1], ARGV[2])
+       end
+       return 1`,
+      1,
+      key,
+      limit,
+      ttlSeconds,
+    );
+
+    return result === 1;
+  }
+
+  async acquireAiConcurrencyLock(
+    key: string,
+    token: string,
+    ttlMilliseconds: number,
+  ): Promise<boolean> {
+    const client = this.getReadyClient();
+    const result = await client.set(
+      key,
+      token,
+      'PX',
+      ttlMilliseconds,
+      'NX',
+    );
+
+    return result === 'OK';
+  }
+
+  async releaseAiConcurrencyLock(
+    key: string,
+    token: string,
+  ): Promise<void> {
+    const client = this.getReadyClient();
+
+    await client.eval(
+      `if redis.call('GET', KEYS[1]) == ARGV[1] then
+         return redis.call('DEL', KEYS[1])
+       end
+       return 0`,
+      1,
+      key,
+      token,
+    );
+  }
+
+  private getReadyClient(): Redis {
+    if (!this.client || this.client.status !== 'ready') {
+      throw new Error('Redis is unavailable.');
+    }
+
+    return this.client;
+  }
 }

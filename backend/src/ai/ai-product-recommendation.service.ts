@@ -28,6 +28,7 @@ import type {
   RecommendProductsResponseDto,
 } from './dto/recommend-products.dto';
 import { AiProviderError, OpenRouterService } from './openrouter.service';
+import { AiQuotaService } from './ai-quota.service';
 import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
 
 const MAX_DB_CANDIDATE_PRODUCTS = 50;
@@ -52,6 +53,7 @@ export class AiProductRecommendationService {
     private readonly aiOutputValidator: AiOutputValidator,
     private readonly openRouterService: OpenRouterService,
     private readonly aiScopeService: AiScopeService,
+    private readonly aiQuotaService: AiQuotaService,
   ) {}
 
   async recommendProducts(
@@ -82,6 +84,12 @@ export class AiProductRecommendationService {
         return this.buildOutOfScopeResponse(request, scopeDecision.locale);
       }
 
+      const quotaLease = await this.aiQuotaService.acquire(
+        'recommend-products',
+        context.userId,
+      );
+
+      try {
       const config = this.aiConfigService.getRuntimeConfig();
 
       if (config.enabled && !this.aiConfigService.isConfigured()) {
@@ -205,6 +213,9 @@ export class AiProductRecommendationService {
       });
 
       return response;
+      } finally {
+        await this.aiQuotaService.release(quotaLease);
+      }
     } catch (error) {
       this.logEvent('AI_RECOMMEND_PRODUCTS_FAILED', context, {
         candidateCount,

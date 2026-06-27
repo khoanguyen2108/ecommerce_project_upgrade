@@ -1,43 +1,52 @@
 [
   {
-    "id": "support-general-handoff",
+    "id": "policy-return-review-required",
+    "title": "Return and refund requests require staff review",
+    "category": "returns",
+    "locale": "en",
+    "status": "approved",
+    "content": "Belikeme return or refund requests must be reviewed by staff. Ask the customer to contact Belikeme Support with the order code, item, reason, and photos if relevant. Do not confirm eligibility, approval, refund amount, or timeline.",
+    "effectiveDate": "2026-06-27",
+    "lastReviewedAt": "2026-06-27"
+  },
+  {
+    "id": "policy-shipping-status-only",
+    "title": "Shipping and delivery status explanations",
+    "category": "shipping",
+    "locale": "en",
+    "status": "approved",
+    "content": "Explain shipping only from the backend order and fulfillment status. Do not promise an exact delivery date unless the backend provides one. Address changes after checkout require Belikeme Support staff.",
+    "effectiveDate": "2026-06-27",
+    "lastReviewedAt": "2026-06-27"
+  },
+  {
+    "id": "policy-sizing-general",
+    "title": "General sizing guidance",
+    "category": "sizing",
+    "locale": "en",
+    "status": "approved",
+    "content": "Sizing guidance may be general and use available product size, color, and variant data. Exact measurements or fit confirmation require Belikeme Support staff. Do not make body-shaming comments or infer sensitive health or body attributes.",
+    "effectiveDate": "2026-06-27",
+    "lastReviewedAt": "2026-06-27"
+  },
+  {
+    "id": "policy-payment-status-only",
+    "title": "Payment status explanations",
+    "category": "payment",
+    "locale": "en",
+    "status": "approved",
+    "content": "Explain only the payment status visible in the backend order summary. Do not claim payment succeeded unless the backend payment status is PAID. Payment disputes, charged-but-not-paid cases, failed webhook cases, refunds, and reconciliation issues require Belikeme Support staff.",
+    "effectiveDate": "2026-06-27",
+    "lastReviewedAt": "2026-06-27"
+  },
+  {
+    "id": "support-human-handoff",
     "title": "Human support handoff",
     "category": "general",
     "locale": "en",
     "status": "approved",
-    "content": "For requests that require staff confirmation, ask the customer to contact Belikeme Support.",
-    "effectiveDate": "2026-06-27",
-    "lastReviewedAt": "2026-06-27"
-  },
-  {
-    "id": "policy-return-unavailable",
-    "title": "Return policy requires staff confirmation",
-    "category": "returns",
-    "locale": "en",
-    "status": "handoff_only",
-    "content": "Return and refund requests require staff confirmation. Do not promise eligibility, refunds, or timelines.",
-    "effectiveDate": "2026-06-27",
-    "lastReviewedAt": "2026-06-27"
-  },
-  {
-    "id": "policy-shipping-unavailable",
-    "title": "Shipping questions require staff confirmation",
-    "category": "shipping",
-    "locale": "en",
-    "status": "handoff_only",
-    "content": "Shipping and delivery questions that require confirmation should be handed off to staff.",
-    "effectiveDate": "2026-06-27",
-    "lastReviewedAt": "2026-06-27"
-  },
-  {
-    "id": "policy-sizing-unavailable",
-    "title": "Sizing questions require staff confirmation",
-    "category": "sizing",
-    "locale": "en",
-    "status": "handoff_only",
-    "content": "Sizing advice can be general only. If the customer needs exact measurements, hand off to staff.",
+    "content": "When a request is uncertain, risky, unsupported, or requires staff action, suggest contacting Belikeme Support and provide a short suggested message the customer can send. Do not promise that staff will approve or perform an action.",
     "effectiveDate": "2026-06-27",
     "lastReviewedAt": "2026-06-27"
   }
 ]
-

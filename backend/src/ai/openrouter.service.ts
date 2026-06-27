@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AiConfigService } from './ai-config.service';
 import {
   RECOMMEND_PRODUCTS_SYSTEM_PROMPT,
@@ -34,6 +34,8 @@ export class AiProviderError extends Error {
 
 @Injectable()
 export class OpenRouterService {
+  private readonly logger = new Logger(OpenRouterService.name);
+
   constructor(private readonly aiConfigService: AiConfigService) {}
 
   async requestStyleAdvice(
@@ -41,6 +43,7 @@ export class OpenRouterService {
     catalog: AiCatalogContextProduct[],
   ): Promise<string> {
     return this.requestCompletion(
+      'style-advice',
       STYLE_ADVICE_SYSTEM_PROMPT,
       buildStyleAdviceUserPrompt(request, catalog),
     );
@@ -51,6 +54,7 @@ export class OpenRouterService {
     catalog: AiCatalogContextProduct[],
   ): Promise<string> {
     return this.requestCompletion(
+      'recommend-products',
       RECOMMEND_PRODUCTS_SYSTEM_PROMPT,
       buildRecommendProductsUserPrompt(request, catalog),
     );
@@ -62,6 +66,7 @@ export class OpenRouterService {
     order?: SupportOrderPromptContext,
   ): Promise<string> {
     return this.requestCompletion(
+      'support',
       SUPPORT_SYSTEM_PROMPT,
       buildSupportUserPrompt(message, content, order),
       { requireZeroDataRetention: Boolean(order) },
@@ -69,6 +74,7 @@ export class OpenRouterService {
   }
 
   private async requestCompletion(
+    operation: 'style-advice' | 'recommend-products' | 'support',
     systemPrompt: string,
     userPrompt: string,
     options?: { requireZeroDataRetention?: boolean },
@@ -83,6 +89,10 @@ export class OpenRouterService {
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
     try {
+      this.logger.log(
+        JSON.stringify({ event: 'AI_PROVIDER_REQUESTED', operation }),
+      );
+
       const response = await fetch(`${config.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
