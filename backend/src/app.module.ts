@@ -8,6 +8,7 @@ import { AdminStatsModule } from './admin-stats/admin-stats.module';
 import { AdminUsersModule } from './admin-users/admin-users.module';
 import { AdminVouchersModule } from './admin-vouchers/admin-vouchers.module';
 import { AddressesModule } from './addresses/addresses.module';
+import { AiModule } from './ai/ai.module';
 import { AuthModule } from './auth/auth.module';
 import { CartModule } from './cart/cart.module';
 import { ChatModule } from './chat/chat.module';
@@ -55,6 +56,7 @@ const getPositiveNumber = (
     }),
     PrismaModule,
     RedisModule,
+    AiModule,
     AuthModule,
     AddressesModule,
     AdminOrdersModule,
