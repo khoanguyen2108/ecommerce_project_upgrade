@@ -240,9 +240,9 @@ export class RecommendProductsRecommendationDto {
 }
 
 export class RecommendProductsResponseDto {
-  @ApiProperty({ enum: ['ai', 'catalog_fallback'] })
-  @IsIn(['ai', 'catalog_fallback'])
-  mode: 'ai' | 'catalog_fallback';
+  @ApiProperty({ enum: ['ai', 'catalog_fallback', 'out_of_scope'] })
+  @IsIn(['ai', 'catalog_fallback', 'out_of_scope'])
+  mode: 'ai' | 'catalog_fallback' | 'out_of_scope';
 
   @ApiProperty()
   summary: string;

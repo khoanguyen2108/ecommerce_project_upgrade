@@ -28,6 +28,7 @@ import type {
   RecommendProductsResponseDto,
 } from './dto/recommend-products.dto';
 import { AiProviderError, OpenRouterService } from './openrouter.service';
+import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
 
 const MAX_DB_CANDIDATE_PRODUCTS = 50;
 const MAX_VND_AMOUNT = 2_000_000_000;
@@ -50,6 +51,7 @@ export class AiProductRecommendationService {
     private readonly aiContextMapper: AiContextMapper,
     private readonly aiOutputValidator: AiOutputValidator,
     private readonly openRouterService: OpenRouterService,
+    private readonly aiScopeService: AiScopeService,
   ) {}
 
   async recommendProducts(
@@ -67,6 +69,19 @@ export class AiProductRecommendationService {
 
     try {
       const request = this.normalizeRequest(dto);
+      const scopeDecision =
+        this.aiScopeService.evaluateProductRecommendation(request);
+
+      this.aiScopeService.logDecision(
+        '/ai/recommend-products',
+        scopeDecision,
+        context,
+      );
+
+      if (scopeDecision.result !== 'allowed') {
+        return this.buildOutOfScopeResponse(request, scopeDecision.locale);
+      }
+
       const config = this.aiConfigService.getRuntimeConfig();
 
       if (config.enabled && !this.aiConfigService.isConfigured()) {
@@ -409,6 +424,31 @@ export class AiProductRecommendationService {
     });
 
     return response;
+  }
+
+  private buildOutOfScopeResponse(
+    request: NormalizedRecommendProductsRequest,
+    locale: AiScopeLocale,
+  ): RecommendProductsResponseDto {
+    return {
+      mode: 'out_of_scope',
+      summary:
+        locale === 'vi'
+          ? 'Mình có thể gợi ý sản phẩm Belikeme theo phong cách, ngân sách, màu sắc, size hoặc dịp sử dụng. Bạn thử mô tả món đồ hay outfit đang cần nhé.'
+          : 'I can recommend Belikeme products based on your style, budget, color, size, or occasion. Try describing the type of outfit or item you want.',
+      appliedFilters: this.buildAppliedFilters(request),
+      recommendations: [],
+      noMatchSuggestions:
+        locale === 'vi'
+          ? [
+              'Thử hỏi: Gợi ý outfit màu đen dưới 500k.',
+              'Thử hỏi: Tìm áo form rộng hoặc đồ tối giản.',
+            ]
+          : [
+              'Try asking for a black outfit under 500k.',
+              'Try asking for oversized shirts or minimal pieces.',
+            ],
+    };
   }
 
   private async loadGroundedProducts(

@@ -28,6 +28,7 @@ import type {
   StyleAdviceResponseDto,
 } from './dto/style-advice.dto';
 import { AiProviderError, OpenRouterService } from './openrouter.service';
+import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
 
 const MAX_CANDIDATE_PRODUCTS = 24;
 const MAX_TOTAL_USER_TEXT_LENGTH = 800;
@@ -49,6 +50,7 @@ export class AiService {
     private readonly aiContextMapper: AiContextMapper,
     private readonly aiOutputValidator: AiOutputValidator,
     private readonly openRouterService: OpenRouterService,
+    private readonly aiScopeService: AiScopeService,
   ) {}
 
   async getStyleAdvice(
@@ -66,6 +68,18 @@ export class AiService {
 
     try {
       const request = this.normalizeRequest(dto);
+      const scopeDecision = this.aiScopeService.evaluateStyleAdvice(request);
+
+      this.aiScopeService.logDecision(
+        '/ai/style-advice',
+        scopeDecision,
+        context,
+      );
+
+      if (scopeDecision.result !== 'allowed') {
+        return this.buildOutOfScopeResponse(scopeDecision.locale);
+      }
+
       const config = this.aiConfigService.getRuntimeConfig();
 
       if (config.enabled && !this.aiConfigService.isConfigured()) {
@@ -422,6 +436,34 @@ export class AiService {
     });
 
     return response;
+  }
+
+  private buildOutOfScopeResponse(
+    locale: AiScopeLocale,
+  ): StyleAdviceResponseDto {
+    if (locale === 'vi') {
+      return {
+        mode: 'out_of_scope',
+        summary:
+          'Mình có thể hỗ trợ bạn về outfit, cách phối đồ và lựa chọn quần áo Belikeme. Hãy thử cho mình biết dịp, màu sắc, kiểu dáng hoặc phong cách bạn thích nhé.',
+        recommendations: [],
+        extraTips: [
+          'Ví dụ: Gợi ý outfit tối giản màu đen để đi chơi.',
+          'Ví dụ: Mình nên mặc gì đi học với ngân sách dưới 500k?',
+        ],
+      };
+    }
+
+    return {
+      mode: 'out_of_scope',
+      summary:
+        'I can help with Belikeme outfits, styling ideas, and clothing choices. Try asking what to wear for an event, a color, a fit, or a style you like.',
+      recommendations: [],
+      extraTips: [
+        'Example: Recommend a minimal black outfit for going out.',
+        'Example: What should I wear for school under 500k?',
+      ],
+    };
   }
 
   private async loadGroundedProducts(

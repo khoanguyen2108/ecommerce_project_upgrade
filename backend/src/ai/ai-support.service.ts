@@ -20,6 +20,7 @@ import type {
   SupportSourceDto,
 } from './dto/support.dto';
 import { AiProviderError, OpenRouterService } from './openrouter.service';
+import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
 import type { SupportOrderPromptContext } from './prompts/support.prompt';
 import {
   SupportKnowledgeService,
@@ -80,6 +81,7 @@ export class AiSupportService {
     private readonly supportKnowledgeService: SupportKnowledgeService,
     private readonly aiOutputValidator: AiOutputValidator,
     private readonly openRouterService: OpenRouterService,
+    private readonly aiScopeService: AiScopeService,
   ) {}
 
   async getSupport(
@@ -96,6 +98,14 @@ export class AiSupportService {
 
     try {
       const message = this.normalizeMessage(dto.message);
+      const scopeDecision = this.aiScopeService.evaluateSupport(message);
+
+      this.aiScopeService.logDecision('/ai/support', scopeDecision, context);
+
+      if (scopeDecision.result !== 'allowed') {
+        return this.buildOutOfScopeResponse(scopeDecision.locale);
+      }
+
       const config = this.aiConfigService.getRuntimeConfig();
 
       if (!config.enabled) {
@@ -380,6 +390,26 @@ export class AiSupportService {
     });
 
     return response;
+  }
+
+  private buildOutOfScopeResponse(locale: AiScopeLocale): SupportResponseDto {
+    return {
+      mode: 'handoff',
+      answer: this.labelAnswer(
+        locale === 'vi'
+          ? 'Mình có thể hỗ trợ bạn về sản phẩm Belikeme, size, đơn hàng, giao hàng hoặc đổi trả. Bạn thử hỏi về trải nghiệm mua sắm hoặc đơn hàng của mình nhé.'
+          : 'I can help with Belikeme products, sizing, shipping, returns, and your order status. For unrelated topics, please ask me something about your shopping or order experience.',
+      ),
+      sources: [],
+      handoff: {
+        required: false,
+        reason: 'OUT_OF_SCOPE',
+        suggestedMessage:
+          locale === 'vi'
+            ? 'Mình cần hỗ trợ về sản phẩm hoặc đơn hàng Belikeme.'
+            : 'I need help with my Belikeme order or product question.',
+      },
+    };
   }
 
   private resolveCitedContent(

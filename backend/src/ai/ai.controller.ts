@@ -118,7 +118,7 @@ export class AiController {
   })
   @ApiOkResponse({
     description:
-      'Returns an AI answer or a safe handoff. AI_DISABLED, AI_UNAVAILABLE, AI_INVALID_RESPONSE, missing policy content, and risky requests are represented as safe handoff reasons without a provider error body.',
+      'Returns an AI answer, a safe handoff, or an out-of-scope redirect. Out-of-scope requests are handled before policy, order, or provider work.',
     schema: {
       type: 'object',
       properties: {
@@ -207,7 +207,8 @@ export class AiController {
       'Applies active-category, active-product, active in-stock variant, structured catalog, and effective-price filters before AI ranking. Returns canonical database product data or a clearly labelled catalog fallback.',
   })
   @ApiOkResponse({
-    description: 'Grounded product recommendations or catalog fallback returned.',
+    description:
+      'Grounded product recommendations, catalog fallback, or an out-of-scope redirect returned.',
     schema: {
       type: 'object',
       properties: {
@@ -317,7 +318,8 @@ export class AiController {
       'Returns AI advice or a clearly labelled deterministic catalog fallback. Only active products with active in-stock variants can be returned.',
   })
   @ApiOkResponse({
-    description: 'Grounded style advice or catalog fallback returned.',
+    description:
+      'Grounded style advice, catalog fallback, or an out-of-scope redirect returned.',
     schema: {
       type: 'object',
       properties: {
