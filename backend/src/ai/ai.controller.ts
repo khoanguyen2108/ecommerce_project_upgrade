@@ -17,6 +17,7 @@ import {
   ApiBearerAuth,
   ApiExtraModels,
   ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiServiceUnavailableResponse,
@@ -42,6 +43,7 @@ import {
 } from '../common/swagger/api-examples';
 import { UserRole } from '../generated/prisma/enums';
 import { AiProductRecommendationService } from './ai-product-recommendation.service';
+import { AiSupportService } from './ai-support.service';
 import { AiService } from './ai.service';
 import {
   RecommendProductsRequestDto,
@@ -51,11 +53,17 @@ import {
   StyleAdviceRequestDto,
   StyleAdviceResponseDto,
 } from './dto/style-advice.dto';
+import {
+  SupportRequestDto,
+  SupportResponseDto,
+} from './dto/support.dto';
 
 const STYLE_ADVICE_RATE_LIMIT_TTL_MS = 10 * 60 * 1000;
 const STYLE_ADVICE_RATE_LIMIT = 5;
 const RECOMMEND_PRODUCTS_RATE_LIMIT_TTL_MS = 10 * 60 * 1000;
 const RECOMMEND_PRODUCTS_RATE_LIMIT = 5;
+const SUPPORT_RATE_LIMIT_TTL_MS = 10 * 60 * 1000;
+const SUPPORT_RATE_LIMIT = 10;
 
 @Catch(ThrottlerException)
 class AiRateLimitExceptionFilter implements ExceptionFilter {
@@ -66,6 +74,7 @@ class AiRateLimitExceptionFilter implements ExceptionFilter {
     const isProductRecommendationRoute = request.path.endsWith(
       '/recommend-products',
     );
+    const isSupportRoute = request.path.endsWith('/support');
 
     response.status(HttpStatus.TOO_MANY_REQUESTS).json({
       data: null,
@@ -74,9 +83,11 @@ class AiRateLimitExceptionFilter implements ExceptionFilter {
       },
       error: {
         code: 'AI_RATE_LIMITED',
-        message: isProductRecommendationRoute
-          ? 'Too many product recommendation requests. Please try again later.'
-          : 'Too many style assistant requests. Please try again later.',
+        message: isSupportRoute
+          ? 'Too many AI support requests. Please try again later.'
+          : isProductRecommendationRoute
+            ? 'Too many product recommendation requests. Please try again later.'
+            : 'Too many style assistant requests. Please try again later.',
       },
     });
   }
@@ -84,7 +95,11 @@ class AiRateLimitExceptionFilter implements ExceptionFilter {
 
 @ApiTags('ai')
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
-@ApiExtraModels(StyleAdviceResponseDto, RecommendProductsResponseDto)
+@ApiExtraModels(
+  StyleAdviceResponseDto,
+  RecommendProductsResponseDto,
+  SupportResponseDto,
+)
 @Controller('ai')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @UseFilters(AiRateLimitExceptionFilter)
@@ -93,7 +108,98 @@ export class AiController {
   constructor(
     private readonly aiService: AiService,
     private readonly aiProductRecommendationService: AiProductRecommendationService,
+    private readonly aiSupportService: AiSupportService,
   ) {}
+
+  @ApiOperation({
+    summary: 'Get grounded AI support for the current customer',
+    description:
+      'Uses only backend-approved support content and an optional owner-scoped minimal order summary. AI replies are not admin replies and are never written to human chat history.',
+  })
+  @ApiOkResponse({
+    description:
+      'Returns an AI answer or a safe handoff. AI_DISABLED, AI_UNAVAILABLE, AI_INVALID_RESPONSE, missing policy content, and risky requests are represented as safe handoff reasons without a provider error body.',
+    schema: {
+      type: 'object',
+      properties: {
+        data: { $ref: getSchemaPath(SupportResponseDto) },
+        meta: {
+          type: 'object',
+          properties: {
+            requestId: { type: 'string' },
+          },
+        },
+        error: { type: 'null' },
+      },
+    },
+  })
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'Request validation failed.',
+      'Bad Request',
+      'message must be longer than or equal to 2 characters.',
+    ),
+  )
+  @ApiUnauthorizedResponse(
+    errorEnvelopeResponse(
+      'Authentication is required.',
+      'AUTH_REQUIRED',
+      'Authentication is required.',
+    ),
+  )
+  @ApiForbiddenResponse(
+    errorEnvelopeResponse(
+      'CUSTOMER role is required.',
+      'FORBIDDEN',
+      'You do not have permission to access this resource.',
+    ),
+  )
+  @ApiNotFoundResponse(
+    errorEnvelopeResponse(
+      'The order was not found or is not owned by the current customer.',
+      'ORDER_NOT_FOUND',
+      'Order was not found.',
+    ),
+  )
+  @ApiTooManyRequestsResponse(
+    errorEnvelopeResponse(
+      'The local AI support quota was exceeded.',
+      'AI_RATE_LIMITED',
+      'Too many AI support requests. Please try again later.',
+    ),
+  )
+  @ApiServiceUnavailableResponse(
+    errorEnvelopeResponse(
+      'AI was enabled without complete backend configuration.',
+      'AI_NOT_CONFIGURED',
+      'Belikeme AI Support is not configured.',
+    ),
+  )
+  @Post('support')
+  @HttpCode(200)
+  @Throttle({
+    default: {
+      ttl: SUPPORT_RATE_LIMIT_TTL_MS,
+      limit: SUPPORT_RATE_LIMIT,
+      getTracker: (request: Record<string, unknown>) => {
+        const authenticatedRequest = request as unknown as AuthenticatedRequest;
+
+        return Promise.resolve(
+          authenticatedRequest.user?.id ?? authenticatedRequest.ip ?? 'unknown',
+        );
+      },
+    },
+  })
+  getSupport(
+    @Body() dto: SupportRequestDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.aiSupportService.getSupport(dto, {
+      requestId: request.requestId,
+      userId: user.id,
+    });
+  }
 
   @ApiOperation({
     summary: 'Get grounded product recommendations',

@@ -3,10 +3,12 @@ import { AuthModule } from '../auth/auth.module';
 import { AiConfigService } from './ai-config.service';
 import { AiContextMapper } from './ai-context.mapper';
 import { AiProductRecommendationService } from './ai-product-recommendation.service';
+import { AiSupportService } from './ai-support.service';
 import { AiController } from './ai.controller';
 import { AiOutputValidator } from './ai-output-validator';
 import { AiService } from './ai.service';
 import { OpenRouterService } from './openrouter.service';
+import { SupportKnowledgeService } from './support-knowledge.service';
 
 @Module({
   imports: [AuthModule],
@@ -16,8 +18,10 @@ import { OpenRouterService } from './openrouter.service';
     AiContextMapper,
     AiOutputValidator,
     AiProductRecommendationService,
+    AiSupportService,
     AiService,
     OpenRouterService,
+    SupportKnowledgeService,
   ],
 })
 export class AiModule {}

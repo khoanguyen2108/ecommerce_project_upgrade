@@ -11,6 +11,12 @@ import {
 import type { AiCatalogContextProduct } from './ai-context.mapper';
 import type { NormalizedRecommendProductsRequest } from './dto/recommend-products.dto';
 import type { NormalizedStyleAdviceRequest } from './dto/style-advice.dto';
+import {
+  SUPPORT_SYSTEM_PROMPT,
+  buildSupportUserPrompt,
+  type SupportOrderPromptContext,
+} from './prompts/support.prompt';
+import type { ApprovedSupportContent } from './support-knowledge.service';
 
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 
@@ -50,9 +56,22 @@ export class OpenRouterService {
     );
   }
 
+  async requestSupportAnswer(
+    message: string,
+    content: ApprovedSupportContent[],
+    order?: SupportOrderPromptContext,
+  ): Promise<string> {
+    return this.requestCompletion(
+      SUPPORT_SYSTEM_PROMPT,
+      buildSupportUserPrompt(message, content, order),
+      { requireZeroDataRetention: Boolean(order) },
+    );
+  }
+
   private async requestCompletion(
     systemPrompt: string,
     userPrompt: string,
+    options?: { requireZeroDataRetention?: boolean },
   ): Promise<string> {
     const config = this.aiConfigService.getRuntimeConfig();
 
@@ -81,6 +100,7 @@ export class OpenRouterService {
           max_tokens: config.maxTokens,
           provider: {
             data_collection: 'deny',
+            ...(options?.requireZeroDataRetention ? { zdr: true } : {}),
           },
         }),
         signal: controller.signal,

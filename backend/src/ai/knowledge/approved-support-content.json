@@ -1,0 +1,43 @@
+[
+  {
+    "id": "support-general-handoff",
+    "title": "Human support handoff",
+    "category": "general",
+    "locale": "en",
+    "status": "approved",
+    "content": "For requests that require staff confirmation, ask the customer to contact Belikeme Support.",
+    "effectiveDate": "2026-06-27",
+    "lastReviewedAt": "2026-06-27"
+  },
+  {
+    "id": "policy-return-unavailable",
+    "title": "Return policy requires staff confirmation",
+    "category": "returns",
+    "locale": "en",
+    "status": "handoff_only",
+    "content": "Return and refund requests require staff confirmation. Do not promise eligibility, refunds, or timelines.",
+    "effectiveDate": "2026-06-27",
+    "lastReviewedAt": "2026-06-27"
+  },
+  {
+    "id": "policy-shipping-unavailable",
+    "title": "Shipping questions require staff confirmation",
+    "category": "shipping",
+    "locale": "en",
+    "status": "handoff_only",
+    "content": "Shipping and delivery questions that require confirmation should be handed off to staff.",
+    "effectiveDate": "2026-06-27",
+    "lastReviewedAt": "2026-06-27"
+  },
+  {
+    "id": "policy-sizing-unavailable",
+    "title": "Sizing questions require staff confirmation",
+    "category": "sizing",
+    "locale": "en",
+    "status": "handoff_only",
+    "content": "Sizing advice can be general only. If the customer needs exact measurements, hand off to staff.",
+    "effectiveDate": "2026-06-27",
+    "lastReviewedAt": "2026-06-27"
+  }
+]
+
