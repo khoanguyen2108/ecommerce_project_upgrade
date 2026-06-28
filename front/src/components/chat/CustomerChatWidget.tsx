@@ -1,16 +1,18 @@
 "use client";
 
-import { LogIn, MessageCircle, Send, WifiOff, X } from "lucide-react";
+import { LogIn, MessageCircle, WifiOff, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AiMessageBubble, type AiMessageTone } from "@/components/chat/AiMessageBubble";
+import { AiTypingIndicator } from "@/components/chat/AiTypingIndicator";
+import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatMessage as ChatMessageBubble } from "@/components/chat/ChatMessage";
+import { useAiSupport } from "@/features/ai/supportHooks";
+import type { SupportResponse } from "@/features/ai/supportTypes";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
-import {
-  getMyChat,
-  sendMyChatMessage,
-} from "@/features/chat/api";
+import { getMyChat, sendMyChatMessage } from "@/features/chat/api";
 import {
   createChatSocket,
   type ChatSocket,
@@ -26,6 +28,27 @@ import { ApiClientError } from "@/lib/errors/api-error";
 
 type ConnectionState = "connected" | "connecting" | "offline";
 
+interface LocalChatMessage {
+  body: string;
+  createdAt: string;
+  id: string;
+  kind: "ai" | "customer";
+  showDayLabel?: boolean;
+  status?: string;
+  statusDetail?: string;
+  tone?: AiMessageTone;
+  welcome?: boolean;
+}
+
+type TimelineMessage =
+  | { createdAt: string; id: string; kind: "persisted"; message: ChatMessage }
+  | { createdAt: string; id: string; kind: "local"; message: LocalChatMessage };
+
+interface PendingForward {
+  body: string;
+  localMessageId: string;
+}
+
 const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
   "/admin",
   "/login",
@@ -33,8 +56,37 @@ const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
   "/forgot-password",
 ] as const;
 
-const CUSTOMER_CHAT_WELCOME_MESSAGE =
-  "Hi there! 👋 Welcome to Belikeme. How can we help you elevate your style today?";
+const CUSTOMER_CHAT_WELCOME_MESSAGE = `Hi 👋
+
+I'm Belikeme AI.
+
+I can help you with:
+
+• outfit suggestions
+• products
+• order status
+• shipping
+• sizing
+
+If I can't solve it,
+
+I'll connect you with our team.`;
+
+const AI_UNAVAILABLE_MESSAGE = `AI is temporarily unavailable.
+
+You can continue chatting with our support team.`;
+
+const OUT_OF_SCOPE_MESSAGE = `Sorry,
+
+I can only help with Belikeme shopping,
+
+orders,
+
+products,
+
+shipping,
+
+and sizing.`;
 
 const CUSTOMER_CHAT_QUICK_ACTIONS = [
   {
@@ -51,10 +103,17 @@ const CUSTOMER_CHAT_QUICK_ACTIONS = [
   },
 ] as const;
 
+let localMessageSequence = 0;
+
 export function CustomerChatWidget() {
   const pathname = usePathname() || "/";
-  const { accessToken, currentUser, isAuthenticated, isLoading: isSessionLoading } =
-    useAuthSession();
+  const {
+    accessToken,
+    currentUser,
+    isAuthenticated,
+    isLoading: isSessionLoading,
+  } = useAuthSession();
+  const { ask: askAiSupport, isLoading: isAiTyping } = useAiSupport();
   const isAdmin = isAdminUser(currentUser);
   const shouldHide = CUSTOMER_CHAT_HIDDEN_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix),
@@ -62,17 +121,40 @@ export function CustomerChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [conversation, setConversation] = useState<ChatConversation>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [localMessages, setLocalMessages] = useState<LocalChatMessage[]>([]);
+  const [forwardedPersistedIds, setForwardedPersistedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [draft, setDraft] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isSending, setIsSending] = useState(false);
+  const [isSendingRealtime, setIsSendingRealtime] = useState(false);
+  const [isHumanHandoffActive, setIsHumanHandoffActive] = useState(false);
   const [error, setError] = useState<string>();
   const [unreadAdminCount, setUnreadAdminCount] = useState(0);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("offline");
   const isOpenRef = useRef(isOpen);
+  const pendingForwardRef = useRef<PendingForward | undefined>(undefined);
+  const isSubmissionPendingRef = useRef(false);
   const socketRef = useRef<ChatSocket | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const activeCustomerId = currentUser?.id;
+  const activeCustomerIdRef = useRef(activeCustomerId);
+  activeCustomerIdRef.current = activeCustomerId;
+  const isSending = isAiTyping || isSendingRealtime;
+
+  useEffect(() => {
+    setConversation(undefined);
+    setMessages([]);
+    setLocalMessages([]);
+    setForwardedPersistedIds(new Set());
+    setIsHumanHandoffActive(false);
+    setDraft("");
+    setError(undefined);
+    pendingForwardRef.current = undefined;
+    isSubmissionPendingRef.current = false;
+  }, [activeCustomerId]);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -83,8 +165,28 @@ export function CustomerChatWidget() {
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen || !isAuthenticated || isAdmin) {
+      return;
+    }
+
+    setLocalMessages((current) => {
+      if (current.some((message) => message.welcome)) {
+        return current;
+      }
+
+      return [
+        ...current,
+        createLocalMessage("ai", CUSTOMER_CHAT_WELCOME_MESSAGE, {
+          showDayLabel: true,
+          welcome: true,
+        }),
+      ];
+    });
+  }, [isAdmin, isAuthenticated, isOpen]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
-  }, [isLoading, isOpen, messages]);
+  }, [isAiTyping, isLoading, isOpen, localMessages, messages]);
 
   useEffect(() => {
     if (!isOpen || !isAuthenticated || isAdmin) {
@@ -194,6 +296,16 @@ export function CustomerChatWidget() {
           return;
         }
 
+        const pendingForward = pendingForwardRef.current;
+
+        if (
+          pendingForward &&
+          message.senderRole === "CUSTOMER" &&
+          message.body === pendingForward.body
+        ) {
+          markMessageAsForwarded(message.id, setForwardedPersistedIds);
+        }
+
         setMessages((current) => {
           const alreadyExists = current.some((item) => item.id === message.id);
 
@@ -239,6 +351,11 @@ export function CustomerChatWidget() {
     return "Offline • We will reconnect shortly";
   }, [connectionState, isAuthenticated]);
 
+  const timeline = useMemo(
+    () => buildTimeline(messages, localMessages, forwardedPersistedIds),
+    [forwardedPersistedIds, localMessages, messages],
+  );
+
   if (shouldHide || isAdmin) {
     return null;
   }
@@ -246,73 +363,180 @@ export function CustomerChatWidget() {
   async function sendMessage() {
     const body = draft.trim();
 
-    if (!body || !isAuthenticated || isSending) {
+    if (
+      !body ||
+      !isAuthenticated ||
+      isSending ||
+      isSubmissionPendingRef.current
+    ) {
       return;
     }
 
-    setIsSending(true);
+    isSubmissionPendingRef.current = true;
     setError(undefined);
 
+    try {
+      if (isHumanHandoffActive) {
+        await sendRealtimeMessage(body, { restoreDraftOnFailure: true });
+        return;
+      }
+
+      setDraft("");
+      const customerMessage = createLocalMessage("customer", body);
+      const requestCustomerId = activeCustomerId;
+      setLocalMessages((current) => [...current, customerMessage]);
+
+      try {
+        const response = await askAiSupport({ message: body });
+
+        if (activeCustomerIdRef.current !== requestCustomerId) {
+          return;
+        }
+
+        if (!isValidSupportResponse(response)) {
+          throw new Error("Invalid AI support response");
+        }
+
+        const isOutOfScope = isOutOfScopeResponse(response);
+        const needsHandoff = !isOutOfScope && isHandoffResponse(response);
+
+        if (isOutOfScope) {
+          addAiMessage(OUT_OF_SCOPE_MESSAGE, "out-of-scope");
+          return;
+        }
+
+        if (needsHandoff) {
+          addAiMessage(response.answer, "handoff", {
+            status: "This conversation has been forwarded to Belikeme Support.",
+            statusDetail: "Waiting for an available specialist...",
+          });
+          setIsHumanHandoffActive(true);
+          await forwardToHumanSupport(body, customerMessage.id);
+          return;
+        }
+
+        addAiMessage(response.answer, "answer");
+      } catch {
+        if (activeCustomerIdRef.current !== requestCustomerId) {
+          return;
+        }
+
+        addAiMessage(AI_UNAVAILABLE_MESSAGE, "error");
+        setIsHumanHandoffActive(true);
+        await forwardToHumanSupport(body, customerMessage.id);
+      }
+    } finally {
+      isSubmissionPendingRef.current = false;
+    }
+  }
+
+  async function forwardToHumanSupport(body: string, localMessageId: string) {
+    pendingForwardRef.current = { body, localMessageId };
+
+    try {
+      await sendRealtimeMessage(body, {
+        forwardedLocalMessageId: localMessageId,
+        restoreDraftOnFailure: false,
+      });
+    } finally {
+      pendingForwardRef.current = undefined;
+    }
+  }
+
+  async function sendRealtimeMessage(
+    body: string,
+    options: {
+      forwardedLocalMessageId?: string;
+      restoreDraftOnFailure: boolean;
+    },
+  ): Promise<void> {
+    setIsSendingRealtime(true);
     const activeSocket = socketRef.current;
 
-    if (activeSocket?.connected) {
+    if (!options.forwardedLocalMessageId) {
       setDraft("");
-      activeSocket.emit(
-        "chat:send",
-        { body },
-        (response?: ChatSocketAck<ChatMessageResponse>) => {
-          setIsSending(false);
+    }
 
-          if (!response) {
-            return;
-          }
+    if (activeSocket?.connected) {
+      await new Promise<void>((resolve) => {
+        activeSocket.emit(
+          "chat:send",
+          { body },
+          (response?: ChatSocketAck<ChatMessageResponse>) => {
+            setIsSendingRealtime(false);
 
-          if (!response.ok) {
-            setError(response.error?.message || "Message could not be sent.");
-            setDraft(body);
-            return;
-          }
+            if (!response) {
+              setError("Message could not be sent.");
 
-          if (response.data) {
-            setConversation(response.data.conversation);
-            setMessages((current) =>
-              appendMessage(current, response.data?.message),
-            );
-          }
-        },
-      );
+              if (options.restoreDraftOnFailure) {
+                setDraft(body);
+              }
+
+              resolve();
+              return;
+            }
+
+            if (!response.ok) {
+              setError(response.error?.message || "Message could not be sent.");
+
+              if (options.restoreDraftOnFailure) {
+                setDraft(body);
+              }
+
+              resolve();
+              return;
+            }
+
+            if (response.data) {
+              setConversation(response.data.conversation);
+              setMessages((current) =>
+                appendMessage(current, response.data?.message),
+              );
+
+              if (options.forwardedLocalMessageId) {
+                markMessageAsForwarded(
+                  response.data.message.id,
+                  setForwardedPersistedIds,
+                );
+              }
+            }
+
+            resolve();
+          },
+        );
+      });
       return;
     }
 
     try {
       const response = await sendMyChatMessage(body);
 
-      setDraft("");
       setConversation(response.conversation);
       setMessages((current) => appendMessage(current, response.message));
+
+      if (options.forwardedLocalMessageId) {
+        markMessageAsForwarded(response.message.id, setForwardedPersistedIds);
+      }
     } catch (sendError) {
       setError(getChatErrorMessage(sendError));
+
+      if (options.restoreDraftOnFailure) {
+        setDraft(body);
+      }
     } finally {
-      setIsSending(false);
+      setIsSendingRealtime(false);
     }
   }
 
-  function handleSend(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void sendMessage();
-  }
-
-  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Enter") {
-      return;
-    }
-
-    if (event.shiftKey || event.nativeEvent.isComposing) {
-      return;
-    }
-
-    event.preventDefault();
-    void sendMessage();
+  function addAiMessage(
+    body: string,
+    tone: AiMessageTone,
+    details: Pick<LocalChatMessage, "status" | "statusDetail"> = {},
+  ) {
+    setLocalMessages((current) => [
+      ...current,
+      createLocalMessage("ai", body, { ...details, tone }),
+    ]);
   }
 
   function handleQuickAction(message: string) {
@@ -372,20 +596,43 @@ export function CustomerChatWidget() {
               </div>
             ) : isLoading ? (
               <ChatMessageSkeleton />
-            ) : messages.length === 0 ? (
-              <div className="customer-chat-messages" role="log">
-                <ChatWelcomeMessage />
-                <div ref={messagesEndRef} />
-              </div>
             ) : (
-              <div className="customer-chat-messages" role="log">
-                {messages.map((message) => (
-                  <ChatBubble
-                    isOwn={message.senderRole === "CUSTOMER"}
-                    key={message.id}
-                    message={message}
-                  />
-                ))}
+              <div
+                aria-live="polite"
+                className="customer-chat-messages"
+                role="log"
+              >
+                {timeline.map((item) => {
+                  if (item.kind === "persisted") {
+                    return (
+                      <ChatMessageBubble key={item.id} message={item.message} />
+                    );
+                  }
+
+                  if (item.message.kind === "customer") {
+                    return (
+                      <ChatMessageBubble
+                        body={item.message.body}
+                        createdAt={item.message.createdAt}
+                        isOwn
+                        key={item.id}
+                      />
+                    );
+                  }
+
+                  return (
+                    <AiMessageBubble
+                      body={item.message.body}
+                      createdAt={item.message.createdAt}
+                      key={item.id}
+                      showDayLabel={item.message.showDayLabel}
+                      status={item.message.status}
+                      statusDetail={item.message.statusDetail}
+                      tone={item.message.tone}
+                    />
+                  );
+                })}
+                {isAiTyping ? <AiTypingIndicator /> : null}
                 <div ref={messagesEndRef} />
               </div>
             )}
@@ -416,32 +663,14 @@ export function CustomerChatWidget() {
                   </button>
                 ))}
               </div>
-              <form className="customer-chat-composer" onSubmit={handleSend}>
-                <label htmlFor="customer-chat-message">Message</label>
-                <div className="customer-chat-composer__field">
-                  <textarea
-                    aria-label="Type your message"
-                    disabled={isSending}
-                    id="customer-chat-message"
-                    maxLength={2000}
-                    onChange={(event) => setDraft(event.target.value)}
-                    onKeyDown={handleComposerKeyDown}
-                    placeholder="Type your message..."
-                    ref={textareaRef}
-                    rows={1}
-                    value={draft}
-                  />
-                  <button
-                    aria-label="Send message"
-                    className="customer-chat-composer__send"
-                    disabled={!draft.trim() || isSending}
-                    title="Send message"
-                    type="submit"
-                  >
-                    <Send aria-hidden="true" size={17} />
-                  </button>
-                </div>
-              </form>
+              <ChatComposer
+                draft={draft}
+                isSending={isSending}
+                maxLength={isHumanHandoffActive ? 2000 : 800}
+                onDraftChange={setDraft}
+                onSend={() => void sendMessage()}
+                textareaRef={textareaRef}
+              />
             </>
           ) : null}
         </section>
@@ -465,40 +694,6 @@ export function CustomerChatWidget() {
         </button>
       ) : null}
     </div>
-  );
-}
-
-function ChatWelcomeMessage() {
-  return (
-    <>
-      <span className="customer-chat-message__day">Today</span>
-      <article
-        className="customer-chat-message customer-chat-message--support customer-chat-message--welcome"
-        id="virtual-welcome-message"
-      >
-        <span className="customer-chat-message__sender">Belikeme Support</span>
-        <p>{CUSTOMER_CHAT_WELCOME_MESSAGE}</p>
-      </article>
-    </>
-  );
-}
-
-function ChatBubble({
-  isOwn,
-  message,
-}: {
-  isOwn: boolean;
-  message: ChatMessage;
-}) {
-  return (
-    <article
-      className={`customer-chat-message ${
-        isOwn ? "customer-chat-message--own" : "customer-chat-message--support"
-      }`}
-    >
-      <p>{message.body}</p>
-      <time dateTime={message.createdAt}>{formatChatTime(message.createdAt)}</time>
-    </article>
   );
 }
 
@@ -528,6 +723,67 @@ function ChatMessageSkeleton() {
   );
 }
 
+function createLocalMessage(
+  kind: LocalChatMessage["kind"],
+  body: string,
+  details: Partial<Omit<LocalChatMessage, "body" | "createdAt" | "id" | "kind">> = {},
+): LocalChatMessage {
+  localMessageSequence += 1;
+
+  return {
+    body,
+    createdAt: new Date().toISOString(),
+    id: `local-${localMessageSequence}`,
+    kind,
+    ...details,
+  };
+}
+
+function buildTimeline(
+  messages: ChatMessage[],
+  localMessages: LocalChatMessage[],
+  forwardedPersistedIds: Set<string>,
+): TimelineMessage[] {
+  const timeline: TimelineMessage[] = [
+    ...messages
+      .filter((message) => !forwardedPersistedIds.has(message.id))
+      .map((message) => ({
+        createdAt: message.createdAt,
+        id: `persisted-${message.id}`,
+        kind: "persisted" as const,
+        message,
+      })),
+    ...localMessages.map((message) => ({
+      createdAt: message.createdAt,
+      id: message.id,
+      kind: "local" as const,
+      message,
+    })),
+  ];
+
+  return timeline.sort(
+    (left, right) =>
+      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+  );
+}
+
+function markMessageAsForwarded(
+  messageId: string,
+  setForwardedPersistedIds: (
+    value: Set<string> | ((current: Set<string>) => Set<string>),
+  ) => void,
+) {
+  setForwardedPersistedIds((current) => {
+    if (current.has(messageId)) {
+      return current;
+    }
+
+    const next = new Set(current);
+    next.add(messageId);
+    return next;
+  });
+}
+
 function appendMessage(
   current: ChatMessage[],
   message: ChatMessage | undefined,
@@ -540,6 +796,30 @@ function appendMessage(
     (left, right) =>
       new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
   );
+}
+
+function isValidSupportResponse(response: SupportResponse): boolean {
+  return Boolean(
+    response &&
+      typeof response.mode === "string" &&
+      typeof response.answer === "string" &&
+      response.answer.trim(),
+  );
+}
+
+function isOutOfScopeResponse(response: SupportResponse): boolean {
+  return (
+    response.mode === "out_of_scope" ||
+    response.handoff?.reason?.toUpperCase() === "OUT_OF_SCOPE"
+  );
+}
+
+function isHandoffResponse(response: SupportResponse): boolean {
+  if (response.handoff?.required) {
+    return true;
+  }
+
+  return response.mode === "handoff" && response.handoff?.required !== false;
 }
 
 function shouldCountCustomerUnread(
@@ -569,17 +849,4 @@ function getChatErrorMessage(error: unknown): string {
   }
 
   return "Belikeme support chat is unavailable right now.";
-}
-
-function formatChatTime(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
