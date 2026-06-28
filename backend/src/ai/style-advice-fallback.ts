@@ -26,6 +26,12 @@ export interface RankedFallbackRecommendation {
   stylingTip?: string;
 }
 
+export function getStyleCandidateRole(
+  candidate: AiCatalogCandidate,
+): OutfitRole | undefined {
+  return detectRole(buildCandidateText(candidate));
+}
+
 const STYLE_CONCEPTS: StyleConcept[] = [
   {
     id: 'minimal',
@@ -278,7 +284,8 @@ export function rankStyleFallbackCandidates(
   ).map(({ role }) => role);
   const promptTokens = tokenize(comparablePrompt);
   const requestedColors = extractRequestedColors(prompt);
-  const wantsOutfit = OUTFIT_PATTERN.test(comparablePrompt);
+  const wantsOutfit =
+    OUTFIT_PATTERN.test(comparablePrompt) || requestedRoles.length === 0;
 
   const scored = candidates
     .map((candidate, index) => {
@@ -337,8 +344,8 @@ export function rankStyleFallbackCandidates(
     .sort((left, right) => right.score - left.score || left.index - right.index);
 
   const selected = wantsOutfit
-    ? selectOutfit(scored, limit)
-    : scored.slice(0, limit);
+    ? selectOutfit(scored, limit, request.budget)
+    : selectRequestedRoles(scored, requestedRoles, limit, request.budget);
 
   return selected.map((entry) => ({
     candidate: entry.candidate,
@@ -352,6 +359,7 @@ export function rankStyleFallbackCandidates(
 export function buildStyleFallbackSummary(
   request: NormalizedStyleAdviceRequest,
   resultCount: number,
+  totalPrice: number,
 ): string {
   const locale = detectLocale(buildPrompt(request));
 
@@ -359,6 +367,12 @@ export function buildStyleFallbackSummary(
     return locale === 'vi'
       ? 'Không tìm thấy sản phẩm còn hàng phù hợp. Hãy thử nới ngân sách, màu sắc, kích cỡ hoặc phong cách.'
       : 'No matching in-stock products were found. Try broadening your budget, color, size, or style preferences.';
+  }
+
+  if (request.budget !== undefined) {
+    return locale === 'vi'
+      ? `Đã chọn ${resultCount} sản phẩm phù hợp với tổng giá ${formatVnd(totalPrice)}, không vượt ngân sách ${formatVnd(request.budget)}.`
+      : `I selected ${resultCount} matching item${resultCount === 1 ? '' : 's'} totaling ${formatVnd(totalPrice)}, within your ${formatVnd(request.budget)} budget.`;
   }
 
   return locale === 'vi'
@@ -383,7 +397,12 @@ export function buildStyleFallbackTips(
 function selectOutfit(
   candidates: ScoredCandidate[],
   limit: number,
+  budget: number | undefined,
 ): ScoredCandidate[] {
+  if (budget !== undefined) {
+    return selectBudgetedOutfit(candidates, limit, budget);
+  }
+
   const firstCandidate = candidates[0];
 
   if (!firstCandidate) {
@@ -419,6 +438,125 @@ function selectOutfit(
   return selected.sort(
     (left, right) => right.score - left.score || left.index - right.index,
   );
+}
+
+function selectBudgetedOutfit(
+  candidates: ScoredCandidate[],
+  limit: number,
+  budget: number,
+): ScoredCandidate[] {
+  const affordable = candidates.filter(
+    (candidate) => candidate.candidate.context.priceMin <= budget,
+  );
+  const tops = affordable.filter((candidate) => candidate.role === 'top');
+  const bottoms = affordable.filter((candidate) => candidate.role === 'bottom');
+  const dresses = affordable.filter((candidate) => candidate.role === 'dress');
+  let selected: ScoredCandidate[] = [];
+
+  const bestCorePair = tops
+    .flatMap((top) =>
+      bottoms.map((bottom) => ({
+        items: [top, bottom],
+        price:
+          top.candidate.context.priceMin + bottom.candidate.context.priceMin,
+        score: top.score + bottom.score,
+      })),
+    )
+    .filter((pair) => pair.price <= budget)
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.price - right.price ||
+        left.items[0].index - right.items[0].index,
+    )[0];
+  const bestDress = dresses[0];
+
+  if (bestCorePair) {
+    selected = bestCorePair.items;
+  } else if (bestDress) {
+    selected = [bestDress];
+  } else {
+    const bestCoreItem = affordable.find(
+      (candidate) =>
+        candidate.role === 'top' || candidate.role === 'bottom',
+    );
+
+    if (bestCoreItem) {
+      // Do not fill an incomplete outfit with accessories. Returning one strong
+      // core piece is more useful than suggesting unrelated items up to budget.
+      return [bestCoreItem];
+    }
+
+    return affordable[0] ? [affordable[0]] : [];
+  }
+
+  for (const role of ['outerwear', 'accessory'] satisfies OutfitRole[]) {
+    if (selected.length >= limit) {
+      break;
+    }
+
+    const remainingBudget = budget - totalCandidatePrice(selected);
+    const addition = affordable.find(
+      (candidate) =>
+        candidate.role === role &&
+        !selected.includes(candidate) &&
+        candidate.candidate.context.priceMin <= remainingBudget,
+    );
+
+    if (addition) {
+      selected.push(addition);
+    }
+  }
+
+  return selected.sort(
+    (left, right) => right.score - left.score || left.index - right.index,
+  );
+}
+
+function selectRequestedRoles(
+  candidates: ScoredCandidate[],
+  requestedRoles: OutfitRole[],
+  limit: number,
+  budget: number | undefined,
+): ScoredCandidate[] {
+  const selected: ScoredCandidate[] = [];
+
+  for (const role of unique(requestedRoles)) {
+    const remainingBudget =
+      budget === undefined ? undefined : budget - totalCandidatePrice(selected);
+    const match = candidates.find(
+      (candidate) =>
+        candidate.role === role &&
+        !selected.includes(candidate) &&
+        (remainingBudget === undefined ||
+          candidate.candidate.context.priceMin <= remainingBudget),
+    );
+
+    if (match && selected.length < limit) {
+      selected.push(match);
+    }
+  }
+
+  if (selected.length === 0 && budget !== undefined) {
+    const affordable = candidates.find(
+      (candidate) => candidate.candidate.context.priceMin <= budget,
+    );
+
+    return affordable ? [affordable] : [];
+  }
+
+  return selected;
+}
+
+function totalCandidatePrice(candidates: ScoredCandidate[]): number {
+  return candidates.reduce(
+    (total, candidate) => total + candidate.candidate.context.priceMin,
+    0,
+  );
+}
+
+function formatVnd(value: number): string {
+  return `${new Intl.NumberFormat('vi-VN').format(value)} đ`;
 }
 
 function buildReason(

@@ -33,6 +33,7 @@ import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
 import {
   buildStyleFallbackSummary,
   buildStyleFallbackTips,
+  getStyleCandidateRole,
   inferBudgetFromStylePrompt,
   rankStyleFallbackCandidates,
 } from './style-advice-fallback';
@@ -200,6 +201,11 @@ export class AiService {
           output.recommendations,
           candidates,
           request,
+        );
+        recommendations = this.constrainAiRecommendations(
+          recommendations,
+          candidates,
+          request.budget,
         );
       } catch {
         throw this.aiUnavailableException();
@@ -445,9 +451,17 @@ export class AiService {
           : [];
       });
     const hasRecommendations = recommendations.length > 0;
+    const totalRecommendationPrice = recommendations.reduce(
+      (total, recommendation) => total + recommendation.price,
+      0,
+    );
     const response: StyleAdviceResponseDto = {
       mode: 'catalog_fallback',
-      summary: buildStyleFallbackSummary(request, recommendations.length),
+      summary: buildStyleFallbackSummary(
+        request,
+        recommendations.length,
+        totalRecommendationPrice,
+      ),
       recommendations,
       extraTips: hasRecommendations ? buildStyleFallbackTips(request) : [],
     };
@@ -461,6 +475,39 @@ export class AiService {
     });
 
     return response;
+  }
+
+  private constrainAiRecommendations(
+    recommendations: StyleAdviceRecommendationDto[],
+    candidates: AiCatalogCandidate[],
+    budget: number | undefined,
+  ): StyleAdviceRecommendationDto[] {
+    const candidateByProductId = new Map(
+      candidates.map((candidate) => [candidate.productId, candidate]),
+    );
+    const selected: StyleAdviceRecommendationDto[] = [];
+    const selectedRoles = new Set<string>();
+    let totalPrice = 0;
+
+    for (const recommendation of recommendations) {
+      const candidate = candidateByProductId.get(recommendation.productId);
+      const role = candidate ? getStyleCandidateRole(candidate) : undefined;
+      const exceedsBudget =
+        budget !== undefined && totalPrice + recommendation.price > budget;
+
+      if (exceedsBudget || (role && selectedRoles.has(role))) {
+        continue;
+      }
+
+      selected.push(recommendation);
+      totalPrice += recommendation.price;
+
+      if (role) {
+        selectedRoles.add(role);
+      }
+    }
+
+    return selected;
   }
 
   private buildOutOfScopeResponse(

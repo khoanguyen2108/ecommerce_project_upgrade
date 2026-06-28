@@ -20,6 +20,11 @@ export function StyleAssistantResult({ result }: StyleAssistantResultProps) {
     return <OutOfScopeResult result={result} />;
   }
 
+  const totalPrice = result.recommendations.reduce(
+    (total, recommendation) => total + recommendation.price,
+    0,
+  );
+
   return (
     <section aria-live="polite" className={styles.resultCard}>
       <div className={styles.resultTopline}>
@@ -43,7 +48,10 @@ export function StyleAssistantResult({ result }: StyleAssistantResultProps) {
       <div className={styles.recommendationsSection}>
         <div className={styles.sectionHeading}>
           <h3>Recommended products</h3>
-          <span>{result.recommendations.length} selected</span>
+          <span>
+            {result.recommendations.length} selected
+            {result.recommendations.length ? ` · ${formatPrice(totalPrice)} total` : ""}
+          </span>
         </div>
         {result.recommendations.length ? (
           <div className={styles.productList}>
