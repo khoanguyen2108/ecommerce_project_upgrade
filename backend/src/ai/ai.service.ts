@@ -30,6 +30,12 @@ import type {
 import { AiProviderError, OpenRouterService } from './openrouter.service';
 import { AiQuotaService } from './ai-quota.service';
 import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
+import {
+  buildStyleFallbackSummary,
+  buildStyleFallbackTips,
+  inferBudgetFromStylePrompt,
+  rankStyleFallbackCandidates,
+} from './style-advice-fallback';
 
 const MAX_CANDIDATE_PRODUCTS = 24;
 const MAX_TOTAL_USER_TEXT_LENGTH = 800;
@@ -256,6 +262,12 @@ export class AiService {
       ...(dto.notes ? { notes: this.normalizeUserText(dto.notes) } : {}),
     };
 
+    const inferredBudget = inferBudgetFromStylePrompt(request);
+
+    if (request.budget === undefined && inferredBudget !== undefined) {
+      request.budget = inferredBudget;
+    }
+
     if (
       request.budget !== undefined &&
       (!Number.isInteger(request.budget) ||
@@ -416,26 +428,28 @@ export class AiService {
     const groundedById = new Map(
       groundedProducts.map((product) => [product.productId, product]),
     );
-    const recommendations = candidates
-      .map((candidate) => groundedById.get(candidate.productId))
-      .filter((product): product is GroundedProduct => Boolean(product))
-      .slice(0, 4)
-      .map((product) => ({
-        ...product,
-        reason: 'This currently available item matches the catalog filters you provided.',
-      }));
+    const recommendations = rankStyleFallbackCandidates(candidates, request)
+      .flatMap((ranked) => {
+        const product = groundedById.get(ranked.candidate.productId);
+
+        return product
+          ? [
+              {
+                ...product,
+                reason: ranked.reason,
+                ...(ranked.stylingTip
+                  ? { stylingTip: ranked.stylingTip }
+                  : {}),
+              },
+            ]
+          : [];
+      });
     const hasRecommendations = recommendations.length > 0;
     const response: StyleAdviceResponseDto = {
       mode: 'catalog_fallback',
-      summary: hasRecommendations
-        ? 'Here are currently available catalog options that match your filters.'
-        : 'No matching in-stock products were found. Try broadening your budget, color, size, or style preferences.',
+      summary: buildStyleFallbackSummary(request, recommendations.length),
       recommendations,
-      extraTips: hasRecommendations
-        ? [
-            'Check the current size and color options on the product page before adding an item to your cart.',
-          ]
-        : [],
+      extraTips: hasRecommendations ? buildStyleFallbackTips(request) : [],
     };
 
     this.logEvent('AI_STYLE_ADVICE_FALLBACK', context, {
