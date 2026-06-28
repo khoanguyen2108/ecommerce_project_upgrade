@@ -56,6 +56,9 @@ const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
   "/forgot-password",
 ] as const;
 
+const ORDER_DETAIL_PATH_PATTERN =
+  /^\/orders\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+
 const CUSTOMER_CHAT_WELCOME_MESSAGE = `Hi 👋
 
 I'm Belikeme AI.
@@ -128,7 +131,6 @@ export function CustomerChatWidget() {
   const [draft, setDraft] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSendingRealtime, setIsSendingRealtime] = useState(false);
-  const [isHumanHandoffActive, setIsHumanHandoffActive] = useState(false);
   const [error, setError] = useState<string>();
   const [unreadAdminCount, setUnreadAdminCount] = useState(0);
   const [connectionState, setConnectionState] =
@@ -149,7 +151,6 @@ export function CustomerChatWidget() {
     setMessages([]);
     setLocalMessages([]);
     setForwardedPersistedIds(new Set());
-    setIsHumanHandoffActive(false);
     setDraft("");
     setError(undefined);
     pendingForwardRef.current = undefined;
@@ -376,18 +377,17 @@ export function CustomerChatWidget() {
     setError(undefined);
 
     try {
-      if (isHumanHandoffActive) {
-        await sendRealtimeMessage(body, { restoreDraftOnFailure: true });
-        return;
-      }
-
       setDraft("");
       const customerMessage = createLocalMessage("customer", body);
       const requestCustomerId = activeCustomerId;
       setLocalMessages((current) => [...current, customerMessage]);
 
       try {
-        const response = await askAiSupport({ message: body });
+        const orderId = getOrderIdFromPathname(pathname);
+        const response = await askAiSupport({
+          message: body,
+          ...(orderId ? { orderId } : {}),
+        });
 
         if (activeCustomerIdRef.current !== requestCustomerId) {
           return;
@@ -406,12 +406,26 @@ export function CustomerChatWidget() {
         }
 
         if (needsHandoff) {
-          addAiMessage(response.answer, "handoff", {
-            status: "This conversation has been forwarded to Belikeme Support.",
-            statusDetail: "Waiting for an available specialist...",
-          });
-          setIsHumanHandoffActive(true);
-          await forwardToHumanSupport(body, customerMessage.id);
+          const isOrderContextRequired =
+            response.handoff?.reason?.toUpperCase() ===
+            "ORDER_CONTEXT_REQUIRED";
+
+          addAiMessage(
+            response.answer,
+            "handoff",
+            isOrderContextRequired
+              ? {}
+              : {
+                  status:
+                    "This conversation has been forwarded to Belikeme Support.",
+                  statusDetail: "Waiting for an available specialist...",
+                },
+          );
+
+          if (!isOrderContextRequired) {
+            await forwardToHumanSupport(body, customerMessage.id);
+          }
+
           return;
         }
 
@@ -422,7 +436,6 @@ export function CustomerChatWidget() {
         }
 
         addAiMessage(AI_UNAVAILABLE_MESSAGE, "error");
-        setIsHumanHandoffActive(true);
         await forwardToHumanSupport(body, customerMessage.id);
       }
     } finally {
@@ -666,7 +679,7 @@ export function CustomerChatWidget() {
               <ChatComposer
                 draft={draft}
                 isSending={isSending}
-                maxLength={isHumanHandoffActive ? 2000 : 800}
+                maxLength={800}
                 onDraftChange={setDraft}
                 onSend={() => void sendMessage()}
                 textareaRef={textareaRef}
@@ -796,6 +809,10 @@ function appendMessage(
     (left, right) =>
       new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
   );
+}
+
+function getOrderIdFromPathname(pathname: string): string | undefined {
+  return ORDER_DETAIL_PATH_PATTERN.exec(pathname)?.[1];
 }
 
 function isValidSupportResponse(response: SupportResponse): boolean {
