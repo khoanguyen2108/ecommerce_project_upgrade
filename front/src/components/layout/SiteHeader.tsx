@@ -22,7 +22,8 @@ interface SiteHeaderProps {
     | "cart"
     | "orders"
     | "wishlist"
-    | "ai";
+    | "ai"
+    | "ai-recommendations";
 }
 
 export function SiteHeader({ active }: SiteHeaderProps) {
@@ -64,12 +65,20 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           </Link>
           <Link href="/#new-arrivals">New Arrivals</Link>
           {!isAdmin ? (
-            <Link
-              className={active === "ai" ? "is-active" : undefined}
-              href="/ai/style-assistant"
-            >
-              AI Style Assistant
-            </Link>
+            <>
+              <Link
+                className={active === "ai" ? "is-active" : undefined}
+                href="/ai/style-assistant"
+              >
+                AI Style Assistant
+              </Link>
+              <Link
+                className={active === "ai-recommendations" ? "is-active" : undefined}
+                href="/ai/recommendations"
+              >
+                AI Recommendations
+              </Link>
+            </>
           ) : null}
           <Link href="/#about">About</Link>
         </nav>
