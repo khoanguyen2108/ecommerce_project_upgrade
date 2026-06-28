@@ -200,7 +200,7 @@ const ROLE_PATTERNS: Array<{ pattern: RegExp; role: OutfitRole }> = [
   {
     role: 'accessory',
     pattern:
-      /\b(?:accessories|accessory|bag|belt|gloves?|hat|cap|tote|phu kien|tui|that lung|gang tay|non)\b/,
+      /\b(?:accessories|accessory|bag|belt|gloves?|hat|cap|tote|handbag|phu kien|tui xach|tui deo|that lung|gang tay|non)\b/,
   },
   {
     role: 'top',
@@ -254,10 +254,10 @@ export function inferBudgetFromStylePrompt(
       .join(' '),
   );
   const constrainedBudget = comparable.match(
-    /\b(?:budget|ngan sach|under|below|max|maximum|duoi|toi da|khong qua)\s*(?:la|of)?\s*([0-9]+(?:[.,][0-9]+)*)\s*(k|trieu|m|million|vnd|dong|d)?\b/,
+    /\b(?:budget|ngan sach|under|below|max|maximum|duoi|toi da|khong qua)\s*(?:la|of)?\s*([0-9]+(?:[.,][0-9]+)*)\s*(tram nghin|tram ngan|tram|nghin|ngan|k|trieu|m|million|vnd|dong|d)?\b/,
   );
   const shorthandBudget = comparable.match(
-    /\b([0-9]+(?:[.,][0-9]+)*)\s*(k|trieu|m|million)\b/,
+    /\b([0-9]+(?:[.,][0-9]+)*)\s*(tram nghin|tram ngan|tram|nghin|ngan|k|trieu|m|million)\b/,
   );
   const match = constrainedBudget ?? shorthandBudget;
 
@@ -727,6 +727,10 @@ function parseBudgetValue(
   const multiplier =
     unit === 'k'
       ? 1_000
+      : unit === 'nghin' || unit === 'ngan'
+        ? 1_000
+        : unit === 'tram' || unit === 'tram nghin' || unit === 'tram ngan'
+          ? 100_000
       : unit === 'trieu' || unit === 'm' || unit === 'million'
         ? 1_000_000
         : 1;
