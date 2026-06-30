@@ -47,7 +47,7 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'Create or reuse a payOS checkout link for an order',
     description:
-      'Creates a provider checkout link from backend-calculated order data for an authenticated owner (or an admin under the existing role rules). Guest orders are rejected because no secure guest payment token exists. Orders or payments with reconciliation history are blocked until a dedicated recovery workflow exists. This endpoint never marks the order or payment as paid.',
+      'Creates a provider checkout link from backend-calculated order data for an authenticated owner (or an admin under the existing role rules). Orders or payments with reconciliation history are blocked until a dedicated recovery workflow exists. This endpoint never marks the order or payment as paid.',
   })
   @ApiCreatedResponse(
     envelopeResponse('payOS checkout link created.', payosPaymentDataExample),

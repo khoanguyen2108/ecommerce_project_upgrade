@@ -11,9 +11,6 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
-import { RecentlyViewedProducts } from "@/components/recently-viewed/RecentlyViewedProducts";
-import { WishlistButton } from "@/components/wishlist/WishlistButton";
-import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { getCartErrorMessage, getCartRequestId } from "@/features/cart/errors";
 import {
   getProductById,
@@ -24,11 +21,6 @@ import {
 import { formatPrice } from "@/features/catalog/format";
 import { isNoSize, sortSizesByStandardOrder } from "@/features/catalog/sizes";
 import type { Product, ProductVariant } from "@/features/catalog/types";
-import {
-  productToRecentlyViewedProduct,
-  useRecentlyViewed,
-} from "@/features/recently-viewed/useRecentlyViewed";
-import { productToWishlistItem } from "@/features/wishlist/useWishlist";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface ProductDetailPageProps {
@@ -48,7 +40,6 @@ interface CartFeedback {
 }
 
 export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
-  const { isLoading: isAuthLoading } = useAuthSession();
   const { addItemAndOpenDrawer } = useCart();
   const [state, setState] = useState<ProductDetailState>({
     isLoading: true,
@@ -60,7 +51,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   const [quantity, setQuantity] = useState(1);
   const [cartFeedback, setCartFeedback] = useState<CartFeedback>();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
-  const { addProduct: addRecentlyViewedProduct } = useRecentlyViewed();
 
   useEffect(() => {
     let isMounted = true;
@@ -106,12 +96,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
       isMounted = false;
     };
   }, [productRef]);
-
-  useEffect(() => {
-    if (state.product) {
-      addRecentlyViewedProduct(productToRecentlyViewedProduct(state.product));
-    }
-  }, [addRecentlyViewedProduct, state.product]);
 
   const selectableVariants = useMemo(
     () => state.variants.filter(isVariantSelectable),
@@ -228,28 +212,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
 
     try {
       await addItemAndOpenDrawer(
-        {
-          quantity,
-          variantId: selectedVariant.id,
-          guestSnapshot: {
-            product: {
-              id: state.product.id,
-              name: state.product.name,
-              slug: state.product.slug,
-              imageUrls: state.product.imageUrls,
-              firstImageUrl: state.product.imageUrls[0] || null,
-              category: state.product.category,
-            },
-            variant: {
-              sku: selectedVariant.sku,
-              size: selectedVariant.size,
-              color: selectedVariant.color,
-              priceOverride: selectedVariant.priceOverride,
-              stock: selectedVariant.stock,
-            },
-            unitPrice: getVariantUnitPrice(state.product, selectedVariant),
-          },
-        },
+        { quantity, variantId: selectedVariant.id },
         state.product.name,
       );
     } catch (error) {
@@ -300,7 +263,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   const product = state.product;
   const imageUrls = getProductImages(product);
   const categories = getProductCategories(product);
-  const wishlistItem = productToWishlistItem(product);
   const displayPrice = selectedVariant
     ? getVariantUnitPrice(product, selectedVariant)
     : product.basePrice;
@@ -317,7 +279,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
       quantity <= selectedVariant.stock,
   );
   const addToCartDisabled =
-    isAuthLoading ||
     isAddingToCart ||
     !hasValidSelection ||
     !hasValidQuantity;
@@ -490,7 +451,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           ) : null}
 
           <div className="product-detail-actions">
-            <WishlistButton item={wishlistItem} />
             <button
               className="button button--primary button--full"
               disabled={addToCartDisabled}
@@ -539,7 +499,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           </dl>
         </div>
       </section>
-      <RecentlyViewedProducts excludeProductId={product.id} />
     </main>
   );
 }

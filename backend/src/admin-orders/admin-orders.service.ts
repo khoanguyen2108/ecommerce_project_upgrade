@@ -102,7 +102,6 @@ const adminOrderReconciliationIssueSelect = {
 const adminOrderListSelect = {
   id: true,
   userId: true,
-  guestEmail: true,
   user: {
     select: adminOrderUserSummarySelect,
   },
@@ -143,7 +142,6 @@ const adminOrderListSelect = {
 const adminOrderDetailSelect = {
   id: true,
   userId: true,
-  guestEmail: true,
   user: {
     select: adminOrderUserSummarySelect,
   },
@@ -451,12 +449,6 @@ export class AdminOrdersService {
         },
       },
       {
-        guestEmail: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
-      {
         shippingRecipientName: {
           contains: search,
           mode: 'insensitive',
@@ -552,11 +544,9 @@ export class AdminOrdersService {
       id: order.id,
       userId: order.userId,
       user: order.user,
-      guestEmail: order.guestEmail,
-      customerType: order.userId ? 'REGISTERED' : 'GUEST',
-      customerEmail: order.userId ? (order.user?.email ?? null) : order.guestEmail,
-      customerName: order.userId ? (order.user?.name ?? null) : order.shippingRecipientName,
-      customerPhone: order.userId ? (order.user?.phone ?? null) : order.shippingPhone,
+      customerEmail: order.user.email,
+      customerName: order.user.name,
+      customerPhone: order.user.phone,
       status: order.status,
       fulfillmentStatus: order.fulfillmentStatus,
       subtotalAmount: order.subtotalAmount,
@@ -589,11 +579,9 @@ export class AdminOrdersService {
       id: order.id,
       userId: order.userId,
       user: order.user,
-      guestEmail: order.guestEmail,
-      customerType: order.userId ? 'REGISTERED' : 'GUEST',
-      customerEmail: order.userId ? (order.user?.email ?? null) : order.guestEmail,
-      customerName: order.userId ? (order.user?.name ?? null) : order.shippingRecipientName,
-      customerPhone: order.userId ? (order.user?.phone ?? null) : order.shippingPhone,
+      customerEmail: order.user.email,
+      customerName: order.user.name,
+      customerPhone: order.user.phone,
       status: order.status,
       fulfillmentStatus: order.fulfillmentStatus,
       subtotalAmount: order.subtotalAmount,

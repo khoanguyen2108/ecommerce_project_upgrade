@@ -57,7 +57,6 @@ const orderItemSelect = {
 const orderSelect = {
   id: true,
   userId: true,
-  guestEmail: true,
   status: true,
   fulfillmentStatus: true,
   subtotalAmount: true,
@@ -197,7 +196,6 @@ export class OrdersService {
       return tx.order.create({
         data: {
           userId: user.id,
-          guestEmail: null,
           status: OrderStatus.PENDING_PAYMENT,
           subtotalAmount,
           totalAmount: subtotalAmount,

@@ -4,9 +4,6 @@ import type {
   CheckoutSummaryResponse,
   CreateCheckoutOrderResponse,
   CreateCheckoutOrderRequest,
-  CreateGuestCheckoutOrderRequest,
-  GuestCheckoutPaymentResponse,
-  GuestCheckoutSummaryRequest,
 } from "@/features/checkout/types";
 
 export function getCheckoutSummary(
@@ -20,36 +17,6 @@ export function getCheckoutSummary(
       method: "GET",
     },
   );
-}
-
-export function getGuestCheckoutSummary(
-  payload: GuestCheckoutSummaryRequest,
-): Promise<CheckoutSummaryResponse> {
-  return apiRequest<CheckoutSummaryResponse>("/checkout/guest/summary", {
-    auth: false,
-    body: payload,
-    method: "POST",
-  });
-}
-
-export function createGuestCheckoutOrder(
-  payload: CreateGuestCheckoutOrderRequest,
-): Promise<CreateCheckoutOrderResponse> {
-  return apiRequest<CreateCheckoutOrderResponse>("/checkout/guest/orders", {
-    auth: false,
-    body: payload,
-    method: "POST",
-  });
-}
-
-export function createGuestCheckoutPayment(
-  payload: CreateGuestCheckoutOrderRequest,
-): Promise<GuestCheckoutPaymentResponse> {
-  return apiRequest<GuestCheckoutPaymentResponse>("/checkout/guest/pay", {
-    auth: false,
-    body: payload,
-    method: "POST",
-  });
 }
 
 export function createCheckoutOrder(

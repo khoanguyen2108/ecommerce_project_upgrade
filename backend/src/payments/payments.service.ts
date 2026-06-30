@@ -255,27 +255,6 @@ export class PaymentsService {
     const order = await this.getOrderForPayment(user, dto.orderId);
 
     this.assertOrderPayable(order, new Date());
-    this.assertGuestPaymentUnavailable(order);
-    return this.createPayosPaymentForOrder(order);
-  }
-
-  async createPayosPaymentForGuestOrder(orderId: string) {
-    const order = await this.prismaService.order.findFirst({
-      where: {
-        id: orderId,
-        userId: null,
-      },
-      select: orderForPaymentSelect,
-    });
-
-    if (!order) {
-      throw new NotFoundException({
-        code: 'GUEST_ORDER_NOT_FOUND',
-        message: 'Guest order was not found.',
-      });
-    }
-
-    this.assertOrderPayable(order, new Date());
     return this.createPayosPaymentForOrder(order);
   }
 
@@ -1647,17 +1626,6 @@ export class PaymentsService {
     }
 
     return order;
-  }
-
-  private assertGuestPaymentUnavailable(order: OrderForPayment): void {
-    if (order.userId !== null) {
-      return;
-    }
-
-    throw new BadRequestException({
-      code: 'GUEST_PAYMENT_NOT_AVAILABLE',
-      message: 'Online payment is not available for guest orders.',
-    });
   }
 
   private async assertNoReconciliationIssue(

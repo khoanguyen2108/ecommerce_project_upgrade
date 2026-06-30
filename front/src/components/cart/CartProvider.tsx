@@ -21,9 +21,7 @@ import {
   updateCartItem,
 } from "@/features/cart/api";
 import { getCartErrorMessage, getCartRequestId } from "@/features/cart/errors";
-import type { AddCartItemRequest, Cart, CartItem } from "@/features/cart/types";
-
-export const GUEST_CART_STORAGE_KEY = "belikeme_guest_cart";
+import type { AddCartItemRequest, Cart } from "@/features/cart/types";
 
 interface CartToastState {
   id: number;
@@ -36,7 +34,6 @@ interface CartContextValue {
   cartCount: number;
   closeCart: () => void;
   clearCart: () => Promise<void>;
-  clearGuestCart: () => void;
   error?: string;
   isLoading: boolean;
   isOpen: boolean;
@@ -45,7 +42,6 @@ interface CartContextValue {
   removeItem: (id: string) => Promise<void>;
   requestId?: string;
   refreshCart: () => Promise<void>;
-  getGuestCartItems: () => CartItem[];
   addItemAndOpenDrawer: (
     payload: AddCartItemRequest,
     productName?: string,
@@ -56,7 +52,8 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { currentUser, isAuthenticated, isLoading: isAuthLoading } = useAuthSession();
+  const { currentUser, isAuthenticated, isLoading: isAuthLoading } =
+    useAuthSession();
   const [cart, setCart] = useState<Cart>();
   const [error, setError] = useState<string>();
   const [requestId, setRequestId] = useState<string>();
@@ -105,26 +102,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [showToast],
   );
 
-  const setAndPersistGuestCart = useCallback((nextCart: Cart) => {
-    window.localStorage.setItem(
-      GUEST_CART_STORAGE_KEY,
-      JSON.stringify(nextCart.items),
-    );
-    setCart(nextCart);
-  }, []);
-
-  const getGuestCartItems = useCallback(() => readGuestCart().items, []);
-
-  const clearGuestCart = useCallback(() => {
-    const emptyGuestCart = createGuestCart([]);
-    window.localStorage.setItem(GUEST_CART_STORAGE_KEY, JSON.stringify([]));
-    if (!isAuthenticated) setCart(emptyGuestCart);
-  }, [isAuthenticated]);
-
   const refreshCart = useCallback(async () => {
     if (!isAuthenticated) {
       refreshPromiseRef.current = null;
-      setCart(readGuestCart());
+      setCart(undefined);
       setIsLoading(false);
       clearError();
       return;
@@ -156,56 +137,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isAuthLoading) return;
+    if (!isAuthenticated) {
+      setCart(undefined);
+      setIsLoading(false);
+      setIsOpen(false);
+      clearError();
+      return;
+    }
     void refreshCart().catch(() => undefined);
-  }, [currentUser?.id, isAuthLoading, refreshCart]);
+  }, [clearError, currentUser?.id, isAuthenticated, isAuthLoading, refreshCart]);
 
   const addItemAndOpenDrawer = useCallback(
     async (payload: AddCartItemRequest, productName?: string) => {
-      if (isSaving) return;
+      if (isSaving || !isAuthenticated) return;
       setIsSaving(true);
       clearError();
-
       try {
-        if (isAuthenticated) {
-          const response = await addCartItem(payload);
-          setCart(response.cart);
-        } else {
-          if (!payload.guestSnapshot) {
-            throw new Error("Guest cart item details are missing.");
-          }
-          const current = readGuestCart();
-          const existing = current.items.find(
-            (item) => item.variantId === payload.variantId,
-          );
-          const maxQuantity = Math.max(
-            1,
-            Math.min(99, payload.guestSnapshot.variant.stock),
-          );
-          const quantity = Math.min(
-            maxQuantity,
-            (existing?.quantity ?? 0) + payload.quantity,
-          );
-          const now = new Date().toISOString();
-          const item: CartItem = {
-            id: payload.variantId,
-            variantId: payload.variantId,
-            quantity,
-            currentUnitPrice: payload.guestSnapshot.unitPrice,
-            currentLineTotal: payload.guestSnapshot.unitPrice * quantity,
-            availableStock: payload.guestSnapshot.variant.stock,
-            product: payload.guestSnapshot.product,
-            variant: payload.guestSnapshot.variant,
-            createdAt: existing?.createdAt ?? now,
-            updatedAt: now,
-          };
-          const items = existing
-            ? current.items.map((candidate) =>
-                candidate.variantId === payload.variantId ? item : candidate,
-              )
-            : [...current.items, item];
-          setAndPersistGuestCart(createGuestCart(items));
-        }
-
+        const response = await addCartItem(payload);
+        setCart(response.cart);
         setIsOpen(true);
         showToast(
           "success",
@@ -218,42 +167,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setIsSaving(false);
       }
     },
-    [
-      clearError,
-      handleError,
-      isAuthenticated,
-      isSaving,
-      setAndPersistGuestCart,
-      showToast,
-    ],
+    [clearError, handleError, isAuthenticated, isSaving, showToast],
   );
 
   const updateQuantity = useCallback(
     async (id: string, quantity: number) => {
-      if (isSaving) return;
+      if (isSaving || !isAuthenticated) return;
       setIsSaving(true);
       clearError();
       try {
-        if (isAuthenticated) {
-          const response = await updateCartItem(id, { quantity });
-          setCart(response.cart);
-        } else {
-          const current = readGuestCart();
-          const items = current.items.map((item) => {
-            if (item.id !== id) return item;
-            const nextQuantity = Math.max(
-              1,
-              Math.min(99, item.availableStock, Math.trunc(quantity)),
-            );
-            return {
-              ...item,
-              quantity: nextQuantity,
-              currentLineTotal: item.currentUnitPrice * nextQuantity,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-          setAndPersistGuestCart(createGuestCart(items));
-        }
+        const response = await updateCartItem(id, { quantity });
+        setCart(response.cart);
       } catch (caughtError) {
         handleError(caughtError, "Cart item could not be updated.");
         throw caughtError;
@@ -261,22 +185,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setIsSaving(false);
       }
     },
-    [clearError, handleError, isAuthenticated, isSaving, setAndPersistGuestCart],
+    [clearError, handleError, isAuthenticated, isSaving],
   );
 
   const removeItem = useCallback(
     async (id: string) => {
-      if (isSaving) return;
+      if (isSaving || !isAuthenticated) return;
       setIsSaving(true);
       clearError();
       try {
-        if (isAuthenticated) {
-          const response = await removeCartItem(id);
-          setCart(response.cart);
-        } else {
-          const items = readGuestCart().items.filter((item) => item.id !== id);
-          setAndPersistGuestCart(createGuestCart(items));
-        }
+        const response = await removeCartItem(id);
+        setCart(response.cart);
       } catch (caughtError) {
         handleError(caughtError, "Cart item could not be removed.");
         throw caughtError;
@@ -284,27 +203,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setIsSaving(false);
       }
     },
-    [clearError, handleError, isAuthenticated, isSaving, setAndPersistGuestCart],
+    [clearError, handleError, isAuthenticated, isSaving],
   );
 
   const clearCart = useCallback(async () => {
-    if (isSaving) return;
+    if (isSaving || !isAuthenticated) return;
     setIsSaving(true);
     clearError();
     try {
-      if (isAuthenticated) {
-        const response = await clearCartRequest();
-        setCart(response.cart);
-      } else {
-        setAndPersistGuestCart(createGuestCart([]));
-      }
+      const response = await clearCartRequest();
+      setCart(response.cart);
     } catch (caughtError) {
       handleError(caughtError, "Cart could not be cleared.");
       throw caughtError;
     } finally {
       setIsSaving(false);
     }
-  }, [clearError, handleError, isAuthenticated, isSaving, setAndPersistGuestCart]);
+  }, [clearError, handleError, isAuthenticated, isSaving]);
 
   const value = useMemo<CartContextValue>(
     () => ({
@@ -312,10 +227,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       cart,
       cartCount: cart?.totalQuantity ?? 0,
       clearCart,
-      clearGuestCart,
       closeCart,
       error,
-      getGuestCartItems,
       isLoading,
       isOpen,
       isSaving,
@@ -329,10 +242,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItemAndOpenDrawer,
       cart,
       clearCart,
-      clearGuestCart,
       closeCart,
       error,
-      getGuestCartItems,
       isLoading,
       isOpen,
       isSaving,
@@ -355,60 +266,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         onDismiss={() => setToast(undefined)}
       />
     </CartContext.Provider>
-  );
-}
-
-function createGuestCart(items: CartItem[]): Cart {
-  const now = new Date().toISOString();
-  return {
-    id: "guest",
-    userId: "guest",
-    items,
-    totalQuantity: items.reduce((total, item) => total + item.quantity, 0),
-    estimatedSubtotal: items.reduce(
-      (total, item) => total + item.currentLineTotal,
-      0,
-    ),
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
-function readGuestCart(): Cart {
-  try {
-    const stored = window.localStorage.getItem(GUEST_CART_STORAGE_KEY);
-    const parsed: unknown = stored ? JSON.parse(stored) : [];
-    if (!Array.isArray(parsed)) return createGuestCart([]);
-
-    const items = parsed.filter(isStoredCartItem).map((item) => ({
-      ...item,
-      currentLineTotal: item.currentUnitPrice * item.quantity,
-    }));
-    return createGuestCart(items);
-  } catch {
-    return createGuestCart([]);
-  }
-}
-
-function isStoredCartItem(value: unknown): value is CartItem {
-  if (!value || typeof value !== "object") return false;
-  const item = value as Partial<CartItem>;
-  return Boolean(
-    typeof item.id === "string" &&
-      typeof item.variantId === "string" &&
-      Number.isInteger(item.quantity) &&
-      Number(item.quantity) > 0 &&
-      typeof item.currentUnitPrice === "number" &&
-      Number.isFinite(item.currentUnitPrice) &&
-      item.currentUnitPrice > 0 &&
-      item.product &&
-      typeof item.product.id === "string" &&
-      typeof item.product.name === "string" &&
-      typeof item.product.slug === "string" &&
-      item.variant &&
-      typeof item.variant.size === "string" &&
-      typeof item.variant.color === "string" &&
-      typeof item.availableStock === "number",
   );
 }
 

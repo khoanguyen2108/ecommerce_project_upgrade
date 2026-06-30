@@ -16,19 +16,14 @@ import { CheckoutSummary } from "@/components/checkout/CheckoutSummary";
 import { getSafeCheckoutUrl } from "@/components/payments/PayosPaymentButton";
 import {
   createCheckoutOrder,
-  createGuestCheckoutPayment,
   getCheckoutSummary,
-  getGuestCheckoutSummary,
 } from "@/features/checkout/api";
 import {
   getCheckoutErrorCode,
   getCheckoutErrorMessage,
   getCheckoutRequestId,
 } from "@/features/checkout/errors";
-import type {
-  CheckoutSummary as CheckoutSummaryModel,
-  GuestCheckoutItemRequest,
-} from "@/features/checkout/types";
+import type { CheckoutSummary as CheckoutSummaryModel } from "@/features/checkout/types";
 import { createPayosPayment } from "@/features/payments/api";
 import { listAddresses } from "@/features/addresses/api";
 import type { Address, AddressInput } from "@/features/addresses/types";
@@ -39,17 +34,9 @@ import {
   validateAddress,
 } from "@/components/profile/AddressFields";
 
-type CheckoutMode = "AUTHENTICATED" | "GUEST";
-
 export function CheckoutPage() {
-  const { clearGuestCart, getGuestCartItems, refreshCart } = useCart();
-  const {
-    currentUser,
-    isAuthenticated,
-    isLoading: isAuthLoading,
-  } = useAuthSession();
-  const [checkoutMode, setCheckoutMode] = useState<CheckoutMode>();
-  const [guestItems, setGuestItems] = useState<GuestCheckoutItemRequest[]>([]);
+  const { refreshCart } = useCart();
+  const { currentUser } = useAuthSession();
   const [summary, setSummary] = useState<CheckoutSummaryModel>();
   const [paymentRecoveryOrderId, setPaymentRecoveryOrderId] = useState<string>();
   const [voucherInput, setVoucherInput] = useState("");
@@ -64,36 +51,12 @@ export function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState("new");
   const [shippingInfo, setShippingInfo] =
     useState<AddressInput>(emptyAddressInput);
-  const [guestEmail, setGuestEmail] = useState("");
   const [saveAddress, setSaveAddress] = useState(false);
   const [setDefault, setSetDefault] = useState(false);
   const submissionLockRef = useRef(false);
   const voucherRequestLockRef = useRef(false);
 
   useEffect(() => {
-    if (checkoutMode || isAuthLoading) return;
-
-    if (isAuthenticated) {
-      setCheckoutMode("AUTHENTICATED");
-      return;
-    }
-
-    setGuestItems(
-      getGuestCartItems().map((item) => ({
-        variantId: item.variantId,
-        quantity: item.quantity,
-      })),
-    );
-    setCheckoutMode("GUEST");
-  }, [checkoutMode, getGuestCartItems, isAuthenticated, isAuthLoading]);
-
-  useEffect(() => {
-    if (checkoutMode !== "AUTHENTICATED") {
-      setAddresses([]);
-      setSelectedAddressId("new");
-      return;
-    }
-
     let active = true;
     listAddresses()
       .then((response) => {
@@ -110,37 +73,19 @@ export function CheckoutPage() {
     return () => {
       active = false;
     };
-  }, [checkoutMode]);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadSummary() {
-      if (!checkoutMode) return;
-
       setIsLoading(true);
       setError(undefined);
       setErrorCode(undefined);
       setRequestId(undefined);
 
       try {
-        if (checkoutMode === "GUEST" && guestItems.length === 0) {
-          if (isMounted) {
-            setSummary(undefined);
-            setError("Your cart is empty. Add an item before checkout.");
-            setErrorCode("CHECKOUT_CART_EMPTY");
-            setIsLoading(false);
-          }
-          return;
-        }
-        const response = checkoutMode === "AUTHENTICATED"
-          ? await getCheckoutSummary(requestedVoucherCode)
-          : await getGuestCheckoutSummary({
-              items: guestItems,
-              ...(requestedVoucherCode
-                ? { voucherCode: requestedVoucherCode }
-                : {}),
-            });
+        const response = await getCheckoutSummary(requestedVoucherCode);
 
         if (isMounted) {
           setSummary(response.summary);
@@ -170,7 +115,7 @@ export function CheckoutPage() {
     return () => {
       isMounted = false;
     };
-  }, [checkoutMode, guestItems, refreshKey, requestedVoucherCode]);
+  }, [refreshKey, requestedVoucherCode]);
 
   function handleApplyVoucher(code = voucherInput) {
     if (voucherRequestLockRef.current) {
@@ -209,22 +154,13 @@ export function CheckoutPage() {
       return;
     }
 
-    if (!checkoutMode) return;
-
-    if (checkoutMode === "GUEST" || selectedAddressId === "new") {
+    if (selectedAddressId === "new") {
       const shippingError = validateAddress(shippingInfo);
       if (shippingError) {
         setError(shippingError);
         setErrorCode("CHECKOUT_SHIPPING_INVALID");
         return;
       }
-    }
-
-    const normalizedGuestEmail = guestEmail.trim().toLowerCase();
-    if (checkoutMode === "GUEST" && !isValidGuestEmail(normalizedGuestEmail)) {
-      setError("Enter a valid email address for order updates.");
-      setErrorCode("CHECKOUT_GUEST_EMAIL_INVALID");
-      return;
     }
 
     submissionLockRef.current = true;
@@ -234,53 +170,30 @@ export function CheckoutPage() {
     setRequestId(undefined);
     setPaymentRecoveryOrderId(undefined);
 
-    let authenticatedOrderId: string | undefined;
-    let guestOrderCode: number | undefined;
+    let orderId: string | undefined;
 
     try {
       const normalizedShipping = normalizeAddressInput(shippingInfo);
-      if (checkoutMode === "AUTHENTICATED") {
-        const response = await createCheckoutOrder({
-          ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
-          ...(selectedAddressId === "new"
-            ? {
-                shippingInfo: {
-                  ...normalizedShipping,
-                  saveAddress,
-                  setDefault: saveAddress && setDefault,
-                },
-              }
-            : { addressId: selectedAddressId }),
-        });
-        authenticatedOrderId = response.order.id;
-        void refreshCart().catch(() => undefined);
-
-        const paymentResponse = await createPayosPayment({
-          orderId: response.order.id,
-        });
-        const checkoutUrl = getSafeCheckoutUrl(
-          paymentResponse.checkoutUrl || paymentResponse.paymentUrl,
-        );
-
-        if (!checkoutUrl) {
-          throw new Error("PAYOS_CHECKOUT_URL_MISSING");
-        }
-
-        window.location.assign(checkoutUrl);
-        return;
-      }
-
-      const response = await createGuestCheckoutPayment({
-        items: guestItems,
+      const response = await createCheckoutOrder({
         ...(requestedVoucherCode ? { voucherCode: requestedVoucherCode } : {}),
-        shippingInfo: {
-          ...normalizedShipping,
-          email: normalizedGuestEmail,
-        },
+        ...(selectedAddressId === "new"
+          ? {
+              shippingInfo: {
+                ...normalizedShipping,
+                saveAddress,
+                setDefault: saveAddress && setDefault,
+              },
+            }
+          : { addressId: selectedAddressId }),
       });
-      guestOrderCode = response.payment.providerOrderCode;
+      orderId = response.order.id;
+      void refreshCart().catch(() => undefined);
+
+      const paymentResponse = await createPayosPayment({
+        orderId: response.order.id,
+      });
       const checkoutUrl = getSafeCheckoutUrl(
-        response.checkoutUrl || response.paymentUrl,
+        paymentResponse.checkoutUrl || paymentResponse.paymentUrl,
       );
 
       if (!checkoutUrl) {
@@ -288,41 +201,23 @@ export function CheckoutPage() {
       }
 
       window.location.assign(checkoutUrl);
-      clearGuestCart();
       return;
     } catch (submitError) {
       const submitErrorCode = getCheckoutErrorCode(submitError);
 
-      if (authenticatedOrderId) {
+      if (orderId) {
         setSummary(undefined);
-        setPaymentRecoveryOrderId(authenticatedOrderId);
+        setPaymentRecoveryOrderId(orderId);
         setError(
           submitErrorCode === "PAYMENT_RECONCILIATION_REQUIRED"
             ? "Payment requires manual review. Please contact support."
             : "Payment link could not be created. Please retry from your order.",
         );
-      } else if (checkoutMode === "GUEST" && guestOrderCode) {
-        setError(
-          `Payment could not be started. Contact support with order code ${guestOrderCode}.`,
-        );
-      } else if (checkoutMode === "GUEST") {
-        const checkoutMessage = getCheckoutErrorMessage(
-          submitError,
-          "Payment could not be started. Please retry or contact support.",
-        );
-        setError(
-          submitErrorCode?.startsWith("CHECKOUT_") ||
-            submitErrorCode === "VALIDATION_ERROR"
-            ? checkoutMessage
-            : "Payment could not be started. Please retry or contact support.",
-        );
       } else {
         setError(
           getCheckoutErrorMessage(
             submitError,
-            checkoutMode === "AUTHENTICATED"
-              ? "Checkout could not be started."
-              : "Pending order could not be created.",
+            "Checkout could not be started.",
           ),
         );
       }
@@ -339,11 +234,7 @@ export function CheckoutPage() {
   return (
     <main className="customer-page checkout-page">
       <CheckoutIntro
-        subtitle={
-          checkoutMode === "AUTHENTICATED"
-            ? "Review your saved details, delivery address, voucher, and order total before payOS."
-            : "You will be redirected to payOS to complete payment."
-        }
+        subtitle="Review your saved details, delivery address, voucher, and order total before payOS."
         title="CHECKOUT"
       />
 
@@ -391,10 +282,6 @@ export function CheckoutPage() {
           contactSection={
             <CheckoutContact
               currentUser={currentUser}
-              disabled={isSubmitting}
-              guestEmail={guestEmail}
-              isGuest={checkoutMode === "GUEST"}
-              onGuestEmailChange={setGuestEmail}
             />
           }
           isDirectPay
@@ -410,7 +297,6 @@ export function CheckoutPage() {
             <CheckoutShipping
               addresses={addresses}
               disabled={isSubmitting}
-              isGuest={checkoutMode === "GUEST"}
               onAddressChange={setShippingInfo}
               onSaveAddressChange={(checked) => {
                 setSaveAddress(checked);
@@ -432,16 +318,8 @@ export function CheckoutPage() {
 
 function CheckoutContact({
   currentUser,
-  disabled,
-  guestEmail,
-  isGuest,
-  onGuestEmailChange,
 }: {
   currentUser?: User;
-  disabled: boolean;
-  guestEmail: string;
-  isGuest: boolean;
-  onGuestEmailChange: (value: string) => void;
 }) {
   return (
     <section
@@ -455,42 +333,24 @@ function CheckoutContact({
         <UserRound aria-hidden="true" size={22} />
       </header>
 
-      {isGuest ? (
-        <div className="form-field checkout-guest-email">
-          <label htmlFor="checkout-guest-email">Email address</label>
-          <input
-            autoComplete="email"
-            disabled={disabled}
-            id="checkout-guest-email"
-            maxLength={320}
-            onChange={(event) => onGuestEmailChange(event.target.value)}
-            placeholder="guest@example.com"
-            required
-            type="email"
-            value={guestEmail}
-          />
-          <small>Required for order updates.</small>
+      <div className="checkout-account-card">
+        <div>
+          <span>Signed in as</span>
+          <strong>{currentUser?.email || "Authenticated customer"}</strong>
         </div>
-      ) : (
-        <div className="checkout-account-card">
+        {currentUser?.name ? (
           <div>
-            <span>Signed in as</span>
-            <strong>{currentUser?.email || "Authenticated customer"}</strong>
+            <span>Name</span>
+            <strong>{currentUser.name}</strong>
           </div>
-          {currentUser?.name ? (
-            <div>
-              <span>Name</span>
-              <strong>{currentUser.name}</strong>
-            </div>
-          ) : null}
-          {currentUser?.phone ? (
-            <div>
-              <span>Phone</span>
-              <strong>{currentUser.phone}</strong>
-            </div>
-          ) : null}
-        </div>
-      )}
+        ) : null}
+        {currentUser?.phone ? (
+          <div>
+            <span>Phone</span>
+            <strong>{currentUser.phone}</strong>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -498,7 +358,6 @@ function CheckoutContact({
 function CheckoutShipping({
   addresses,
   disabled,
-  isGuest,
   onAddressChange,
   onSaveAddressChange,
   onSelectedAddressChange,
@@ -510,7 +369,6 @@ function CheckoutShipping({
 }: {
   addresses: Address[];
   disabled: boolean;
-  isGuest: boolean;
   onAddressChange: (value: AddressInput) => void;
   onSaveAddressChange: (value: boolean) => void;
   onSelectedAddressChange: (value: string) => void;
@@ -591,32 +449,30 @@ function CheckoutShipping({
             onChange={onAddressChange}
             value={shippingInfo}
           />
-          {!isGuest ? (
-            <div className="checkout-address-checks">
-              <label className="address-checkbox">
-                <input
-                  checked={saveAddress}
-                  disabled={disabled}
-                  onChange={(event) =>
-                    onSaveAddressChange(event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                Save this address
-              </label>
-              <label className="address-checkbox">
-                <input
-                  checked={setDefault}
-                  disabled={disabled || !saveAddress}
-                  onChange={(event) =>
-                    onSetDefaultChange(event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                Set as default
-              </label>
-            </div>
-          ) : null}
+          <div className="checkout-address-checks">
+            <label className="address-checkbox">
+              <input
+                checked={saveAddress}
+                disabled={disabled}
+                onChange={(event) =>
+                  onSaveAddressChange(event.target.checked)
+                }
+                type="checkbox"
+              />
+              Save this address
+            </label>
+            <label className="address-checkbox">
+              <input
+                checked={setDefault}
+                disabled={disabled || !saveAddress}
+                onChange={(event) =>
+                  onSetDefaultChange(event.target.checked)
+                }
+                type="checkbox"
+              />
+              Set as default
+            </label>
+          </div>
         </div>
       ) : null}
     </section>
@@ -662,10 +518,3 @@ function CheckoutSkeleton() {
   );
 }
 
-function isValidGuestEmail(value: string): boolean {
-  return (
-    value.length > 0 &&
-    value.length <= 320 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-  );
-}

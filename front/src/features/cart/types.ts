@@ -51,13 +51,6 @@ export interface CartResponse {
 export interface AddCartItemRequest {
   variantId: string;
   quantity: number;
-  guestSnapshot?: GuestCartItemSnapshot;
-}
-
-export interface GuestCartItemSnapshot {
-  product: CartProductSnapshot;
-  variant: CartVariantDisplay;
-  unitPrice: number;
 }
 
 export interface UpdateCartItemRequest {

@@ -31,7 +31,6 @@ const orderEmailPaymentSelect = {
 
 const orderEmailSelect = {
   id: true,
-  guestEmail: true,
   shippingRecipientName: true,
   status: true,
   subtotalAmount: true,
@@ -303,7 +302,7 @@ export class OrderEmailService {
         return false;
       }
 
-      const recipientEmail = order.user?.email ?? order.guestEmail;
+      const recipientEmail = order.user.email;
       if (!recipientEmail) {
         this.log('warn', 'ORDER_EMAIL_SKIPPED_NO_RECIPIENT', {
           event,

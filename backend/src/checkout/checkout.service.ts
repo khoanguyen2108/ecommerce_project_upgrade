@@ -13,11 +13,6 @@ import type {
   CheckoutShippingInfoDto,
   CreateCheckoutOrderDto,
 } from './dto/create-checkout-order.dto';
-import type {
-  CreateGuestCheckoutOrderDto,
-  GuestCheckoutItemDto,
-  GuestCheckoutSummaryDto,
-} from './dto/guest-checkout.dto';
 import { VoucherEligibilityService } from './voucher-eligibility.service';
 
 const MAX_CHECKOUT_ITEM_QUANTITY = 99;
@@ -114,7 +109,6 @@ const checkoutPaymentSelect = {
 const checkoutOrderSelect = {
   id: true,
   userId: true,
-  guestEmail: true,
   status: true,
   subtotalAmount: true,
   discountAmount: true,
@@ -242,39 +236,6 @@ export class CheckoutService {
     };
   }
 
-  async getGuestSummary(dto: GuestCheckoutSummaryDto) {
-    const cart = await this.loadGuestCart(this.prismaService, dto.items);
-    const baseSummary = this.toValidatedSummary(cart);
-    const [voucherResult, eligibleVouchers] = await Promise.all([
-      dto.voucherCode
-        ? this.voucherEligibilityService.evaluateForSummary(
-            undefined,
-            baseSummary.subtotalAmount,
-            dto.voucherCode,
-          )
-        : undefined,
-      this.voucherEligibilityService.listEligible(
-        undefined,
-        baseSummary.subtotalAmount,
-      ),
-    ]);
-
-    return {
-      summary: {
-        ...baseSummary,
-        discountAmount: voucherResult?.discountAmount ?? 0,
-        totalAmount: voucherResult?.totalAmount ?? baseSummary.subtotalAmount,
-        appliedVoucher:
-          voucherResult?.eligible === true
-            ? voucherResult.appliedVoucher
-            : null,
-        voucherError:
-          voucherResult && !voucherResult.eligible ? voucherResult.error : null,
-        eligibleVouchers,
-      },
-    };
-  }
-
   async createOrderFromCart(user: AuthenticatedUser, dto: CreateCheckoutOrderDto) {
     this.assertShippingSource(dto);
 
@@ -328,7 +289,6 @@ export class CheckoutService {
       const createdOrder = await tx.order.create({
         data: {
           userId: user.id,
-          guestEmail: null,
           status: OrderStatus.PENDING_PAYMENT,
           subtotalAmount: summary.subtotalAmount,
           discountAmount,
@@ -387,65 +347,6 @@ export class CheckoutService {
     return {
       order: this.toOrderResponse(order),
     };
-  }
-
-  async createGuestOrder(dto: CreateGuestCheckoutOrderDto) {
-    const order = await this.prismaService.$transaction(async (tx) => {
-      const cart = await this.loadGuestCart(tx, dto.items);
-      const summary = this.toValidatedSummary(cart);
-      const voucherResult = dto.voucherCode
-        ? await this.voucherEligibilityService.requireForOrder(
-            tx,
-            undefined,
-            summary.subtotalAmount,
-            dto.voucherCode,
-          )
-        : undefined;
-      const shipping = dto.shippingInfo;
-
-      return tx.order.create({
-        data: {
-          userId: null,
-          guestEmail: shipping.email,
-          status: OrderStatus.PENDING_PAYMENT,
-          subtotalAmount: summary.subtotalAmount,
-          discountAmount: voucherResult?.discountAmount ?? 0,
-          totalAmount: voucherResult?.totalAmount ?? summary.subtotalAmount,
-          voucherId: voucherResult?.voucher.id,
-          voucherCodeSnapshot: voucherResult?.voucher.code,
-          voucherNameSnapshot: voucherResult?.voucher.name,
-          currency: summary.currency,
-          shippingRecipientName: shipping.recipientName,
-          shippingPhone: shipping.phone,
-          shippingProvince: shipping.province,
-          shippingDistrict: shipping.district,
-          shippingWard: shipping.ward,
-          shippingAddressLine: shipping.addressLine,
-          shippingNote: shipping.note || null,
-          expiresAt: this.orderExpiryService.getPendingOrderExpiresAt(),
-          items: {
-            create: summary.items.map((item) => ({
-              productId: item.productId,
-              variantId: item.variantId,
-              productName: item.productName,
-              sku: item.sku,
-              size: item.size,
-              color: item.color,
-              unitPrice: item.currentUnitPrice,
-              quantity: item.quantity,
-              lineTotal: item.currentLineTotal,
-            })),
-          },
-        },
-        select: checkoutOrderSelect,
-      });
-    });
-
-    if (order.guestEmail) {
-      void this.orderEmailService.sendOrderCreatedEmail(order.id);
-    }
-
-    return { order: this.toOrderResponse(order) };
   }
 
   private toOrderResponse(order: CheckoutOrderRecord) {
@@ -693,45 +594,6 @@ export class CheckoutService {
     if (!cart || cart.items.length === 0) {
       throw this.cartEmptyException();
     }
-  }
-
-  private async loadGuestCart(
-    client: Pick<Prisma.TransactionClient, 'productVariant'>,
-    items: GuestCheckoutItemDto[],
-  ): Promise<CheckoutValidationCart> {
-    const itemIntents = new Map<string, number>();
-
-    for (const item of items) {
-      const quantity = (itemIntents.get(item.variantId) ?? 0) + item.quantity;
-      if (quantity > MAX_CHECKOUT_ITEM_QUANTITY) {
-        throw new BadRequestException({
-          code: 'CHECKOUT_ITEM_QUANTITY_INVALID',
-          message: 'Checkout item quantity must be an integer from 1 to 99.',
-        });
-      }
-      itemIntents.set(item.variantId, quantity);
-    }
-
-    if (itemIntents.size === 0) {
-      throw this.cartEmptyException();
-    }
-
-    const variants = await client.productVariant.findMany({
-      where: { id: { in: [...itemIntents.keys()] } },
-      select: checkoutCartItemVariantSelect,
-    });
-    const variantsById = new Map(
-      variants.map((variant) => [variant.id, variant]),
-    );
-
-    return {
-      items: [...itemIntents.entries()].map(([variantId, quantity]) => ({
-        id: `guest:${variantId}`,
-        variantId,
-        quantity,
-        variant: variantsById.get(variantId) ?? null,
-      })),
-    };
   }
 
   private cartEmptyException() {

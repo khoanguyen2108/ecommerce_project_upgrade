@@ -1,5 +1,4 @@
 import type { OrderResponse } from "@/features/orders/types";
-import type { PayosPaymentResponse } from "@/features/payments/types";
 import type { AddressInput } from '@/features/addresses/types';
 
 export interface CheckoutSummaryItem {
@@ -59,7 +58,6 @@ export type CreateCheckoutOrderResponse = OrderResponse;
 export interface CheckoutShippingInfo extends AddressInput {
   saveAddress?: boolean;
   setDefault?: boolean;
-  email?: string;
 }
 
 export interface CreateCheckoutOrderRequest {
@@ -68,25 +66,3 @@ export interface CreateCheckoutOrderRequest {
   shippingInfo?: CheckoutShippingInfo;
 }
 
-export interface GuestCheckoutItemRequest {
-  variantId: string;
-  quantity: number;
-}
-
-export interface GuestCheckoutSummaryRequest {
-  items: GuestCheckoutItemRequest[];
-  voucherCode?: string;
-}
-
-export interface GuestCheckoutShippingInfo extends AddressInput {
-  email: string;
-}
-
-export interface CreateGuestCheckoutOrderRequest
-  extends GuestCheckoutSummaryRequest {
-  shippingInfo: GuestCheckoutShippingInfo;
-}
-
-export interface GuestCheckoutPaymentResponse extends PayosPaymentResponse {
-  order: OrderResponse["order"];
-}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { AuthenticatedAppGuard } from "@/components/auth/AuthenticatedAppGuard";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { CustomerChatWidget } from "@/components/chat/CustomerChatWidget";
 import { AuthSessionProvider } from "@/features/auth/AuthSessionProvider";
@@ -19,10 +20,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <AuthSessionProvider>
-          <CartProvider>
-            {children}
-            <CustomerChatWidget />
-          </CartProvider>
+          <AuthenticatedAppGuard>
+            <CartProvider>
+              {children}
+              <CustomerChatWidget />
+            </CartProvider>
+          </AuthenticatedAppGuard>
         </AuthSessionProvider>
       </body>
     </html>
