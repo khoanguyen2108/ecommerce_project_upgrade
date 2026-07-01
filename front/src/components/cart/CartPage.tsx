@@ -120,7 +120,7 @@ export function CartPage() {
 
 function CartEmptyState() {
   return (
-    <section className="wishlist-empty" aria-labelledby="cart-empty-heading">
+    <section className="checkout-empty" aria-labelledby="cart-empty-heading">
       <PackageOpen aria-hidden="true" size={38} strokeWidth={1.6} />
       <h2 id="cart-empty-heading">Your cart is empty</h2>
       <p>Add a size and color from product details before checkout.</p>

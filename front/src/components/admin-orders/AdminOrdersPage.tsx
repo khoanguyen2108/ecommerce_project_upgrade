@@ -399,7 +399,6 @@ function OrderRow({
   const customerLabel =
     order.customerName || order.customerEmail || order.shippingRecipientName || "Not set";
   const customerMeta = [
-    order.customerType === "GUEST" ? "Guest" : "Registered",
     order.customerEmail,
     order.customerPhone,
   ]

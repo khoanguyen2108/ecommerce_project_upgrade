@@ -1,7 +1,6 @@
 "use client";
 
-import { LogIn, MessageCircle, WifiOff, X } from "lucide-react";
-import Link from "next/link";
+import { MessageCircle, WifiOff, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AiMessageBubble, type AiMessageTone } from "@/components/chat/AiMessageBubble";
@@ -337,10 +336,6 @@ export function CustomerChatWidget() {
   }, [accessToken, isAdmin, isAuthenticated]);
 
   const connectionLabel = useMemo(() => {
-    if (!isAuthenticated) {
-      return "Sign in required";
-    }
-
     if (connectionState === "connected") {
       return "Online • Usually responds in minutes";
     }
@@ -350,14 +345,14 @@ export function CustomerChatWidget() {
     }
 
     return "Offline • We will reconnect shortly";
-  }, [connectionState, isAuthenticated]);
+  }, [connectionState]);
 
   const timeline = useMemo(
     () => buildTimeline(messages, localMessages, forwardedPersistedIds),
     [forwardedPersistedIds, localMessages, messages],
   );
 
-  if (shouldHide || isAdmin) {
+  if (shouldHide || isAdmin || isSessionLoading || !isAuthenticated) {
     return null;
   }
 
@@ -597,17 +592,7 @@ export function CustomerChatWidget() {
           </header>
 
           <div className="customer-chat-panel__body">
-            {isSessionLoading ? (
-              <ChatPanelState message="Checking your session." />
-            ) : !isAuthenticated ? (
-              <div className="customer-chat-login">
-                <p>Log in to chat with Belikeme support.</p>
-                <Link className="button button--primary" href="/login">
-                  <LogIn aria-hidden="true" size={17} />
-                  Log in
-                </Link>
-              </div>
-            ) : isLoading ? (
+            {isLoading ? (
               <ChatMessageSkeleton />
             ) : (
               <div
@@ -657,35 +642,31 @@ export function CustomerChatWidget() {
             </div>
           ) : null}
 
-          {isAuthenticated ? (
-            <>
-              <div
-                aria-label="Quick messages"
-                className="customer-chat-quick-actions"
-                role="group"
+          <div
+            aria-label="Quick messages"
+            className="customer-chat-quick-actions"
+            role="group"
+          >
+            {CUSTOMER_CHAT_QUICK_ACTIONS.map((action) => (
+              <button
+                className="customer-chat-quick-actions__chip"
+                disabled={isSending}
+                key={action.label}
+                onClick={() => handleQuickAction(action.message)}
+                type="button"
               >
-                {CUSTOMER_CHAT_QUICK_ACTIONS.map((action) => (
-                  <button
-                    className="customer-chat-quick-actions__chip"
-                    disabled={isSending}
-                    key={action.label}
-                    onClick={() => handleQuickAction(action.message)}
-                    type="button"
-                  >
-                    {action.label}
-                  </button>
-                ))}
-              </div>
-              <ChatComposer
-                draft={draft}
-                isSending={isSending}
-                maxLength={800}
-                onDraftChange={setDraft}
-                onSend={() => void sendMessage()}
-                textareaRef={textareaRef}
-              />
-            </>
-          ) : null}
+                {action.label}
+              </button>
+            ))}
+          </div>
+          <ChatComposer
+            draft={draft}
+            isSending={isSending}
+            maxLength={800}
+            onDraftChange={setDraft}
+            onSend={() => void sendMessage()}
+            textareaRef={textareaRef}
+          />
         </section>
       ) : null}
 
@@ -706,14 +687,6 @@ export function CustomerChatWidget() {
           ) : null}
         </button>
       ) : null}
-    </div>
-  );
-}
-
-function ChatPanelState({ message }: { message: string }) {
-  return (
-    <div className="customer-chat-panel__state" role="status">
-      {message}
     </div>
   );
 }

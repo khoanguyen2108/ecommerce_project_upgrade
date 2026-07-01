@@ -65,4 +65,3 @@ export interface CreateCheckoutOrderRequest {
   addressId?: string;
   shippingInfo?: CheckoutShippingInfo;
 }
-

@@ -29,7 +29,7 @@ export interface AdminPaymentQuery {
 
 export interface AdminPaymentOrderSummary {
   id: string;
-  userId: string | null;
+  userId: string;
   status: OrderStatus;
   subtotalAmount: number;
   totalAmount: number;
@@ -53,7 +53,7 @@ export interface AdminPaymentSummary {
   providerTransactionReference: string | null;
   failureReason: string | null;
   order: AdminPaymentOrderSummary;
-  user: AdminOrderCustomer | null;
+  user: AdminOrderCustomer;
   reconciliationIssues: PaymentReconciliationIssue[];
   createdAt: string;
   updatedAt: string;

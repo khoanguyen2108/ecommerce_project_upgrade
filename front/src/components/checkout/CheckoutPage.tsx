@@ -517,4 +517,3 @@ function CheckoutSkeleton() {
     </section>
   );
 }
-

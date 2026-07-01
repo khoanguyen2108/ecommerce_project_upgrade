@@ -10026,8 +10026,6 @@ img {
   overflow: hidden;
 }
 
-.customer-chat-login,
-.customer-chat-panel__state,
 .admin-chat-thread__empty,
 .admin-chats-list__empty {
   align-content: center;
@@ -10040,14 +10038,6 @@ img {
   text-align: center;
 }
 
-.customer-chat-login,
-.customer-chat-panel__state {
-  min-height: 100%;
-  padding: 24px;
-}
-
-.customer-chat-login p,
-.customer-chat-panel__state,
 .admin-chat-thread__empty span,
 .admin-chats-list__empty span {
   margin: 0;

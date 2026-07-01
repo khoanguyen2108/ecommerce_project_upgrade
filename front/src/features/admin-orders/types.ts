@@ -114,10 +114,8 @@ export interface PaymentReconciliationIssue {
 
 export interface AdminOrderBase {
   id: string;
-  userId: string | null;
-  user: AdminOrderCustomer | null;
-  guestEmail: string | null;
-  customerType: "GUEST" | "REGISTERED";
+  userId: string;
+  user: AdminOrderCustomer;
   customerEmail: string | null;
   customerName: string | null;
   customerPhone: string | null;

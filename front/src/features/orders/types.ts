@@ -68,8 +68,7 @@ export interface PaymentSummary {
 
 export interface Order {
   id: string;
-  userId: string | null;
-  guestEmail: string | null;
+  userId: string;
   status: OrderStatus;
   fulfillmentStatus: OrderFulfillmentStatus;
   subtotalAmount: number;
