@@ -10308,6 +10308,10 @@ img {
   margin-top: 4px;
 }
 
+.customer-chat-order-cards--single {
+  margin-top: 8px;
+}
+
 .customer-chat-order-card {
   align-items: center;
   background: #f8f8f8;
@@ -10337,6 +10341,33 @@ img {
 .customer-chat-order-card:focus-visible {
   outline: 2px solid #111111;
   outline-offset: 2px;
+}
+
+.customer-chat-order-card--single {
+  align-items: stretch;
+  background: #ffffff;
+  border: 0;
+  box-shadow: 0 10px 30px rgba(17, 17, 17, 0.07);
+  gap: 14px;
+  grid-template-columns: 82px minmax(0, 1fr) 18px;
+  padding: 16px;
+}
+
+.customer-chat-order-card--single .order-item-image--compact {
+  border-radius: 12px;
+  height: 104px;
+  width: 82px;
+}
+
+.customer-chat-order-card--single .customer-chat-order-card__content {
+  align-content: space-between;
+  gap: 8px;
+}
+
+.customer-chat-order-card--single
+  .customer-chat-order-card__header
+  > strong {
+  font-size: 0.95rem;
 }
 
 .customer-chat-order-card .order-item-image--compact {
@@ -10420,6 +10451,13 @@ img {
   color: #555858;
   font-size: 0.68rem;
   font-weight: 700;
+}
+
+.customer-chat-order-card--single .customer-chat-order-card__footer > span {
+  background: #111111;
+  border-radius: 10px;
+  color: #ffffff;
+  padding: 8px 10px;
 }
 
 .customer-chat-order-card > svg {

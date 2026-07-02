@@ -36,7 +36,8 @@ interface LocalChatMessage {
   createdAt: string;
   id: string;
   kind: "ai" | "customer";
-  messageType?: "text" | "order_cards";
+  messageType?: "text" | "single_order_card" | "order_cards";
+  order?: SupportOrderCard;
   orders?: SupportOrderCard[];
   showDayLabel?: boolean;
   status?: string;
@@ -64,7 +65,7 @@ const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
 const ORDER_DETAIL_PATH_PATTERN =
   /^\/orders\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
 const ORDER_DETAIL_URL_PATTERN =
-  /^\/orders\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  /^\/orders\/(?:BK\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 const SUPPORT_ORDER_CARD_STATUSES = new Set([
   "PENDING_PAYMENT",
   "PAID",
@@ -441,6 +442,7 @@ export function CustomerChatWidget() {
 
         addAiMessage(response.answer, "answer", {
           messageType: response.type ?? "text",
+          order: response.order,
           orders: response.orders,
         });
       } catch {
@@ -559,7 +561,7 @@ export function CustomerChatWidget() {
     tone: AiMessageTone,
     details: Pick<
       LocalChatMessage,
-      "messageType" | "orders" | "status" | "statusDetail"
+      "messageType" | "order" | "orders" | "status" | "statusDetail"
     > = {},
   ) {
     setLocalMessages((current) => [
@@ -660,6 +662,7 @@ export function CustomerChatWidget() {
                       createdAt={item.message.createdAt}
                       key={item.id}
                       messageType={item.message.messageType}
+                      order={item.message.order}
                       orders={item.message.orders}
                       showDayLabel={item.message.showDayLabel}
                       status={item.message.status}
@@ -838,13 +841,21 @@ function isValidSupportResponse(response: SupportResponse): boolean {
       response.answer.trim(),
   );
 
-  if (!hasValidBase || response.type !== "order_cards") {
+  if (!hasValidBase) {
+    return false;
+  }
+
+  if (response.type === "single_order_card") {
+    return Boolean(response.order && isValidOrderCard(response.order));
+  }
+
+  if (response.type !== "order_cards") {
     return hasValidBase;
   }
 
   return Boolean(
     Array.isArray(response.orders) &&
-      response.orders.length > 0 &&
+      response.orders.length > 1 &&
       response.orders.every(isValidOrderCard),
   );
 }
@@ -853,10 +864,13 @@ function isValidOrderCard(order: SupportOrderCard): boolean {
   return Boolean(
     order &&
       typeof order.orderCode === "string" &&
-      /^[0-9A-F]{8}$/.test(order.orderCode) &&
+      /^BK\d{6,}$/.test(order.orderCode) &&
       SUPPORT_ORDER_CARD_STATUSES.has(order.status) &&
       typeof order.createdAt === "string" &&
       !Number.isNaN(new Date(order.createdAt).getTime()) &&
+      (order.estimatedArrival === null ||
+        (typeof order.estimatedArrival === "string" &&
+          !Number.isNaN(new Date(order.estimatedArrival).getTime()))) &&
       Number.isSafeInteger(order.totalAmount) &&
       order.totalAmount >= 0 &&
       typeof order.currency === "string" &&

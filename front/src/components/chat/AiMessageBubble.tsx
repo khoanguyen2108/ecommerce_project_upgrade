@@ -8,7 +8,8 @@ export type AiMessageTone = "answer" | "error" | "handoff" | "out-of-scope";
 interface AiMessageBubbleProps {
   body: string;
   createdAt?: string;
-  messageType?: "text" | "order_cards";
+  messageType?: "text" | "single_order_card" | "order_cards";
+  order?: SupportOrderCard;
   orders?: SupportOrderCard[];
   showDayLabel?: boolean;
   status?: string;
@@ -20,6 +21,7 @@ export function AiMessageBubble({
   body,
   createdAt,
   messageType = "text",
+  order,
   orders = [],
   showDayLabel = false,
   status,
@@ -33,7 +35,7 @@ export function AiMessageBubble({
       ) : null}
       <article
         className={`customer-chat-ai-message customer-chat-ai-message--${tone} ${
-          messageType === "order_cards"
+          messageType === "order_cards" || messageType === "single_order_card"
             ? "customer-chat-ai-message--order-cards"
             : ""
         }`}
@@ -46,7 +48,12 @@ export function AiMessageBubble({
           <span>Belikeme AI</span>
         </div>
         <div className="customer-chat-ai-message__bubble">
-          {messageType === "order_cards" ? (
+          {messageType === "single_order_card" && order ? (
+            <div className="customer-chat-ai-message__content">
+              <p>{body}</p>
+              <AiOrderCards orders={[order]} variant="single" />
+            </div>
+          ) : messageType === "order_cards" ? (
             <div className="customer-chat-ai-message__content">
               <p>{body}</p>
               <AiOrderCards orders={orders} />

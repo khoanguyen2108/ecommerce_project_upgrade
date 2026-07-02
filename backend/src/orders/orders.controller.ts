@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Param,
-  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -90,7 +89,7 @@ export class OrdersController {
       'Customers can read only their own orders. Admin users may read any order for display purposes.',
   })
   @ApiParam({
-    description: 'Order UUID.',
+    description: 'Order UUID or public order code.',
     name: 'id',
   })
   @ApiOkResponse(envelopeResponse('Order returned.', orderDataExample))
@@ -104,7 +103,7 @@ export class OrdersController {
   @Get(':id')
   getOrder(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('id') id: string,
   ) {
     return this.ordersService.getOrder(user, id);
   }

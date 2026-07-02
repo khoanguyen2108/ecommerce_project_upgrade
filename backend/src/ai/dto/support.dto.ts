@@ -81,7 +81,7 @@ export class SupportHandoffDto {
 }
 
 export class SupportOrderCardDto {
-  @ApiProperty({ example: 'A1B2C3D4' })
+  @ApiProperty({ example: 'BK000001' })
   orderCode: string;
 
   @ApiProperty({ example: 'IN_TRANSIT' })
@@ -89,6 +89,9 @@ export class SupportOrderCardDto {
 
   @ApiProperty({ format: 'date-time' })
   createdAt: string;
+
+  @ApiPropertyOptional({ format: 'date-time', nullable: true })
+  estimatedArrival: string | null;
 
   @ApiProperty({ example: 126000 })
   totalAmount: number;
@@ -99,7 +102,7 @@ export class SupportOrderCardDto {
   @ApiPropertyOptional({ nullable: true })
   thumbnail: string | null;
 
-  @ApiProperty({ example: '/orders/61bc6e5d-7f1b-4e69-85ab-a1b2c3d4e5f6' })
+  @ApiProperty({ example: '/orders/BK000001' })
   detailUrl: string;
 }
 
@@ -108,9 +111,9 @@ export class SupportResponseDto {
   @IsIn(['ai', 'policy_fallback', 'handoff'])
   mode: 'ai' | 'policy_fallback' | 'handoff';
 
-  @ApiProperty({ enum: ['text', 'order_cards'] })
-  @IsIn(['text', 'order_cards'])
-  type: 'text' | 'order_cards';
+  @ApiProperty({ enum: ['text', 'single_order_card', 'order_cards'] })
+  @IsIn(['text', 'single_order_card', 'order_cards'])
+  type: 'text' | 'single_order_card' | 'order_cards';
 
   @ApiProperty({
     example:
@@ -126,6 +129,9 @@ export class SupportResponseDto {
 
   @ApiPropertyOptional({ type: [SupportOrderCardDto] })
   orders?: SupportOrderCardDto[];
+
+  @ApiPropertyOptional({ type: SupportOrderCardDto })
+  order?: SupportOrderCardDto;
 
   @ApiProperty({ type: SupportHandoffDto })
   handoff: SupportHandoffDto;

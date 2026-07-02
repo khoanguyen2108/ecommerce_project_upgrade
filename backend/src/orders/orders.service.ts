@@ -22,6 +22,9 @@ const DEFAULT_ORDER_LIMIT = 20;
 const MAX_ORDER_LIMIT = 50;
 const MAX_ORDER_TOTAL = 2_000_000_000;
 const DEFAULT_CURRENCY = 'VND';
+const ORDER_UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PUBLIC_ORDER_CODE_PATTERN = /^BK\d{6,}$/;
 
 export type ActiveOrderCardStatus =
   | 'PENDING_PAYMENT'
@@ -34,6 +37,7 @@ export interface ActiveOrderCardProjection {
   orderCode: string;
   status: ActiveOrderCardStatus;
   createdAt: string;
+  estimatedArrival: string | null;
   totalAmount: number;
   currency: string;
   thumbnail: string | null;
@@ -86,6 +90,7 @@ const orderItemSelect = {
 
 const orderSelect = {
   id: true,
+  orderCode: true,
   userId: true,
   status: true,
   fulfillmentStatus: true,
@@ -129,6 +134,7 @@ type OrderRecord = Prisma.OrderGetPayload<{
 
 const activeOrderCardSelect = {
   id: true,
+  orderCode: true,
   status: true,
   fulfillmentStatus: true,
   totalAmount: true,
@@ -311,9 +317,13 @@ export class OrdersService {
     };
   }
 
-  async getOrder(user: AuthenticatedUser, id: string) {
+  async getOrder(user: AuthenticatedUser, identifier: string) {
+    const identifierWhere = this.buildOrderIdentifierWhere(identifier);
     const order = await this.prismaService.order.findFirst({
-      where: this.buildOrderWhere(user, { id }),
+      where: {
+        ...identifierWhere,
+        ...(user.role === UserRole.ADMIN ? {} : { userId: user.id }),
+      },
       select: orderSelect,
     });
 
@@ -389,13 +399,14 @@ export class OrdersService {
     order: ActiveOrderCardRecord,
   ): ActiveOrderCardProjection {
     return {
-      orderCode: order.id.replace(/-/g, '').slice(-8).toUpperCase(),
+      orderCode: order.orderCode,
       status: this.getActiveOrderCardStatus(order),
       createdAt: order.createdAt.toISOString(),
+      estimatedArrival: null,
       totalAmount: order.totalAmount,
       currency: order.currency,
       thumbnail: getFirstProductImage(order.items[0]?.product),
-      detailUrl: `/orders/${encodeURIComponent(order.id)}`,
+      detailUrl: `/orders/${encodeURIComponent(order.orderCode)}`,
     };
   }
 
@@ -431,6 +442,20 @@ export class OrdersService {
       ...(user.role === UserRole.ADMIN ? {} : { userId: user.id }),
       ...(query.status ? { status: query.status } : {}),
     };
+  }
+
+  private buildOrderIdentifierWhere(
+    identifier: string,
+  ): Pick<Prisma.OrderWhereInput, 'id' | 'orderCode'> {
+    if (ORDER_UUID_PATTERN.test(identifier)) {
+      return { id: identifier };
+    }
+
+    if (PUBLIC_ORDER_CODE_PATTERN.test(identifier)) {
+      return { orderCode: identifier };
+    }
+
+    throw this.orderNotFoundException();
   }
 
   private mergeItemIntents(

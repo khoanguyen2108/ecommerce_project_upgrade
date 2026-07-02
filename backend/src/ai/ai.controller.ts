@@ -111,7 +111,7 @@ export class AiController {
   @ApiOperation({
     summary: "Get grounded AI support for the current customer",
     description:
-      "Uses only backend-approved support content and owner-scoped order tools. Track-order intent returns active order cards without a provider call. AI replies are not admin replies and are never written to human chat history.",
+      "Uses the configured AI provider for support intent classification, backend-approved support content, and owner-scoped order tools. AI replies are not admin replies and are never written to human chat history.",
   })
   @ApiOkResponse({
     description:

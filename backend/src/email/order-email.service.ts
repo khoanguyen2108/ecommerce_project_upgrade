@@ -31,6 +31,7 @@ const orderEmailPaymentSelect = {
 
 const orderEmailSelect = {
   id: true,
+  orderCode: true,
   shippingRecipientName: true,
   status: true,
   subtotalAmount: true,
@@ -127,7 +128,7 @@ export class OrderEmailService {
       }
 
       return {
-        subject: `Belikeme order ${this.shortOrderId(order.id)} is pending payment`,
+        subject: `Belikeme order ${order.orderCode} is pending payment`,
         text: this.buildTextEmail(
           order,
           'Thanks for your order.',
@@ -167,9 +168,7 @@ export class OrderEmailService {
       }
 
       return {
-        subject: `Belikeme payment confirmed for order ${this.shortOrderId(
-          order.id,
-        )}`,
+        subject: `Belikeme payment confirmed for order ${order.orderCode}`,
         text: this.buildTextEmail(
           order,
           'Payment confirmed.',
@@ -213,9 +212,7 @@ export class OrderEmailService {
       const message = this.getPaymentFailureMessage(payment.status, reason);
 
       return {
-        subject: `Belikeme ${headline.toLowerCase()} for order ${this.shortOrderId(
-          order.id,
-        )}`,
+        subject: `Belikeme ${headline.toLowerCase()} for order ${order.orderCode}`,
         text: this.buildTextEmail(order, `${headline}.`, [message]),
         html: this.buildHtmlEmail(order, `${headline}.`, [message]),
       };
@@ -229,7 +226,7 @@ export class OrderEmailService {
       }
 
       return {
-        subject: `Belikeme order ${this.shortOrderId(order.id)} was cancelled`,
+        subject: `Belikeme order ${order.orderCode} was cancelled`,
         text: this.buildTextEmail(order, 'Order cancelled.', [
           'Your pending order has been cancelled. No payment has been confirmed for this order.',
         ]),
@@ -247,7 +244,7 @@ export class OrderEmailService {
       }
 
       return {
-        subject: `Belikeme order ${this.shortOrderId(order.id)} expired`,
+        subject: `Belikeme order ${order.orderCode} expired`,
         text: this.buildTextEmail(order, 'Order expired.', [
           'Your pending order expired before payment was confirmed.',
         ]),
@@ -486,7 +483,7 @@ export class OrderEmailService {
       headline,
       ...messages.filter((message): message is string => Boolean(message)),
       '',
-      `Order ID: ${order.id}`,
+      `Order code: ${order.orderCode}`,
       `Status: ${this.formatStatus(order.status)}`,
       `Created: ${this.formatDate(order.createdAt)}`,
       order.expiresAt ? `Expires: ${this.formatDate(order.expiresAt)}` : undefined,
@@ -542,8 +539,8 @@ export class OrderEmailService {
         ${messageHtml}
         <table style="border-collapse:collapse;width:100%;margin:18px 0;">
           <tbody>
-            <tr><td style="padding:4px 0;color:#666;">Order ID</td><td style="padding:4px 0;text-align:right;">${this.escapeHtml(
-              order.id,
+            <tr><td style="padding:4px 0;color:#666;">Order code</td><td style="padding:4px 0;text-align:right;">${this.escapeHtml(
+              order.orderCode,
             )}</td></tr>
             <tr><td style="padding:4px 0;color:#666;">Status</td><td style="padding:4px 0;text-align:right;">${this.escapeHtml(
               this.formatStatus(order.status),
@@ -626,10 +623,10 @@ export class OrderEmailService {
     }
 
     if (reason === 'INSUFFICIENT_STOCK_AT_PAYMENT') {
-      return 'We could not confirm this payment because one or more items became unavailable. If your bank shows a deduction, please contact support with your order ID.';
+      return 'We could not confirm this payment because one or more items became unavailable. If your bank shows a deduction, please contact support with your order code.';
     }
 
-    return 'We could not confirm this payment for your order. If your bank shows a deduction, please contact support with your order ID.';
+    return 'We could not confirm this payment for your order. If your bank shows a deduction, please contact support with your order code.';
   }
 
   private formatTextItem(
@@ -669,10 +666,6 @@ export class OrderEmailService {
 
   private formatStatus(status: OrderStatus): string {
     return status.replace(/_/g, ' ').toLowerCase();
-  }
-
-  private shortOrderId(orderId: string): string {
-    return orderId.slice(0, 8);
   }
 
   private escapeHtml(value: string): string {

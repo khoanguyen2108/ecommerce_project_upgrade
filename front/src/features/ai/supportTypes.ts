@@ -34,6 +34,7 @@ export interface SupportOrderCard {
   orderCode: string;
   status: SupportOrderCardStatus;
   createdAt: string;
+  estimatedArrival: string | null;
   totalAmount: number;
   currency: string;
   thumbnail: string | null;
@@ -48,10 +49,11 @@ export interface SupportHandoff {
 
 export interface SupportResponse {
   mode: SupportMode;
-  type?: "text" | "order_cards";
+  type?: "text" | "single_order_card" | "order_cards";
   answer: string;
   sources?: SupportSource[];
   orderSummary?: SupportOrderSummary;
+  order?: SupportOrderCard;
   orders?: SupportOrderCard[];
   handoff?: SupportHandoff;
 }

@@ -108,6 +108,7 @@ const checkoutPaymentSelect = {
 
 const checkoutOrderSelect = {
   id: true,
+  orderCode: true,
   userId: true,
   status: true,
   subtotalAmount: true,

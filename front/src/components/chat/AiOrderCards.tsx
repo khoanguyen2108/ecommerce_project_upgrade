@@ -9,6 +9,7 @@ import { formatCurrency } from "@/components/orders/order-format";
 
 interface AiOrderCardsProps {
   orders: SupportOrderCard[];
+  variant?: "compact" | "single";
 }
 
 const STATUS_LABELS: Record<SupportOrderCardStatus, string> = {
@@ -19,13 +20,18 @@ const STATUS_LABELS: Record<SupportOrderCardStatus, string> = {
   OUT_FOR_DELIVERY: "Out for delivery",
 };
 
-export function AiOrderCards({ orders }: AiOrderCardsProps) {
+export function AiOrderCards({
+  orders,
+  variant = "compact",
+}: AiOrderCardsProps) {
   return (
-    <div className="customer-chat-order-cards">
+    <div
+      className={`customer-chat-order-cards customer-chat-order-cards--${variant}`}
+    >
       {orders.map((order) => (
         <Link
           aria-label={`View order ${order.orderCode}`}
-          className="customer-chat-order-card"
+          className={`customer-chat-order-card customer-chat-order-card--${variant}`}
           href={order.detailUrl}
           key={order.detailUrl}
         >
@@ -46,9 +52,14 @@ export function AiOrderCards({ orders }: AiOrderCardsProps) {
             <span className="customer-chat-order-card__date">
               Placed {formatPlacedDate(order.createdAt)}
             </span>
+            {order.estimatedArrival ? (
+              <span className="customer-chat-order-card__date">
+                Estimated arrival {formatPlacedDate(order.estimatedArrival)}
+              </span>
+            ) : null}
             <span className="customer-chat-order-card__footer">
               <strong>{formatCurrency(order.totalAmount, order.currency)}</strong>
-              <span>View order</span>
+              <span>Track Order</span>
             </span>
           </span>
           <ChevronRight aria-hidden="true" size={18} />

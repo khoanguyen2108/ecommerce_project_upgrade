@@ -68,6 +68,7 @@ export interface PaymentSummary {
 
 export interface Order {
   id: string;
+  orderCode: string;
   userId: string;
   status: OrderStatus;
   fulfillmentStatus: OrderFulfillmentStatus;

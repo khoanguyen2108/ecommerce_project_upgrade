@@ -17,6 +17,10 @@ import {
   type SupportOrderPromptContext,
 } from './prompts/support.prompt';
 import type { ApprovedSupportContent } from './support-knowledge.service';
+import {
+  SUPPORT_INTENT_SYSTEM_PROMPT,
+  buildSupportIntentUserPrompt,
+} from './prompts/support-intent.prompt';
 
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 
@@ -73,11 +77,28 @@ export class OpenRouterService {
     );
   }
 
+  async requestSupportIntent(message: string): Promise<string> {
+    return this.requestCompletion(
+      'support-intent',
+      SUPPORT_INTENT_SYSTEM_PROMPT,
+      buildSupportIntentUserPrompt(message),
+      { maxTokens: 32, temperature: 0 },
+    );
+  }
+
   private async requestCompletion(
-    operation: 'style-advice' | 'recommend-products' | 'support',
+    operation:
+      | 'style-advice'
+      | 'recommend-products'
+      | 'support'
+      | 'support-intent',
     systemPrompt: string,
     userPrompt: string,
-    options?: { requireZeroDataRetention?: boolean },
+    options?: {
+      maxTokens?: number;
+      requireZeroDataRetention?: boolean;
+      temperature?: number;
+    },
   ): Promise<string> {
     const config = this.aiConfigService.getRuntimeConfig();
 
@@ -106,8 +127,11 @@ export class OpenRouterService {
             { role: 'user', content: userPrompt },
           ],
           stream: false,
-          temperature: config.temperature,
-          max_tokens: config.maxTokens,
+          temperature: options?.temperature ?? config.temperature,
+          max_tokens: Math.min(
+            config.maxTokens,
+            options?.maxTokens ?? config.maxTokens,
+          ),
           provider: {
             data_collection: 'deny',
             ...(options?.requireZeroDataRetention ? { zdr: true } : {}),

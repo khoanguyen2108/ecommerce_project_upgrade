@@ -5,7 +5,10 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import type { CustomerOrderSupportSummary } from '../orders/orders.service';
+import type {
+  ActiveOrderCardStatus,
+  CustomerOrderSupportSummary,
+} from '../orders/orders.service';
 import { AiConfigService } from './ai-config.service';
 import { AiOrderToolService } from './ai-order-tool.service';
 import {
@@ -31,8 +34,6 @@ const DISALLOWED_CONTROL_CHARACTERS =
   /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const ORDER_RELATED_PATTERN =
   /\b(order|ordered|payment|paid|tracking|track|package|parcel|purchase|status)\b/i;
-const TRACK_ORDER_INTENT_PATTERN =
-  /\b(?:track|tracking|where is|where's|status|shipping status|delivery status|theo doi|trang thai)\b.*\b(?:order|package|parcel|purchase|don hang|goi hang)\b|\b(?:order|package|parcel|purchase|don hang|goi hang)\b.*\b(?:track|tracking|status|shipping|delivery|where|theo doi|trang thai|dau)\b/i;
 const RISKY_SUPPORT_PATTERN =
   /\b(refund|chargeback|dispute|charged(?:-| )but(?:-| )not(?:-| )paid|debited(?:-| )but(?:-| )not(?:-| )paid|charged but|debited but|failed webhook|reconciliation|cancel|cancellation|change (?:my |the )?address|address change|return eligibility|return eligible|eligible (?:for )?(?:a )?return|qualif(?:y|ies|ied) (?:for )?(?:a )?return|can i return|may i return|exception|exact measurements?|measurement chart|fit confirmation|guarantee(?:d)? fit|legal|lawyer|privacy|personal data|delete my data|threat|abuse)\b/i;
 const POSSIBLE_PII_PATTERN =
@@ -91,10 +92,6 @@ export class AiSupportService {
         return this.buildOutOfScopeResponse(scopeDecision.locale);
       }
 
-      if (this.isTrackOrderIntent(message)) {
-        return this.getActiveOrderCards(context, startedAt);
-      }
-
       const quotaLease = await this.aiQuotaService.acquire(
         'support',
         context.userId,
@@ -123,6 +120,71 @@ export class AiSupportService {
 
       const supportContent =
         this.supportKnowledgeService.selectRelevant(message);
+
+      if (POSSIBLE_PII_PATTERN.test(message)) {
+        return this.buildHandoff(
+          context,
+          startedAt,
+          supportContent,
+          undefined,
+          'SENSITIVE_REQUEST',
+          'This request may contain personal information and needs human support.',
+        );
+      }
+
+      if (RISKY_SUPPORT_PATTERN.test(message)) {
+        return this.buildHandoff(
+          context,
+          startedAt,
+          supportContent,
+          undefined,
+          'STAFF_CONFIRMATION_REQUIRED',
+          'This request requires confirmation from Belikeme Support staff.',
+        );
+      }
+
+      let intentContent: string;
+
+      try {
+        intentContent = await this.openRouterService.requestSupportIntent(
+          message,
+        );
+      } catch (error) {
+        const errorCode =
+          error instanceof AiProviderError ? error.code : 'AI_UNAVAILABLE';
+
+        return this.buildHandoff(
+          context,
+          startedAt,
+          supportContent,
+          undefined,
+          errorCode,
+          'Belikeme AI Support is temporarily unavailable. Please contact Belikeme Support.',
+        );
+      }
+
+      let intent: ReturnType<AiOutputValidator['validateSupportIntent']>;
+
+      try {
+        intent = this.aiOutputValidator.validateSupportIntent(intentContent);
+      } catch (error) {
+        if (!(error instanceof AiOutputValidationError)) {
+          throw error;
+        }
+
+        return this.buildHandoff(
+          context,
+          startedAt,
+          supportContent,
+          undefined,
+          'AI_INVALID_RESPONSE',
+          'Belikeme AI Support could not understand this request safely. Please contact Belikeme Support.',
+        );
+      }
+
+      if (intent === 'TRACK_ORDER') {
+        return this.getActiveOrderCards(context, startedAt);
+      }
 
       if (!dto.orderId && this.isOrderRelated(message)) {
         return this.buildHandoff(
@@ -155,28 +217,6 @@ export class AiSupportService {
           orderSummary,
           'SUPPORT_CONTENT_UNAVAILABLE',
           'Approved support information is unavailable. Please contact Belikeme Support.',
-        );
-      }
-
-      if (POSSIBLE_PII_PATTERN.test(message)) {
-        return this.buildHandoff(
-          context,
-          startedAt,
-          supportContent,
-          orderSummary,
-          'SENSITIVE_REQUEST',
-          'This request may contain personal information and needs human support.',
-        );
-      }
-
-      if (RISKY_SUPPORT_PATTERN.test(message)) {
-        return this.buildHandoff(
-          context,
-          startedAt,
-          supportContent,
-          orderSummary,
-          'STAFF_CONFIRMATION_REQUIRED',
-          'This request requires confirmation from Belikeme Support staff.',
         );
       }
 
@@ -347,15 +387,24 @@ export class AiSupportService {
     startedAt: number,
   ): Promise<SupportResponseDto> {
     const orders = await this.aiOrderToolService.getActiveOrders(context.userId);
+    const singleOrder = orders.length === 1 ? orders[0] : undefined;
     const response: SupportResponseDto = {
       mode: 'ai',
-      type: orders.length > 0 ? 'order_cards' : 'text',
+      type:
+        orders.length === 0
+          ? 'text'
+          : singleOrder
+            ? 'single_order_card'
+            : 'order_cards',
       answer:
-        orders.length > 0
-          ? 'I found your active orders.\n\nTap one to see tracking details.'
-          : "I couldn't find any active orders.\n\nIf you're looking for an older completed order, you can visit Order History.",
+        orders.length === 0
+          ? "I couldn't find any active orders.\n\nYou can visit Order History for completed orders."
+          : singleOrder
+            ? `Your latest order is currently ${this.getOrderStatusLabel(singleOrder.status)}.`
+            : 'I found your active orders.',
       sources: [],
-      ...(orders.length > 0 ? { orders } : {}),
+      ...(singleOrder ? { order: singleOrder } : {}),
+      ...(orders.length > 1 ? { orders } : {}),
       handoff: {
         required: false,
       },
@@ -369,6 +418,21 @@ export class AiSupportService {
     });
 
     return response;
+  }
+
+  private getOrderStatusLabel(status: ActiveOrderCardStatus): string {
+    switch (status) {
+      case 'PENDING_PAYMENT':
+        return 'Pending payment';
+      case 'PAID':
+        return 'Paid';
+      case 'PICKED_UP':
+        return 'Picked up';
+      case 'IN_TRANSIT':
+        return 'Shipping';
+      case 'OUT_FOR_DELIVERY':
+        return 'Out for delivery';
+    }
   }
 
   private buildHandoff(
@@ -459,18 +523,6 @@ export class AiSupportService {
 
   private isOrderRelated(message: string): boolean {
     return ORDER_RELATED_PATTERN.test(message);
-  }
-
-  private isTrackOrderIntent(message: string): boolean {
-    const comparable = message
-      .normalize('NFKD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/Ä‘/gi, 'd')
-      .toLocaleLowerCase()
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    return TRACK_ORDER_INTENT_PATTERN.test(comparable);
   }
 
   private isOrderAnswerGrounded(

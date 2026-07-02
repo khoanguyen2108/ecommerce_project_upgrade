@@ -61,6 +61,8 @@ export interface ValidatedSupportOutput {
   };
 }
 
+export type ValidatedSupportIntent = 'TRACK_ORDER' | 'GENERAL_SUPPORT';
+
 export class AiOutputValidationError extends Error {
   constructor() {
     super('AI response validation failed.');
@@ -70,6 +72,38 @@ export class AiOutputValidationError extends Error {
 
 @Injectable()
 export class AiOutputValidator {
+  validateSupportIntent(content: string): ValidatedSupportIntent {
+    const trimmedContent = content.trim();
+
+    if (
+      !trimmedContent ||
+      trimmedContent.length > MAX_PROVIDER_CONTENT_LENGTH ||
+      trimmedContent.startsWith('```') ||
+      HTML_PATTERN.test(trimmedContent)
+    ) {
+      throw new AiOutputValidationError();
+    }
+
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(trimmedContent);
+    } catch {
+      throw new AiOutputValidationError();
+    }
+
+    if (
+      !this.isRecord(parsed) ||
+      !this.hasOnlyKeys(parsed, ['intent']) ||
+      (parsed.intent !== 'TRACK_ORDER' &&
+        parsed.intent !== 'GENERAL_SUPPORT')
+    ) {
+      throw new AiOutputValidationError();
+    }
+
+    return parsed.intent;
+  }
+
   validateStyleAdvice(
     content: string,
     allowedRefs: ReadonlySet<string>,

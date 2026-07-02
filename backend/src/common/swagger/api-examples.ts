@@ -395,6 +395,7 @@ export const paymentExample = {
 
 export const orderExample = {
   id: orderItemExample.orderId,
+  orderCode: 'BK000001',
   userId: publicUserExample.id,
   status: 'PENDING_PAYMENT',
   fulfillmentStatus: 'PENDING',
