@@ -10279,6 +10279,11 @@ img {
   text-underline-offset: 2px;
 }
 
+.customer-chat-ai-message__content a.customer-chat-order-card {
+  color: #1a1c1c;
+  text-decoration: none;
+}
+
 .customer-chat-ai-message--order-cards {
   max-width: 100%;
   width: 100%;
