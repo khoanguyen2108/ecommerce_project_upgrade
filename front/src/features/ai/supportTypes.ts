@@ -7,7 +7,7 @@ export type SupportMode =
 
 export interface SupportRequest {
   message: string;
-  action?: "TRACK_ORDER";
+  action?: "TRACK_ORDER" | "RETURN_REQUEST";
   orderId?: string;
 }
 
@@ -42,6 +42,13 @@ export interface SupportOrderCard {
   detailUrl: string;
 }
 
+export interface SupportReturnRequestCard {
+  orderCode: string;
+  deliveredAt: string;
+  status: "DELIVERED";
+  requestStatus?: "PENDING";
+}
+
 export interface SupportHandoff {
   required: boolean;
   reason?: string;
@@ -50,12 +57,13 @@ export interface SupportHandoff {
 
 export interface SupportResponse {
   mode: SupportMode;
-  type?: "text" | "single_order_card" | "order_cards";
+  type?: "text" | "single_order_card" | "order_cards" | "return_request_card";
   answer: string;
   sources?: SupportSource[];
   orderSummary?: SupportOrderSummary;
   order?: SupportOrderCard;
   orders?: SupportOrderCard[];
+  returnRequest?: SupportReturnRequestCard;
   handoff?: SupportHandoff;
 }
 

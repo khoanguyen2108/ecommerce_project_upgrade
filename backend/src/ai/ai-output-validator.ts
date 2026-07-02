@@ -61,7 +61,10 @@ export interface ValidatedSupportOutput {
   };
 }
 
-export type ValidatedSupportIntent = 'TRACK_ORDER' | 'GENERAL_SUPPORT';
+export type ValidatedSupportIntent =
+  | 'TRACK_ORDER'
+  | 'RETURN_REQUEST'
+  | 'GENERAL_SUPPORT';
 
 export class AiOutputValidationError extends Error {
   constructor() {
@@ -96,6 +99,7 @@ export class AiOutputValidator {
       !this.isRecord(parsed) ||
       !this.hasOnlyKeys(parsed, ['intent']) ||
       (parsed.intent !== 'TRACK_ORDER' &&
+        parsed.intent !== 'RETURN_REQUEST' &&
         parsed.intent !== 'GENERAL_SUPPORT')
     ) {
       throw new AiOutputValidationError();

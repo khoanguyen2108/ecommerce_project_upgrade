@@ -35,10 +35,10 @@ export class SupportRequestDto {
   @Matches(SAFE_SUPPORT_TEXT_PATTERN)
   message: string;
 
-  @ApiPropertyOptional({ enum: ['TRACK_ORDER'] })
+  @ApiPropertyOptional({ enum: ['TRACK_ORDER', 'RETURN_REQUEST'] })
   @IsOptional()
-  @IsIn(['TRACK_ORDER'])
-  action?: 'TRACK_ORDER';
+  @IsIn(['TRACK_ORDER', 'RETURN_REQUEST'])
+  action?: 'TRACK_ORDER' | 'RETURN_REQUEST';
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
@@ -111,14 +111,31 @@ export class SupportOrderCardDto {
   detailUrl: string;
 }
 
+export class SupportReturnRequestCardDto {
+  @ApiProperty({ example: 'BK000001' })
+  orderCode: string;
+
+  @ApiProperty({ format: 'date-time' })
+  deliveredAt: string;
+
+  @ApiProperty({ example: 'DELIVERED' })
+  status: 'DELIVERED';
+}
+
 export class SupportResponseDto {
   @ApiProperty({ enum: ['ai', 'policy_fallback', 'handoff'] })
   @IsIn(['ai', 'policy_fallback', 'handoff'])
   mode: 'ai' | 'policy_fallback' | 'handoff';
 
-  @ApiProperty({ enum: ['text', 'single_order_card', 'order_cards'] })
-  @IsIn(['text', 'single_order_card', 'order_cards'])
-  type: 'text' | 'single_order_card' | 'order_cards';
+  @ApiProperty({
+    enum: ['text', 'single_order_card', 'order_cards', 'return_request_card'],
+  })
+  @IsIn(['text', 'single_order_card', 'order_cards', 'return_request_card'])
+  type:
+    | 'text'
+    | 'single_order_card'
+    | 'order_cards'
+    | 'return_request_card';
 
   @ApiProperty({
     example:
@@ -137,6 +154,9 @@ export class SupportResponseDto {
 
   @ApiPropertyOptional({ type: SupportOrderCardDto })
   order?: SupportOrderCardDto;
+
+  @ApiPropertyOptional({ type: SupportReturnRequestCardDto })
+  returnRequest?: SupportReturnRequestCardDto;
 
   @ApiProperty({ type: SupportHandoffDto })
   handoff: SupportHandoffDto;

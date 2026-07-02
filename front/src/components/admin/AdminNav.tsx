@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   MessageCircle,
   Package,
+  RotateCcw,
   Tags,
   TicketPercent,
   Users,
@@ -53,6 +54,11 @@ const adminNavItems = [
     href: "/admin/orders",
     icon: ClipboardList,
     label: "Orders",
+  },
+  {
+    href: "/admin/returns",
+    icon: RotateCcw,
+    label: "Returns",
   },
 ] as const;
 

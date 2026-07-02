@@ -7545,7 +7545,8 @@ img {
 
 .order-status-badge,
 .payment-status-badge,
-.fulfillment-status-badge {
+.fulfillment-status-badge,
+.return-request-status {
   align-items: center;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -7564,6 +7565,110 @@ img {
   background: #fff7d6;
   border-color: #e4bc41;
   color: #6d4b00;
+}
+
+.return-request-status--pending {
+  background: #fff7d6;
+  border-color: #e4bc41;
+  color: #6d4b00;
+}
+
+.return-request-status--approved {
+  background: #e7f7ed;
+  border-color: #88c99d;
+  color: #176b34;
+}
+
+.return-request-status--rejected {
+  background: #fff1f2;
+  border-color: #f3a6ad;
+  color: #b42335;
+}
+
+.admin-returns-page,
+.admin-return-detail {
+  display: grid;
+  gap: 22px;
+}
+
+.admin-returns-hero {
+  align-items: end;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.admin-returns-filter {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.admin-returns-filter label {
+  display: grid;
+  gap: 7px;
+  max-width: 260px;
+}
+
+.admin-returns-filter label > span {
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.admin-returns-filter select {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+}
+
+.admin-return-detail__back {
+  align-items: center;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 700;
+  gap: 7px;
+  justify-self: start;
+}
+
+.admin-return-review-card > p {
+  color: var(--color-text-muted);
+  line-height: 1.65;
+  margin: 16px 0 0;
+  white-space: pre-wrap;
+}
+
+.admin-return-review-card__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.button--danger {
+  background: #b42335;
+  border-color: #b42335;
+  color: #ffffff;
+}
+
+.button--danger:hover:not(:disabled) {
+  background: #8f1d2b;
+  border-color: #8f1d2b;
+}
+
+.admin-return-review-card__reviewed {
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  padding: 12px !important;
+}
+
+@media (max-width: 700px) {
+  .admin-returns-hero { align-items: flex-start; flex-direction: column; }
+  .admin-return-review-card__actions { flex-direction: column; }
+  .admin-return-review-card__actions .button { width: 100%; }
 }
 
 .order-status-badge--paid,

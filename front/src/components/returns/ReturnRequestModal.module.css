@@ -1,0 +1,142 @@
+.backdrop {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.56);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 1200;
+}
+
+.modal {
+  background: #ffffff;
+  border: 1px solid #dbe4ed;
+  border-radius: 20px;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.2);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  width: min(520px, 100%);
+}
+
+.header {
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 22px 24px;
+}
+
+.header p,
+.header h2 {
+  margin: 0;
+}
+
+.header p {
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.header h2 {
+  font-family: Montserrat, Inter, sans-serif;
+  font-size: 1.35rem;
+  margin-top: 3px;
+}
+
+.icon {
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 11px;
+  display: inline-flex;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.close {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #64748b;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.close:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #111827;
+}
+
+.body {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+}
+
+.body label {
+  display: grid;
+  gap: 8px;
+}
+
+.body label > span {
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.body select,
+.body textarea {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  color: #111827;
+  font: inherit;
+  padding: 12px 13px;
+  width: 100%;
+}
+
+.body textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.body select:focus,
+.body textarea:focus {
+  border-color: #111827;
+  outline: 2px solid rgba(17, 24, 39, 0.12);
+}
+
+.body small {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  justify-self: end;
+}
+
+.error {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  color: #be123c;
+  font-size: 0.82rem;
+  padding: 11px 12px;
+}
+
+.footer {
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 18px 24px 22px;
+}
+
+@media (max-width: 540px) {
+  .backdrop { align-items: flex-end; padding: 0; }
+  .modal { border-radius: 20px 20px 0 0; max-height: 92dvh; width: 100%; }
+  .header, .body { padding-left: 18px; padding-right: 18px; }
+  .footer { padding-left: 18px; padding-right: 18px; }
+  .footer :global(.button) { flex: 1; }
+}

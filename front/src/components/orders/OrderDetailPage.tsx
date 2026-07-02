@@ -8,11 +8,14 @@ import {
   MapPin,
   Package,
   RefreshCw,
+  RotateCcw,
   Truck,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { OrderItemImage } from "@/components/orders/OrderItemImage";
+import { ReturnRequestModal } from "@/components/returns/ReturnRequestModal";
+import { ReturnRequestStatusBadge } from "@/components/returns/ReturnRequestStatusBadge";
 import {
   FulfillmentStatusBadge,
   OrderStatusBadge,
@@ -31,11 +34,13 @@ import {
   getOrderRequestId,
 } from "@/components/orders/order-format";
 import { getOrder } from "@/features/orders/api";
+import { listMyReturnRequests } from "@/features/returns/api";
 import type {
   Order,
   OrderFulfillmentStatus,
   PaymentSummary,
 } from "@/features/orders/types";
+import type { CustomerReturnRequest } from "@/features/returns/types";
 
 interface OrderDetailPageProps {
   orderId: string;
@@ -57,6 +62,9 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
   const [error, setError] = useState<string>();
   const [requestId, setRequestId] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [returnRequest, setReturnRequest] = useState<CustomerReturnRequest>();
+  const [returnError, setReturnError] = useState<string>();
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,12 +73,30 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       setIsLoading(true);
       setError(undefined);
       setRequestId(undefined);
+      setReturnError(undefined);
 
       try {
         const response = await getOrder(orderId);
 
         if (isMounted) {
           setOrder(response.order);
+        }
+
+        try {
+          const returnsResponse = await listMyReturnRequests();
+
+          if (isMounted) {
+            setReturnRequest(
+              returnsResponse.returnRequests.find(
+                (request) => request.orderCode === response.order.orderCode,
+              ),
+            );
+          }
+        } catch {
+          if (isMounted) {
+            setReturnRequest(undefined);
+            setReturnError('Return status could not be loaded. Refresh to try again.');
+          }
         }
       } catch (loadError) {
         if (!isMounted) {
@@ -148,6 +174,12 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
       <div className="order-detail-layout">
         <div className="order-detail-main">
           <FulfillmentProgress order={order} />
+          <ReturnRequestPanel
+            error={returnError}
+            onRequestReturn={() => setIsReturnModalOpen(true)}
+            order={order}
+            returnRequest={returnRequest}
+          />
           <OrderItems order={order} />
         </div>
 
@@ -157,7 +189,62 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           <PaymentDetails currency={order.currency} payment={latestPayment} />
         </aside>
       </div>
+
+      <ReturnRequestModal
+        isOpen={isReturnModalOpen}
+        onClose={() => setIsReturnModalOpen(false)}
+        onSubmitted={setReturnRequest}
+        orderCode={order.orderCode}
+      />
     </main>
+  );
+}
+
+function ReturnRequestPanel({
+  error,
+  onRequestReturn,
+  order,
+  returnRequest,
+}: {
+  error?: string;
+  onRequestReturn: () => void;
+  order: Order;
+  returnRequest?: CustomerReturnRequest;
+}) {
+  if (order.fulfillmentStatus !== "DELIVERED") {
+    return null;
+  }
+
+  return (
+    <section className="order-detail-card order-return-card" aria-labelledby="return-request-heading">
+      <div className="order-detail-card__heading">
+        <div>
+          <p className="eyebrow">After delivery</p>
+          <h2 id="return-request-heading">Return request</h2>
+        </div>
+        <RotateCcw aria-hidden="true" size={22} />
+      </div>
+
+      {returnRequest ? (
+        <div className="order-return-card__status">
+          <ReturnRequestStatusBadge status={returnRequest.status} />
+          <p>
+            Submitted {formatDate(returnRequest.createdAt)} for order #{order.orderCode}.
+          </p>
+        </div>
+      ) : (
+        <div className="order-return-card__action">
+          <p>
+            If something is not right, send a short request for our team to review.
+          </p>
+          <button className="button button--primary" onClick={onRequestReturn} type="button">
+            Request Return
+          </button>
+        </div>
+      )}
+
+      {error ? <p className="order-return-card__error" role="alert">{error}</p> : null}
+    </section>
   );
 }
 

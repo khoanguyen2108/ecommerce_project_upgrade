@@ -8,10 +8,12 @@ import { AiMessageBubble, type AiMessageTone } from "@/components/chat/AiMessage
 import { AiTypingIndicator } from "@/components/chat/AiTypingIndicator";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatMessage as ChatMessageBubble } from "@/components/chat/ChatMessage";
+import { ReturnRequestModal } from "@/components/returns/ReturnRequestModal";
 import { useAiSupport } from "@/features/ai/supportHooks";
 import type {
   SupportOrderCard,
   SupportRequest,
+  SupportReturnRequestCard,
   SupportResponse,
 } from "@/features/ai/supportTypes";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
@@ -37,9 +39,10 @@ interface LocalChatMessage {
   createdAt: string;
   id: string;
   kind: "ai" | "customer";
-  messageType?: "text" | "single_order_card" | "order_cards";
+  messageType?: "text" | "single_order_card" | "order_cards" | "return_request_card";
   order?: SupportOrderCard;
   orders?: SupportOrderCard[];
+  returnRequest?: SupportReturnRequestCard;
   showDayLabel?: boolean;
   status?: string;
   statusDetail?: string;
@@ -114,8 +117,9 @@ const CUSTOMER_CHAT_QUICK_ACTIONS = [
     action: "TRACK_ORDER",
   },
   {
-    label: "Return Policy",
-    message: "Can you tell me about the return policy?",
+    label: "Request Return",
+    message: "I want to return my order.",
+    action: "RETURN_REQUEST",
   },
   {
     label: "Sizing Guide",
@@ -153,6 +157,8 @@ export function CustomerChatWidget() {
   const [unreadAdminCount, setUnreadAdminCount] = useState(0);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("offline");
+  const [selectedReturnOrder, setSelectedReturnOrder] =
+    useState<SupportReturnRequestCard>();
   const isOpenRef = useRef(isOpen);
   const pendingForwardRef = useRef<PendingForward | undefined>(undefined);
   const isSubmissionPendingRef = useRef(false);
@@ -171,6 +177,7 @@ export function CustomerChatWidget() {
     setForwardedPersistedIds(new Set());
     setDraft("");
     setError(undefined);
+    setSelectedReturnOrder(undefined);
     pendingForwardRef.current = undefined;
     isSubmissionPendingRef.current = false;
   }, [activeCustomerId]);
@@ -450,6 +457,7 @@ export function CustomerChatWidget() {
           messageType: response.type ?? "text",
           order: response.order,
           orders: response.orders,
+          returnRequest: response.returnRequest,
         });
       } catch {
         if (activeCustomerIdRef.current !== requestCustomerId) {
@@ -567,7 +575,12 @@ export function CustomerChatWidget() {
     tone: AiMessageTone,
     details: Pick<
       LocalChatMessage,
-      "messageType" | "order" | "orders" | "status" | "statusDetail"
+      | "messageType"
+      | "order"
+      | "orders"
+      | "returnRequest"
+      | "status"
+      | "statusDetail"
     > = {},
   ) {
     setLocalMessages((current) => [
@@ -671,8 +684,10 @@ export function CustomerChatWidget() {
                       createdAt={item.message.createdAt}
                       key={item.id}
                       messageType={item.message.messageType}
+                      onRequestReturn={setSelectedReturnOrder}
                       order={item.message.order}
                       orders={item.message.orders}
+                      returnRequest={item.message.returnRequest}
                       showDayLabel={item.message.showDayLabel}
                       status={item.message.status}
                       statusDetail={item.message.statusDetail}
@@ -744,6 +759,27 @@ export function CustomerChatWidget() {
           ) : null}
         </button>
       ) : null}
+
+      <ReturnRequestModal
+        isOpen={Boolean(selectedReturnOrder)}
+        onClose={() => setSelectedReturnOrder(undefined)}
+        onSubmitted={(request) => {
+          setLocalMessages((current) =>
+            current.map((message) =>
+              message.returnRequest?.orderCode === request.orderCode
+                ? {
+                    ...message,
+                    returnRequest: {
+                      ...message.returnRequest,
+                      requestStatus: "PENDING",
+                    },
+                  }
+                : message,
+            ),
+          );
+        }}
+        orderCode={selectedReturnOrder?.orderCode}
+      />
     </div>
   );
 }
@@ -861,6 +897,12 @@ function isValidSupportResponse(response: SupportResponse): boolean {
     return Boolean(response.order && isValidOrderCard(response.order));
   }
 
+  if (response.type === "return_request_card") {
+    return Boolean(
+      response.returnRequest && isValidReturnRequestCard(response.returnRequest),
+    );
+  }
+
   if (response.type !== "order_cards") {
     return hasValidBase;
   }
@@ -869,6 +911,19 @@ function isValidSupportResponse(response: SupportResponse): boolean {
     Array.isArray(response.orders) &&
       response.orders.length > 1 &&
       response.orders.every(isValidOrderCard),
+  );
+}
+
+function isValidReturnRequestCard(
+  returnRequest: SupportReturnRequestCard,
+): boolean {
+  return Boolean(
+    returnRequest &&
+      typeof returnRequest.orderCode === "string" &&
+      /^BK\d{6,}$/.test(returnRequest.orderCode) &&
+      returnRequest.status === "DELIVERED" &&
+      typeof returnRequest.deliveredAt === "string" &&
+      !Number.isNaN(new Date(returnRequest.deliveredAt).getTime()),
   );
 }
 

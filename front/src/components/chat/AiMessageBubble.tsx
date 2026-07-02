@@ -1,16 +1,22 @@
 import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { AiOrderCards } from "@/components/chat/AiOrderCards";
-import type { SupportOrderCard } from "@/features/ai/supportTypes";
+import { AiReturnRequestCard } from "@/components/chat/AiReturnRequestCard";
+import type {
+  SupportOrderCard,
+  SupportReturnRequestCard,
+} from "@/features/ai/supportTypes";
 
 export type AiMessageTone = "answer" | "error" | "handoff" | "out-of-scope";
 
 interface AiMessageBubbleProps {
   body: string;
   createdAt?: string;
-  messageType?: "text" | "single_order_card" | "order_cards";
+  messageType?: "text" | "single_order_card" | "order_cards" | "return_request_card";
+  onRequestReturn?: (returnRequest: SupportReturnRequestCard) => void;
   order?: SupportOrderCard;
   orders?: SupportOrderCard[];
+  returnRequest?: SupportReturnRequestCard;
   showDayLabel?: boolean;
   status?: string;
   statusDetail?: string;
@@ -21,8 +27,10 @@ export function AiMessageBubble({
   body,
   createdAt,
   messageType = "text",
+  onRequestReturn,
   order,
   orders = [],
+  returnRequest,
   showDayLabel = false,
   status,
   statusDetail,
@@ -35,7 +43,9 @@ export function AiMessageBubble({
       ) : null}
       <article
         className={`customer-chat-ai-message customer-chat-ai-message--${tone} ${
-          messageType === "order_cards" || messageType === "single_order_card"
+          messageType === "order_cards" ||
+          messageType === "single_order_card" ||
+          messageType === "return_request_card"
             ? "customer-chat-ai-message--order-cards"
             : ""
         }`}
@@ -57,6 +67,16 @@ export function AiMessageBubble({
             <div className="customer-chat-ai-message__content">
               <p>{body}</p>
               <AiOrderCards orders={orders} />
+            </div>
+          ) : messageType === "return_request_card" &&
+            returnRequest &&
+            onRequestReturn ? (
+            <div className="customer-chat-ai-message__content">
+              <p>{body}</p>
+              <AiReturnRequestCard
+                onRequestReturn={onRequestReturn}
+                returnRequest={returnRequest}
+              />
             </div>
           ) : (
             <SafeMarkdown value={body} />

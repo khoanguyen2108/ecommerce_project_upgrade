@@ -43,6 +43,12 @@ enum OrderFulfillmentStatus {
   DELIVERED
 }
 
+enum ReturnRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -98,6 +104,8 @@ model User {
   cart                  Cart?
   customerChatConversations ChatConversation[] @relation("CustomerChatConversations")
   chatMessages          ChatMessage[] @relation("UserChatMessages")
+  returnRequests        ReturnRequest[] @relation("CustomerReturnRequests")
+  reviewedReturnRequests ReturnRequest[] @relation("ReviewedReturnRequests")
 
   @@index([role])
   @@index([isActive])
@@ -323,11 +331,31 @@ model Order {
   payments       Payment[]
   webhookEvents  PaymentWebhookEvent[]
   paymentReconciliationIssues PaymentReconciliationIssue[]
+  returnRequests ReturnRequest[]
 
   @@index([userId, createdAt])
   @@index([status])
   @@index([voucherId])
   @@index([createdAt])
+}
+
+model ReturnRequest {
+  id          String              @id @default(uuid()) @db.Uuid
+  orderId     String              @db.Uuid
+  order       Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customerId  String              @db.Uuid
+  customer    User                @relation("CustomerReturnRequests", fields: [customerId], references: [id], onDelete: Restrict)
+  reason      String              @db.VarChar(32)
+  description String?             @db.VarChar(1000)
+  status      ReturnRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  reviewedAt  DateTime?
+  reviewedBy  String?             @db.Uuid
+  reviewer    User?               @relation("ReviewedReturnRequests", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([customerId, createdAt])
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
 }
 
 model OrderItem {

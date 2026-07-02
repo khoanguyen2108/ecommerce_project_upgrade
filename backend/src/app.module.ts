@@ -22,6 +22,7 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
+import { ReturnsModule } from './returns/returns.module';
 import { RequestLoggingMiddleware } from './common/middleware/request-logging.middleware';
 
 const secondsToMilliseconds = (seconds: number) => seconds * 1000;
@@ -56,6 +57,7 @@ const getPositiveNumber = (
     }),
     PrismaModule,
     RedisModule,
+    ReturnsModule,
     AiModule,
     AuthModule,
     AddressesModule,

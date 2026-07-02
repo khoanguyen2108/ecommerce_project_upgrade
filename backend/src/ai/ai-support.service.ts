@@ -9,6 +9,7 @@ import type {
   ActiveOrderCardStatus,
   CustomerOrderSupportSummary,
 } from '../orders/orders.service';
+import { ReturnsService } from '../returns/returns.service';
 import { AiConfigService } from './ai-config.service';
 import { AiOrderToolService } from './ai-order-tool.service';
 import {
@@ -34,6 +35,8 @@ const DISALLOWED_CONTROL_CHARACTERS =
   /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const ORDER_RELATED_PATTERN =
   /\b(order|ordered|payment|paid|tracking|track|package|parcel|purchase|status)\b/i;
+const RETURN_REQUEST_PATTERN =
+  /\b(?:i\s+(?:want|need|would like)\s+(?:to\s+)?return|return\s+my\s+(?:order|item)|request\s+(?:a\s+)?return|start\s+(?:a\s+)?return|wrong\s+(?:size|item)|incorrect\s+item|damaged(?:\s+(?:item|order|product))?|(?:arrived\s+)?(?:broken|defective)|doesn['’]?t\s+fit|too\s+(?:small|large)|changed?\s+my\s+mind|change\s+of\s+mind)\b/i;
 const RISKY_SUPPORT_PATTERN =
   /\b(refund|chargeback|dispute|charged(?:-| )but(?:-| )not(?:-| )paid|debited(?:-| )but(?:-| )not(?:-| )paid|charged but|debited but|failed webhook|reconciliation|cancel|cancellation|change (?:my |the )?address|address change|return eligibility|return eligible|eligible (?:for )?(?:a )?return|qualif(?:y|ies|ied) (?:for )?(?:a )?return|can i return|may i return|exception|exact measurements?|measurement chart|fit confirmation|guarantee(?:d)? fit|legal|lawyer|privacy|personal data|delete my data|threat|abuse)\b/i;
 const POSSIBLE_PII_PATTERN =
@@ -68,6 +71,7 @@ export class AiSupportService {
     private readonly openRouterService: OpenRouterService,
     private readonly aiScopeService: AiScopeService,
     private readonly aiQuotaService: AiQuotaService,
+    private readonly returnsService: ReturnsService,
   ) {}
 
   async getSupport(
@@ -89,12 +93,20 @@ export class AiSupportService {
         return this.getActiveOrderCards(context, startedAt);
       }
 
+      if (dto.action === 'RETURN_REQUEST') {
+        return this.getReturnRequestCard(context, startedAt, dto.orderId);
+      }
+
       const scopeDecision = this.aiScopeService.evaluateSupport(message);
 
       this.aiScopeService.logDecision('/ai/support', scopeDecision, context);
 
       if (scopeDecision.result !== 'allowed') {
         return this.buildOutOfScopeResponse(scopeDecision.locale);
+      }
+
+      if (this.isReturnRequest(message)) {
+        return this.getReturnRequestCard(context, startedAt, dto.orderId);
       }
 
       const quotaLease = await this.aiQuotaService.acquire(
@@ -189,6 +201,10 @@ export class AiSupportService {
 
       if (intent === 'TRACK_ORDER') {
         return this.getActiveOrderCards(context, startedAt);
+      }
+
+      if (intent === 'RETURN_REQUEST') {
+        return this.getReturnRequestCard(context, startedAt, dto.orderId);
       }
 
       if (!dto.orderId && this.isOrderRelated(message)) {
@@ -440,6 +456,62 @@ export class AiSupportService {
     }
   }
 
+  private async getReturnRequestCard(
+    context: SupportRequestContext,
+    startedAt: number,
+    orderId?: string,
+  ): Promise<SupportResponseDto> {
+    const eligibility =
+      await this.returnsService.getReturnEligibilityForCustomer(
+        context.userId,
+        orderId,
+      );
+
+    if (!eligibility.eligible) {
+      const answer =
+        eligibility.reason === 'PENDING_REQUEST_EXISTS'
+          ? 'Your return request is already pending review.'
+          : eligibility.reason === 'ORDER_NOT_DELIVERED'
+            ? 'This order is not eligible yet. Return requests can be submitted after delivery.'
+            : "I couldn't find a delivered order that is eligible for a return request.";
+      const response: SupportResponseDto = {
+        mode: 'ai',
+        type: 'text',
+        answer,
+        sources: [],
+        handoff: { required: false },
+      };
+
+      this.logEvent('AI_SUPPORT_RETURN_NOT_ELIGIBLE', context, {
+        mode: response.mode,
+        sourceCount: 0,
+        hasOrderContext: Boolean(orderId),
+        latencyMs: Date.now() - startedAt,
+        errorCode: eligibility.reason,
+      });
+
+      return response;
+    }
+
+    const response: SupportResponseDto = {
+      mode: 'ai',
+      type: 'return_request_card',
+      answer: 'This delivered order is eligible for a return request.',
+      sources: [],
+      returnRequest: eligibility.order,
+      handoff: { required: false },
+    };
+
+    this.logEvent('AI_SUPPORT_RETURN_ELIGIBLE', context, {
+      mode: response.mode,
+      sourceCount: 0,
+      hasOrderContext: true,
+      latencyMs: Date.now() - startedAt,
+    });
+
+    return response;
+  }
+
   private buildHandoff(
     context: SupportRequestContext,
     startedAt: number,
@@ -528,6 +600,10 @@ export class AiSupportService {
 
   private isOrderRelated(message: string): boolean {
     return ORDER_RELATED_PATTERN.test(message);
+  }
+
+  private isReturnRequest(message: string): boolean {
+    return RETURN_REQUEST_PATTERN.test(message);
   }
 
   private isOrderAnswerGrounded(
