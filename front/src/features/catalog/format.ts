@@ -1,6 +1,7 @@
 export function formatPrice(value: number): string {
   return new Intl.NumberFormat("vi-VN", {
     currency: "VND",
+    currencyDisplay: "code",
     maximumFractionDigits: 0,
     style: "currency",
   }).format(value);
