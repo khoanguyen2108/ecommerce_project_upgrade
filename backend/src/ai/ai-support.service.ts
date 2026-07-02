@@ -84,6 +84,11 @@ export class AiSupportService {
 
     try {
       const message = this.normalizeMessage(dto.message);
+
+      if (dto.action === 'TRACK_ORDER') {
+        return this.getActiveOrderCards(context, startedAt);
+      }
+
       const scopeDecision = this.aiScopeService.evaluateSupport(message);
 
       this.aiScopeService.logDecision('/ai/support', scopeDecision, context);

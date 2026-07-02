@@ -11,6 +11,7 @@ import { ChatMessage as ChatMessageBubble } from "@/components/chat/ChatMessage"
 import { useAiSupport } from "@/features/ai/supportHooks";
 import type {
   SupportOrderCard,
+  SupportRequest,
   SupportResponse,
 } from "@/features/ai/supportTypes";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
@@ -110,6 +111,7 @@ const CUSTOMER_CHAT_QUICK_ACTIONS = [
   {
     label: "Track Order",
     message: "I need help tracking my order.",
+    action: "TRACK_ORDER",
   },
   {
     label: "Return Policy",
@@ -144,6 +146,7 @@ export function CustomerChatWidget() {
     () => new Set(),
   );
   const [draft, setDraft] = useState("");
+  const [draftAction, setDraftAction] = useState<SupportRequest["action"]>();
   const [isLoading, setIsLoading] = useState(false);
   const [isSendingRealtime, setIsSendingRealtime] = useState(false);
   const [error, setError] = useState<string>();
@@ -374,6 +377,7 @@ export function CustomerChatWidget() {
 
   async function sendMessage() {
     const body = draft.trim();
+    const action = draftAction;
 
     if (
       !body ||
@@ -389,6 +393,7 @@ export function CustomerChatWidget() {
 
     try {
       setDraft("");
+      setDraftAction(undefined);
       const customerMessage = createLocalMessage("customer", body);
       const requestCustomerId = activeCustomerId;
       setLocalMessages((current) => [...current, customerMessage]);
@@ -397,6 +402,7 @@ export function CustomerChatWidget() {
         const orderId = getOrderIdFromPathname(pathname);
         const response = await askAiSupport({
           message: body,
+          ...(action ? { action } : {}),
           ...(orderId ? { orderId } : {}),
         });
 
@@ -570,8 +576,11 @@ export function CustomerChatWidget() {
     ]);
   }
 
-  function handleQuickAction(message: string) {
-    setDraft(message);
+  function handleQuickAction(
+    action: (typeof CUSTOMER_CHAT_QUICK_ACTIONS)[number],
+  ) {
+    setDraft(action.message);
+    setDraftAction("action" in action ? action.action : undefined);
     textareaRef.current?.focus();
   }
 
@@ -695,7 +704,7 @@ export function CustomerChatWidget() {
                     className="customer-chat-quick-actions__chip"
                     disabled={isSending}
                     key={action.label}
-                    onClick={() => handleQuickAction(action.message)}
+                    onClick={() => handleQuickAction(action)}
                     type="button"
                   >
                     {action.label}
@@ -706,7 +715,10 @@ export function CustomerChatWidget() {
                 draft={draft}
                 isSending={isSending}
                 maxLength={800}
-                onDraftChange={setDraft}
+                onDraftChange={(value) => {
+                  setDraft(value);
+                  setDraftAction(undefined);
+                }}
                 onSend={() => void sendMessage()}
                 textareaRef={textareaRef}
               />

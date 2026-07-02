@@ -7,6 +7,7 @@ export type SupportMode =
 
 export interface SupportRequest {
   message: string;
+  action?: "TRACK_ORDER";
   orderId?: string;
 }
 

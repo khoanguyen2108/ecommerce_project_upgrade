@@ -35,6 +35,11 @@ export class SupportRequestDto {
   @Matches(SAFE_SUPPORT_TEXT_PATTERN)
   message: string;
 
+  @ApiPropertyOptional({ enum: ['TRACK_ORDER'] })
+  @IsOptional()
+  @IsIn(['TRACK_ORDER'])
+  action?: 'TRACK_ORDER';
+
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()
