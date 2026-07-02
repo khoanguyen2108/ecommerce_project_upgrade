@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
 const PUBLIC_AUTH_ROUTES = new Set([
+  "/",
   "/login",
   "/register",
   "/forgot-password",
