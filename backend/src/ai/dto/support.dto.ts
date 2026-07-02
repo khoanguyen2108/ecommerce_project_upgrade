@@ -80,10 +80,37 @@ export class SupportHandoffDto {
   suggestedMessage?: string;
 }
 
+export class SupportOrderCardDto {
+  @ApiProperty({ example: 'A1B2C3D4' })
+  orderCode: string;
+
+  @ApiProperty({ example: 'IN_TRANSIT' })
+  status: string;
+
+  @ApiProperty({ format: 'date-time' })
+  createdAt: string;
+
+  @ApiProperty({ example: 126000 })
+  totalAmount: number;
+
+  @ApiProperty({ example: 'VND' })
+  currency: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  thumbnail: string | null;
+
+  @ApiProperty({ example: '/orders/61bc6e5d-7f1b-4e69-85ab-a1b2c3d4e5f6' })
+  detailUrl: string;
+}
+
 export class SupportResponseDto {
   @ApiProperty({ enum: ['ai', 'policy_fallback', 'handoff'] })
   @IsIn(['ai', 'policy_fallback', 'handoff'])
   mode: 'ai' | 'policy_fallback' | 'handoff';
+
+  @ApiProperty({ enum: ['text', 'order_cards'] })
+  @IsIn(['text', 'order_cards'])
+  type: 'text' | 'order_cards';
 
   @ApiProperty({
     example:
@@ -96,6 +123,9 @@ export class SupportResponseDto {
 
   @ApiPropertyOptional({ type: SupportOrderSummaryDto })
   orderSummary?: SupportOrderSummaryDto;
+
+  @ApiPropertyOptional({ type: [SupportOrderCardDto] })
+  orders?: SupportOrderCardDto[];
 
   @ApiProperty({ type: SupportHandoffDto })
   handoff: SupportHandoffDto;

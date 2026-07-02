@@ -1,11 +1,15 @@
 import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
+import { AiOrderCards } from "@/components/chat/AiOrderCards";
+import type { SupportOrderCard } from "@/features/ai/supportTypes";
 
 export type AiMessageTone = "answer" | "error" | "handoff" | "out-of-scope";
 
 interface AiMessageBubbleProps {
   body: string;
   createdAt?: string;
+  messageType?: "text" | "order_cards";
+  orders?: SupportOrderCard[];
   showDayLabel?: boolean;
   status?: string;
   statusDetail?: string;
@@ -15,6 +19,8 @@ interface AiMessageBubbleProps {
 export function AiMessageBubble({
   body,
   createdAt,
+  messageType = "text",
+  orders = [],
   showDayLabel = false,
   status,
   statusDetail,
@@ -26,7 +32,11 @@ export function AiMessageBubble({
         <span className="customer-chat-message__day">Today</span>
       ) : null}
       <article
-        className={`customer-chat-ai-message customer-chat-ai-message--${tone}`}
+        className={`customer-chat-ai-message customer-chat-ai-message--${tone} ${
+          messageType === "order_cards"
+            ? "customer-chat-ai-message--order-cards"
+            : ""
+        }`}
       >
         <div className="customer-chat-ai-message__identity">
           <span className="customer-chat-ai-message__badge">
@@ -36,7 +46,14 @@ export function AiMessageBubble({
           <span>Belikeme AI</span>
         </div>
         <div className="customer-chat-ai-message__bubble">
-          <SafeMarkdown value={body} />
+          {messageType === "order_cards" ? (
+            <div className="customer-chat-ai-message__content">
+              <p>{body}</p>
+              <AiOrderCards orders={orders} />
+            </div>
+          ) : (
+            <SafeMarkdown value={body} />
+          )}
           {status ? (
             <div className="customer-chat-ai-message__status">
               <strong>{status}</strong>

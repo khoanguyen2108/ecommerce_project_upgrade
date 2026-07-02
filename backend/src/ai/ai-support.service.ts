@@ -3,12 +3,11 @@ import {
   HttpException,
   Injectable,
   Logger,
-  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import type { CustomerOrderSupportSummary } from '../orders/orders.service';
 import { AiConfigService } from './ai-config.service';
+import { AiOrderToolService } from './ai-order-tool.service';
 import {
   AiOutputValidationError,
   AiOutputValidator,
@@ -32,6 +31,8 @@ const DISALLOWED_CONTROL_CHARACTERS =
   /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const ORDER_RELATED_PATTERN =
   /\b(order|ordered|payment|paid|tracking|track|package|parcel|purchase|status)\b/i;
+const TRACK_ORDER_INTENT_PATTERN =
+  /\b(?:track|tracking|where is|where's|status|shipping status|delivery status|theo doi|trang thai)\b.*\b(?:order|package|parcel|purchase|don hang|goi hang)\b|\b(?:order|package|parcel|purchase|don hang|goi hang)\b.*\b(?:track|tracking|status|shipping|delivery|where|theo doi|trang thai|dau)\b/i;
 const RISKY_SUPPORT_PATTERN =
   /\b(refund|chargeback|dispute|charged(?:-| )but(?:-| )not(?:-| )paid|debited(?:-| )but(?:-| )not(?:-| )paid|charged but|debited but|failed webhook|reconciliation|cancel|cancellation|change (?:my |the )?address|address change|return eligibility|return eligible|eligible (?:for )?(?:a )?return|qualif(?:y|ies|ied) (?:for )?(?:a )?return|can i return|may i return|exception|exact measurements?|measurement chart|fit confirmation|guarantee(?:d)? fit|legal|lawyer|privacy|personal data|delete my data|threat|abuse)\b/i;
 const POSSIBLE_PII_PATTERN =
@@ -49,24 +50,6 @@ const KNOWN_ORDER_STATUS_VALUES = [
   'FAILED',
 ] as const;
 
-const supportOrderSelect = {
-  id: true,
-  status: true,
-  fulfillmentStatus: true,
-  updatedAt: true,
-  payments: {
-    orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-    take: 1,
-    select: {
-      status: true,
-    },
-  },
-} as const satisfies Prisma.OrderSelect;
-
-type SupportOrderRecord = Prisma.OrderGetPayload<{
-  select: typeof supportOrderSelect;
-}>;
-
 export interface SupportRequestContext {
   requestId?: string;
   userId: string;
@@ -77,7 +60,7 @@ export class AiSupportService {
   private readonly logger = new Logger(AiSupportService.name);
 
   constructor(
-    private readonly prismaService: PrismaService,
+    private readonly aiOrderToolService: AiOrderToolService,
     private readonly aiConfigService: AiConfigService,
     private readonly supportKnowledgeService: SupportKnowledgeService,
     private readonly aiOutputValidator: AiOutputValidator,
@@ -106,6 +89,10 @@ export class AiSupportService {
 
       if (scopeDecision.result !== 'allowed') {
         return this.buildOutOfScopeResponse(scopeDecision.locale);
+      }
+
+      if (this.isTrackOrderIntent(message)) {
+        return this.getActiveOrderCards(context, startedAt);
       }
 
       const quotaLease = await this.aiQuotaService.acquire(
@@ -150,7 +137,10 @@ export class AiSupportService {
       }
 
       const order = dto.orderId
-        ? await this.loadOwnedOrder(dto.orderId, context.userId)
+        ? await this.aiOrderToolService.getOwnedOrderSummary(
+            context.userId,
+            dto.orderId,
+          )
         : undefined;
       const orderSummary = order ? this.toOrderSummary(order) : undefined;
       const orderPromptContext = order
@@ -278,6 +268,7 @@ export class AiSupportService {
 
         const response: SupportResponseDto = {
           mode: output.handoff.required ? 'handoff' : 'ai',
+          type: 'text',
           answer,
           sources: this.toSources(citedContent),
           ...(orderSummary ? { orderSummary } : {}),
@@ -327,48 +318,57 @@ export class AiSupportService {
     }
   }
 
-  private async loadOwnedOrder(
-    orderId: string,
-    userId: string,
-  ): Promise<SupportOrderRecord> {
-    const order = await this.prismaService.order.findFirst({
-      where: {
-        id: orderId,
-        userId,
-      },
-      select: supportOrderSelect,
-    });
-
-    if (!order) {
-      throw new NotFoundException({
-        code: 'ORDER_NOT_FOUND',
-        message: 'Order was not found.',
-      });
-    }
-
-    return order;
-  }
-
   private toOrderPromptContext(
-    order: SupportOrderRecord,
+    order: CustomerOrderSupportSummary,
   ): SupportOrderPromptContext {
     return {
       ref: 'O1',
       status: order.status,
       fulfillmentStatus: order.fulfillmentStatus,
-      paymentStatus: order.payments[0]?.status ?? 'NOT_AVAILABLE',
-      updatedAt: order.updatedAt.toISOString(),
+      paymentStatus: order.paymentStatus,
+      updatedAt: order.updatedAt,
     };
   }
 
-  private toOrderSummary(order: SupportOrderRecord): SupportOrderSummaryDto {
+  private toOrderSummary(
+    order: CustomerOrderSupportSummary,
+  ): SupportOrderSummaryDto {
     return {
-      orderId: order.id,
+      orderId: order.orderId,
       status: order.status,
       fulfillmentStatus: order.fulfillmentStatus,
-      paymentStatus: order.payments[0]?.status ?? 'NOT_AVAILABLE',
-      updatedAt: order.updatedAt.toISOString(),
+      paymentStatus: order.paymentStatus,
+      updatedAt: order.updatedAt,
     };
+  }
+
+  private async getActiveOrderCards(
+    context: SupportRequestContext,
+    startedAt: number,
+  ): Promise<SupportResponseDto> {
+    const orders = await this.aiOrderToolService.getActiveOrders(context.userId);
+    const response: SupportResponseDto = {
+      mode: 'ai',
+      type: orders.length > 0 ? 'order_cards' : 'text',
+      answer:
+        orders.length > 0
+          ? 'I found your active orders.\n\nTap one to see tracking details.'
+          : "I couldn't find any active orders.\n\nIf you're looking for an older completed order, you can visit Order History.",
+      sources: [],
+      ...(orders.length > 0 ? { orders } : {}),
+      handoff: {
+        required: false,
+      },
+    };
+
+    this.logEvent('AI_SUPPORT_ACTIVE_ORDERS_RETURNED', context, {
+      mode: response.mode,
+      sourceCount: 0,
+      hasOrderContext: orders.length > 0,
+      latencyMs: Date.now() - startedAt,
+    });
+
+    return response;
   }
 
   private buildHandoff(
@@ -382,6 +382,7 @@ export class AiSupportService {
   ): SupportResponseDto {
     const response: SupportResponseDto = {
       mode: 'handoff',
+      type: 'text',
       answer: this.labelAnswer(answer),
       sources: this.toSources(content),
       ...(orderSummary ? { orderSummary } : {}),
@@ -406,6 +407,7 @@ export class AiSupportService {
   private buildOutOfScopeResponse(locale: AiScopeLocale): SupportResponseDto {
     return {
       mode: 'handoff',
+      type: 'text',
       answer: this.labelAnswer(
         locale === 'vi'
           ? 'Mình có thể hỗ trợ bạn về sản phẩm Belikeme, size, đơn hàng, giao hàng hoặc đổi trả. Bạn thử hỏi về trải nghiệm mua sắm hoặc đơn hàng của mình nhé.'
@@ -457,6 +459,18 @@ export class AiSupportService {
 
   private isOrderRelated(message: string): boolean {
     return ORDER_RELATED_PATTERN.test(message);
+  }
+
+  private isTrackOrderIntent(message: string): boolean {
+    const comparable = message
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/Ä‘/gi, 'd')
+      .toLocaleLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return TRACK_ORDER_INTENT_PATTERN.test(comparable);
   }
 
   private isOrderAnswerGrounded(

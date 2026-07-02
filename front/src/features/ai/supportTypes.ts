@@ -23,6 +23,23 @@ export interface SupportOrderSummary {
   updatedAt: string;
 }
 
+export type SupportOrderCardStatus =
+  | "PENDING_PAYMENT"
+  | "PAID"
+  | "PICKED_UP"
+  | "IN_TRANSIT"
+  | "OUT_FOR_DELIVERY";
+
+export interface SupportOrderCard {
+  orderCode: string;
+  status: SupportOrderCardStatus;
+  createdAt: string;
+  totalAmount: number;
+  currency: string;
+  thumbnail: string | null;
+  detailUrl: string;
+}
+
 export interface SupportHandoff {
   required: boolean;
   reason?: string;
@@ -31,9 +48,11 @@ export interface SupportHandoff {
 
 export interface SupportResponse {
   mode: SupportMode;
+  type?: "text" | "order_cards";
   answer: string;
   sources?: SupportSource[];
   orderSummary?: SupportOrderSummary;
+  orders?: SupportOrderCard[];
   handoff?: SupportHandoff;
 }
 

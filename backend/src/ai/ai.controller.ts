@@ -111,11 +111,11 @@ export class AiController {
   @ApiOperation({
     summary: "Get grounded AI support for the current customer",
     description:
-      "Uses only backend-approved support content and an optional owner-scoped minimal order summary. AI replies are not admin replies and are never written to human chat history.",
+      "Uses only backend-approved support content and owner-scoped order tools. Track-order intent returns active order cards without a provider call. AI replies are not admin replies and are never written to human chat history.",
   })
   @ApiOkResponse({
     description:
-      "Returns an AI answer, a safe handoff, or an out-of-scope redirect. Out-of-scope requests are handled before policy, order, or provider work.",
+      "Returns an AI answer, active order cards, a safe handoff, or an out-of-scope redirect. Out-of-scope requests are handled before policy, order, or provider work.",
     schema: {
       type: "object",
       properties: {

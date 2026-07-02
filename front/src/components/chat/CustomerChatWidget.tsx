@@ -9,7 +9,10 @@ import { AiTypingIndicator } from "@/components/chat/AiTypingIndicator";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatMessage as ChatMessageBubble } from "@/components/chat/ChatMessage";
 import { useAiSupport } from "@/features/ai/supportHooks";
-import type { SupportResponse } from "@/features/ai/supportTypes";
+import type {
+  SupportOrderCard,
+  SupportResponse,
+} from "@/features/ai/supportTypes";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
 import { getMyChat, sendMyChatMessage } from "@/features/chat/api";
@@ -33,6 +36,8 @@ interface LocalChatMessage {
   createdAt: string;
   id: string;
   kind: "ai" | "customer";
+  messageType?: "text" | "order_cards";
+  orders?: SupportOrderCard[];
   showDayLabel?: boolean;
   status?: string;
   statusDetail?: string;
@@ -58,6 +63,15 @@ const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
 
 const ORDER_DETAIL_PATH_PATTERN =
   /^\/orders\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+const ORDER_DETAIL_URL_PATTERN =
+  /^\/orders\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SUPPORT_ORDER_CARD_STATUSES = new Set([
+  "PENDING_PAYMENT",
+  "PAID",
+  "PICKED_UP",
+  "IN_TRANSIT",
+  "OUT_FOR_DELIVERY",
+]);
 
 const CUSTOMER_CHAT_WELCOME_MESSAGE = `Hi 👋
 
@@ -425,7 +439,10 @@ export function CustomerChatWidget() {
           return;
         }
 
-        addAiMessage(response.answer, "answer");
+        addAiMessage(response.answer, "answer", {
+          messageType: response.type ?? "text",
+          orders: response.orders,
+        });
       } catch {
         if (activeCustomerIdRef.current !== requestCustomerId) {
           return;
@@ -540,7 +557,10 @@ export function CustomerChatWidget() {
   function addAiMessage(
     body: string,
     tone: AiMessageTone,
-    details: Pick<LocalChatMessage, "status" | "statusDetail"> = {},
+    details: Pick<
+      LocalChatMessage,
+      "messageType" | "orders" | "status" | "statusDetail"
+    > = {},
   ) {
     setLocalMessages((current) => [
       ...current,
@@ -639,6 +659,8 @@ export function CustomerChatWidget() {
                       body={item.message.body}
                       createdAt={item.message.createdAt}
                       key={item.id}
+                      messageType={item.message.messageType}
+                      orders={item.message.orders}
                       showDayLabel={item.message.showDayLabel}
                       status={item.message.status}
                       statusDetail={item.message.statusDetail}
@@ -809,11 +831,38 @@ function getOrderIdFromPathname(pathname: string): string | undefined {
 }
 
 function isValidSupportResponse(response: SupportResponse): boolean {
-  return Boolean(
+  const hasValidBase = Boolean(
     response &&
       typeof response.mode === "string" &&
       typeof response.answer === "string" &&
       response.answer.trim(),
+  );
+
+  if (!hasValidBase || response.type !== "order_cards") {
+    return hasValidBase;
+  }
+
+  return Boolean(
+    Array.isArray(response.orders) &&
+      response.orders.length > 0 &&
+      response.orders.every(isValidOrderCard),
+  );
+}
+
+function isValidOrderCard(order: SupportOrderCard): boolean {
+  return Boolean(
+    order &&
+      typeof order.orderCode === "string" &&
+      /^[0-9A-F]{8}$/.test(order.orderCode) &&
+      SUPPORT_ORDER_CARD_STATUSES.has(order.status) &&
+      typeof order.createdAt === "string" &&
+      !Number.isNaN(new Date(order.createdAt).getTime()) &&
+      Number.isSafeInteger(order.totalAmount) &&
+      order.totalAmount >= 0 &&
+      typeof order.currency === "string" &&
+      /^[A-Z]{3}$/.test(order.currency) &&
+      (order.thumbnail === null || typeof order.thumbnail === "string") &&
+      ORDER_DETAIL_URL_PATTERN.test(order.detailUrl),
   );
 }
 

@@ -6,7 +6,12 @@ import {
 import type { AuthenticatedUser } from '../auth/types/authenticated-user';
 import { OrderEmailService } from '../email/order-email.service';
 import { Prisma } from '../generated/prisma/client';
-import { OrderStatus, UserRole } from '../generated/prisma/enums';
+import {
+  OrderFulfillmentStatus,
+  OrderStatus,
+  PaymentReconciliationIssueStatus,
+  UserRole,
+} from '../generated/prisma/enums';
 import { OrderExpiryService } from '../order-expiry/order-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
@@ -17,6 +22,31 @@ const DEFAULT_ORDER_LIMIT = 20;
 const MAX_ORDER_LIMIT = 50;
 const MAX_ORDER_TOTAL = 2_000_000_000;
 const DEFAULT_CURRENCY = 'VND';
+
+export type ActiveOrderCardStatus =
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'PICKED_UP'
+  | 'IN_TRANSIT'
+  | 'OUT_FOR_DELIVERY';
+
+export interface ActiveOrderCardProjection {
+  orderCode: string;
+  status: ActiveOrderCardStatus;
+  createdAt: string;
+  totalAmount: number;
+  currency: string;
+  thumbnail: string | null;
+  detailUrl: string;
+}
+
+export interface CustomerOrderSupportSummary {
+  orderId: string;
+  status: string;
+  fulfillmentStatus: string;
+  paymentStatus: string;
+  updatedAt: string;
+}
 
 const paymentSummarySelect = {
   id: true,
@@ -96,6 +126,46 @@ const orderSelect = {
 type OrderRecord = Prisma.OrderGetPayload<{
   select: typeof orderSelect;
 }>;
+
+const activeOrderCardSelect = {
+  id: true,
+  status: true,
+  fulfillmentStatus: true,
+  totalAmount: true,
+  currency: true,
+  createdAt: true,
+  items: {
+    orderBy: {
+      createdAt: 'asc',
+    },
+    take: 1,
+    select: {
+      product: {
+        select: {
+          imageUrls: true,
+        },
+      },
+    },
+  },
+} as const satisfies Prisma.OrderSelect;
+
+type ActiveOrderCardRecord = Prisma.OrderGetPayload<{
+  select: typeof activeOrderCardSelect;
+}>;
+
+const customerOrderSupportSelect = {
+  id: true,
+  status: true,
+  fulfillmentStatus: true,
+  updatedAt: true,
+  payments: {
+    orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    take: 1,
+    select: {
+      status: true,
+    },
+  },
+} as const satisfies Prisma.OrderSelect;
 
 const variantSnapshotSelect = {
   id: true,
@@ -254,6 +324,57 @@ export class OrdersService {
     return { order: this.toOrderResponse(order) };
   }
 
+  async getActiveOrdersForCustomer(
+    userId: string,
+  ): Promise<ActiveOrderCardProjection[]> {
+    const orders = await this.prismaService.order.findMany({
+      where: {
+        userId,
+        status: {
+          in: [OrderStatus.PENDING_PAYMENT, OrderStatus.PAID],
+        },
+        fulfillmentStatus: {
+          not: OrderFulfillmentStatus.DELIVERED,
+        },
+        fulfilledAt: null,
+        paymentReconciliationIssues: {
+          none: {
+            status: PaymentReconciliationIssueStatus.REFUNDED,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      select: activeOrderCardSelect,
+    });
+
+    return orders.map((order) => this.toActiveOrderCard(order));
+  }
+
+  async getCustomerOrderSupportSummary(
+    userId: string,
+    orderId: string,
+  ): Promise<CustomerOrderSupportSummary> {
+    const order = await this.prismaService.order.findFirst({
+      where: {
+        id: orderId,
+        userId,
+      },
+      select: customerOrderSupportSelect,
+    });
+
+    if (!order) {
+      throw this.orderNotFoundException();
+    }
+
+    return {
+      orderId: order.id,
+      status: order.status,
+      fulfillmentStatus: order.fulfillmentStatus,
+      paymentStatus: order.payments[0]?.status ?? 'NOT_AVAILABLE',
+      updatedAt: order.updatedAt.toISOString(),
+    };
+  }
+
   private toOrderResponse(order: OrderRecord) {
     return {
       ...order,
@@ -262,6 +383,43 @@ export class OrdersService {
         imageUrl: getFirstProductImage(product),
       })),
     };
+  }
+
+  private toActiveOrderCard(
+    order: ActiveOrderCardRecord,
+  ): ActiveOrderCardProjection {
+    return {
+      orderCode: order.id.replace(/-/g, '').slice(-8).toUpperCase(),
+      status: this.getActiveOrderCardStatus(order),
+      createdAt: order.createdAt.toISOString(),
+      totalAmount: order.totalAmount,
+      currency: order.currency,
+      thumbnail: getFirstProductImage(order.items[0]?.product),
+      detailUrl: `/orders/${encodeURIComponent(order.id)}`,
+    };
+  }
+
+  private getActiveOrderCardStatus(
+    order: Pick<ActiveOrderCardRecord, 'status' | 'fulfillmentStatus'>,
+  ): ActiveOrderCardStatus {
+    if (order.status === OrderStatus.PENDING_PAYMENT) {
+      return 'PENDING_PAYMENT';
+    }
+
+    if (order.fulfillmentStatus === OrderFulfillmentStatus.PENDING) {
+      return 'PAID';
+    }
+
+    switch (order.fulfillmentStatus) {
+      case OrderFulfillmentStatus.PICKED_UP:
+        return 'PICKED_UP';
+      case OrderFulfillmentStatus.IN_TRANSIT:
+        return 'IN_TRANSIT';
+      case OrderFulfillmentStatus.OUT_FOR_DELIVERY:
+        return 'OUT_FOR_DELIVERY';
+      default:
+        return 'PAID';
+    }
   }
 
   private buildOrderWhere(

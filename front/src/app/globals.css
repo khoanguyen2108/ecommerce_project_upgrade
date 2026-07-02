@@ -10279,6 +10279,147 @@ img {
   text-underline-offset: 2px;
 }
 
+.customer-chat-ai-message--order-cards {
+  max-width: 100%;
+  width: 100%;
+}
+
+.customer-chat-ai-message--order-cards .customer-chat-ai-message__bubble {
+  background: #ffffff;
+  border-color: #dedede;
+  padding: 16px;
+}
+
+.customer-chat-ai-message--order-cards .customer-chat-ai-message__content > p {
+  color: #333333;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.customer-chat-order-cards {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.customer-chat-order-card {
+  align-items: center;
+  background: #f8f8f8;
+  border: 1px solid #e3e3e3;
+  border-radius: 14px;
+  color: #1a1c1c;
+  display: grid;
+  gap: 11px;
+  grid-template-columns: 48px minmax(0, 1fr) 18px;
+  min-width: 0;
+  padding: 12px;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.customer-chat-order-card:hover {
+  background: #ffffff;
+  border-color: #b9b9b9;
+  box-shadow: 0 10px 28px rgba(17, 17, 17, 0.08);
+  transform: translateY(-1px);
+}
+
+.customer-chat-order-card:focus-visible {
+  outline: 2px solid #111111;
+  outline-offset: 2px;
+}
+
+.customer-chat-order-card .order-item-image--compact {
+  border: 0;
+  border-radius: 10px;
+  height: 62px;
+  width: 48px;
+}
+
+.customer-chat-order-card__content,
+.customer-chat-order-card__header,
+.customer-chat-order-card__footer {
+  min-width: 0;
+}
+
+.customer-chat-order-card__content {
+  display: grid;
+  gap: 6px;
+}
+
+.customer-chat-order-card__header,
+.customer-chat-order-card__footer {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.customer-chat-order-card__header > strong {
+  font-family: Montserrat, Inter, sans-serif;
+  font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-chat-order-card__status {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  max-width: 54%;
+  overflow: hidden;
+  padding: 5px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-chat-order-card__status--pending-payment {
+  background: #e8e8e8;
+  color: #545454;
+}
+
+.customer-chat-order-card__status--paid {
+  background: #e9f0ff;
+  color: #2456a6;
+}
+
+.customer-chat-order-card__status--picked-up {
+  background: #f1eaff;
+  color: #6941c6;
+}
+
+.customer-chat-order-card__status--in-transit,
+.customer-chat-order-card__status--out-for-delivery {
+  background: #fff0df;
+  color: #b54708;
+}
+
+.customer-chat-order-card__date {
+  color: #6d7070;
+  font-size: 0.72rem;
+}
+
+.customer-chat-order-card__footer strong {
+  font-size: 0.8rem;
+}
+
+.customer-chat-order-card__footer > span {
+  color: #555858;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.customer-chat-order-card > svg {
+  color: #747878;
+}
+
 .customer-chat-ai-message__status {
   border-top: 1px solid rgba(82, 72, 59, 0.18);
   display: grid;
