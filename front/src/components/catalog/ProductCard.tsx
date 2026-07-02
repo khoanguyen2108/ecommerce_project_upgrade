@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { formatPrice, getVariantSummary } from "@/features/catalog/format";
+import { formatPrice } from "@/features/catalog/format";
 import type { Product } from "@/features/catalog/types";
 
 interface ProductCardProps {
@@ -58,7 +58,6 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
               <p className="product-card__availability">{availability}</p>
             ) : null}
           </div>
-          <p className="product-card__meta">{getVariantSummary(product.variants)}</p>
         </div>
       </Link>
     </article>
