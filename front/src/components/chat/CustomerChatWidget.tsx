@@ -1,6 +1,7 @@
 "use client";
 
 import { MessageCircle, WifiOff, X } from "lucide-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AiMessageBubble, type AiMessageTone } from "@/components/chat/AiMessageBubble";
@@ -352,7 +353,7 @@ export function CustomerChatWidget() {
     [forwardedPersistedIds, localMessages, messages],
   );
 
-  if (shouldHide || isAdmin || isSessionLoading || !isAuthenticated) {
+  if (shouldHide || isAdmin || isSessionLoading) {
     return null;
   }
 
@@ -571,10 +572,12 @@ export function CustomerChatWidget() {
                 <span
                   className={`customer-chat-panel__status customer-chat-panel__status--${connectionState}`}
                 >
-                  {connectionState === "offline" ? (
+                  {isAuthenticated && connectionState === "offline" ? (
                     <WifiOff aria-hidden="true" size={13} />
                   ) : null}
-                  {connectionLabel}
+                  {isAuthenticated
+                    ? connectionLabel
+                    : "Sign in to start a conversation"}
                 </span>
               </div>
             </div>
@@ -592,7 +595,20 @@ export function CustomerChatWidget() {
           </header>
 
           <div className="customer-chat-panel__body">
-            {isLoading ? (
+            {!isAuthenticated ? (
+              <div className="customer-chat-panel__sign-in">
+                <div aria-hidden="true" className="customer-chat-panel__sign-in-icon">
+                  <MessageCircle size={25} />
+                </div>
+                <h3>We&apos;re here to help</h3>
+                <p>
+                  Sign in to chat with Belikeme AI and our customer support team.
+                </p>
+                <Link href={`/login?next=${encodeURIComponent(pathname)}`}>
+                  Sign in to chat
+                </Link>
+              </div>
+            ) : isLoading ? (
               <ChatMessageSkeleton />
             ) : (
               <div
@@ -636,37 +652,41 @@ export function CustomerChatWidget() {
             )}
           </div>
 
-          {error ? (
+          {isAuthenticated && error ? (
             <div className="customer-chat-panel__error" role="alert">
               {error}
             </div>
           ) : null}
 
-          <div
-            aria-label="Quick messages"
-            className="customer-chat-quick-actions"
-            role="group"
-          >
-            {CUSTOMER_CHAT_QUICK_ACTIONS.map((action) => (
-              <button
-                className="customer-chat-quick-actions__chip"
-                disabled={isSending}
-                key={action.label}
-                onClick={() => handleQuickAction(action.message)}
-                type="button"
+          {isAuthenticated ? (
+            <>
+              <div
+                aria-label="Quick messages"
+                className="customer-chat-quick-actions"
+                role="group"
               >
-                {action.label}
-              </button>
-            ))}
-          </div>
-          <ChatComposer
-            draft={draft}
-            isSending={isSending}
-            maxLength={800}
-            onDraftChange={setDraft}
-            onSend={() => void sendMessage()}
-            textareaRef={textareaRef}
-          />
+                {CUSTOMER_CHAT_QUICK_ACTIONS.map((action) => (
+                  <button
+                    className="customer-chat-quick-actions__chip"
+                    disabled={isSending}
+                    key={action.label}
+                    onClick={() => handleQuickAction(action.message)}
+                    type="button"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+              <ChatComposer
+                draft={draft}
+                isSending={isSending}
+                maxLength={800}
+                onDraftChange={setDraft}
+                onSend={() => void sendMessage()}
+                textareaRef={textareaRef}
+              />
+            </>
+          ) : null}
         </section>
       ) : null}
 

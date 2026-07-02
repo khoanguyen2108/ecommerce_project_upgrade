@@ -143,6 +143,43 @@
   font-size: 0.7rem;
 }
 
+.signInPrompt {
+  align-items: center;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  margin-top: 22px;
+  padding: 16px 18px;
+}
+
+.signInPrompt > div {
+  display: grid;
+  gap: 4px;
+}
+
+.signInPrompt strong {
+  font-size: 0.84rem;
+}
+
+.signInPrompt span {
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.signInPrompt a {
+  background: var(--color-text);
+  color: var(--color-surface);
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  padding: 11px 14px;
+  text-transform: uppercase;
+}
+
 .textarea {
   background: var(--color-surface-muted);
   border: 1px solid transparent;
@@ -807,6 +844,15 @@
     align-items: stretch;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .signInPrompt {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .signInPrompt a {
+    text-align: center;
   }
 
   .generateButton {

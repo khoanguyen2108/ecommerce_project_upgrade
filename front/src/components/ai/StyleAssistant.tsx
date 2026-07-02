@@ -8,11 +8,14 @@ import styles from "@/components/ai/StyleAssistant.module.css";
 import { StyleAssistantResult } from "@/components/ai/StyleAssistantResult";
 import { StyleAssistantSkeleton } from "@/components/ai/StyleAssistantSkeleton";
 import { useStyleAdvice } from "@/features/ai/hooks";
+import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
 export function StyleAssistant() {
   const [prompt, setPrompt] = useState("");
   const { error, generate, result, retry, status } = useStyleAdvice();
+  const { isAuthenticated, isLoading: isSessionLoading } = useAuthSession();
   const isLoading = status === "loading";
+  const isLocked = !isSessionLoading && !isAuthenticated;
 
   return (
     <main className={styles.page}>
@@ -32,6 +35,8 @@ export function StyleAssistant() {
             </p>
           </div>
           <StyleAssistantInput
+            isDisabled={isLoading || isSessionLoading || !isAuthenticated}
+            isLocked={isLocked}
             isLoading={isLoading}
             onChange={setPrompt}
             onSubmit={() => void generate(prompt)}

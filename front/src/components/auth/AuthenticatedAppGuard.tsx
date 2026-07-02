@@ -15,6 +15,7 @@ const PUBLIC_ROUTES = new Set([
   "/auth/failure",
 ]);
 const PUBLIC_CATALOG_PREFIXES = ["/products", "/categories"];
+const PUBLIC_FEATURE_ROUTES = new Set(["/ai/style-assistant"]);
 
 export function AuthenticatedAppGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
@@ -22,6 +23,7 @@ export function AuthenticatedAppGuard({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthSession();
   const isPublicRoute =
     PUBLIC_ROUTES.has(pathname) ||
+    PUBLIC_FEATURE_ROUTES.has(pathname) ||
     PUBLIC_CATALOG_PREFIXES.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
     );

@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowUpRight, Loader2 } from "lucide-react";
+import Link from "next/link";
 import type { KeyboardEvent } from "react";
 import { useEffect, useRef } from "react";
 import styles from "@/components/ai/StyleAssistant.module.css";
@@ -15,6 +16,8 @@ const SUGGESTED_PROMPTS = [
 ] as const;
 
 interface StyleAssistantInputProps {
+  isDisabled: boolean;
+  isLocked: boolean;
   isLoading: boolean;
   onChange: (value: string) => void;
   onSubmit: () => void;
@@ -22,6 +25,8 @@ interface StyleAssistantInputProps {
 }
 
 export function StyleAssistantInput({
+  isDisabled,
+  isLocked,
   isLoading,
   onChange,
   onSubmit,
@@ -51,7 +56,7 @@ export function StyleAssistantInput({
 
     event.preventDefault();
 
-    if (value.trim() && !isLoading) {
+    if (value.trim() && !isDisabled) {
       onSubmit();
     }
   }
@@ -77,13 +82,23 @@ export function StyleAssistantInput({
         <span className={styles.inputHint}>Enter to send · Shift+Enter for a new line</span>
       </div>
 
+      {isLocked ? (
+        <div className={styles.signInPrompt} role="note">
+          <div>
+            <strong>Sign in to create your personal edit</strong>
+            <span>Your style request will be ready to use after you sign in.</span>
+          </div>
+          <Link href="/login?next=%2Fai%2Fstyle-assistant">Sign in to continue</Link>
+        </div>
+      ) : null}
+
       <label className={styles.visuallyHidden} htmlFor="style-assistant-prompt">
         Describe the outfit or style you want
       </label>
       <textarea
         aria-describedby="style-assistant-help"
         className={styles.textarea}
-        disabled={isLoading}
+        disabled={isDisabled}
         id="style-assistant-prompt"
         maxLength={500}
         onChange={(event) => onChange(event.target.value)}
@@ -101,7 +116,7 @@ export function StyleAssistantInput({
         {SUGGESTED_PROMPTS.map((prompt) => (
           <button
             className={styles.chip}
-            disabled={isLoading}
+            disabled={isDisabled}
             key={prompt}
             onClick={() => selectPrompt(prompt)}
             type="button"
@@ -115,7 +130,7 @@ export function StyleAssistantInput({
         <span>{value.length}/500</span>
         <button
           className={styles.generateButton}
-          disabled={!value.trim() || isLoading}
+          disabled={!value.trim() || isDisabled}
           type="submit"
         >
           {isLoading ? (

@@ -10026,6 +10026,51 @@ img {
   overflow: hidden;
 }
 
+.customer-chat-panel__sign-in {
+  align-content: center;
+  display: grid;
+  flex: 1 1 auto;
+  gap: 12px;
+  justify-items: center;
+  padding: 36px 30px;
+  text-align: center;
+}
+
+.customer-chat-panel__sign-in-icon {
+  align-items: center;
+  background: #000000;
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  height: 56px;
+  justify-content: center;
+  margin-bottom: 6px;
+  width: 56px;
+}
+
+.customer-chat-panel__sign-in h3 {
+  font-family: Montserrat, Inter, sans-serif;
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.customer-chat-panel__sign-in p {
+  color: var(--color-text-muted);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 280px;
+}
+
+.customer-chat-panel__sign-in a {
+  background: #000000;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-top: 10px;
+  padding: 13px 22px;
+  text-transform: uppercase;
+}
+
 .admin-chat-thread__empty,
 .admin-chats-list__empty {
   align-content: center;
