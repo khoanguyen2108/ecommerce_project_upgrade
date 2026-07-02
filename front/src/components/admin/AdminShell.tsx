@@ -32,7 +32,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <AdminNav />
 
         <div className="admin-sidebar__footer">
-          <Link className="admin-store-link" href="/products">
+          <Link className="admin-store-link" href="/">
             <Store aria-hidden="true" size={17} strokeWidth={1.8} />
             Storefront
           </Link>
