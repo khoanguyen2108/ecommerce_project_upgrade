@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
-const PUBLIC_AUTH_ROUTES = new Set([
+const PUBLIC_ROUTES = new Set([
   "/",
   "/login",
   "/register",
@@ -14,21 +14,26 @@ const PUBLIC_AUTH_ROUTES = new Set([
   "/auth/success",
   "/auth/failure",
 ]);
+const PUBLIC_CATALOG_PREFIXES = ["/products", "/categories"];
 
 export function AuthenticatedAppGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuthSession();
-  const isPublicAuthRoute = PUBLIC_AUTH_ROUTES.has(pathname);
+  const isPublicRoute =
+    PUBLIC_ROUTES.has(pathname) ||
+    PUBLIC_CATALOG_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
 
   useEffect(() => {
-    if (isLoading || isAuthenticated || isPublicAuthRoute) return;
+    if (isLoading || isAuthenticated || isPublicRoute) return;
 
     const returnPath = `${window.location.pathname}${window.location.search}`;
     router.replace(`/login?next=${encodeURIComponent(returnPath)}`);
-  }, [isAuthenticated, isLoading, isPublicAuthRoute, router]);
+  }, [isAuthenticated, isLoading, isPublicRoute, router]);
 
-  if (isPublicAuthRoute) return <>{children}</>;
+  if (isPublicRoute) return <>{children}</>;
   if (isAuthenticated) return <>{children}</>;
 
   return (
