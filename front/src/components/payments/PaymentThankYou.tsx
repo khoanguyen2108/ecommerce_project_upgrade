@@ -23,7 +23,8 @@ interface PaymentThankYouProps {
 export function PaymentThankYou({ status }: PaymentThankYouProps) {
   const paidAt = status.paidAt || status.payment.paidAt || status.order.paidAt;
   const orderItems = status.order.items ?? [];
-  const orderHref = `/orders/${encodeURIComponent(status.order.orderCode)}`;
+  const publicOrderIdentifier = status.order.orderCode || status.order.id;
+  const orderHref = `/orders/${encodeURIComponent(publicOrderIdentifier)}`;
 
   return (
     <main className="customer-page payment-page payment-thank-you-page">
@@ -58,7 +59,7 @@ export function PaymentThankYou({ status }: PaymentThankYouProps) {
             <div>
               <p className="eyebrow">Order summary</p>
               <h2 id="thank-you-summary-heading">
-                Order {formatOrderDisplayId(status.order.orderCode)}
+                Order {formatOrderDisplayId(publicOrderIdentifier)}
               </h2>
             </div>
             <span className="payment-thank-you__paid-label">Paid</span>

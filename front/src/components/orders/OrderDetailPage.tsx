@@ -146,7 +146,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         <div className="order-detail-heading__copy">
           <p className="eyebrow">Order detail</p>
           <h1 id="order-heading">
-            Order {formatOrderDisplayId(order.orderCode)}
+            Order {formatOrderDisplayId(order.orderCode || order.id)}
           </h1>
           <p>Placed on {formatDate(order.createdAt)}</p>
         </div>

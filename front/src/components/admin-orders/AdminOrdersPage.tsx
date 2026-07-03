@@ -162,7 +162,7 @@ export function AdminOrdersPage({
 
     const verb = action === "cancel" ? "cancel" : "expire";
     const confirmed = window.confirm(
-      `Confirm ${verb} for order ${order.orderCode}? This changes only the local pending order/payment state and does not call payOS.`,
+      `Confirm ${verb} for order ${order.orderCode || order.id}? This changes only the local pending order/payment state and does not call payOS.`,
     );
     if (!confirmed) return;
 
@@ -176,7 +176,7 @@ export function AdminOrdersPage({
       if (action === "cancel") await cancelAdminOrder(order.id);
       else await expireAdminOrder(order.id);
       setSuccess(
-        `Order ${formatOrderDisplayId(order.orderCode)} was ${
+        `Order ${formatOrderDisplayId(order.orderCode || order.id)} was ${
           action === "cancel" ? "cancelled" : "expired"
         }.`,
       );
@@ -410,7 +410,7 @@ function OrderRow({
     <article className="admin-orders-row">
       <div className="admin-orders-cell admin-orders-cell--order">
         <span className="admin-orders-mobile-label">Order</span>
-        <strong>{formatOrderDisplayId(order.orderCode)}</strong>
+        <strong>{formatOrderDisplayId(order.orderCode || order.id)}</strong>
       </div>
       <div className="admin-orders-cell">
         <span className="admin-orders-mobile-label">Customer</span>

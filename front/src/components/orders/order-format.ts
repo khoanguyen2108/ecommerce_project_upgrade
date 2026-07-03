@@ -98,8 +98,10 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-export function formatOrderDisplayId(value: string): string {
-  const normalizedValue = value.trim();
+export function formatOrderDisplayId(
+  value: string | null | undefined,
+): string {
+  const normalizedValue = value?.trim() ?? "";
 
   if (!normalizedValue) {
     return "#ORDER";
