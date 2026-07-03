@@ -5,7 +5,6 @@ import {
   IsIn,
   IsOptional,
   IsString,
-  IsUUID,
   Matches,
   MaxLength,
   MinLength,
@@ -40,9 +39,9 @@ export class SupportRequestDto {
   @IsIn(['TRACK_ORDER', 'RETURN_REQUEST'])
   action?: 'TRACK_ORDER' | 'RETURN_REQUEST';
 
-  @ApiPropertyOptional({ format: 'uuid' })
+  @ApiPropertyOptional({ example: 'BK000001' })
   @IsOptional()
-  @IsUUID()
+  @Matches(/^(?:BK\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i)
   orderId?: string;
 }
 
@@ -120,6 +119,12 @@ export class SupportReturnRequestCardDto {
 
   @ApiProperty({ example: 'DELIVERED' })
   status: 'DELIVERED';
+
+  @ApiPropertyOptional({ nullable: true })
+  thumbnail: string | null;
+
+  @ApiProperty({ example: '/orders/BK000001' })
+  detailUrl: string;
 }
 
 export class SupportResponseDto {
@@ -157,6 +162,9 @@ export class SupportResponseDto {
 
   @ApiPropertyOptional({ type: SupportReturnRequestCardDto })
   returnRequest?: SupportReturnRequestCardDto;
+
+  @ApiPropertyOptional({ type: [SupportReturnRequestCardDto] })
+  returnRequests?: SupportReturnRequestCardDto[];
 
   @ApiProperty({ type: SupportHandoffDto })
   handoff: SupportHandoffDto;

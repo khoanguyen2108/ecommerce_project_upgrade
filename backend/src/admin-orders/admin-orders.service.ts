@@ -101,6 +101,7 @@ const adminOrderReconciliationIssueSelect = {
 
 const adminOrderListSelect = {
   id: true,
+  orderCode: true,
   userId: true,
   user: {
     select: adminOrderUserSummarySelect,
@@ -141,6 +142,7 @@ const adminOrderListSelect = {
 
 const adminOrderDetailSelect = {
   id: true,
+  orderCode: true,
   userId: true,
   user: {
     select: adminOrderUserSummarySelect,

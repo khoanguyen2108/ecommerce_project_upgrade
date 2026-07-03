@@ -43,6 +43,7 @@ interface LocalChatMessage {
   order?: SupportOrderCard;
   orders?: SupportOrderCard[];
   returnRequest?: SupportReturnRequestCard;
+  returnRequests?: SupportReturnRequestCard[];
   showDayLabel?: boolean;
   status?: string;
   statusDetail?: string;
@@ -67,7 +68,7 @@ const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
 ] as const;
 
 const ORDER_DETAIL_PATH_PATTERN =
-  /^\/orders\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+  /^\/orders\/(BK\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
 const ORDER_DETAIL_URL_PATTERN =
   /^\/orders\/(?:BK\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 const SUPPORT_ORDER_CARD_STATUSES = new Set([
@@ -458,6 +459,9 @@ export function CustomerChatWidget() {
           order: response.order,
           orders: response.orders,
           returnRequest: response.returnRequest,
+          returnRequests:
+            response.returnRequests ??
+            (response.returnRequest ? [response.returnRequest] : undefined),
         });
       } catch {
         if (activeCustomerIdRef.current !== requestCustomerId) {
@@ -579,6 +583,7 @@ export function CustomerChatWidget() {
       | "order"
       | "orders"
       | "returnRequest"
+      | "returnRequests"
       | "status"
       | "statusDetail"
     > = {},
@@ -688,6 +693,7 @@ export function CustomerChatWidget() {
                       order={item.message.order}
                       orders={item.message.orders}
                       returnRequest={item.message.returnRequest}
+                      returnRequests={item.message.returnRequests}
                       showDayLabel={item.message.showDayLabel}
                       status={item.message.status}
                       statusDetail={item.message.statusDetail}
@@ -765,17 +771,18 @@ export function CustomerChatWidget() {
         onClose={() => setSelectedReturnOrder(undefined)}
         onSubmitted={(request) => {
           setLocalMessages((current) =>
-            current.map((message) =>
-              message.returnRequest?.orderCode === request.orderCode
-                ? {
-                    ...message,
-                    returnRequest: {
-                      ...message.returnRequest,
-                      requestStatus: "PENDING",
-                    },
-                  }
-                : message,
-            ),
+            current.map((message) => ({
+              ...message,
+              returnRequest:
+                message.returnRequest?.orderCode === request.orderCode
+                  ? { ...message.returnRequest, requestStatus: "PENDING" }
+                  : message.returnRequest,
+              returnRequests: message.returnRequests?.map((item) =>
+                item.orderCode === request.orderCode
+                  ? { ...item, requestStatus: "PENDING" }
+                  : item,
+              ),
+            })),
           );
         }}
         orderCode={selectedReturnOrder?.orderCode}
@@ -898,8 +905,13 @@ function isValidSupportResponse(response: SupportResponse): boolean {
   }
 
   if (response.type === "return_request_card") {
+    const returnRequests =
+      response.returnRequests ??
+      (response.returnRequest ? [response.returnRequest] : []);
+
     return Boolean(
-      response.returnRequest && isValidReturnRequestCard(response.returnRequest),
+      returnRequests.length > 0 &&
+        returnRequests.every(isValidReturnRequestCard),
     );
   }
 
@@ -923,7 +935,10 @@ function isValidReturnRequestCard(
       /^BK\d{6,}$/.test(returnRequest.orderCode) &&
       returnRequest.status === "DELIVERED" &&
       typeof returnRequest.deliveredAt === "string" &&
-      !Number.isNaN(new Date(returnRequest.deliveredAt).getTime()),
+      !Number.isNaN(new Date(returnRequest.deliveredAt).getTime()) &&
+      (returnRequest.thumbnail === null ||
+        typeof returnRequest.thumbnail === "string") &&
+      ORDER_DETAIL_URL_PATTERN.test(returnRequest.detailUrl),
   );
 }
 

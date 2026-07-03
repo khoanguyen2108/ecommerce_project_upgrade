@@ -114,6 +114,7 @@ export interface PaymentReconciliationIssue {
 
 export interface AdminOrderBase {
   id: string;
+  orderCode: string;
   userId: string;
   user: AdminOrderCustomer;
   customerEmail: string | null;

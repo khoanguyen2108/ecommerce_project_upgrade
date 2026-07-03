@@ -46,6 +46,8 @@ export interface SupportReturnRequestCard {
   orderCode: string;
   deliveredAt: string;
   status: "DELIVERED";
+  thumbnail: string | null;
+  detailUrl: string;
   requestStatus?: "PENDING";
 }
 
@@ -64,6 +66,7 @@ export interface SupportResponse {
   order?: SupportOrderCard;
   orders?: SupportOrderCard[];
   returnRequest?: SupportReturnRequestCard;
+  returnRequests?: SupportReturnRequestCard[];
   handoff?: SupportHandoff;
 }
 

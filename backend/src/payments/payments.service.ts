@@ -81,6 +81,7 @@ const paymentDisplaySelect = {
   order: {
     select: {
       id: true,
+      orderCode: true,
       userId: true,
       status: true,
       fulfillmentStatus: true,

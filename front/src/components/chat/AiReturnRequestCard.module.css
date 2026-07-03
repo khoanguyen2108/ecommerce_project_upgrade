@@ -1,23 +1,26 @@
 .card {
-  align-items: center;
   background: #ffffff;
   border: 1px solid #dbe4ed;
   border-radius: 14px;
   display: grid;
   gap: 10px;
-  grid-template-columns: auto minmax(0, 1fr);
   margin-top: 10px;
   padding: 12px;
 }
 
-.icon {
+.orderLink {
   align-items: center;
-  background: #f1f5f9;
-  border-radius: 10px;
-  display: inline-flex;
-  height: 38px;
-  justify-content: center;
-  width: 38px;
+  color: inherit;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.orderLink:hover strong,
+.orderLink:focus-visible strong {
+  text-decoration: underline;
 }
 
 .content {
@@ -49,7 +52,6 @@
   color: #ffffff;
   font-size: 0.72rem;
   font-weight: 750;
-  grid-column: 1 / -1;
   min-height: 36px;
   padding: 8px 12px;
   width: 100%;

@@ -497,9 +497,12 @@ export class AiSupportService {
     const response: SupportResponseDto = {
       mode: 'ai',
       type: 'return_request_card',
-      answer: 'This delivered order is eligible for a return request.',
+      answer:
+        eligibility.orders.length === 1
+          ? 'This delivered order is eligible for a return request.'
+          : `I found ${eligibility.orders.length} delivered orders eligible for a return request.`,
       sources: [],
-      returnRequest: eligibility.order,
+      returnRequests: eligibility.orders,
       handoff: { required: false },
     };
 

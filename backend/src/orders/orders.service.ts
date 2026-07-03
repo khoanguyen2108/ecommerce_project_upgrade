@@ -362,11 +362,11 @@ export class OrdersService {
 
   async getCustomerOrderSupportSummary(
     userId: string,
-    orderId: string,
+    orderIdentifier: string,
   ): Promise<CustomerOrderSupportSummary> {
     const order = await this.prismaService.order.findFirst({
       where: {
-        id: orderId,
+        ...this.buildOrderIdentifierWhere(orderIdentifier),
         userId,
       },
       select: customerOrderSupportSelect,

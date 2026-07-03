@@ -37,6 +37,7 @@ export interface PayosStatusQuery {
 
 export interface PayosDisplayOrder {
   id: string;
+  orderCode: string;
   userId: string | null;
   status: OrderStatus;
   fulfillmentStatus: OrderFulfillmentStatus;

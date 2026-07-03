@@ -238,7 +238,7 @@ function OrderCard({ order }: { order: Order }) {
 
       <div className="customer-order-card__body">
         <div className="customer-order-card__heading">
-          <h2>{formatOrderDisplayId(order.id)}</h2>
+          <h2>{formatOrderDisplayId(order.orderCode)}</h2>
           <time dateTime={order.createdAt}>{createdDate}</time>
         </div>
         <p>{itemSummary}</p>
@@ -255,9 +255,9 @@ function OrderCard({ order }: { order: Order }) {
         </div>
         <div className="customer-order-card__actions">
           <Link
-            aria-label={`View details for order ${order.id}`}
+            aria-label={`View details for order ${order.orderCode}`}
             className="button button--secondary customer-order-card__button"
-            href={`/orders/${encodeURIComponent(order.id)}`}
+            href={`/orders/${encodeURIComponent(order.orderCode)}`}
           >
             <Eye aria-hidden="true" size={17} />
             View details

@@ -17,6 +17,7 @@ interface AiMessageBubbleProps {
   order?: SupportOrderCard;
   orders?: SupportOrderCard[];
   returnRequest?: SupportReturnRequestCard;
+  returnRequests?: SupportReturnRequestCard[];
   showDayLabel?: boolean;
   status?: string;
   statusDetail?: string;
@@ -31,6 +32,7 @@ export function AiMessageBubble({
   order,
   orders = [],
   returnRequest,
+  returnRequests = [],
   showDayLabel = false,
   status,
   statusDetail,
@@ -69,14 +71,22 @@ export function AiMessageBubble({
               <AiOrderCards orders={orders} />
             </div>
           ) : messageType === "return_request_card" &&
-            returnRequest &&
+            (returnRequests.length > 0 || returnRequest) &&
             onRequestReturn ? (
             <div className="customer-chat-ai-message__content">
               <p>{body}</p>
-              <AiReturnRequestCard
-                onRequestReturn={onRequestReturn}
-                returnRequest={returnRequest}
-              />
+              {(returnRequests.length > 0
+                ? returnRequests
+                : returnRequest
+                  ? [returnRequest]
+                  : []
+              ).map((item) => (
+                <AiReturnRequestCard
+                  key={item.orderCode}
+                  onRequestReturn={onRequestReturn}
+                  returnRequest={item}
+                />
+              ))}
             </div>
           ) : (
             <SafeMarkdown value={body} />

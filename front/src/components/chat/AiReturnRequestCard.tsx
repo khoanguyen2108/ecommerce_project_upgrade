@@ -1,4 +1,6 @@
-import { RotateCcw } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import Link from 'next/link';
+import { OrderItemImage } from '@/components/orders/OrderItemImage';
 import type { SupportReturnRequestCard } from '@/features/ai/supportTypes';
 import styles from './AiReturnRequestCard.module.css';
 
@@ -13,14 +15,23 @@ export function AiReturnRequestCard({
 
   return (
     <div className={styles.card}>
-      <span className={styles.icon}>
-        <RotateCcw aria-hidden="true" size={18} />
-      </span>
-      <div className={styles.content}>
-        <span className={styles.eyebrow}>Delivered order</span>
-        <strong>#{returnRequest.orderCode}</strong>
-        <span>Delivered {formatDate(returnRequest.deliveredAt)}</span>
-      </div>
+      <Link
+        aria-label={`View order ${returnRequest.orderCode}`}
+        className={styles.orderLink}
+        href={returnRequest.detailUrl}
+      >
+        <OrderItemImage
+          alt={`Order ${returnRequest.orderCode}`}
+          imageUrl={returnRequest.thumbnail}
+          size="compact"
+        />
+        <span className={styles.content}>
+          <span className={styles.eyebrow}>Delivered order</span>
+          <strong>#{returnRequest.orderCode}</strong>
+          <span>Delivered {formatDate(returnRequest.deliveredAt)}</span>
+        </span>
+        <ChevronRight aria-hidden="true" size={18} />
+      </Link>
       <button
         className={styles.action}
         disabled={isPending}

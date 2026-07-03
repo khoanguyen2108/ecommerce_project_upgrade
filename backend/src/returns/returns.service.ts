@@ -11,6 +11,7 @@ import {
   ReturnRequestStatus,
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { getFirstProductImage } from '../orders/order-item-image';
 import type { AdminReturnQueryDto } from './dto/admin-return-query.dto';
 import type { CreateReturnRequestDto } from './dto/create-return-request.dto';
 import type { ReviewReturnRequestDto } from './dto/review-return-request.dto';
@@ -97,10 +98,12 @@ export interface EligibleReturnOrder {
   orderCode: string;
   deliveredAt: string;
   status: 'DELIVERED';
+  thumbnail: string | null;
+  detailUrl: string;
 }
 
 export type ReturnEligibilityResult =
-  | { eligible: true; order: EligibleReturnOrder }
+  | { eligible: true; orders: EligibleReturnOrder[] }
   | {
       eligible: false;
       reason: 'NO_DELIVERED_ORDER' | 'ORDER_NOT_DELIVERED' | 'PENDING_REQUEST_EXISTS';
@@ -295,12 +298,22 @@ export class ReturnsService {
   ): Promise<ReturnEligibilityResult> {
     if (orderId) {
       const order = await this.prismaService.order.findFirst({
-        where: { id: orderId, userId: customerId },
+        where: {
+          ...this.buildOrderIdentifierWhere(orderId),
+          userId: customerId,
+        },
         select: {
           orderCode: true,
           status: true,
           fulfillmentStatus: true,
           fulfilledAt: true,
+          items: {
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+            select: {
+              product: { select: { imageUrls: true } },
+            },
+          },
           returnRequests: {
             where: { status: ReturnRequestStatus.PENDING },
             take: 1,
@@ -321,10 +334,10 @@ export class ReturnsService {
         return { eligible: false, reason: 'PENDING_REQUEST_EXISTS' };
       }
 
-      return { eligible: true, order: this.toEligibleReturnOrder(order) };
+      return { eligible: true, orders: [this.toEligibleReturnOrder(order)] };
     }
 
-    const eligibleOrder = await this.prismaService.order.findFirst({
+    const eligibleOrders = await this.prismaService.order.findMany({
       where: {
         userId: customerId,
         status: OrderStatus.PAID,
@@ -340,13 +353,22 @@ export class ReturnsService {
         status: true,
         fulfillmentStatus: true,
         fulfilledAt: true,
+        items: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: {
+            product: { select: { imageUrls: true } },
+          },
+        },
       },
     });
 
-    if (eligibleOrder) {
+    if (eligibleOrders.length > 0) {
       return {
         eligible: true,
-        order: this.toEligibleReturnOrder(eligibleOrder),
+        orders: eligibleOrders.map((order) =>
+          this.toEligibleReturnOrder(order),
+        ),
       };
     }
 
@@ -429,6 +451,9 @@ export class ReturnsService {
   private toEligibleReturnOrder(order: {
     orderCode: string;
     fulfilledAt: Date | null;
+    items: Array<{
+      product: { imageUrls: string[] };
+    }>;
   }): EligibleReturnOrder {
     if (!order.fulfilledAt) {
       throw new ConflictException({
@@ -441,7 +466,17 @@ export class ReturnsService {
       orderCode: order.orderCode,
       deliveredAt: order.fulfilledAt.toISOString(),
       status: 'DELIVERED',
+      thumbnail: getFirstProductImage(order.items[0]?.product),
+      detailUrl: `/orders/${encodeURIComponent(order.orderCode)}`,
     };
+  }
+
+  private buildOrderIdentifierWhere(
+    identifier: string,
+  ): Prisma.OrderWhereInput {
+    return /^BK\d{6,}$/i.test(identifier)
+      ? { orderCode: identifier.toUpperCase() }
+      : { id: identifier };
   }
 
   private customerOrderNotFoundException() {

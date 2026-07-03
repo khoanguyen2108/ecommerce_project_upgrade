@@ -211,7 +211,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
         <div className="admin-order-hero__copy">
           <div className="admin-order-hero__title-row">
             <h1 id="admin-order-detail-heading">
-              Order {formatOrderDisplayId(order.id)}
+              Order {formatOrderDisplayId(order.orderCode)}
             </h1>
             <AdminOrderStatusBadge status={order.status} />
           </div>
