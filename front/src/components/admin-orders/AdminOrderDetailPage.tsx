@@ -45,6 +45,7 @@ const FULFILLMENT_LABELS: Record<OrderFulfillmentStatus, string> = {
   OUT_FOR_DELIVERY: "Out for delivery",
   PENDING: "Preparing",
   PICKED_UP: "Picked up",
+  RETURNED: "Returned",
 };
 
 export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
@@ -453,9 +454,12 @@ function FulfillmentStatusSection({
   onUpdate: (status: OrderFulfillmentStatus) => void;
   order: AdminOrder;
 }) {
-  const locked = order.status !== "PAID";
+  const locked =
+    order.status !== "PAID" || order.fulfillmentStatus === "RETURNED";
   const helper =
-    order.status === "PENDING_PAYMENT"
+    order.fulfillmentStatus === "RETURNED"
+      ? "This order has an approved return and can no longer re-enter delivery."
+      : order.status === "PENDING_PAYMENT"
       ? "Fulfillment status can be updated after payment is confirmed."
       : order.status === "CANCELLED" || order.status === "EXPIRED"
         ? "Fulfillment updates are disabled for cancelled or expired orders."

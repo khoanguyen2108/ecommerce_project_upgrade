@@ -163,7 +163,7 @@ export class AdminOrdersController {
   @ApiOperation({
     summary: 'Update delivery fulfillment status as an admin',
     description:
-      'Updates fulfillment/shipping progress only for PAID orders. This does not mutate Payment.status, mark orders paid, call payOS, or send payment emails.',
+      'Updates fulfillment/shipping progress only for PAID orders that have not been returned. This does not mutate Payment.status, mark orders paid, call payOS, or send payment emails.',
   })
   @ApiParam({
     description: 'Order UUID.',

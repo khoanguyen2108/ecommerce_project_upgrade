@@ -51,6 +51,7 @@ const KNOWN_ORDER_STATUS_VALUES = [
   'IN_TRANSIT',
   'OUT_FOR_DELIVERY',
   'DELIVERED',
+  'RETURNED',
   'FAILED',
 ] as const;
 

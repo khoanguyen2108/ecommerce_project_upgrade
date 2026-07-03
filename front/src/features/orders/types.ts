@@ -10,7 +10,8 @@ export type OrderFulfillmentStatus =
   | "PICKED_UP"
   | "IN_TRANSIT"
   | "OUT_FOR_DELIVERY"
-  | "DELIVERED";
+  | "DELIVERED"
+  | "RETURNED";
 export type PaymentStatus =
   | "PENDING"
   | "PAID"

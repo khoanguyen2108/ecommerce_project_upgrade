@@ -211,7 +211,10 @@ function ReturnRequestPanel({
   order: Order;
   returnRequest?: CustomerReturnRequest;
 }) {
-  if (order.fulfillmentStatus !== "DELIVERED") {
+  if (
+    order.fulfillmentStatus !== "DELIVERED" &&
+    order.fulfillmentStatus !== "RETURNED"
+  ) {
     return null;
   }
 
@@ -232,6 +235,11 @@ function ReturnRequestPanel({
             Submitted {formatDate(returnRequest.createdAt)} for order #{order.orderCode}.
           </p>
         </div>
+      ) : order.fulfillmentStatus === "RETURNED" ? (
+        <div className="order-return-card__status">
+          <ReturnRequestStatusBadge status="APPROVED" />
+          <p>This order has an approved return.</p>
+        </div>
       ) : (
         <div className="order-return-card__action">
           <p>
@@ -249,9 +257,12 @@ function ReturnRequestPanel({
 }
 
 function FulfillmentProgress({ order }: { order: Order }) {
-  const activeIndex = FULFILLMENT_STEPS.findIndex(
-    (step) => step.status === order.fulfillmentStatus,
-  );
+  const isReturned = order.fulfillmentStatus === "RETURNED";
+  const activeIndex = isReturned
+    ? FULFILLMENT_STEPS.length
+    : FULFILLMENT_STEPS.findIndex(
+        (step) => step.status === order.fulfillmentStatus,
+      );
   const isInactive = order.status === "CANCELLED" || order.status === "EXPIRED";
 
   return (
@@ -270,6 +281,8 @@ function FulfillmentProgress({ order }: { order: Order }) {
       <p className="order-detail-card__intro">
         {isInactive
           ? "This timeline is retained for reference. The order is no longer active."
+          : isReturned
+            ? "This order was delivered and its return request has been approved."
           : "Fulfillment updates are read-only and come directly from our shipping team."}
       </p>
       <ol className={`fulfillment-progress${isInactive ? " is-inactive" : ""}`}>

@@ -60,6 +60,7 @@ const FULFILLMENT_STATUSES: OrderFulfillmentStatus[] = [
   "IN_TRANSIT",
   "OUT_FOR_DELIVERY",
   "DELIVERED",
+  "RETURNED",
 ];
 
 export function AdminOrdersPage({
@@ -621,7 +622,9 @@ function getPageMetrics(orders: AdminOrderSummary[], total: number) {
     ).length,
     inProgress: orders.filter(
       (order) =>
-        order.status === "PAID" && order.fulfillmentStatus !== "DELIVERED",
+        order.status === "PAID" &&
+        order.fulfillmentStatus !== "DELIVERED" &&
+        order.fulfillmentStatus !== "RETURNED",
     ).length,
     paid: orders.filter((order) => order.status === "PAID").length,
     pending: orders.filter((order) => order.status === "PENDING_PAYMENT").length,

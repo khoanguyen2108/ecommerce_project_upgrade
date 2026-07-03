@@ -169,6 +169,7 @@ export function getFulfillmentStatusLabel(
     OUT_FOR_DELIVERY: "Out for delivery",
     PENDING: "Preparing",
     PICKED_UP: "Picked up",
+    RETURNED: "Returned",
   };
 
   return labels[status];

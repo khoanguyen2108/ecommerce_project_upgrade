@@ -281,7 +281,10 @@ export class AdminOrdersService {
         throw this.orderNotFoundException();
       }
 
-      this.assertOrderCanUpdateFulfillment(currentOrder.status);
+      this.assertOrderCanUpdateFulfillment(
+        currentOrder.status,
+        currentOrder.fulfillmentStatus,
+      );
 
       if (currentOrder.fulfillmentStatus === dto.fulfillmentStatus) {
         return tx.order.findUnique({
@@ -648,7 +651,17 @@ export class AdminOrdersService {
     throw this.orderStatusInvalidException();
   }
 
-  private assertOrderCanUpdateFulfillment(status: OrderStatus) {
+  private assertOrderCanUpdateFulfillment(
+    status: OrderStatus,
+    fulfillmentStatus: OrderFulfillmentStatus,
+  ) {
+    if (fulfillmentStatus === OrderFulfillmentStatus.RETURNED) {
+      throw new ConflictException({
+        code: 'ADMIN_ORDER_RETURNED_FULFILLMENT_LOCKED',
+        message: 'Returned orders cannot be moved back into delivery.',
+      });
+    }
+
     if (status === OrderStatus.PAID) {
       return;
     }

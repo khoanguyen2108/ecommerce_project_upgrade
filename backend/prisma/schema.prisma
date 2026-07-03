@@ -41,6 +41,7 @@ enum OrderFulfillmentStatus {
   IN_TRANSIT
   OUT_FOR_DELIVERY
   DELIVERED
+  RETURNED
 }
 
 enum ReturnRequestStatus {

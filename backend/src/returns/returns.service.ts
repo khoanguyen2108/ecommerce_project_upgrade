@@ -258,6 +258,24 @@ export class ReturnsService {
         });
       }
 
+      if (dto.status === ReturnRequestStatus.APPROVED) {
+        const approvedRequest = await tx.returnRequest.findUnique({
+          where: { id },
+          select: { orderId: true },
+        });
+
+        if (!approvedRequest) {
+          throw this.returnRequestNotFoundException();
+        }
+
+        await tx.order.update({
+          where: { id: approvedRequest.orderId },
+          data: {
+            fulfillmentStatus: OrderFulfillmentStatus.RETURNED,
+          },
+        });
+      }
+
       return tx.returnRequest.findUnique({
         where: { id },
         select: adminReturnDetailSelect,

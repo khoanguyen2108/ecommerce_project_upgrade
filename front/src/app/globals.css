@@ -7704,6 +7704,12 @@ img {
   color: #5b35a4;
 }
 
+.fulfillment-status-badge--returned {
+  background: #fff1f2;
+  border-color: #f3a6ad;
+  color: #b42335;
+}
+
 .payment-read-note--review,
 .payment-read-note--non-paid {
   background: #fff1ef;
