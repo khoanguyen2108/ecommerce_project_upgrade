@@ -20,6 +20,7 @@ import type { ApprovedSupportContent } from './support-knowledge.service';
 import {
   SUPPORT_INTENT_SYSTEM_PROMPT,
   buildSupportIntentUserPrompt,
+  type SupportIntentMemoryContext,
 } from './prompts/support-intent.prompt';
 
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
@@ -77,12 +78,15 @@ export class OpenRouterService {
     );
   }
 
-  async requestSupportIntent(message: string): Promise<string> {
+  async requestSupportIntent(
+    message: string,
+    memory: SupportIntentMemoryContext,
+  ): Promise<string> {
     return this.requestCompletion(
       'support-intent',
       SUPPORT_INTENT_SYSTEM_PROMPT,
-      buildSupportIntentUserPrompt(message),
-      { maxTokens: 32, temperature: 0 },
+      buildSupportIntentUserPrompt(message, memory),
+      { maxTokens: 160, temperature: 0 },
     );
   }
 

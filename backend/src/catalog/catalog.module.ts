@@ -17,5 +17,6 @@ import { ProductsController } from './products.controller';
     AdminProductVariantsController,
   ],
   providers: [CatalogService],
+  exports: [CatalogService],
 })
 export class CatalogModule {}

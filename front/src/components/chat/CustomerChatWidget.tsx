@@ -40,7 +40,7 @@ interface LocalChatMessage {
   createdAt: string;
   id: string;
   kind: "ai" | "customer";
-  messageType?: "text" | "single_order_card" | "order_cards" | "return_request_card";
+  messageType?: SupportResponse["type"];
   order?: SupportOrderCard;
   orders?: SupportOrderCard[];
   returnRequest?: SupportReturnRequestCard;
@@ -70,6 +70,8 @@ const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
 
 const ORDER_DETAIL_PATH_PATTERN =
   /^\/orders\/(BK\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+const PRODUCT_DETAIL_PATH_PATTERN =
+  /^\/products\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/?$/i;
 const ORDER_DETAIL_URL_PATTERN =
   /^\/orders\/(?:BK\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 const SUPPORT_ORDER_CARD_STATUSES = new Set([
@@ -424,10 +426,12 @@ export function CustomerChatWidget() {
 
       try {
         const orderId = getOrderIdFromPathname(pathname);
+        const productId = getProductIdFromPathname(pathname);
         const response = await askAiSupport({
           message: body,
           ...(action ? { action } : {}),
           ...(orderId ? { orderId } : {}),
+          ...(productId ? { productId } : {}),
         });
 
         if (activeCustomerIdRef.current !== requestCustomerId) {
@@ -982,6 +986,10 @@ function appendMessage(
 
 function getOrderIdFromPathname(pathname: string): string | undefined {
   return ORDER_DETAIL_PATH_PATTERN.exec(pathname)?.[1];
+}
+
+function getProductIdFromPathname(pathname: string): string | undefined {
+  return PRODUCT_DETAIL_PATH_PATTERN.exec(pathname)?.[1];
 }
 
 function isValidSupportResponse(response: SupportResponse): boolean {

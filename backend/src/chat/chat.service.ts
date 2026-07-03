@@ -163,6 +163,13 @@ export interface AiChatExchangeResult {
   notifyAdmin: boolean;
 }
 
+export interface AiConversationMessage {
+  body: string;
+  createdAt: Date;
+  metadata: Prisma.JsonValue | null;
+  senderRole: ChatSenderRole;
+}
+
 @Injectable()
 export class ChatService {
   constructor(private readonly prismaService: PrismaService) {}
@@ -293,6 +300,46 @@ export class ChatService {
         notifyAdmin,
       };
     });
+  }
+
+  async getAiConversationMessages(
+    customerId: string,
+  ): Promise<AiConversationMessage[]> {
+    const conversation = await this.prismaService.chatConversation.findFirst({
+      where: {
+        customerId,
+        status: ChatStatus.OPEN,
+      },
+      orderBy: [
+        {
+          lastMessageAt: {
+            sort: 'desc',
+            nulls: 'last',
+          },
+        },
+        { createdAt: 'desc' },
+        { id: 'asc' },
+      ],
+      select: {
+        messages: {
+          where: {
+            senderRole: {
+              in: [ChatSenderRole.CUSTOMER, ChatSenderRole.AI],
+            },
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 50,
+          select: {
+            body: true,
+            createdAt: true,
+            metadata: true,
+            senderRole: true,
+          },
+        },
+      },
+    });
+
+    return conversation ? [...conversation.messages].reverse() : [];
   }
 
   async listAdminConversations(): Promise<{ conversations: ChatConversationDto[] }> {

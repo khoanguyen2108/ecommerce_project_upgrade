@@ -5,6 +5,7 @@ import { AiReturnRequestCard } from "@/components/chat/AiReturnRequestCard";
 import type {
   SupportOrderCard,
   SupportReturnRequestCard,
+  SupportResponse,
 } from "@/features/ai/supportTypes";
 
 export type AiMessageTone = "answer" | "error" | "handoff" | "out-of-scope";
@@ -12,7 +13,7 @@ export type AiMessageTone = "answer" | "error" | "handoff" | "out-of-scope";
 interface AiMessageBubbleProps {
   body: string;
   createdAt?: string;
-  messageType?: "text" | "single_order_card" | "order_cards" | "return_request_card";
+  messageType?: SupportResponse["type"];
   onRequestReturn?: (returnRequest: SupportReturnRequestCard) => void;
   order?: SupportOrderCard;
   orders?: SupportOrderCard[];

@@ -9,19 +9,27 @@ import type {
   ActiveOrderCardStatus,
   CustomerOrderSupportSummary,
 } from '../orders/orders.service';
+import { ChatService } from '../chat/chat.service';
 import { ReturnsService } from '../returns/returns.service';
+import { AiConversationMemoryService } from './ai-conversation-memory.service';
 import { AiConfigService } from './ai-config.service';
 import { AiOrderToolService } from './ai-order-tool.service';
+import { AiProductComparisonService } from './ai-product-comparison.service';
+import { AiSizeRecommendationService } from './ai-size-recommendation.service';
 import {
   AiOutputValidationError,
   AiOutputValidator,
 } from './ai-output-validator';
 import type {
+  ConversationMemoryDto,
+  ProductComparisonDto,
+  SizeRecommendationDto,
   SupportOrderSummaryDto,
   SupportRequestDto,
   SupportResponseDto,
   SupportSourceDto,
 } from './dto/support.dto';
+import type { AiPublicProduct } from './ai-product-context.service';
 import { AiProviderError, OpenRouterService } from './openrouter.service';
 import { AiQuotaService } from './ai-quota.service';
 import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
@@ -73,6 +81,10 @@ export class AiSupportService {
     private readonly aiScopeService: AiScopeService,
     private readonly aiQuotaService: AiQuotaService,
     private readonly returnsService: ReturnsService,
+    private readonly chatService: ChatService,
+    private readonly conversationMemoryService: AiConversationMemoryService,
+    private readonly productComparisonService: AiProductComparisonService,
+    private readonly sizeRecommendationService: AiSizeRecommendationService,
   ) {}
 
   async getSupport(
@@ -108,6 +120,22 @@ export class AiSupportService {
 
       if (this.isReturnRequest(message)) {
         return this.getReturnRequestCard(context, startedAt, dto.orderId);
+      }
+
+      const conversationMessages =
+        await this.chatService.getAiConversationMessages(context.userId);
+      const memoryState = this.conversationMemoryService.build(
+        conversationMessages,
+        message,
+      );
+
+      if (memoryState.reset) {
+        return this.buildConversationMemoryResponse(
+          context,
+          startedAt,
+          memoryState.memory,
+          true,
+        );
       }
 
       const quotaLease = await this.aiQuotaService.acquire(
@@ -166,6 +194,12 @@ export class AiSupportService {
       try {
         intentContent = await this.openRouterService.requestSupportIntent(
           message,
+          {
+            ...memoryState.memory,
+            ...(memoryState.pendingIntent
+              ? { pendingIntent: memoryState.pendingIntent }
+              : {}),
+          },
         );
       } catch (error) {
         const errorCode =
@@ -200,12 +234,81 @@ export class AiSupportService {
         );
       }
 
-      if (intent === 'TRACK_ORDER') {
+      if (
+        memoryState.pendingIntent &&
+        (intent.intent === 'GENERAL_SUPPORT' ||
+          intent.intent === 'CONVERSATION_MEMORY')
+      ) {
+        intent = {
+          intent: memoryState.pendingIntent,
+          productQueries:
+            memoryState.pendingIntent === 'PRODUCT_COMPARISON' &&
+            intent.productQueries.length === 0
+              ? [message]
+              : intent.productQueries,
+        };
+      }
+
+      if (intent.intent === 'TRACK_ORDER') {
         return this.getActiveOrderCards(context, startedAt);
       }
 
-      if (intent === 'RETURN_REQUEST') {
+      if (intent.intent === 'RETURN_REQUEST') {
         return this.getReturnRequestCard(context, startedAt, dto.orderId);
+      }
+
+      if (intent.intent === 'SIZE_RECOMMENDATION') {
+        const result = await this.sizeRecommendationService.recommend({
+          currentProductId: dto.productId,
+          memory: memoryState.memory,
+          productQueries: intent.productQueries,
+          sizeProfile: memoryState.sizeProfile,
+        });
+        const memory = result.product
+          ? this.conversationMemoryService.withSelectedProducts(
+              memoryState.memory,
+              [this.toProductReference(result.product)],
+            )
+          : memoryState.memory;
+
+        return this.buildSizeRecommendationResponse(
+          context,
+          startedAt,
+          result.recommendation,
+          memory,
+        );
+      }
+
+      if (intent.intent === 'PRODUCT_COMPARISON') {
+        const productQueries =
+          intent.productQueries.length > 0
+            ? intent.productQueries
+            : this.extractComparisonQueries(message);
+        const result = await this.productComparisonService.compare({
+          currentProductId: dto.productId,
+          memory: memoryState.memory,
+          productQueries,
+        });
+        const memory = this.conversationMemoryService.withSelectedProducts(
+          memoryState.memory,
+          result.products.map((product) => this.toProductReference(product)),
+        );
+
+        return this.buildProductComparisonResponse(
+          context,
+          startedAt,
+          result.comparison,
+          memory,
+        );
+      }
+
+      if (intent.intent === 'CONVERSATION_MEMORY') {
+        return this.buildConversationMemoryResponse(
+          context,
+          startedAt,
+          memoryState.memory,
+          false,
+        );
       }
 
       if (!dto.orderId && this.isOrderRelated(message)) {
@@ -335,6 +438,11 @@ export class AiSupportService {
           sources: this.toSources(citedContent),
           ...(orderSummary ? { orderSummary } : {}),
           handoff: output.handoff,
+          ...(this.conversationMemoryService.hasRememberedPreferences(
+            memoryState.memory,
+          )
+            ? { conversationMemory: memoryState.memory }
+            : {}),
         };
 
         this.logEvent(
@@ -402,6 +510,163 @@ export class AiSupportService {
       paymentStatus: order.paymentStatus,
       updatedAt: order.updatedAt,
     };
+  }
+
+  private buildSizeRecommendationResponse(
+    context: SupportRequestContext,
+    startedAt: number,
+    sizeRecommendation: SizeRecommendationDto,
+    memory: ConversationMemoryDto,
+  ): SupportResponseDto {
+    const answer =
+      sizeRecommendation.status === 'complete'
+        ? [
+            `Recommended size: ${sizeRecommendation.recommendedSize}.`,
+            `Confidence: ${sizeRecommendation.confidence}%.`,
+            sizeRecommendation.reason,
+            sizeRecommendation.alternativeSize
+              ? `Alternative: ${sizeRecommendation.alternativeSize}.`
+              : undefined,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        : sizeRecommendation.question ??
+          sizeRecommendation.reason ??
+          'A size recommendation is not available right now.';
+    const response: SupportResponseDto = {
+      mode: 'ai',
+      type: 'size_recommendation',
+      answer: this.labelAnswer(answer),
+      sources: [],
+      sizeRecommendation,
+      conversationMemory: memory,
+      handoff: { required: false },
+    };
+
+    this.logEvent('AI_SIZE_RECOMMENDATION_RETURNED', context, {
+      mode: response.mode,
+      sourceCount: 0,
+      hasOrderContext: false,
+      latencyMs: Date.now() - startedAt,
+      errorCode:
+        sizeRecommendation.status === 'complete'
+          ? undefined
+          : sizeRecommendation.status.toLocaleUpperCase(),
+    });
+
+    return response;
+  }
+
+  private buildProductComparisonResponse(
+    context: SupportRequestContext,
+    startedAt: number,
+    comparison: ProductComparisonDto,
+    memory: ConversationMemoryDto,
+  ): SupportResponseDto {
+    const answer =
+      comparison.status === 'complete' && comparison.productA && comparison.productB
+        ? `${comparison.productA.name} vs ${comparison.productB.name}. ${comparison.recommendation}`
+        : comparison.question ?? 'Please choose two Belikeme products to compare.';
+    const response: SupportResponseDto = {
+      mode: 'ai',
+      type: 'comparison_card',
+      answer: this.labelAnswer(answer),
+      sources: [],
+      comparison,
+      conversationMemory: memory,
+      handoff: { required: false },
+    };
+
+    this.logEvent('AI_PRODUCT_COMPARISON_RETURNED', context, {
+      mode: response.mode,
+      sourceCount: 0,
+      hasOrderContext: false,
+      latencyMs: Date.now() - startedAt,
+      errorCode:
+        comparison.status === 'complete' ? undefined : 'NEEDS_INFORMATION',
+    });
+
+    return response;
+  }
+
+  private buildConversationMemoryResponse(
+    context: SupportRequestContext,
+    startedAt: number,
+    memory: ConversationMemoryDto,
+    reset: boolean,
+  ): SupportResponseDto {
+    const remembered = this.describeMemory(memory);
+    const answer = reset
+      ? 'I cleared the shopping preferences for this conversation.'
+      : remembered
+        ? `I will remember ${remembered} for this conversation.`
+        : 'I do not have any shopping preferences saved in this conversation yet.';
+    const response: SupportResponseDto = {
+      mode: 'ai',
+      type: 'conversation_memory',
+      answer: this.labelAnswer(answer),
+      sources: [],
+      conversationMemory: memory,
+      handoff: { required: false },
+    };
+
+    this.logEvent('AI_CONVERSATION_MEMORY_RETURNED', context, {
+      mode: response.mode,
+      sourceCount: 0,
+      hasOrderContext: false,
+      latencyMs: Date.now() - startedAt,
+      errorCode: reset ? 'MEMORY_RESET' : undefined,
+    });
+
+    return response;
+  }
+
+  private describeMemory(memory: ConversationMemoryDto): string {
+    const details: string[] = [];
+
+    if (memory.budget) {
+      details.push(`a budget of ${memory.budget.amount} ${memory.budget.currency}`);
+    }
+
+    if (memory.preferredStyle) {
+      details.push(`${memory.preferredStyle} style`);
+    }
+
+    if (memory.preferredFit) {
+      details.push(`${memory.preferredFit} fit`);
+    }
+
+    if (memory.occasion) {
+      details.push(`the ${memory.occasion} occasion`);
+    }
+
+    if (memory.genderPreference) {
+      details.push(`${memory.genderPreference} products`);
+    }
+
+    if (memory.favoriteColor) {
+      details.push(`${memory.favoriteColor} as your color preference`);
+    }
+
+    return details.join(', ');
+  }
+
+  private toProductReference(product: AiPublicProduct) {
+    return { name: product.name, slug: product.slug };
+  }
+
+  private extractComparisonQueries(message: string): string[] {
+    const match = message.match(
+      /\bcompare\s+(.+?)\s+(?:vs\.?|versus|with|and)\s+(.+?)(?:[?.!]|$)/i,
+    );
+
+    if (!match) {
+      return [];
+    }
+
+    return [match[1], match[2]]
+      .map((value) => value.trim().replace(/^["']|["']$/g, ''))
+      .filter(Boolean);
   }
 
   private async getActiveOrderCards(

@@ -64,7 +64,15 @@ export interface ValidatedSupportOutput {
 export type ValidatedSupportIntent =
   | 'TRACK_ORDER'
   | 'RETURN_REQUEST'
+  | 'SIZE_RECOMMENDATION'
+  | 'CONVERSATION_MEMORY'
+  | 'PRODUCT_COMPARISON'
   | 'GENERAL_SUPPORT';
+
+export interface ValidatedSupportRouting {
+  intent: ValidatedSupportIntent;
+  productQueries: string[];
+}
 
 export class AiOutputValidationError extends Error {
   constructor() {
@@ -75,7 +83,7 @@ export class AiOutputValidationError extends Error {
 
 @Injectable()
 export class AiOutputValidator {
-  validateSupportIntent(content: string): ValidatedSupportIntent {
+  validateSupportIntent(content: string): ValidatedSupportRouting {
     const trimmedContent = content.trim();
 
     if (
@@ -97,15 +105,24 @@ export class AiOutputValidator {
 
     if (
       !this.isRecord(parsed) ||
-      !this.hasOnlyKeys(parsed, ['intent']) ||
+      !this.hasOnlyKeys(parsed, ['intent', 'productQueries']) ||
       (parsed.intent !== 'TRACK_ORDER' &&
         parsed.intent !== 'RETURN_REQUEST' &&
-        parsed.intent !== 'GENERAL_SUPPORT')
+        parsed.intent !== 'SIZE_RECOMMENDATION' &&
+        parsed.intent !== 'CONVERSATION_MEMORY' &&
+        parsed.intent !== 'PRODUCT_COMPARISON' &&
+        parsed.intent !== 'GENERAL_SUPPORT') ||
+      !Array.isArray(parsed.productQueries) ||
+      parsed.productQueries.length > 2
     ) {
       throw new AiOutputValidationError();
     }
 
-    return parsed.intent;
+    const productQueries = parsed.productQueries.map((query) =>
+      this.validatePlainText(query, 160),
+    );
+
+    return { intent: parsed.intent, productQueries };
   }
 
   validateStyleAdvice(
