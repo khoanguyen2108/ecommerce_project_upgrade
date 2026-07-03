@@ -18,9 +18,10 @@
   text-decoration: none;
 }
 
-.orderLink:hover strong,
-.orderLink:focus-visible strong {
-  text-decoration: underline;
+:global(.customer-chat-ai-message__content) .orderLink,
+:global(.customer-chat-ai-message__content) .orderLink:hover,
+:global(.customer-chat-ai-message__content) .orderLink:focus-visible {
+  text-decoration: none;
 }
 
 .content {
