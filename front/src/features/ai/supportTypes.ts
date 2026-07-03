@@ -48,7 +48,7 @@ export interface SupportReturnRequestCard {
   status: "DELIVERED";
   thumbnail: string | null;
   detailUrl: string;
-  requestStatus?: "PENDING";
+  requestStatus?: "PENDING" | "APPROVED";
 }
 
 export interface SupportHandoff {
@@ -68,6 +68,10 @@ export interface SupportResponse {
   returnRequest?: SupportReturnRequestCard;
   returnRequests?: SupportReturnRequestCard[];
   handoff?: SupportHandoff;
+  history?: {
+    messages: ChatMessage[];
+  };
 }
 
 export type SupportRequestStatus = "idle" | "loading" | "success" | "error";
+import type { ChatMessage } from "@/features/chat/types";

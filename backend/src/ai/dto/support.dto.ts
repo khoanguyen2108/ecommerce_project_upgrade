@@ -168,4 +168,7 @@ export class SupportResponseDto {
 
   @ApiProperty({ type: SupportHandoffDto })
   handoff: SupportHandoffDto;
+
+  @ApiPropertyOptional({ type: Object })
+  history?: { messages: unknown[] };
 }

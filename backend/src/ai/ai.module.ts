@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { OrdersModule } from '../orders/orders.module';
 import { ReturnsModule } from '../returns/returns.module';
+import { ChatModule } from '../chat/chat.module';
 import { AiConfigService } from './ai-config.service';
 import { AiContextMapper } from './ai-context.mapper';
 import { AiOrderToolService } from './ai-order-tool.service';
@@ -16,7 +17,7 @@ import { OpenRouterService } from './openrouter.service';
 import { SupportKnowledgeService } from './support-knowledge.service';
 
 @Module({
-  imports: [AuthModule, OrdersModule, ReturnsModule],
+  imports: [AuthModule, ChatModule, OrdersModule, ReturnsModule],
   controllers: [AiController],
   providers: [
     AiConfigService,

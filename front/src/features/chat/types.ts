@@ -1,7 +1,7 @@
 import type { UserRole } from "@/features/auth/types";
 
 export type ChatStatus = "OPEN" | "CLOSED";
-export type ChatSenderRole = "CUSTOMER" | "ADMIN";
+export type ChatSenderRole = "CUSTOMER" | "ADMIN" | "AI";
 
 export interface ChatCustomer {
   id: string;
@@ -12,16 +12,18 @@ export interface ChatCustomer {
 export interface ChatMessage {
   id: string;
   conversationId: string;
-  senderId: string;
+  senderId: string | null;
   senderRole: ChatSenderRole;
   body: string;
+  messageType: string;
+  metadata: unknown;
   readAt: string | null;
   createdAt: string;
   sender: {
     id: string;
     name: string | null;
     role: UserRole;
-  };
+  } | null;
 }
 
 export interface ChatConversation {

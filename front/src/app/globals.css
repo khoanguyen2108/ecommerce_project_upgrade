@@ -11154,6 +11154,11 @@ img {
   align-items: start;
 }
 
+.admin-chat-message--ai {
+  align-self: start;
+  align-items: start;
+}
+
 .admin-chat-message--admin {
   align-self: end;
   align-items: end;
@@ -11180,6 +11185,10 @@ img {
   color: var(--color-text);
 }
 
+.admin-chat-message--ai strong {
+  color: #4338ca;
+}
+
 .admin-chat-message p {
   border-radius: 16px;
   font-size: 0.94rem;
@@ -11192,6 +11201,13 @@ img {
   border: 1px solid #e2e2e2;
   border-top-left-radius: 4px;
   color: #1a1c1c;
+}
+
+.admin-chat-message--ai p {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-top-left-radius: 4px;
+  color: #312e81;
 }
 
 .admin-chat-message--admin p {

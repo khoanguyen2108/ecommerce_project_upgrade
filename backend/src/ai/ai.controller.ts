@@ -42,6 +42,8 @@ import {
   errorEnvelopeExample,
 } from "../common/swagger/api-examples";
 import { UserRole } from "../generated/prisma/enums";
+import { ChatGateway } from "../chat/chat.gateway";
+import { ChatService } from "../chat/chat.service";
 import { AiProductRecommendationService } from "./ai-product-recommendation.service";
 import { AiSupportService } from "./ai-support.service";
 import { AiService } from "./ai.service";
@@ -106,12 +108,14 @@ export class AiController {
     private readonly aiService: AiService,
     private readonly aiProductRecommendationService: AiProductRecommendationService,
     private readonly aiSupportService: AiSupportService,
+    private readonly chatGateway: ChatGateway,
+    private readonly chatService: ChatService,
   ) {}
 
   @ApiOperation({
     summary: "Get grounded AI support for the current customer",
     description:
-      "Uses the configured AI provider for support intent classification, backend-approved support content, and owner-scoped order tools. AI replies are not admin replies and are never written to human chat history.",
+      "Uses the configured AI provider for support intent classification, backend-approved support content, and owner-scoped order tools. Customer prompts and AI replies are stored in chat history with AI clearly separated from admin replies.",
   })
   @ApiOkResponse({
     description:
@@ -187,15 +191,34 @@ export class AiController {
       },
     },
   })
-  getSupport(
+  async getSupport(
     @Body() dto: SupportRequestDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.aiSupportService.getSupport(dto, {
+    const response = await this.aiSupportService.getSupport(dto, {
       requestId: request.requestId,
       userId: user.id,
     });
+    const history = await this.chatService.saveAiExchange(
+      user,
+      dto.message,
+      response,
+    );
+
+    if (history.notifyAdmin) {
+      for (const message of history.messages) {
+        this.chatGateway.broadcastMessageResult({
+          conversation: history.conversation,
+          message,
+        });
+      }
+    }
+
+    return {
+      ...response,
+      history: { messages: history.messages },
+    };
   }
 
   @ApiOperation({

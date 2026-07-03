@@ -12,6 +12,7 @@ import {
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user';
+import type { SupportResponseDto } from '../ai/dto/support.dto';
 
 const RECENT_MESSAGE_LIMIT = 50;
 const MAX_CHAT_MESSAGE_LENGTH = 2000;
@@ -37,6 +38,8 @@ const chatMessageSelect = {
   senderId: true,
   senderRole: true,
   body: true,
+  messageType: true,
+  metadata: true,
   readAt: true,
   createdAt: true,
   sender: {
@@ -118,16 +121,18 @@ export interface ChatCustomerDto {
 export interface ChatMessageDto {
   id: string;
   conversationId: string;
-  senderId: string;
+  senderId: string | null;
   senderRole: ChatSenderRole;
   body: string;
+  messageType: string;
+  metadata: Prisma.JsonValue | null;
   readAt: Date | null;
   createdAt: Date;
   sender: {
     id: string;
     name: string | null;
     role: UserRole;
-  };
+  } | null;
 }
 
 export interface ChatConversationDto {
@@ -150,6 +155,12 @@ export interface ChatConversationDetailDto {
 export interface ChatMessageResult {
   conversation: ChatConversationDto;
   message: ChatMessageDto;
+}
+
+export interface AiChatExchangeResult {
+  conversation: ChatConversationDto;
+  messages: ChatMessageDto[];
+  notifyAdmin: boolean;
 }
 
 @Injectable()
@@ -217,6 +228,69 @@ export class ChatService {
       return {
         conversation: this.toConversationDto(updatedConversation),
         message: this.toMessageDto(message),
+      };
+    });
+  }
+
+  async saveAiExchange(
+    user: AuthenticatedUser,
+    customerBody: string,
+    response: SupportResponseDto,
+  ): Promise<AiChatExchangeResult> {
+    this.assertCustomer(user);
+    const normalizedCustomerBody = this.normalizeMessageBody(customerBody);
+    const normalizedAiBody = this.normalizeMessageBody(response.answer);
+    const notifyAdmin =
+      response.handoff.required &&
+      response.handoff.reason?.toUpperCase() !== 'ORDER_CONTEXT_REQUIRED';
+
+    return this.prismaService.$transaction(async (tx) => {
+      const conversation = await this.findOrCreateOpenCustomerConversation(
+        tx,
+        user.id,
+      );
+      const customerCreatedAt = new Date();
+      const aiCreatedAt = new Date(customerCreatedAt.getTime() + 1);
+      const customerMessage = await tx.chatMessage.create({
+        data: {
+          body: normalizedCustomerBody,
+          conversationId: conversation.id,
+          createdAt: customerCreatedAt,
+          readAt: notifyAdmin ? null : customerCreatedAt,
+          senderId: user.id,
+          senderRole: ChatSenderRole.CUSTOMER,
+        },
+        select: chatMessageSelect,
+      });
+      const aiMessage = await tx.chatMessage.create({
+        data: {
+          body: normalizedAiBody,
+          conversationId: conversation.id,
+          createdAt: aiCreatedAt,
+          messageType: response.type,
+          metadata: this.toJsonValue(response),
+          readAt: aiCreatedAt,
+          senderId: null,
+          senderRole: ChatSenderRole.AI,
+        },
+        select: chatMessageSelect,
+      });
+      const updatedConversation = await tx.chatConversation.update({
+        where: { id: conversation.id },
+        data: {
+          lastMessageAt: aiCreatedAt,
+          status: ChatStatus.OPEN,
+        },
+        select: chatConversationSelect,
+      });
+
+      return {
+        conversation: this.toConversationDto(updatedConversation),
+        messages: [
+          this.toMessageDto(customerMessage),
+          this.toMessageDto(aiMessage),
+        ],
+        notifyAdmin,
       };
     });
   }
@@ -413,6 +487,10 @@ export class ChatService {
     return normalized;
   }
 
+  private toJsonValue(value: unknown): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  }
+
   private assertCustomer(user: AuthenticatedUser) {
     if (user.role !== UserRole.CUSTOMER) {
       throw new ConflictException({
@@ -484,13 +562,17 @@ export class ChatService {
       senderId: message.senderId,
       senderRole: message.senderRole,
       body: message.body,
+      messageType: message.messageType,
+      metadata: message.metadata,
       readAt: message.readAt,
       createdAt: message.createdAt,
-      sender: {
-        id: message.sender.id,
-        name: message.sender.name,
-        role: message.sender.role,
-      },
+      sender: message.sender
+        ? {
+            id: message.sender.id,
+            name: message.sender.name,
+            role: message.sender.role,
+          }
+        : null,
     };
   }
 

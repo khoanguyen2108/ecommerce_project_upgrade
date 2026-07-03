@@ -11,7 +11,7 @@ export function AiReturnRequestCard({
   onRequestReturn: (returnRequest: SupportReturnRequestCard) => void;
   returnRequest: SupportReturnRequestCard;
 }) {
-  const isPending = returnRequest.requestStatus === 'PENDING';
+  const isUnavailable = Boolean(returnRequest.requestStatus);
 
   return (
     <div className={styles.card}>
@@ -34,11 +34,15 @@ export function AiReturnRequestCard({
       </Link>
       <button
         className={styles.action}
-        disabled={isPending}
+        disabled={isUnavailable}
         onClick={() => onRequestReturn(returnRequest)}
         type="button"
       >
-        {isPending ? 'Pending Review' : 'Request Return'}
+        {returnRequest.requestStatus === 'APPROVED'
+          ? 'Return Approved'
+          : returnRequest.requestStatus === 'PENDING'
+            ? 'Pending Review'
+            : 'Request Return'}
       </button>
     </div>
   );

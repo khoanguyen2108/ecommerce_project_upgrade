@@ -1,0 +1,6 @@
+ALTER TYPE "ChatSenderRole" ADD VALUE 'AI';
+
+ALTER TABLE "ChatMessage"
+  ALTER COLUMN "senderId" DROP NOT NULL,
+  ADD COLUMN "messageType" VARCHAR(32) NOT NULL DEFAULT 'text',
+  ADD COLUMN "metadata" JSONB;

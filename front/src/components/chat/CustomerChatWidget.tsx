@@ -19,6 +19,7 @@ import type {
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
 import { getMyChat, sendMyChatMessage } from "@/features/chat/api";
+import { listMyReturnRequests } from "@/features/returns/api";
 import {
   createChatSocket,
   type ChatSocket,
@@ -228,14 +229,29 @@ export function CustomerChatWidget() {
       setError(undefined);
 
       try {
-        const response = await getMyChat();
+        const [response, returnsResponse] = await Promise.all([
+          getMyChat(),
+          listMyReturnRequests().catch(() => ({ returnRequests: [] })),
+        ]);
 
         if (!isMounted) {
           return;
         }
 
         setConversation(response.conversation);
-        setMessages(response.messages);
+        const returnStatuses = new Map<string, "PENDING" | "APPROVED">();
+
+        for (const request of returnsResponse.returnRequests) {
+          if (request.status === "PENDING" || request.status === "APPROVED") {
+            returnStatuses.set(request.orderCode, request.status);
+          }
+        }
+
+        setMessages(
+          response.messages.map((message) =>
+            applyReturnStatusesToAiMessage(message, returnStatuses),
+          ),
+        );
         setUnreadAdminCount(0);
       } catch (loadError) {
         if (!isMounted) {
@@ -424,9 +440,15 @@ export function CustomerChatWidget() {
 
         const isOutOfScope = isOutOfScopeResponse(response);
         const needsHandoff = !isOutOfScope && isHandoffResponse(response);
+        const hasPersistedHistory = syncPersistedAiHistory(
+          response,
+          customerMessage.id,
+        );
 
         if (isOutOfScope) {
-          addAiMessage(OUT_OF_SCOPE_MESSAGE, "out-of-scope");
+          if (!hasPersistedHistory) {
+            addAiMessage(OUT_OF_SCOPE_MESSAGE, "out-of-scope");
+          }
           return;
         }
 
@@ -435,34 +457,38 @@ export function CustomerChatWidget() {
             response.handoff?.reason?.toUpperCase() ===
             "ORDER_CONTEXT_REQUIRED";
 
-          addAiMessage(
-            response.answer,
-            "handoff",
-            isOrderContextRequired
-              ? {}
-              : {
-                  status:
-                    "This conversation has been forwarded to Belikeme Support.",
-                  statusDetail: "Waiting for an available specialist...",
-                },
-          );
+          if (!hasPersistedHistory) {
+            addAiMessage(
+              response.answer,
+              "handoff",
+              isOrderContextRequired
+                ? {}
+                : {
+                    status:
+                      "This conversation has been forwarded to Belikeme Support.",
+                    statusDetail: "Waiting for an available specialist...",
+                  },
+            );
+          }
 
-          if (!isOrderContextRequired) {
+          if (!hasPersistedHistory && !isOrderContextRequired) {
             await forwardToHumanSupport(body, customerMessage.id);
           }
 
           return;
         }
 
-        addAiMessage(response.answer, "answer", {
-          messageType: response.type ?? "text",
-          order: response.order,
-          orders: response.orders,
-          returnRequest: response.returnRequest,
-          returnRequests:
-            response.returnRequests ??
-            (response.returnRequest ? [response.returnRequest] : undefined),
-        });
+        if (!hasPersistedHistory) {
+          addAiMessage(response.answer, "answer", {
+            messageType: response.type ?? "text",
+            order: response.order,
+            orders: response.orders,
+            returnRequest: response.returnRequest,
+            returnRequests:
+              response.returnRequests ??
+              (response.returnRequest ? [response.returnRequest] : undefined),
+          });
+        }
       } catch {
         if (activeCustomerIdRef.current !== requestCustomerId) {
           return;
@@ -474,6 +500,26 @@ export function CustomerChatWidget() {
     } finally {
       isSubmissionPendingRef.current = false;
     }
+  }
+
+  function syncPersistedAiHistory(
+    response: SupportResponse,
+    localCustomerMessageId: string,
+  ): boolean {
+    const persistedMessages = response.history?.messages;
+
+    if (!persistedMessages?.length) {
+      return false;
+    }
+
+    setLocalMessages((current) =>
+      current.filter((message) => message.id !== localCustomerMessageId),
+    );
+    setMessages((current) =>
+      persistedMessages.reduce(appendMessage, current),
+    );
+
+    return true;
   }
 
   async function forwardToHumanSupport(body: string, localMessageId: string) {
@@ -667,6 +713,46 @@ export function CustomerChatWidget() {
               >
                 {timeline.map((item) => {
                   if (item.kind === "persisted") {
+                    const aiResponse = getPersistedAiResponse(item.message);
+
+                    if (aiResponse) {
+                      const requiresHuman = isHandoffResponse(aiResponse);
+                      const requiresOrderContext =
+                        aiResponse.handoff?.reason?.toUpperCase() ===
+                        "ORDER_CONTEXT_REQUIRED";
+
+                      return (
+                        <AiMessageBubble
+                          body={item.message.body}
+                          createdAt={item.message.createdAt}
+                          key={item.id}
+                          messageType={aiResponse.type ?? "text"}
+                          onRequestReturn={setSelectedReturnOrder}
+                          order={aiResponse.order}
+                          orders={aiResponse.orders}
+                          returnRequest={aiResponse.returnRequest}
+                          returnRequests={aiResponse.returnRequests}
+                          status={
+                            requiresHuman && !requiresOrderContext
+                              ? "This conversation has been forwarded to Belikeme Support."
+                              : undefined
+                          }
+                          statusDetail={
+                            requiresHuman && !requiresOrderContext
+                              ? "Waiting for an available specialist..."
+                              : undefined
+                          }
+                          tone={
+                            isOutOfScopeResponse(aiResponse)
+                              ? "out-of-scope"
+                              : requiresHuman
+                                ? "handoff"
+                                : "answer"
+                          }
+                        />
+                      );
+                    }
+
                     return (
                       <ChatMessageBubble key={item.id} message={item.message} />
                     );
@@ -783,6 +869,16 @@ export function CustomerChatWidget() {
                   : item,
               ),
             })),
+          );
+          setMessages((current) =>
+            current.map((message) =>
+              applyReturnStatusesToAiMessage(
+                message,
+                new Map<string, "PENDING" | "APPROVED">([
+                  [request.orderCode, "PENDING"],
+                ]),
+              ),
+            ),
           );
         }}
         orderCode={selectedReturnOrder?.orderCode}
@@ -967,6 +1063,44 @@ function isOutOfScopeResponse(response: SupportResponse): boolean {
     response.mode === "out_of_scope" ||
     response.handoff?.reason?.toUpperCase() === "OUT_OF_SCOPE"
   );
+}
+
+function getPersistedAiResponse(
+  message: ChatMessage,
+): SupportResponse | undefined {
+  if (message.senderRole !== "AI") {
+    return undefined;
+  }
+
+  const response = message.metadata as SupportResponse | null;
+
+  return response && isValidSupportResponse(response) ? response : undefined;
+}
+
+function applyReturnStatusesToAiMessage(
+  message: ChatMessage,
+  statuses: Map<string, "PENDING" | "APPROVED">,
+): ChatMessage {
+  if (message.senderRole !== "AI" || !message.metadata) {
+    return message;
+  }
+
+  const response = message.metadata as SupportResponse;
+  const applyStatus = (item: SupportReturnRequestCard) => ({
+    ...item,
+    requestStatus: statuses.get(item.orderCode) ?? item.requestStatus,
+  });
+
+  return {
+    ...message,
+    metadata: {
+      ...response,
+      returnRequest: response.returnRequest
+        ? applyStatus(response.returnRequest)
+        : undefined,
+      returnRequests: response.returnRequests?.map(applyStatus),
+    },
+  };
 }
 
 function isHandoffResponse(response: SupportResponse): boolean {

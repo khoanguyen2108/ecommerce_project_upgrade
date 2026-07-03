@@ -602,14 +602,26 @@ function AdminChatBubble({
   isAdmin: boolean;
   message: ChatMessage;
 }) {
+  const isAi = message.senderRole === "AI";
+
   return (
     <article
       className={`admin-chat-message ${
-        isAdmin ? "admin-chat-message--admin" : "admin-chat-message--customer"
+        isAdmin
+          ? "admin-chat-message--admin"
+          : isAi
+            ? "admin-chat-message--ai"
+            : "admin-chat-message--customer"
       }`}
     >
       <div>
-        <strong>{isAdmin ? "Admin" : message.sender.name || "Customer"}</strong>
+        <strong>
+          {isAdmin
+            ? "Admin"
+            : isAi
+              ? "Belikeme AI"
+              : message.sender?.name || "Customer"}
+        </strong>
         <time dateTime={message.createdAt}>{formatAdminDate(message.createdAt)}</time>
       </div>
       <p>{message.body}</p>
