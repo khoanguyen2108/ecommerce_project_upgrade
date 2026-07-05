@@ -62,6 +62,7 @@ const CATEGORY_OPTION_LIMIT = 100;
 const MAX_PRODUCT_IMAGES = 4;
 const MAX_PRODUCT_VARIANTS = 50;
 const PRODUCT_VARIANT_LIMIT_MESSAGE = "Maximum 50 variants per product.";
+const DEFAULT_ACCESSORY_VARIANT_COLOR = "Default";
 
 const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
   AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
@@ -97,6 +98,7 @@ interface ProductFormState {
   isActive: boolean;
   name: string;
   slug: string;
+  stockQuantity: string;
 }
 
 interface VariantFormState {
@@ -436,6 +438,22 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       return;
     }
 
+    const accessoryStock =
+      panelMode === "create" && sizingType === "ACCESSORIES"
+        ? parseRequiredInteger(productForm.stockQuantity)
+        : undefined;
+
+    if (
+      panelMode === "create" &&
+      sizingType === "ACCESSORIES" &&
+      accessoryStock === undefined
+    ) {
+      setActionError(
+        "Stock quantity must be a whole number greater than or equal to 0.",
+      );
+      return;
+    }
+
     if (
       panelMode === "edit" &&
       selectedProduct &&
@@ -453,7 +471,19 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       if (panelMode === "create") {
         await createAdminProduct({
           ...productPayload.payload,
-          variants: draftVariants.map(({ tempId: _tempId, ...variant }) => variant),
+          variants:
+            sizingType === "ACCESSORIES"
+              ? [
+                  {
+                    color: DEFAULT_ACCESSORY_VARIANT_COLOR,
+                    isActive: true,
+                    priceOverride: null,
+                    size: ONE_SIZE,
+                    sku: null,
+                    stock: accessoryStock!,
+                  },
+                ]
+              : draftVariants.map(({ tempId: _tempId, ...variant }) => variant),
         });
 
         setSuccessMessage("Product created.");
@@ -687,6 +717,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     setSizingType(nextType);
     setVariantForm(getEmptyVariantForm(nextType));
     setEditingVariantId(undefined);
+    if (panelMode === "create" && nextType === "ACCESSORIES") {
+      setDraftVariants([]);
+    }
   }
 
   async function handleVariantStatusChange(variant: AdminProductVariant) {
@@ -1185,12 +1218,34 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                 <label>
                   <span>Stock quantity</span>
                   <input
-                    aria-label="Stock quantity managed by variants"
-                    disabled
+                    aria-label="Stock quantity"
+                    disabled={
+                      isPanelLoading ||
+                      panelMode !== "create" ||
+                      sizingType !== "ACCESSORIES"
+                    }
+                    min="0"
+                    onChange={(event) =>
+                      setProductForm((current) => ({
+                        ...current,
+                        stockQuantity: event.target.value,
+                      }))
+                    }
+                    required={panelMode === "create" && sizingType === "ACCESSORIES"}
                     type="number"
-                    value={selectedProduct ? getProductStock(selectedProduct) : 0}
+                    value={
+                      panelMode === "create" && sizingType === "ACCESSORIES"
+                        ? productForm.stockQuantity
+                        : selectedProduct
+                          ? getProductStock(selectedProduct)
+                          : 0
+                    }
                   />
-                  <small>Managed through variants.</small>
+                  <small>
+                    {panelMode === "create" && sizingType === "ACCESSORIES"
+                      ? "Enter stock directly for this accessory."
+                      : "Managed through variants."}
+                  </small>
                 </label>
                 <label className="admin-compact-field--wide">
                   <span>Selling classification</span>
@@ -1376,7 +1431,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
           </form>
 
-          <section className="admin-variants" aria-labelledby="product-variants-heading">
+          {panelMode === "create" && sizingType === "ACCESSORIES" ? null : (
+            <section className="admin-variants" aria-labelledby="product-variants-heading">
             <div className="admin-variants__header">
               <div>
                 <p className="eyebrow">Variants</p>
@@ -1632,7 +1688,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                 </form>
               </>
             ) : null}
-          </section>
+            </section>
+          )}
       </AdminModal>
     </div>
   );
@@ -1647,6 +1704,7 @@ function getEmptyProductForm(): ProductFormState {
     isActive: true,
     name: "",
     slug: "",
+    stockQuantity: "0",
   };
 }
 
@@ -1662,6 +1720,7 @@ function getProductForm(product: AdminProduct): ProductFormState {
     isActive: product.isActive,
     name: product.name,
     slug: product.slug,
+    stockQuantity: String(getProductStock(product)),
   };
 }
 
@@ -1709,7 +1768,8 @@ function areProductFormsEqual(
     left.imageUrls.join("|") === right.imageUrls.join("|") &&
     left.isActive === right.isActive &&
     left.name === right.name &&
-    left.slug === right.slug
+    left.slug === right.slug &&
+    left.stockQuantity === right.stockQuantity
   );
 }
 
