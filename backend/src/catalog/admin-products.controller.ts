@@ -168,7 +168,6 @@ export class AdminProductsController {
         fields: 0,
         fileSize: MAX_PRODUCT_IMAGE_BYTES,
         files: 1,
-        parts: 1,
       },
     }),
   )

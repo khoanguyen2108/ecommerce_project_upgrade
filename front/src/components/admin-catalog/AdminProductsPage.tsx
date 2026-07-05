@@ -79,7 +79,6 @@ const PRODUCT_VARIANT_LIMIT_MESSAGE = "Maximum 50 variants per product.";
 
 const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
   AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
-  BAD_REQUEST: "Some catalog fields are invalid. Review the form and try again.",
   CATALOG_UPDATE_EMPTY: "Change at least one catalog field before saving.",
   CATEGORY_INACTIVE: "Products cannot be assigned to an inactive category.",
   CATEGORY_NOT_FOUND: "That category no longer exists.",
