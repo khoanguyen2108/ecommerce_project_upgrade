@@ -19,7 +19,11 @@ import {
   getProductVariantsBySlug,
 } from "@/features/catalog/api";
 import { formatPrice } from "@/features/catalog/format";
-import { isNoSize, sortSizesByStandardOrder } from "@/features/catalog/sizes";
+import {
+  isImplicitAccessoryOption,
+  isNoSize,
+  sortSizesByStandardOrder,
+} from "@/features/catalog/sizes";
 import type { Product, ProductVariant } from "@/features/catalog/types";
 import { ApiClientError } from "@/lib/errors/api-error";
 
@@ -118,6 +122,8 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     () => Array.from(new Set(state.variants.map((variant) => variant.color))),
     [state.variants],
   );
+  const isSimpleAccessory =
+    state.variants.length === 1 && isImplicitAccessoryOption(state.variants[0]);
   const sizesForSelectedColor = useMemo(
     () =>
       selectedColor
@@ -339,7 +345,8 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             {product.description || "Product details are being prepared for this item."}
           </p>
 
-          <section className="variant-panel" aria-labelledby="variants-heading">
+          {isSimpleAccessory ? null : (
+            <section className="variant-panel" aria-labelledby="variants-heading">
             <div className="product-option-heading">
               <h2 id="variants-heading">Color</h2>
             </div>
@@ -398,17 +405,20 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             ) : (
               <p className="product-selection-hint">{selectionMessage}</p>
             )}
-          </section>
+            </section>
+          )}
 
           <section className="quantity-panel" aria-labelledby="quantity-heading">
             <div>
               <h2 id="quantity-heading">Quantity</h2>
               <p>
-                {hasValidSelection && selectedVariant
-                  ? `${selectedVariant.stock} available for this option.`
-                  : requiresSize
-                    ? "Complete the color and size selection first."
-                    : "Select a color first."}
+                {getQuantityAvailabilityMessage({
+                  hasValidSelection,
+                  isSimpleAccessory,
+                  requiresSize,
+                  selectedVariant,
+                  totalStock,
+                })}
               </p>
             </div>
             <div className="quantity-stepper">
@@ -471,7 +481,8 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             </button>
           </div>
 
-          <dl className="product-facts">
+          {isSimpleAccessory ? null : (
+            <dl className="product-facts">
             <div>
               <dt>SKU</dt>
               <dd>{selectedVariant?.sku || "Select a variant"}</dd>
@@ -496,7 +507,8 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                     : "Out of stock"}
               </dd>
             </div>
-          </dl>
+            </dl>
+          )}
         </div>
       </section>
     </main>
@@ -588,6 +600,34 @@ function hasSelectableCombination(
 
 function getVariantUnitPrice(product: Product, variant: ProductVariant): number {
   return variant.priceOverride ?? product.basePrice;
+}
+
+function getQuantityAvailabilityMessage({
+  hasValidSelection,
+  isSimpleAccessory,
+  requiresSize,
+  selectedVariant,
+  totalStock,
+}: {
+  hasValidSelection: boolean;
+  isSimpleAccessory: boolean;
+  requiresSize: boolean;
+  selectedVariant?: ProductVariant;
+  totalStock: number;
+}): string {
+  if (isSimpleAccessory) {
+    if (totalStock === 0) return "Out of stock";
+    if (totalStock <= 5) return `Only ${totalStock} left`;
+    return "In stock";
+  }
+
+  if (hasValidSelection && selectedVariant) {
+    return `${selectedVariant.stock} available for this option.`;
+  }
+
+  return requiresSize
+    ? "Complete the color and size selection first."
+    : "Select a color first.";
 }
 
 function getSelectionMessage({

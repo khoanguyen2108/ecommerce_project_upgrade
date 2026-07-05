@@ -34,6 +34,7 @@ import {
   getOrderRequestId,
 } from "@/components/orders/order-format";
 import { getOrder } from "@/features/orders/api";
+import { isImplicitAccessoryOption } from "@/features/catalog/sizes";
 import { listMyReturnRequests } from "@/features/returns/api";
 import type {
   Order,
@@ -345,27 +346,33 @@ function OrderItems({ order }: { order: Order }) {
         </div>
       ) : (
         <div className="order-detail-items">
-          {order.items.map((item) => (
-            <article className="order-detail-item" key={item.id}>
-              <OrderItemImage alt={item.productName} imageUrl={item.imageUrl} />
-              <div className="order-detail-item__info">
-                <h3>{item.productName}</h3>
-                <p>
-                  <span>{item.color || "Color not set"}</span>
-                  <span>{item.size || "Size not set"}</span>
-                </p>
-                {item.sku ? <small>SKU {item.sku}</small> : null}
-              </div>
-              <div className="order-detail-item__quantity">
-                <span>Quantity</span>
-                <strong>{formatNumber(item.quantity)}</strong>
-              </div>
-              <div className="order-detail-item__price">
-                <span>{formatCurrency(item.unitPrice, order.currency)} each</span>
-                <strong>{formatCurrency(item.lineTotal, order.currency)}</strong>
-              </div>
-            </article>
-          ))}
+          {order.items.map((item) => {
+            const showVariantOption = !isImplicitAccessoryOption(item);
+
+            return (
+              <article className="order-detail-item" key={item.id}>
+                <OrderItemImage alt={item.productName} imageUrl={item.imageUrl} />
+                <div className="order-detail-item__info">
+                  <h3>{item.productName}</h3>
+                  {showVariantOption ? (
+                    <p>
+                      <span>{item.color || "Color not set"}</span>
+                      <span>{item.size || "Size not set"}</span>
+                    </p>
+                  ) : null}
+                  {item.sku ? <small>SKU {item.sku}</small> : null}
+                </div>
+                <div className="order-detail-item__quantity">
+                  <span>Quantity</span>
+                  <strong>{formatNumber(item.quantity)}</strong>
+                </div>
+                <div className="order-detail-item__price">
+                  <span>{formatCurrency(item.unitPrice, order.currency)} each</span>
+                  <strong>{formatCurrency(item.lineTotal, order.currency)}</strong>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>

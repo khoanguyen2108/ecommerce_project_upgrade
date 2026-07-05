@@ -4,6 +4,7 @@ import { Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatPrice } from "@/features/catalog/format";
+import { isImplicitAccessoryOption } from "@/features/catalog/sizes";
 import type { CartItem } from "@/features/cart/types";
 
 interface CartItemRowProps {
@@ -27,6 +28,7 @@ export function CartItemRow({
   const canUpdate = item.availableStock > 0;
   const hasChanged = quantity !== item.quantity;
   const productHref = `/products/${encodeURIComponent(item.product.slug)}`;
+  const showVariantOption = !isImplicitAccessoryOption(item.variant);
 
   useEffect(() => {
     setQuantity(item.quantity);
@@ -60,10 +62,12 @@ export function CartItemRow({
         <h2>
           <Link href={productHref}>{item.product.name}</Link>
         </h2>
-        <p className="cart-item-row__variant">
-          {item.variant.size} / {item.variant.color}
-          {item.variant.sku ? ` / ${item.variant.sku}` : ""}
-        </p>
+        {showVariantOption ? (
+          <p className="cart-item-row__variant">
+            {item.variant.size} / {item.variant.color}
+            {item.variant.sku ? ` / ${item.variant.sku}` : ""}
+          </p>
+        ) : null}
         <p className="cart-item-row__stock">
           {item.availableStock > 0
             ? `${item.availableStock} in stock`

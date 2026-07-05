@@ -14,6 +14,7 @@ export const SHOE_SIZE_ORDER = [
   "46",
 ] as const;
 export const ONE_SIZE = "ONE_SIZE";
+export const DEFAULT_ACCESSORY_VARIANT_COLOR = "Default";
 export const SIZE_ORDER = CLOTHING_SIZE_ORDER;
 
 export type StandardSize = (typeof SIZE_ORDER)[number];
@@ -45,4 +46,15 @@ export function isShoeSize(size: string): boolean {
 
 export function isNoSize(size: string): boolean {
   return size === ONE_SIZE || size.trim() === "";
+}
+
+export function isImplicitAccessoryOption(option: {
+  color: string;
+  size: string;
+}): boolean {
+  return (
+    isNoSize(option.size) &&
+    option.color.trim().toLocaleLowerCase() ===
+      DEFAULT_ACCESSORY_VARIANT_COLOR.toLocaleLowerCase()
+  );
 }

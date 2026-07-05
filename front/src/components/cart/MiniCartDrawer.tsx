@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { useCart } from "@/components/cart/CartProvider";
 import { formatPrice } from "@/features/catalog/format";
+import { isImplicitAccessoryOption } from "@/features/catalog/sizes";
 import type { CartItem } from "@/features/cart/types";
 
 export function MiniCartDrawer() {
@@ -199,6 +200,7 @@ function MiniCartItem({
 }) {
   const maxQuantity = Math.max(1, Math.min(99, item.availableStock));
   const productHref = `/products/${encodeURIComponent(item.product.slug)}`;
+  const showVariantOption = !isImplicitAccessoryOption(item.variant);
 
   return (
     <article className="mini-cart-item">
@@ -218,9 +220,11 @@ function MiniCartItem({
         <Link href={productHref} onClick={onClose}>
           {item.product.name}
         </Link>
-        <p>
-          {item.variant.size} / {item.variant.color}
-        </p>
+        {showVariantOption ? (
+          <p>
+            {item.variant.size} / {item.variant.color}
+          </p>
+        ) : null}
         <span>{formatPrice(item.currentUnitPrice)}</span>
         <div className="mini-cart-item__controls">
           <div className="mini-cart-stepper" aria-label="Quantity controls">

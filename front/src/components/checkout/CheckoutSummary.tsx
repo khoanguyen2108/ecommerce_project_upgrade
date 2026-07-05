@@ -7,6 +7,7 @@ import {
   formatCurrency,
   formatNumber,
 } from "@/components/orders/order-format";
+import { isImplicitAccessoryOption } from "@/features/catalog/sizes";
 import type { CheckoutSummary as CheckoutSummaryModel } from "@/features/checkout/types";
 
 interface CheckoutSummaryProps {
@@ -59,6 +60,7 @@ export function CheckoutSummary({
           <div className="checkout-item-list">
             {summary.items.map((item) => {
               const productHref = `/products/${encodeURIComponent(item.productSlug)}`;
+              const showVariantOption = !isImplicitAccessoryOption(item);
 
               return (
                 <article className="checkout-item" key={item.cartItemId}>
@@ -84,10 +86,12 @@ export function CheckoutSummary({
                     <h3>
                       <Link href={productHref}>{item.productName}</Link>
                     </h3>
-                    <p>
-                      Size {item.size} / Color {item.color}
-                      {item.sku ? ` / ${item.sku}` : ""}
-                    </p>
+                    {showVariantOption ? (
+                      <p>
+                        Size {item.size} / Color {item.color}
+                        {item.sku ? ` / ${item.sku}` : ""}
+                      </p>
+                    ) : null}
                     <p>{item.availableStock} available</p>
                   </div>
                   <div className="checkout-item__totals">

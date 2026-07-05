@@ -41,6 +41,7 @@ import type {
 import { formatPrice } from "@/features/catalog/format";
 import {
   CLOTHING_SIZE_ORDER,
+  DEFAULT_ACCESSORY_VARIANT_COLOR,
   isNoSize,
   isShoeSize,
   ONE_SIZE,
@@ -62,7 +63,6 @@ const CATEGORY_OPTION_LIMIT = 100;
 const MAX_PRODUCT_IMAGES = 4;
 const MAX_PRODUCT_VARIANTS = 50;
 const PRODUCT_VARIANT_LIMIT_MESSAGE = "Maximum 50 variants per product.";
-const DEFAULT_ACCESSORY_VARIANT_COLOR = "Default";
 
 const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
   AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",

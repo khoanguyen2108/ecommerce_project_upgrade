@@ -14,7 +14,10 @@ import {
   formatOrderDisplayId,
 } from "@/components/orders/order-format";
 import type { PayosDisplayStatusResponse } from "@/features/payments/types";
-import { isNoSize } from "@/features/catalog/sizes";
+import {
+  isImplicitAccessoryOption,
+  isNoSize,
+} from "@/features/catalog/sizes";
 
 interface PaymentThankYouProps {
   status: PayosDisplayStatusResponse;
@@ -69,21 +72,25 @@ export function PaymentThankYou({ status }: PaymentThankYouProps) {
             <div className="payment-thank-you__items">
               <h3>Purchased products</h3>
               <ul>
-                {orderItems.map((item) => (
-                  <li key={item.id}>
-                    <OrderItemImage
-                      alt={item.productName}
-                      imageUrl={item.imageUrl}
-                      size="compact"
-                    />
-                    <div>
-                      <strong>{item.productName}</strong>
-                      <span>{formatOrderItemOptions(item.size, item.color)}</span>
-                    </div>
-                    <span>x{item.quantity}</span>
-                    <strong>{formatCurrency(item.lineTotal, status.currency)}</strong>
-                  </li>
-                ))}
+                {orderItems.map((item) => {
+                  const optionLabel = formatOrderItemOptions(item.size, item.color);
+
+                  return (
+                    <li key={item.id}>
+                      <OrderItemImage
+                        alt={item.productName}
+                        imageUrl={item.imageUrl}
+                        size="compact"
+                      />
+                      <div>
+                        <strong>{item.productName}</strong>
+                        {optionLabel ? <span>{optionLabel}</span> : null}
+                      </div>
+                      <span>x{item.quantity}</span>
+                      <strong>{formatCurrency(item.lineTotal, status.currency)}</strong>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ) : null}
@@ -133,7 +140,9 @@ export function PaymentThankYou({ status }: PaymentThankYouProps) {
   );
 }
 
-function formatOrderItemOptions(size: string, color: string): string {
+function formatOrderItemOptions(size: string, color: string): string | undefined {
+  if (isImplicitAccessoryOption({ color, size })) return undefined;
+
   const sizeLabel = isNoSize(size) ? "One size" : size;
 
   return `${sizeLabel} / ${color}`;
