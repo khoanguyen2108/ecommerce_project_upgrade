@@ -483,6 +483,11 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       return;
     }
 
+    const productDetailsChanged =
+      panelMode === "create" ||
+      !selectedProduct ||
+      !areProductDetailsEqual(productForm, getProductForm(selectedProduct));
+
     const accessoryStock =
       panelMode === "create" && sizingType === "ACCESSORIES"
         ? parseRequiredInteger(productForm.stockQuantity)
@@ -502,6 +507,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     if (
       panelMode === "edit" &&
       selectedProduct &&
+      productDetailsChanged &&
       productPayload.payload.isActive !== selectedProduct.isActive &&
       !window.confirm(
         `${productPayload.payload.isActive ? "Activate" : "Deactivate"} ${selectedProduct.name}?`,
@@ -534,7 +540,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               : draftVariants.map(({ tempId: _tempId, ...variant }) => variant),
         });
         latestProduct = response.product;
-      } else if (selectedProduct) {
+      } else if (selectedProduct && productDetailsChanged) {
         const response = await updateAdminProduct(
           selectedProduct.id,
           productPayload.payload,
@@ -543,6 +549,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
           ...response.product,
           variants: response.product.variants || selectedProduct.variants,
         };
+      } else if (selectedProduct) {
+        latestProduct = selectedProduct;
       }
 
       if (!latestProduct) {
@@ -2248,6 +2256,21 @@ function toManagedProductImageFormItem(
     source: "managed",
     url: image.url,
   };
+}
+
+function areProductDetailsEqual(
+  left: ProductFormState,
+  right: ProductFormState,
+): boolean {
+  return (
+    left.basePrice === right.basePrice &&
+    left.categoryIds.join("|") === right.categoryIds.join("|") &&
+    left.description === right.description &&
+    left.isActive === right.isActive &&
+    left.name === right.name &&
+    left.slug === right.slug &&
+    left.stockQuantity === right.stockQuantity
+  );
 }
 
 function serializeImageItems(items: ProductImageFormItem[]): string {
