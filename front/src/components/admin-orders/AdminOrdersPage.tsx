@@ -242,7 +242,7 @@ export function AdminOrdersPage({
         <MetricCard label="Delivered" meta="Current page" value={metrics.delivered} />
       </section>
 
-      <section className="admin-orders-filter-panel" aria-label="Order filters">
+      <section className="admin-orders-filter-panel admin-filter-surface" aria-label="Order filters">
         <form className="admin-orders-search" onSubmit={submitSearch}>
           <label htmlFor="admin-order-search">Search</label>
           <div>

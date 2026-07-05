@@ -394,7 +394,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
         </button>
       </section>
 
-      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline" aria-label="User filters">
+      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline admin-filter-surface" aria-label="User filters">
         <form className="admin-search" onSubmit={handleSearchSubmit}>
           <label htmlFor="admin-user-search">Search</label>
           <div>

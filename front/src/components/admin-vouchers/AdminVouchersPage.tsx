@@ -321,7 +321,7 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
 
       <section
         aria-label="Voucher filters"
-        className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline"
+        className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline admin-filter-surface"
       >
         <form className="admin-search" onSubmit={handleSearchSubmit}>
           <label htmlFor="admin-voucher-search">Search</label>

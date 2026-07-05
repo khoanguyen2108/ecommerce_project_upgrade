@@ -4199,6 +4199,41 @@ img {
   box-shadow: 0 0 0 1px var(--color-border-strong);
 }
 
+/* Rounded filter language shared with the Returns admin page. */
+.admin-resource__toolbar.admin-filter-surface,
+.admin-orders-filter-panel.admin-filter-surface {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.admin-filter-surface .admin-search input,
+.admin-filter-surface .admin-filter-grid input,
+.admin-filter-surface .admin-filter-grid select,
+.admin-filter-surface .admin-orders-search input,
+.admin-filter-surface .admin-orders-filters input,
+.admin-filter-surface .admin-orders-filters select,
+.admin-filter-surface .button {
+  border-radius: 8px;
+}
+
+.admin-filter-surface .admin-orders-search input,
+.admin-filter-surface .admin-orders-filters input,
+.admin-filter-surface .admin-orders-filters select {
+  background: #ffffff;
+  border-color: var(--color-border);
+}
+
+.admin-filter-surface input,
+.admin-filter-surface select,
+.admin-filter-surface .button {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
 .admin-orders-list {
   background: var(--color-surface);
   border: 1px solid var(--color-border);

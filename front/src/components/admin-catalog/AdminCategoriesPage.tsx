@@ -515,7 +515,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
         </div>
       </section>
 
-      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline" aria-label="Category filters">
+      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline admin-filter-surface" aria-label="Category filters">
         <form className="admin-search" onSubmit={handleSearchSubmit}>
           <label htmlFor="admin-category-search">Search</label>
           <div>

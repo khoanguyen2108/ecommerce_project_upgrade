@@ -1097,7 +1097,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         </div>
       </section>
 
-      <section className="admin-resource__toolbar admin-resource__toolbar--compact" aria-label="Product filters">
+      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-filter-surface" aria-label="Product filters">
         <form className="admin-search admin-search--products" onSubmit={handleSearchSubmit}>
           <label htmlFor="admin-product-search">Search</label>
           <div>
