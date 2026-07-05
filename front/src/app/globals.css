@@ -3566,7 +3566,7 @@ img {
 
 .admin-compact-form .admin-image-url-row {
   gap: 8px;
-  grid-template-columns: 48px minmax(0, 1fr) 30px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
 }
 
 .admin-compact-form .admin-image-preview-wrap,
@@ -4114,6 +4114,13 @@ img {
     minmax(64px, 0.42fr)
     minmax(150px, 0.9fr)
     minmax(150px, 0.9fr);
+}
+
+.admin-compact-form .admin-image-actions .icon-button {
+  height: 28px;
+  min-height: 28px;
+  padding: 5px;
+  width: 28px;
 }
 
 .admin-orders-list__head {
@@ -4698,7 +4705,44 @@ img {
   align-items: end;
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: 64px minmax(0, 1fr) 42px;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+}
+
+.admin-image-file-input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  width: 1px;
+}
+
+.admin-image-file-meta {
+  align-self: center;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-image-file-meta strong {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-image-file-meta small,
+.admin-image-empty {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  margin: 0;
+}
+
+.admin-image-actions {
+  align-items: center;
+  align-self: center;
+  display: flex;
+  gap: 4px;
 }
 
 .admin-image-preview-wrap {
@@ -9532,7 +9576,12 @@ img {
 
   .admin-image-url-row {
     align-items: end;
-    grid-template-columns: 52px minmax(0, 1fr) 42px;
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .admin-image-actions {
+    grid-column: 2;
+    justify-content: flex-end;
   }
 
   .admin-image-url-preview {

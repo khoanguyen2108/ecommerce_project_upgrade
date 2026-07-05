@@ -6,6 +6,7 @@ import type {
   AdminCategoryResponse,
   AdminDeleteResponse,
   AdminProductQuery,
+  AdminProductImageMutationResponse,
   AdminProductResponse,
   AdminProductsListResponse,
   AdminProductVariantQuery,
@@ -140,6 +141,49 @@ export function updateAdminProduct(
     {
       auth: true,
       body: payload,
+      credentials: "include",
+      method: "PATCH",
+    },
+  );
+}
+
+export function uploadAdminProductImage(
+  productId: string,
+  file: File,
+): Promise<AdminProductImageMutationResponse> {
+  const body = new FormData();
+  body.append("file", file);
+
+  return apiRequest<AdminProductImageMutationResponse>(
+    `/admin/products/${encodeURIComponent(productId)}/images`,
+    {
+      auth: true,
+      body,
+      credentials: "include",
+      method: "POST",
+    },
+  );
+}
+
+export function deleteAdminProductImage(
+  productId: string,
+  imageId: string,
+): Promise<AdminProductImageMutationResponse> {
+  return apiRequest<AdminProductImageMutationResponse>(
+    `/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`,
+    { auth: true, credentials: "include", method: "DELETE" },
+  );
+}
+
+export function reorderAdminProductImages(
+  productId: string,
+  imageIds: string[],
+): Promise<AdminProductResponse> {
+  return apiRequest<AdminProductResponse>(
+    `/admin/products/${encodeURIComponent(productId)}/images/reorder`,
+    {
+      auth: true,
+      body: { imageIds },
       credentials: "include",
       method: "PATCH",
     },

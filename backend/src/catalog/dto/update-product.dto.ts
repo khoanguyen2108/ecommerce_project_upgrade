@@ -81,6 +81,9 @@ export class UpdateProductDto {
   basePrice?: number | null;
 
   @ApiPropertyOptional({
+    deprecated: true,
+    description:
+      'Legacy transition field. Only retaining, reordering, or removing existing legacy URLs is allowed.',
     example: ['https://example.com/images/classic-cotton-t-shirt.jpg'],
     maxItems: 4,
     nullable: true,

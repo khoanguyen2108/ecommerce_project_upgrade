@@ -4,6 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  AssetService,
+  type ProductImageUpload,
+} from '../assets/asset.service';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -88,6 +92,33 @@ const variantOrderBy: Prisma.ProductVariantOrderByWithRelationInput[] = [
   { color: 'asc' },
 ];
 
+const managedProductImageSelect = {
+  id: true,
+  sortOrder: true,
+  isPrimary: true,
+  createdAt: true,
+  updatedAt: true,
+  imageAsset: {
+    select: {
+      id: true,
+      provider: true,
+      bucket: true,
+      storagePath: true,
+      publicUrl: true,
+      originalFilename: true,
+      mimeType: true,
+      sizeBytes: true,
+      width: true,
+      height: true,
+      checksum: true,
+      uploadedById: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+} satisfies Prisma.ProductImageSelect;
+
 const productSelect = {
   id: true,
   categoryId: true,
@@ -96,6 +127,10 @@ const productSelect = {
   description: true,
   basePrice: true,
   imageUrls: true,
+  managedImages: {
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    select: managedProductImageSelect,
+  },
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -141,26 +176,82 @@ const publicProductSelect = {
 function serializeProduct<
   T extends {
     category: { id: string; name: string; slug: string };
+    imageUrls: string[];
+    managedImages: Array<{
+      id: string;
+      sortOrder: number;
+      isPrimary: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+      imageAsset: {
+        id: string;
+        provider: string;
+        bucket: string;
+        storagePath: string;
+        publicUrl: string;
+        originalFilename: string | null;
+        mimeType: string;
+        sizeBytes: number;
+        width: number | null;
+        height: number | null;
+        checksum: string | null;
+        uploadedById: string;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+      };
+    }>;
     productCategories: Array<{
       category: { id: string; name: string; slug: string };
     }>;
   },
->(product: T) {
-  const { productCategories, ...productData } = product;
+>(product: T, includeManagedMetadata = false) {
+  const {
+    productCategories,
+    managedImages: productImages,
+    imageUrls: legacyImageUrls,
+    ...productData
+  } = product;
   const secondaryCategories = productCategories
     .map((membership) => membership.category)
     .filter((category) => category.id !== product.category.id)
     .sort((first, second) => first.name.localeCompare(second.name));
+  const managedImages = productImages.map(({ imageAsset, ...productImage }) => ({
+    ...productImage,
+    assetId: imageAsset.id,
+    url: imageAsset.publicUrl,
+    provider: imageAsset.provider,
+    bucket: imageAsset.bucket,
+    storagePath: imageAsset.storagePath,
+    originalFilename: imageAsset.originalFilename,
+    mimeType: imageAsset.mimeType,
+    sizeBytes: imageAsset.sizeBytes,
+    width: imageAsset.width,
+    height: imageAsset.height,
+    checksum: imageAsset.checksum,
+    uploadedById: imageAsset.uploadedById,
+    status: imageAsset.status,
+    assetCreatedAt: imageAsset.createdAt,
+    assetUpdatedAt: imageAsset.updatedAt,
+  }));
 
   return {
     ...productData,
+    imageUrls:
+      managedImages.length > 0
+        ? managedImages.map((image) => image.url)
+        : legacyImageUrls,
+    ...(includeManagedMetadata ? { managedImages } : {}),
     categories: [product.category, ...secondaryCategories],
   };
 }
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly assetService: AssetService,
+  ) {}
 
   async listCategories() {
     const categories = await this.prismaService.category.findMany({
@@ -491,7 +582,7 @@ export class CatalogService {
     ]);
 
     return {
-      products: products.map(serializeProduct),
+      products: products.map((product) => serializeProduct(product)),
       pagination: {
         page,
         limit,
@@ -523,7 +614,7 @@ export class CatalogService {
     ]);
 
     return {
-      products: products.map(serializeProduct),
+      products: products.map((product) => serializeProduct(product, true)),
       pagination: {
         page,
         limit,
@@ -564,7 +655,7 @@ export class CatalogService {
       throw this.productNotFoundException();
     }
 
-    return { product: serializeProduct(product) };
+    return { product: serializeProduct(product, true) };
   }
 
   async getPublicProductBySlug(slug: string) {
@@ -694,6 +785,10 @@ export class CatalogService {
 
   async createProduct(dto: CreateProductDto) {
     const slug = this.normalizeSlug(dto.slug);
+    const requestedLegacyImageUrls = this.normalizeImageUrls(dto.imageUrls);
+    if (requestedLegacyImageUrls.length > 0) {
+      throw this.productImageUrlInputDisabledException();
+    }
     const categoryIds = this.normalizeCategoryIds(dto.categoryIds, dto.categoryId);
     await this.assertActiveCategoriesExist(categoryIds);
     await this.assertProductSlugAvailable(slug);
@@ -734,7 +829,7 @@ export class CatalogService {
           slug,
           description: this.normalizeOptionalText(dto.description),
           basePrice: dto.basePrice,
-          imageUrls: this.normalizeImageUrls(dto.imageUrls),
+          imageUrls: [],
           isActive: this.normalizeOptionalBoolean(dto.isActive, true, 'isActive'),
           ...(variants.length > 0
             ? {
@@ -747,7 +842,7 @@ export class CatalogService {
         select: productSelect,
       });
 
-      return { product: serializeProduct(product) };
+      return { product: serializeProduct(product, true) };
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         const target = this.getUniqueConstraintTarget(error);
@@ -762,7 +857,7 @@ export class CatalogService {
   }
 
   async updateProduct(id: string, dto: UpdateProductDto) {
-    await this.getProductForAdmin(id);
+    const existingProduct = await this.getProductForAdmin(id);
 
     const data: Prisma.ProductUpdateInput = {};
 
@@ -808,7 +903,18 @@ export class CatalogService {
     }
 
     if ('imageUrls' in dto) {
-      data.imageUrls = this.normalizeImageUrls(dto.imageUrls);
+      const managedImages = await this.prismaService.productImage.findMany({
+        where: { productId: id },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        select: { imageAsset: { select: { publicUrl: true } } },
+      });
+      data.imageUrls =
+        managedImages.length > 0
+          ? managedImages.map((image) => image.imageAsset.publicUrl)
+          : this.normalizeLegacyImageUrlSelection(
+              dto.imageUrls,
+              existingProduct.imageUrls,
+            );
     }
 
     if ('isActive' in dto) {
@@ -830,7 +936,7 @@ export class CatalogService {
         select: productSelect,
       });
 
-      return { product: serializeProduct(product) };
+      return { product: serializeProduct(product, true) };
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
         throw this.productSlugExistsException();
@@ -838,6 +944,36 @@ export class CatalogService {
 
       throw error;
     }
+  }
+
+  async uploadProductImage(
+    productId: string,
+    uploadedById: string,
+    file: ProductImageUpload | undefined,
+  ) {
+    const uploadedImage = await this.assetService.uploadProductImage(
+      productId,
+      uploadedById,
+      file,
+    );
+    const { product } = await this.getAdminProduct(productId);
+
+    return { product, uploadedImageId: uploadedImage.id };
+  }
+
+  async deleteProductImage(productId: string, productImageId: string) {
+    const deletion = await this.assetService.deleteProductImage(
+      productId,
+      productImageId,
+    );
+    const { product } = await this.getAdminProduct(productId);
+
+    return { product, ...deletion };
+  }
+
+  async reorderProductImages(productId: string, productImageIds: string[]) {
+    await this.assetService.reorderProductImages(productId, productImageIds);
+    return this.getAdminProduct(productId);
   }
 
   async deactivateProduct(id: string) {
@@ -853,7 +989,7 @@ export class CatalogService {
       select: productSelect,
     });
 
-    return { product: serializeProduct(product) };
+    return { product: serializeProduct(product, true) };
   }
 
   async activateProduct(id: string) {
@@ -865,7 +1001,7 @@ export class CatalogService {
       select: productSelect,
     });
 
-    return { product: serializeProduct(product) };
+    return { product: serializeProduct(product, true) };
   }
 
   async deleteProduct(id: string) {
@@ -873,6 +1009,7 @@ export class CatalogService {
       where: { id },
       select: {
         id: true,
+        managedImages: { select: { id: true } },
         orderItems: { select: { id: true }, take: 1 },
         variants: {
           select: {
@@ -902,12 +1039,24 @@ export class CatalogService {
       });
     }
 
+    const cleanupWarnings: string[] = [];
+    for (const image of product.managedImages) {
+      const result = await this.assetService.deleteProductImage(id, image.id);
+      if (result.warning) {
+        cleanupWarnings.push(result.warning);
+      }
+    }
+
     await this.prismaService.$transaction([
       this.prismaService.productVariant.deleteMany({ where: { productId: id } }),
       this.prismaService.product.delete({ where: { id } }),
     ]);
 
-    return { deletedId: id };
+    return {
+      deletedId: id,
+      warning:
+        cleanupWarnings.length > 0 ? cleanupWarnings.join(' ') : undefined,
+    };
   }
 
   async createProductVariant(productId: string, dto: CreateProductVariantDto) {
@@ -1362,6 +1511,7 @@ export class CatalogService {
       },
       select: {
         id: true,
+        imageUrls: true,
         slug: true,
       },
     });
@@ -1620,6 +1770,19 @@ export class CatalogService {
     });
   }
 
+  private normalizeLegacyImageUrlSelection(
+    value: string[] | null | undefined,
+    existingImageUrls: string[],
+  ): string[] {
+    const imageUrls = this.normalizeImageUrls(value);
+
+    if (imageUrls.some((imageUrl) => !existingImageUrls.includes(imageUrl))) {
+      throw this.productImageUrlInputDisabledException();
+    }
+
+    return imageUrls;
+  }
+
   private normalizeCategoryIds(
     value: string[] | null | undefined,
     primaryCategoryId: string | null | undefined,
@@ -1861,6 +2024,13 @@ export class CatalogService {
     return new NotFoundException({
       code: 'PRODUCT_NOT_FOUND',
       message: 'Product was not found.',
+    });
+  }
+
+  private productImageUrlInputDisabledException() {
+    return new BadRequestException({
+      code: 'PRODUCT_IMAGE_URL_INPUT_DISABLED',
+      message: 'New product images must be uploaded as JPEG, PNG, or WebP files.',
     });
   }
 

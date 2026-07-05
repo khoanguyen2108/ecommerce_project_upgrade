@@ -85,29 +85,39 @@ enum VoucherDiscountType {
   FIXED
 }
 
+enum AssetProvider {
+  SUPABASE
+}
+
+enum AssetStatus {
+  ACTIVE
+  DELETE_FAILED
+}
+
 model User {
-  id                    String       @id @default(uuid()) @db.Uuid
-  email                 String       @unique @db.VarChar(320)
-  passwordHash          String?      @db.VarChar(255)
-  name                  String?      @db.VarChar(120)
-  phone                 String?      @db.VarChar(32)
-  role                  UserRole     @default(CUSTOMER)
-  authProvider          AuthProvider @default(EMAIL)
-  isActive              Boolean      @default(true)
-  googleId              String?      @unique @db.VarChar(255)
-  emailVerified         Boolean      @default(false)
-  refreshTokenHash      String?      @db.VarChar(255)
-  refreshTokenExpiresAt DateTime?
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
-  passwordResetOtps     PasswordResetOtp[]
-  orders                Order[]
-  addresses             Address[]
-  cart                  Cart?
+  id                        String             @id @default(uuid()) @db.Uuid
+  email                     String             @unique @db.VarChar(320)
+  passwordHash              String?            @db.VarChar(255)
+  name                      String?            @db.VarChar(120)
+  phone                     String?            @db.VarChar(32)
+  role                      UserRole           @default(CUSTOMER)
+  authProvider              AuthProvider       @default(EMAIL)
+  isActive                  Boolean            @default(true)
+  googleId                  String?            @unique @db.VarChar(255)
+  emailVerified             Boolean            @default(false)
+  refreshTokenHash          String?            @db.VarChar(255)
+  refreshTokenExpiresAt     DateTime?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  passwordResetOtps         PasswordResetOtp[]
+  orders                    Order[]
+  addresses                 Address[]
+  cart                      Cart?
   customerChatConversations ChatConversation[] @relation("CustomerChatConversations")
-  chatMessages          ChatMessage[] @relation("UserChatMessages")
-  returnRequests        ReturnRequest[] @relation("CustomerReturnRequests")
-  reviewedReturnRequests ReturnRequest[] @relation("ReviewedReturnRequests")
+  chatMessages              ChatMessage[]      @relation("UserChatMessages")
+  returnRequests            ReturnRequest[]    @relation("CustomerReturnRequests")
+  reviewedReturnRequests    ReturnRequest[]    @relation("ReviewedReturnRequests")
+  uploadedImageAssets       ImageAsset[]       @relation("UploadedImageAssets")
 
   @@index([role])
   @@index([isActive])
@@ -152,14 +162,14 @@ model PasswordResetOtp {
 }
 
 model ChatConversation {
-  id             String        @id @default(uuid()) @db.Uuid
-  customerId     String        @db.Uuid
-  customer       User          @relation("CustomerChatConversations", fields: [customerId], references: [id])
-  status         ChatStatus    @default(OPEN)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  lastMessageAt  DateTime?
-  messages       ChatMessage[]
+  id            String        @id @default(uuid()) @db.Uuid
+  customerId    String        @db.Uuid
+  customer      User          @relation("CustomerChatConversations", fields: [customerId], references: [id])
+  status        ChatStatus    @default(OPEN)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  lastMessageAt DateTime?
+  messages      ChatMessage[]
 
   @@index([customerId])
   @@index([status])
@@ -167,33 +177,33 @@ model ChatConversation {
 }
 
 model ChatMessage {
-  id              String             @id @default(uuid()) @db.Uuid
-  conversationId  String             @db.Uuid
-  conversation    ChatConversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderId        String?            @db.Uuid
-  sender          User?              @relation("UserChatMessages", fields: [senderId], references: [id])
-  senderRole      ChatSenderRole
-  body            String             @db.VarChar(2000)
-  messageType     String             @default("text") @db.VarChar(32)
-  metadata        Json?
-  readAt          DateTime?
-  createdAt       DateTime           @default(now())
+  id             String           @id @default(uuid()) @db.Uuid
+  conversationId String           @db.Uuid
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String?          @db.Uuid
+  sender         User?            @relation("UserChatMessages", fields: [senderId], references: [id])
+  senderRole     ChatSenderRole
+  body           String           @db.VarChar(2000)
+  messageType    String           @default("text") @db.VarChar(32)
+  metadata       Json?
+  readAt         DateTime?
+  createdAt      DateTime         @default(now())
 
   @@index([conversationId, createdAt])
   @@index([senderId])
 }
 
 model Category {
-  id            String    @id @default(uuid()) @db.Uuid
-  name          String    @db.VarChar(120)
-  slug          String    @unique @db.VarChar(160)
-  description   String?
-  imageUrl      String?   @db.VarChar(2048)
-  isFeatured    Boolean   @default(false)
-  featuredOrder Int?      @unique
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String            @id @default(uuid()) @db.Uuid
+  name              String            @db.VarChar(120)
+  slug              String            @unique @db.VarChar(160)
+  description       String?
+  imageUrl          String?           @db.VarChar(2048)
+  isFeatured        Boolean           @default(false)
+  featuredOrder     Int?              @unique
+  isActive          Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
   primaryProducts   Product[]         @relation("PrimaryProductCategory")
   productCategories ProductCategory[]
 
@@ -202,13 +212,13 @@ model Category {
 }
 
 model LandingPageSetting {
-  id             String   @id @default("default") @db.VarChar(32)
-  heroImageUrl   String?  @db.VarChar(2048)
-  heroEyebrow    String?  @db.VarChar(120)
-  heroTitle      String?  @db.VarChar(160)
-  heroSubtitle   String?  @db.VarChar(300)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String   @id @default("default") @db.VarChar(32)
+  heroImageUrl String?  @db.VarChar(2048)
+  heroEyebrow  String?  @db.VarChar(120)
+  heroTitle    String?  @db.VarChar(160)
+  heroSubtitle String?  @db.VarChar(300)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model LandingGalleryImage {
@@ -227,24 +237,63 @@ model LandingGalleryImage {
 }
 
 model Product {
-  id          String           @id @default(uuid()) @db.Uuid
-  categoryId  String           @db.Uuid
-  category    Category         @relation("PrimaryProductCategory", fields: [categoryId], references: [id], onDelete: Restrict)
-  name        String           @db.VarChar(160)
-  slug        String           @unique @db.VarChar(180)
-  description String?
-  basePrice   Int
-  imageUrls   String[]         @default([])
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  variants    ProductVariant[]
-  orderItems  OrderItem[]
+  id                String            @id @default(uuid()) @db.Uuid
+  categoryId        String            @db.Uuid
+  category          Category          @relation("PrimaryProductCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+  name              String            @db.VarChar(160)
+  slug              String            @unique @db.VarChar(180)
+  description       String?
+  basePrice         Int
+  imageUrls         String[]          @default([])
+  isActive          Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  variants          ProductVariant[]
+  orderItems        OrderItem[]
   productCategories ProductCategory[]
+  managedImages     ProductImage[]
 
   @@index([categoryId])
   @@index([isActive])
   @@index([basePrice])
+}
+
+model ImageAsset {
+  id               String        @id @default(uuid()) @db.Uuid
+  provider         AssetProvider @default(SUPABASE)
+  bucket           String        @db.VarChar(100)
+  storagePath      String        @db.VarChar(500)
+  publicUrl        String        @db.VarChar(2048)
+  originalFilename String?       @db.VarChar(255)
+  mimeType         String        @db.VarChar(100)
+  sizeBytes        Int
+  width            Int?
+  height           Int?
+  checksum         String?       @db.VarChar(64)
+  uploadedById     String        @db.Uuid
+  uploadedBy       User          @relation("UploadedImageAssets", fields: [uploadedById], references: [id], onDelete: Restrict)
+  status           AssetStatus   @default(ACTIVE)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  productImage     ProductImage?
+
+  @@unique([provider, bucket, storagePath])
+  @@index([uploadedById, createdAt])
+  @@index([status])
+}
+
+model ProductImage {
+  id           String     @id @default(uuid()) @db.Uuid
+  productId    String     @db.Uuid
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  imageAssetId String     @unique @db.Uuid
+  imageAsset   ImageAsset @relation(fields: [imageAssetId], references: [id], onDelete: Cascade)
+  sortOrder    Int
+  isPrimary    Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([productId, sortOrder])
 }
 
 model ProductCategory {
@@ -258,17 +307,17 @@ model ProductCategory {
 }
 
 model ProductVariant {
-  id            String   @id @default(uuid()) @db.Uuid
-  productId     String   @db.Uuid
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
-  sku           String?  @unique @db.VarChar(80)
-  size          String   @db.VarChar(32)
-  color         String   @db.VarChar(64)
-  stock         Int      @default(0)
+  id            String      @id @default(uuid()) @db.Uuid
+  productId     String      @db.Uuid
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sku           String?     @unique @db.VarChar(80)
+  size          String      @db.VarChar(32)
+  color         String      @db.VarChar(64)
+  stock         Int         @default(0)
   priceOverride Int?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
   orderItems    OrderItem[]
   cartItems     CartItem[]
 
@@ -304,38 +353,38 @@ model CartItem {
 }
 
 model Order {
-  id             String      @id @default(uuid()) @db.Uuid
-  orderCode      String      @unique @default(dbgenerated("'BK' || lpad(nextval('\"Order_orderCode_seq\"'::regclass)::text, 6, '0')")) @db.VarChar(16)
-  userId         String      @db.Uuid
-  user           User        @relation(fields: [userId], references: [id], onDelete: Restrict)
-  status         OrderStatus @default(PENDING_PAYMENT)
-  fulfillmentStatus OrderFulfillmentStatus @default(PENDING)
-  subtotalAmount Int
-  discountAmount Int         @default(0)
-  totalAmount    Int
-  voucherId      String?     @db.Uuid
-  voucher        Voucher?    @relation(fields: [voucherId], references: [id], onDelete: SetNull)
-  voucherCodeSnapshot String? @db.VarChar(64)
-  voucherNameSnapshot String? @db.VarChar(160)
-  currency       String      @default("VND") @db.VarChar(3)
-  shippingRecipientName String? @db.VarChar(120)
-  shippingPhone         String? @db.VarChar(20)
-  shippingProvince      String? @db.VarChar(120)
-  shippingDistrict      String? @db.VarChar(120)
-  shippingWard          String? @db.VarChar(120)
-  shippingAddressLine   String? @db.VarChar(255)
-  shippingNote          String? @db.VarChar(500)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  paidAt         DateTime?
-  fulfilledAt    DateTime?
-  cancelledAt    DateTime?
-  expiresAt      DateTime?
-  items          OrderItem[]
-  payments       Payment[]
-  webhookEvents  PaymentWebhookEvent[]
+  id                          String                       @id @default(uuid()) @db.Uuid
+  orderCode                   String                       @unique @default(dbgenerated("'BK' || lpad(nextval('\"Order_orderCode_seq\"'::regclass)::text, 6, '0')")) @db.VarChar(16)
+  userId                      String                       @db.Uuid
+  user                        User                         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  status                      OrderStatus                  @default(PENDING_PAYMENT)
+  fulfillmentStatus           OrderFulfillmentStatus       @default(PENDING)
+  subtotalAmount              Int
+  discountAmount              Int                          @default(0)
+  totalAmount                 Int
+  voucherId                   String?                      @db.Uuid
+  voucher                     Voucher?                     @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+  voucherCodeSnapshot         String?                      @db.VarChar(64)
+  voucherNameSnapshot         String?                      @db.VarChar(160)
+  currency                    String                       @default("VND") @db.VarChar(3)
+  shippingRecipientName       String?                      @db.VarChar(120)
+  shippingPhone               String?                      @db.VarChar(20)
+  shippingProvince            String?                      @db.VarChar(120)
+  shippingDistrict            String?                      @db.VarChar(120)
+  shippingWard                String?                      @db.VarChar(120)
+  shippingAddressLine         String?                      @db.VarChar(255)
+  shippingNote                String?                      @db.VarChar(500)
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  paidAt                      DateTime?
+  fulfilledAt                 DateTime?
+  cancelledAt                 DateTime?
+  expiresAt                   DateTime?
+  items                       OrderItem[]
+  payments                    Payment[]
+  webhookEvents               PaymentWebhookEvent[]
   paymentReconciliationIssues PaymentReconciliationIssue[]
-  returnRequests ReturnRequest[]
+  returnRequests              ReturnRequest[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -385,20 +434,20 @@ model OrderItem {
 }
 
 model Payment {
-  id                           String                @id @default(uuid()) @db.Uuid
-  orderId                      String                @db.Uuid
-  order                        Order                 @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  provider                     PaymentProvider       @default(PAYOS)
-  status                       PaymentStatus         @default(PENDING)
+  id                           String                       @id @default(uuid()) @db.Uuid
+  orderId                      String                       @db.Uuid
+  order                        Order                        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  provider                     PaymentProvider              @default(PAYOS)
+  status                       PaymentStatus                @default(PENDING)
   amount                       Int
-  currency                     String                @default("VND") @db.VarChar(3)
-  providerOrderCode            Int                   @unique @default(autoincrement())
+  currency                     String                       @default("VND") @db.VarChar(3)
+  providerOrderCode            Int                          @unique @default(autoincrement())
   checkoutUrl                  String?
-  providerPaymentLinkId        String?               @unique @db.VarChar(120)
-  providerTransactionReference String?               @db.VarChar(120)
-  failureReason                String?               @db.VarChar(160)
-  createdAt                    DateTime              @default(now())
-  updatedAt                    DateTime              @updatedAt
+  providerPaymentLinkId        String?                      @unique @db.VarChar(120)
+  providerTransactionReference String?                      @db.VarChar(120)
+  failureReason                String?                      @db.VarChar(160)
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
   paidAt                       DateTime?
   cancelledAt                  DateTime?
   webhookEvents                PaymentWebhookEvent[]

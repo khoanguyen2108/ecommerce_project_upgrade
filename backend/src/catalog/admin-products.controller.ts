@@ -8,12 +8,15 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiConsumes,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -22,6 +25,14 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  MAX_PRODUCT_IMAGE_BYTES,
+  type ProductImageUpload,
+} from '../assets/asset.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -41,6 +52,7 @@ import { AdminProductVariantQueryDto } from './dto/admin-product-variant-query.d
 import { CreateProductVariantDto } from './dto/create-product-variant.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { ReorderProductImagesDto } from './dto/reorder-product-images.dto';
 
 @ApiTags('admin-products')
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
@@ -142,6 +154,50 @@ export class AdminProductsController {
   @Post()
   createProduct(@Body() dto: CreateProductDto) {
     return this.catalogService.createProduct(dto);
+  }
+
+  @ApiOperation({ summary: 'Upload a managed product image as an admin' })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ description: 'Product UUID.', name: 'id' })
+  @Post(':id/images')
+  @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fieldNameSize: 100,
+        fields: 0,
+        fileSize: MAX_PRODUCT_IMAGE_BYTES,
+        files: 1,
+        parts: 1,
+      },
+    }),
+  )
+  uploadProductImage(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file?: ProductImageUpload,
+  ) {
+    return this.catalogService.uploadProductImage(id, user.id, file);
+  }
+
+  @ApiOperation({ summary: 'Reorder managed product images as an admin' })
+  @ApiParam({ description: 'Product UUID.', name: 'id' })
+  @Patch(':id/images/reorder')
+  reorderProductImages(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: ReorderProductImagesDto,
+  ) {
+    return this.catalogService.reorderProductImages(id, dto.imageIds);
+  }
+
+  @ApiOperation({ summary: 'Delete a managed product image as an admin' })
+  @ApiParam({ description: 'Product UUID.', name: 'id' })
+  @Delete(':id/images/:imageId')
+  deleteProductImage(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('imageId', new ParseUUIDPipe()) imageId: string,
+  ) {
+    return this.catalogService.deleteProductImage(id, imageId);
   }
 
   @ApiOperation({ summary: 'Update a product as an admin' })

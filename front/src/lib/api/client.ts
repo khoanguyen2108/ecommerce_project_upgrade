@@ -25,7 +25,15 @@ export async function apiRequest<T>(
 
   headers.set("accept", "application/json");
 
-  if (options.body !== undefined) {
+  const isMultipartBody = options.body instanceof FormData;
+  const requestBody: BodyInit | undefined =
+    options.body === undefined
+      ? undefined
+      : isMultipartBody
+        ? (options.body as FormData)
+        : JSON.stringify(options.body);
+
+  if (options.body !== undefined && !isMultipartBody) {
     headers.set("content-type", "application/json");
   }
 
@@ -42,7 +50,7 @@ export async function apiRequest<T>(
   try {
     response = await fetch(url, {
       ...options,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: requestBody,
       credentials: options.credentials ?? "include",
       headers,
     });

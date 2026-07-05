@@ -81,6 +81,9 @@ export class CreateProductDto {
   basePrice: number;
 
   @ApiPropertyOptional({
+    deprecated: true,
+    description:
+      'Legacy transition field. New non-empty image URLs are rejected; use the managed image upload endpoint.',
     example: ['https://example.com/images/classic-cotton-t-shirt.jpg'],
     maxItems: 4,
     nullable: true,

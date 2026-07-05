@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AssetsModule } from '../assets/assets.module';
 import { AuthModule } from '../auth/auth.module';
 import { AdminCategoriesController } from './admin-categories.controller';
 import { AdminProductVariantsController } from './admin-product-variants.controller';
@@ -8,7 +9,7 @@ import { CategoriesController } from './categories.controller';
 import { ProductsController } from './products.controller';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AssetsModule, AuthModule],
   controllers: [
     CategoriesController,
     ProductsController,

@@ -2,6 +2,8 @@
 
 import {
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   Edit3,
   ImageIcon,
@@ -11,9 +13,10 @@ import {
   Save,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
-import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createAdminProduct,
   createAdminProductVariant,
@@ -25,12 +28,16 @@ import {
   listAdminCategories,
   listAdminProducts,
   listAdminProductVariants,
+  deleteAdminProductImage,
   deleteAdminProduct,
+  reorderAdminProductImages,
+  uploadAdminProductImage,
   updateAdminProduct,
   updateAdminProductVariant,
 } from "@/features/admin-catalog/api";
 import type {
   AdminCategory,
+  AdminManagedProductImage,
   AdminProduct,
   AdminProductQuery,
   AdminProductVariant,
@@ -61,6 +68,12 @@ import {
 const PRODUCT_LIMIT = 8;
 const CATEGORY_OPTION_LIMIT = 100;
 const MAX_PRODUCT_IMAGES = 4;
+const MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_PRODUCT_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 const MAX_PRODUCT_VARIANTS = 50;
 const PRODUCT_VARIANT_LIMIT_MESSAGE = "Maximum 50 variants per product.";
 
@@ -74,6 +87,16 @@ const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
   INVALID_CATALOG_FIELD: "One or more catalog fields are invalid.",
   INVALID_PRICE_RANGE: "The price filter range is invalid.",
   NETWORK_ERROR: "The product API could not be reached. Check the backend and retry.",
+  PRODUCT_IMAGE_EMPTY: "Choose a non-empty JPEG, PNG, or WebP image.",
+  PRODUCT_IMAGE_LIMIT_EXCEEDED: "A product can include at most 4 images.",
+  PRODUCT_IMAGE_NOT_FOUND: "That product image no longer exists.",
+  PRODUCT_IMAGE_ORDER_STALE: "Product images changed. Refresh and try again.",
+  PRODUCT_IMAGE_TOO_LARGE: "Each product image must be 5 MB or smaller.",
+  PRODUCT_IMAGE_TYPE_INVALID: "Only genuine JPEG, PNG, and WebP images are allowed.",
+  PRODUCT_IMAGE_URL_INPUT_DISABLED:
+    "New product images must be selected from your device.",
+  SUPABASE_IMAGE_STORAGE_NOT_CONFIGURED:
+    "Image storage is not configured. Ask an operator to configure Supabase Storage.",
   PRODUCT_NOT_FOUND: "That product no longer exists.",
   PRODUCT_DELETE_BLOCKED:
     "This product has related orders or carts. Deactivate it instead.",
@@ -94,11 +117,20 @@ interface ProductFormState {
   basePrice: string;
   categoryIds: string[];
   description: string;
-  imageUrls: string[];
+  imageItems: ProductImageFormItem[];
   isActive: boolean;
   name: string;
   slug: string;
   stockQuantity: string;
+}
+
+interface ProductImageFormItem {
+  file?: File;
+  filename: string;
+  key: string;
+  managedImageId?: string;
+  source: "legacy" | "local" | "managed";
+  url: string;
 }
 
 interface VariantFormState {
@@ -209,6 +241,17 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   const [requestId, setRequestId] = useState<string>();
   const [successMessage, setSuccessMessage] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const localPreviewUrlsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const previewUrls = localPreviewUrlsRef.current;
+
+    return () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      previewUrls.clear();
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -367,6 +410,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   }
 
   function openCreatePanel() {
+    releaseLocalImagePreviews(productForm.imageItems, localPreviewUrlsRef.current);
     setPanelMode("create");
     setSelectedProduct(undefined);
     setProductForm(getEmptyProductForm());
@@ -381,6 +425,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   }
 
   async function openEditPanel(product: AdminProduct) {
+    releaseLocalImagePreviews(productForm.imageItems, localPreviewUrlsRef.current);
     setPanelMode("edit");
     setSelectedProduct(product);
     setProductForm(getProductForm(product));
@@ -466,10 +511,13 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     }
 
     setIsSavingProduct(true);
+    let latestProduct: AdminProduct | undefined;
+    let workingImageItems = [...productForm.imageItems];
+    const cleanupWarnings: string[] = [];
 
     try {
       if (panelMode === "create") {
-        await createAdminProduct({
+        const response = await createAdminProduct({
           ...productPayload.payload,
           variants:
             sizingType === "ACCESSORIES"
@@ -485,32 +533,120 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                 ]
               : draftVariants.map(({ tempId: _tempId, ...variant }) => variant),
         });
-
-        setSuccessMessage("Product created.");
+        latestProduct = response.product;
       } else if (selectedProduct) {
         const response = await updateAdminProduct(
           selectedProduct.id,
           productPayload.payload,
         );
-        const updatedProduct = {
+        latestProduct = {
           ...response.product,
           variants: response.product.variants || selectedProduct.variants,
         };
-
-        setSelectedProduct(updatedProduct);
-        setProductForm(getProductForm(updatedProduct));
-        syncProduct(updatedProduct);
-        setSuccessMessage("Product updated.");
       }
 
+      if (!latestProduct) {
+        throw new Error("Product response was unavailable.");
+      }
+
+      const previousManagedImages = selectedProduct?.managedImages ?? [];
+      const retainedManagedIds = new Set(
+        workingImageItems
+          .map((item) => item.managedImageId)
+          .filter((id): id is string => Boolean(id)),
+      );
+
+      for (const image of previousManagedImages) {
+        if (retainedManagedIds.has(image.id)) {
+          continue;
+        }
+
+        const response = await deleteAdminProductImage(latestProduct.id, image.id);
+        latestProduct = response.product;
+        if (response.warning) {
+          cleanupWarnings.push(response.warning);
+        }
+      }
+
+      for (const item of [...workingImageItems]) {
+        if (item.source !== "local" || !item.file) {
+          continue;
+        }
+
+        const response = await uploadAdminProductImage(latestProduct.id, item.file);
+        latestProduct = response.product;
+        const uploadedImage = latestProduct.managedImages.find(
+          (image) => image.id === response.uploadedImageId,
+        );
+
+        if (!uploadedImage) {
+          throw new Error("Uploaded image metadata was unavailable.");
+        }
+
+        releaseLocalImagePreviews([item], localPreviewUrlsRef.current);
+        workingImageItems = workingImageItems.map((candidate) =>
+          candidate.key === item.key
+            ? toManagedProductImageFormItem(uploadedImage)
+            : candidate,
+        );
+        setProductForm((current) => ({
+          ...current,
+          imageItems: workingImageItems,
+        }));
+      }
+
+      const desiredManagedOrder = workingImageItems
+        .map((item) => item.managedImageId)
+        .filter((id): id is string => Boolean(id));
+      const currentManagedOrder = latestProduct.managedImages.map(
+        (image) => image.id,
+      );
+
+      if (
+        desiredManagedOrder.length > 0 &&
+        desiredManagedOrder.join("|") !== currentManagedOrder.join("|")
+      ) {
+        const response = await reorderAdminProductImages(
+          latestProduct.id,
+          desiredManagedOrder,
+        );
+        latestProduct = response.product;
+      }
+
+      setSelectedProduct(latestProduct);
+      setProductForm(getProductForm(latestProduct));
+      syncProduct(latestProduct);
+      setDraftVariants([]);
+      setPanelMode("edit");
       setRefreshKey((current) => current + 1);
+
+      if (cleanupWarnings.length > 0) {
+        setSuccessMessage("Product image changes were saved.");
+        setActionError(cleanupWarnings.join(" "));
+        return;
+      }
+
       setIsModalOpen(false);
     } catch (error) {
+      if (latestProduct) {
+        setPanelMode("edit");
+        setSelectedProduct(latestProduct);
+        setDraftVariants([]);
+        setProductForm((current) => ({
+          ...current,
+          imageItems: workingImageItems,
+        }));
+        syncProduct(latestProduct);
+        setRefreshKey((current) => current + 1);
+      }
+
       setActionError(
         getApiErrorMessage(
           error,
           PRODUCT_ERROR_MESSAGES,
-          "Product could not be saved.",
+          latestProduct
+            ? "Product details were saved, but image changes did not finish. Review the images and retry."
+            : "Product could not be saved.",
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -686,13 +822,16 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     setSuccessMessage(undefined);
     setRequestId(undefined);
     try {
-      await deleteAdminProduct(product.id);
+      const response = await deleteAdminProduct(product.id);
       if (products.length === 1 && (query.page || 1) > 1) {
         setQuery((current) => ({ ...current, page: Math.max(1, (current.page || 1) - 1) }));
       } else {
         setRefreshKey((current) => current + 1);
       }
       setSuccessMessage("Product deleted.");
+      if (response.warning) {
+        setActionError(response.warning);
+      }
     } catch (error) {
       setActionError(
         getApiErrorMessage(error, PRODUCT_ERROR_MESSAGES, "Product could not be deleted."),
@@ -720,6 +859,87 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     if (panelMode === "create" && nextType === "ACCESSORIES") {
       setDraftVariants([]);
     }
+  }
+
+  function handleImageSelection(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+
+    if (files.length === 0) {
+      return;
+    }
+
+    const retainedItems = productForm.imageItems.filter(
+      (item) => item.source !== "legacy",
+    );
+
+    if (retainedItems.length + files.length > MAX_PRODUCT_IMAGES) {
+      setActionError("A product can include at most 4 images.");
+      return;
+    }
+
+    for (const file of files) {
+      if (!ALLOWED_PRODUCT_IMAGE_TYPES.has(file.type)) {
+        setActionError("Only JPEG, PNG, and WebP images are allowed.");
+        return;
+      }
+
+      if (file.size === 0) {
+        setActionError("Choose a non-empty image file.");
+        return;
+      }
+
+      if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
+        setActionError("Each product image must be 5 MB or smaller.");
+        return;
+      }
+    }
+
+    const localItems = files.map((file) => {
+      const url = URL.createObjectURL(file);
+      localPreviewUrlsRef.current.add(url);
+
+      return {
+        file,
+        filename: file.name,
+        key: createImageItemKey(),
+        source: "local" as const,
+        url,
+      };
+    });
+
+    setProductForm((current) => ({
+      ...current,
+      imageItems: [
+        ...current.imageItems.filter((item) => item.source !== "legacy"),
+        ...localItems,
+      ],
+    }));
+    setActionError(undefined);
+  }
+
+  function removeImageItem(item: ProductImageFormItem) {
+    releaseLocalImagePreviews([item], localPreviewUrlsRef.current);
+    setProductForm((current) => ({
+      ...current,
+      imageItems: current.imageItems.filter((image) => image.key !== item.key),
+    }));
+  }
+
+  function moveImageItem(index: number, direction: -1 | 1) {
+    setProductForm((current) => {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= current.imageItems.length) {
+        return current;
+      }
+
+      const imageItems = [...current.imageItems];
+      [imageItems[index], imageItems[targetIndex]] = [
+        imageItems[targetIndex],
+        imageItems[index],
+      ];
+      return { ...current, imageItems };
+    });
   }
 
   async function handleVariantStatusChange(variant: AdminProductVariant) {
@@ -829,6 +1049,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
           isDraft: false as const,
         }));
   const isVariantLimitReached = displayedVariants.length >= MAX_PRODUCT_VARIANTS;
+  const hasPendingImageUploads = productForm.imageItems.some(
+    (image) => image.source === "local",
+  );
   const hasUnsavedChanges = isModalOpen
     ? !areProductFormsEqual(productForm, productFormBaseline) ||
       !areVariantFormsEqual(variantForm, variantFormBaseline) ||
@@ -1143,7 +1366,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
             >
               <Save aria-hidden="true" size={17} />
               {isSavingProduct
-                ? "Saving"
+                ? hasPendingImageUploads
+                  ? "Uploading"
+                  : "Saving"
                 : panelMode === "create"
                   ? "Create"
                   : "Save"}
@@ -1152,7 +1377,13 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         )}
         hasUnsavedChanges={hasUnsavedChanges}
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          releaseLocalImagePreviews(
+            productForm.imageItems,
+            localPreviewUrlsRef.current,
+          );
+          setIsModalOpen(false);
+        }}
         title={panelMode === "create" ? "New product" : "Edit product"}
       >
         {actionError ? (
@@ -1342,76 +1573,96 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               ) : null}
             </fieldset>
 
-            <section className="admin-image-url-editor" aria-labelledby="image-urls-heading">
+            <section className="admin-image-url-editor" aria-labelledby="product-images-heading">
               <div className="admin-image-url-editor__header">
                 <div>
-                  <span id="image-urls-heading">Product images</span>
-                  <small>Optional. Add up to four http or https image URLs.</small>
+                  <span id="product-images-heading">Product images</span>
+                  <small>JPEG, PNG, or WebP. Up to 4 images, 5 MB each.</small>
                 </div>
+                <input
+                  accept="image/jpeg,image/png,image/webp"
+                  className="admin-image-file-input"
+                  disabled={isPanelLoading || isSavingProduct}
+                  multiple
+                  onChange={handleImageSelection}
+                  ref={imageInputRef}
+                  type="file"
+                />
                 <button
                   className="button button--secondary"
                   disabled={
-                    isPanelLoading || productForm.imageUrls.length >= MAX_PRODUCT_IMAGES
+                    isPanelLoading ||
+                    isSavingProduct ||
+                    productForm.imageItems.length >= MAX_PRODUCT_IMAGES
                   }
-                  onClick={() =>
-                    setProductForm((current) => ({
-                      ...current,
-                      imageUrls: [...current.imageUrls, ""],
-                    }))
-                  }
+                  onClick={() => imageInputRef.current?.click()}
                   type="button"
                 >
-                  <Plus aria-hidden="true" size={15} />
-                  Add image
+                  <Upload aria-hidden="true" size={15} />
+                  Choose files
                 </button>
               </div>
 
               <div className="admin-image-url-list">
-                {productForm.imageUrls.map((imageUrl, index) => (
-                  <div className="admin-image-url-row" key={index}>
+                {productForm.imageItems.length === 0 ? (
+                  <p className="admin-image-empty">No product images selected.</p>
+                ) : null}
+                {productForm.imageItems.map((image, index) => (
+                  <div className="admin-image-url-row" key={image.key}>
                     <div className="admin-image-preview-wrap">
                       <AdminProductImage
                         alt={`Image ${index + 1} preview`}
                         className="admin-image-url-preview"
-                        url={imageUrl.trim()}
+                        url={image.url}
                       />
                       {index === 0 ? <span className="admin-image-primary">Primary</span> : null}
                     </div>
-                    <label>
-                      <span>Image URL {index + 1}</span>
-                      <input
-                        disabled={isPanelLoading}
-                        maxLength={2048}
-                        onChange={(event) =>
-                          setProductForm((current) => ({
-                            ...current,
-                            imageUrls: current.imageUrls.map((value, imageIndex) =>
-                              imageIndex === index ? event.target.value : value,
-                            ),
-                          }))
+                    <div className="admin-image-file-meta">
+                      <strong>{image.filename}</strong>
+                      <small>
+                        {image.source === "local"
+                          ? "Ready to upload"
+                          : image.source === "managed"
+                            ? "Managed in Supabase Storage"
+                            : "Legacy URL image"}
+                      </small>
+                    </div>
+                    <div className="admin-image-actions">
+                      <button
+                        aria-label={`Move image ${index + 1} up`}
+                        className="icon-button admin-icon-button"
+                        disabled={isPanelLoading || isSavingProduct || index === 0}
+                        onClick={() => moveImageItem(index, -1)}
+                        title="Move image up"
+                        type="button"
+                      >
+                        <ChevronUp aria-hidden="true" size={15} />
+                      </button>
+                      <button
+                        aria-label={`Move image ${index + 1} down`}
+                        className="icon-button admin-icon-button"
+                        disabled={
+                          isPanelLoading ||
+                          isSavingProduct ||
+                          index === productForm.imageItems.length - 1
                         }
-                        placeholder="https://example.com/image.jpg"
-                        type="url"
-                        value={imageUrl}
-                      />
-                    </label>
-                    <button
-                      aria-label={`Remove image URL ${index + 1}`}
-                      className="icon-button admin-icon-button"
-                      disabled={isPanelLoading || productForm.imageUrls.length === 1}
-                      onClick={() =>
-                        setProductForm((current) => ({
-                          ...current,
-                          imageUrls: current.imageUrls.filter(
-                            (_, imageIndex) => imageIndex !== index,
-                          ),
-                        }))
-                      }
-                      title="Remove image URL"
-                      type="button"
-                    >
-                      <Trash2 aria-hidden="true" size={16} />
-                    </button>
+                        onClick={() => moveImageItem(index, 1)}
+                        title="Move image down"
+                        type="button"
+                      >
+                        <ChevronDown aria-hidden="true" size={15} />
+                      </button>
+                      <button
+                        aria-label={`Remove image ${index + 1}`}
+                        className="icon-button admin-icon-button"
+                        disabled={isPanelLoading || isSavingProduct}
+                        onClick={() => removeImageItem(image)}
+                        title="Remove image"
+                        type="button"
+                      >
+                        <Trash2 aria-hidden="true" size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1700,7 +1951,7 @@ function getEmptyProductForm(): ProductFormState {
     basePrice: "",
     categoryIds: [],
     description: "",
-    imageUrls: [""],
+    imageItems: [],
     isActive: true,
     name: "",
     slug: "",
@@ -1713,10 +1964,17 @@ function getProductForm(product: AdminProduct): ProductFormState {
     basePrice: String(product.basePrice),
     categoryIds: getProductCategories(product).map((category) => category.id),
     description: product.description || "",
-    imageUrls:
-      product.imageUrls.length > 0
-        ? product.imageUrls.slice(0, MAX_PRODUCT_IMAGES)
-        : [""],
+    imageItems:
+      product.managedImages?.length > 0
+        ? product.managedImages
+            .slice(0, MAX_PRODUCT_IMAGES)
+            .map(toManagedProductImageFormItem)
+        : product.imageUrls.slice(0, MAX_PRODUCT_IMAGES).map((url, index) => ({
+            filename: getLegacyImageLabel(url, index),
+            key: `legacy:${index}:${url}`,
+            source: "legacy" as const,
+            url,
+          })),
     isActive: product.isActive,
     name: product.name,
     slug: product.slug,
@@ -1765,7 +2023,7 @@ function areProductFormsEqual(
     left.basePrice === right.basePrice &&
     left.categoryIds.join("|") === right.categoryIds.join("|") &&
     left.description === right.description &&
-    left.imageUrls.join("|") === right.imageUrls.join("|") &&
+    serializeImageItems(left.imageItems) === serializeImageItems(right.imageItems) &&
     left.isActive === right.isActive &&
     left.name === right.name &&
     left.slug === right.slug &&
@@ -1803,7 +2061,6 @@ function getProductPayload(form: ProductFormState):
     }
   | { error: string; payload?: undefined } {
   const basePrice = parseRequiredInteger(form.basePrice);
-  const imageUrls = parseImageUrls(form.imageUrls);
 
   if (!form.name.trim()) {
     return { error: "Product name is required." };
@@ -1821,17 +2078,15 @@ function getProductPayload(form: ProductFormState):
     return { error: "Base price must be a whole number greater than or equal to 0." };
   }
 
-  if (imageUrls.error) {
-    return { error: imageUrls.error };
-  }
-
   return {
     payload: {
       basePrice,
       categoryId: form.categoryIds[0],
       categoryIds: form.categoryIds,
       description: normalizeNullableText(form.description),
-      imageUrls: imageUrls.urls,
+      imageUrls: form.imageItems
+        .filter((image) => image.source === "legacy")
+        .map((image) => image.url),
       isActive: form.isActive,
       name: form.name.trim(),
       slug: form.slug.trim(),
@@ -1983,35 +2238,50 @@ function parseRequiredInteger(value: string): number | undefined {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-function parseImageUrls(values: string[]): { error?: string; urls: string[] } {
-  const urls = values
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  if (urls.length > MAX_PRODUCT_IMAGES) {
-    return { error: "A product can include at most 4 image URLs.", urls: [] };
-  }
-
-  for (const url of urls) {
-    if (url.length > 2048 || !isHttpUrl(url)) {
-      return {
-        error: "Each image URL must be a valid http or https URL.",
-        urls: [],
-      };
-    }
-  }
-
-  return { urls };
+function toManagedProductImageFormItem(
+  image: AdminManagedProductImage,
+): ProductImageFormItem {
+  return {
+    filename: image.originalFilename || `Managed image ${image.sortOrder + 1}`,
+    key: `managed:${image.id}`,
+    managedImageId: image.id,
+    source: "managed",
+    url: image.url,
+  };
 }
 
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
+function serializeImageItems(items: ProductImageFormItem[]): string {
+  return items
+    .map((item) =>
+      [item.source, item.managedImageId || "", item.url, item.filename].join(":"),
+    )
+    .join("|");
+}
 
-    return url.protocol === "http:" || url.protocol === "https:";
+function getLegacyImageLabel(url: string, index: number): string {
+  try {
+    const pathname = new URL(url).pathname;
+    const filename = pathname.split("/").filter(Boolean).pop();
+    return filename ? decodeURIComponent(filename).slice(0, 120) : `Legacy image ${index + 1}`;
   } catch {
-    return false;
+    return `Legacy image ${index + 1}`;
   }
+}
+
+function createImageItemKey(): string {
+  return `local:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+function releaseLocalImagePreviews(
+  items: ProductImageFormItem[],
+  previewUrls: Set<string>,
+) {
+  items.forEach((item) => {
+    if (item.source === "local" && previewUrls.has(item.url)) {
+      URL.revokeObjectURL(item.url);
+      previewUrls.delete(item.url);
+    }
+  });
 }
 
 function getProductSortValue(query: AdminProductQuery): string {

@@ -63,6 +63,29 @@ export interface AdminProductVariant {
   updatedAt: string;
 }
 
+export interface AdminManagedProductImage {
+  id: string;
+  assetId: string;
+  url: string;
+  provider: "SUPABASE";
+  bucket: string;
+  storagePath: string;
+  originalFilename: string | null;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  checksum: string | null;
+  uploadedById: string;
+  status: "ACTIVE" | "DELETE_FAILED";
+  sortOrder: number;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+  assetCreatedAt: string;
+  assetUpdatedAt: string;
+}
+
 export interface AdminProduct {
   id: string;
   categoryId: string;
@@ -71,6 +94,7 @@ export interface AdminProduct {
   description: string | null;
   basePrice: number;
   imageUrls: string[];
+  managedImages: AdminManagedProductImage[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -192,6 +216,12 @@ export interface AdminProductResponse {
   product: AdminProduct;
 }
 
+export interface AdminProductImageMutationResponse extends AdminProductResponse {
+  storageDeleted?: boolean;
+  uploadedImageId?: string;
+  warning?: string;
+}
+
 export interface AdminProductVariantsListResponse {
   variants: AdminProductVariant[];
   pagination: Pagination;
@@ -203,4 +233,5 @@ export interface AdminProductVariantResponse {
 
 export interface AdminDeleteResponse {
   deletedId: string;
+  warning?: string;
 }
