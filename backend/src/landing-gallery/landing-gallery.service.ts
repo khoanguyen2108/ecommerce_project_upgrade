@@ -4,6 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  AssetService,
+  type ProductImageUpload,
+} from '../assets/asset.service';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateLandingGalleryImageDto } from './dto/create-landing-gallery-image.dto';
@@ -26,16 +30,29 @@ const adminLandingGalleryImageSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  managedImageAsset: {
+    select: {
+      id: true,
+      originalFilename: true,
+      mimeType: true,
+      sizeBytes: true,
+      status: true,
+    },
+  },
 } satisfies Prisma.LandingGalleryImageSelect;
 
 @Injectable()
 export class LandingGalleryService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly assetService: AssetService,
+  ) {}
 
   async listPublicImages() {
     const images = await this.prismaService.landingGalleryImage.findMany({
       where: {
         isActive: true,
+        imageUrl: { not: null },
       },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       take: MAX_LANDING_GALLERY_IMAGES,
@@ -74,7 +91,7 @@ export class LandingGalleryService {
 
       return tx.landingGalleryImage.create({
         data: {
-          imageUrl: this.normalizeRequiredImageUrl(dto.imageUrl),
+          imageUrl: this.normalizeNewImageUrl(dto.imageUrl),
           title: this.normalizeOptionalText(dto.title, 80, 'title'),
           caption: this.normalizeOptionalText(dto.caption, 160, 'caption'),
           altText: this.normalizeOptionalText(dto.altText, 160, 'altText'),
@@ -93,12 +110,16 @@ export class LandingGalleryService {
   }
 
   async updateAdminImage(id: string, dto: UpdateLandingGalleryImageDto) {
-    await this.getImageForAdmin(id);
+    const existingImage = await this.getImageForAdmin(id);
 
     const data: Prisma.LandingGalleryImageUpdateInput = {};
 
     if ('imageUrl' in dto) {
-      data.imageUrl = this.normalizeRequiredImageUrl(dto.imageUrl);
+      data.imageUrl = this.normalizeLegacyImageUrlSelection(
+        dto.imageUrl,
+        existingImage.imageUrl,
+        existingImage.managedImageAssetId,
+      );
     }
 
     if ('title' in dto) {
@@ -137,11 +158,48 @@ export class LandingGalleryService {
     return { image };
   }
 
+  async uploadAdminImage(
+    id: string,
+    uploadedById: string,
+    file: ProductImageUpload | undefined,
+  ) {
+    const result = await this.assetService.uploadLandingGalleryImage(
+      id,
+      uploadedById,
+      file,
+    );
+    const image = await this.prismaService.landingGalleryImage.findUnique({
+      where: { id },
+      select: adminLandingGalleryImageSelect,
+    });
+
+    if (!image) {
+      throw this.imageNotFoundException();
+    }
+
+    return { image, ...result };
+  }
+
+  async deleteAdminImageFile(id: string) {
+    const result = await this.assetService.deleteLandingGalleryImage(id);
+    const image = await this.prismaService.landingGalleryImage.findUnique({
+      where: { id },
+      select: adminLandingGalleryImageSelect,
+    });
+
+    if (!image) {
+      throw this.imageNotFoundException();
+    }
+
+    return { image, ...result };
+  }
+
   async deleteAdminImage(id: string) {
     await this.getImageForAdmin(id);
+    const cleanup = await this.assetService.deleteLandingGalleryImage(id);
     await this.prismaService.landingGalleryImage.delete({ where: { id } });
 
-    return { deletedId: id };
+    return { deletedId: id, warning: cleanup.warning };
   }
 
   async reorderAdminImages(dto: ReorderLandingGalleryImagesDto) {
@@ -210,6 +268,8 @@ export class LandingGalleryService {
       },
       select: {
         id: true,
+        imageUrl: true,
+        managedImageAssetId: true,
       },
     });
 
@@ -220,15 +280,43 @@ export class LandingGalleryService {
     return image;
   }
 
-  private normalizeRequiredImageUrl(value: string | null | undefined): string {
+  private normalizeNewImageUrl(value: string | null | undefined): null {
+    if (
+      value === null ||
+      value === undefined ||
+      (typeof value === 'string' && value.trim() === '')
+    ) {
+      return null;
+    }
+
+    throw this.imageUrlInputDisabledException();
+  }
+
+  private normalizeLegacyImageUrlSelection(
+    value: string | null | undefined,
+    existingImageUrl: string | null,
+    managedImageAssetId: string | null,
+  ): string | null {
+    if (managedImageAssetId) {
+      return existingImageUrl;
+    }
+
+    if (
+      value === null ||
+      value === undefined ||
+      (typeof value === 'string' && value.trim() === '')
+    ) {
+      return null;
+    }
+
     if (typeof value !== 'string') {
-      throw this.invalidImageUrlException();
+      throw this.imageUrlInputDisabledException();
     }
 
     const normalized = value.trim();
 
     if (!normalized || normalized.length > 1000) {
-      throw this.invalidImageUrlException();
+      throw this.imageUrlInputDisabledException();
     }
 
     try {
@@ -238,7 +326,11 @@ export class LandingGalleryService {
         throw new Error('Unsupported protocol');
       }
     } catch {
-      throw this.invalidImageUrlException();
+      throw this.imageUrlInputDisabledException();
+    }
+
+    if (normalized !== existingImageUrl) {
+      throw this.imageUrlInputDisabledException();
     }
 
     return normalized;
@@ -307,6 +399,13 @@ export class LandingGalleryService {
     return new BadRequestException({
       code: 'LANDING_GALLERY_IMAGE_URL_INVALID',
       message: 'Image URL must be a valid public HTTP or HTTPS URL.',
+    });
+  }
+
+  private imageUrlInputDisabledException() {
+    return new BadRequestException({
+      code: 'LANDING_GALLERY_IMAGE_URL_INPUT_DISABLED',
+      message: 'New gallery images must be uploaded as JPEG, PNG, or WebP files.',
     });
   }
 

@@ -11,8 +11,9 @@ import {
   RefreshCw,
   Save,
   Trash2,
+  Upload,
 } from "lucide-react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { AdminFeedback } from "@/components/admin/AdminCommerceUi";
 import { AdminModal } from "@/components/admin/AdminModal";
@@ -25,9 +26,11 @@ import {
 import {
   createAdminLandingGalleryImage,
   deleteAdminLandingGalleryImage,
+  deleteAdminLandingGalleryImageFile,
   getAdminLandingGallery,
   reorderAdminLandingGalleryImages,
   updateAdminLandingGalleryImage,
+  uploadAdminLandingGalleryImage,
 } from "@/features/landing/api";
 import type {
   AdminLandingGalleryImage,
@@ -44,23 +47,34 @@ const LANDING_GALLERY_ERRORS: Record<string, string> = {
   LANDING_GALLERY_IMAGE_NOT_FOUND: "That gallery image no longer exists.",
   LANDING_GALLERY_IMAGE_URL_INVALID:
     "Enter a valid public HTTP or HTTPS image URL.",
+  LANDING_GALLERY_IMAGE_URL_INPUT_DISABLED:
+    "Choose a JPEG, PNG, or WebP file instead of entering an image URL.",
   LANDING_GALLERY_REORDER_DUPLICATE:
     "Each gallery image can appear only once in a reorder request.",
   LANDING_GALLERY_REORDER_EMPTY:
     "Choose at least one image before saving a new order.",
   LANDING_GALLERY_UPDATE_EMPTY: "Change at least one image field before saving.",
   NETWORK_ERROR: "The gallery API could not be reached. Check the backend and retry.",
+  PRODUCT_IMAGE_EMPTY: "Choose a non-empty JPEG, PNG, or WebP image.",
+  PRODUCT_IMAGE_TOO_LARGE: "Gallery images must be 5 MB or smaller.",
+  PRODUCT_IMAGE_TYPE_INVALID: "Only genuine JPEG, PNG, and WebP images are allowed.",
   VALIDATION_ERROR: "Some gallery fields are invalid. Review the form and try again.",
 };
 
 interface GalleryFormState {
   altText: string;
   caption: string;
+  imageFile?: File;
+  imageFilename: string;
+  imageSource: "legacy" | "local" | "managed" | "none";
   imageUrl: string;
   isActive: boolean;
   sortOrder: string;
   title: string;
 }
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 type GalleryModalMode = "create" | "edit";
 type MoveDirection = "up" | "down";
@@ -82,6 +96,11 @@ export function AdminLandingGalleryPage() {
   const [requestId, setRequestId] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
   const savingRef = useRef(false);
+  const localPreviewUrlRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    return () => releaseGalleryPreview(localPreviewUrlRef);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -141,6 +160,7 @@ export function AdminLandingGalleryPage() {
       return;
     }
 
+    releaseGalleryPreview(localPreviewUrlRef);
     setModalMode("create");
     setSelectedImage(undefined);
     setForm(emptyGalleryForm());
@@ -149,11 +169,50 @@ export function AdminLandingGalleryPage() {
   }
 
   function openEditModal(image: AdminLandingGalleryImage) {
+    releaseGalleryPreview(localPreviewUrlRef);
     setModalMode("edit");
     setSelectedImage(image);
     setForm(galleryForm(image));
     resetActionFeedback();
     setIsModalOpen(true);
+  }
+
+  function handleGalleryImageSelection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      setActionError("Only JPEG, PNG, and WebP images are allowed.");
+      return;
+    }
+    if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
+      setActionError("Gallery images must be non-empty and 5 MB or smaller.");
+      return;
+    }
+
+    releaseGalleryPreview(localPreviewUrlRef);
+    const imageUrl = URL.createObjectURL(file);
+    localPreviewUrlRef.current = imageUrl;
+    setForm((current) => ({
+      ...current,
+      imageFile: file,
+      imageFilename: file.name,
+      imageSource: "local",
+      imageUrl,
+    }));
+    setActionError(undefined);
+  }
+
+  function removeGalleryImage() {
+    releaseGalleryPreview(localPreviewUrlRef);
+    setForm((current) => ({
+      ...current,
+      imageFile: undefined,
+      imageFilename: "",
+      imageSource: "none",
+      imageUrl: "",
+    }));
   }
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
@@ -165,7 +224,7 @@ export function AdminLandingGalleryPage() {
 
     resetActionFeedback();
 
-    const validationError = validateGalleryForm(form);
+    const validationError = validateGalleryForm(form, modalMode);
 
     if (validationError) {
       setActionError(validationError);
@@ -174,21 +233,68 @@ export function AdminLandingGalleryPage() {
 
     savingRef.current = true;
     setIsSaving(true);
+    let latestImage: AdminLandingGalleryImage | undefined;
+    const metadataChanged =
+      modalMode === "create" ||
+      !selectedImage ||
+      !areGalleryDetailsEqual(form, galleryForm(selectedImage));
 
     try {
       const payload = galleryPayload(form);
 
       if (modalMode === "create") {
-        await createAdminLandingGalleryImage(payload);
-        setSuccessMessage("Landing gallery image created.");
+        const response = await createAdminLandingGalleryImage({
+          ...payload,
+          imageUrl: null,
+        });
+        latestImage = response.image;
+      } else if (selectedImage && metadataChanged) {
+        const response = await updateAdminLandingGalleryImage(
+          selectedImage.id,
+          payload,
+        );
+        latestImage = response.image;
       } else if (selectedImage) {
-        await updateAdminLandingGalleryImage(selectedImage.id, payload);
-        setSuccessMessage("Landing gallery image updated.");
+        latestImage = selectedImage;
       }
 
-      setIsModalOpen(false);
+      if (!latestImage) throw new Error("Gallery image response was unavailable.");
+
+      let warning: string | undefined;
+      if (form.imageFile) {
+        const response = await uploadAdminLandingGalleryImage(
+          latestImage.id,
+          form.imageFile,
+        );
+        latestImage = response.image;
+        warning = response.warning;
+        releaseGalleryPreview(localPreviewUrlRef);
+      } else if (
+        modalMode === "edit" &&
+        selectedImage?.imageUrl &&
+        form.imageSource === "none"
+      ) {
+        const response = await deleteAdminLandingGalleryImageFile(latestImage.id);
+        latestImage = response.image;
+        warning = response.warning;
+      }
+
+      setSelectedImage(latestImage);
+      setForm(galleryForm(latestImage));
+      setModalMode("edit");
+
       setRefreshKey((current) => current + 1);
+      if (warning) {
+        setSuccessMessage("Landing gallery image changes were saved.");
+        setActionError(warning);
+      } else {
+        setIsModalOpen(false);
+      }
     } catch (error) {
+      if (latestImage) {
+        setModalMode("edit");
+        setSelectedImage(latestImage);
+      }
       setActionError(
         getApiErrorMessage(
           error,
@@ -258,8 +364,11 @@ export function AdminLandingGalleryPage() {
     resetActionFeedback();
 
     try {
-      await deleteAdminLandingGalleryImage(image.id);
+      const response = await deleteAdminLandingGalleryImage(image.id);
       setSuccessMessage("Landing gallery image deleted.");
+      if (response.warning) {
+        setActionError(response.warning);
+      }
       setRefreshKey((current) => current + 1);
     } catch (error) {
       setActionError(
@@ -421,7 +530,9 @@ export function AdminLandingGalleryPage() {
                       <dd>{formatAdminDate(image.updatedAt)}</dd>
                     </div>
                   </dl>
-                  <code title={image.imageUrl}>{image.imageUrl}</code>
+                  <code title={image.imageUrl || undefined}>
+                    {image.imageUrl || "No image uploaded"}
+                  </code>
                 </div>
                 <footer className="admin-landing-gallery-card__actions">
                   <button
@@ -507,19 +618,35 @@ export function AdminLandingGalleryPage() {
               type="submit"
             >
               <Save aria-hidden="true" size={17} />
-              {isSaving ? "Saving" : modalMode === "create" ? "Create" : "Save"}
+              {isSaving
+                ? form.imageFile
+                  ? "Uploading"
+                  : "Saving"
+                : modalMode === "create"
+                  ? "Create"
+                  : "Save"}
             </button>
           </>
         )}
         hasUnsavedChanges={hasUnsavedChanges}
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          releaseGalleryPreview(localPreviewUrlRef);
+          setIsModalOpen(false);
+        }}
         title={modalMode === "create" ? "New gallery image" : "Edit gallery image"}
       >
         {actionError ? (
           <AdminFeedback message={actionError} requestId={requestId} tone="error" />
         ) : null}
-        <GalleryForm form={form} isDisabled={isSaving} onChange={setForm} onSubmit={handleSave} />
+        <GalleryForm
+          form={form}
+          isDisabled={isSaving}
+          onChange={setForm}
+          onFileChange={handleGalleryImageSelection}
+          onRemoveImage={removeGalleryImage}
+          onSubmit={handleSave}
+        />
       </AdminModal>
     </div>
   );
@@ -529,13 +656,18 @@ function GalleryForm({
   form,
   isDisabled,
   onChange,
+  onFileChange,
+  onRemoveImage,
   onSubmit,
 }: {
   form: GalleryFormState;
   isDisabled: boolean;
   onChange: (form: GalleryFormState) => void;
+  onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onRemoveImage: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const update = <K extends keyof GalleryFormState>(
     key: K,
     value: GalleryFormState[K],
@@ -554,30 +686,48 @@ function GalleryForm({
         <div className="admin-form-section__heading">
           <p className="eyebrow">Image source</p>
           <h3 id="landing-gallery-image-heading">Lookbook image</h3>
-          <p>Use a public HTTP or HTTPS image URL.</p>
+          <p>Upload one JPEG, PNG, or WebP image, up to 5 MB.</p>
         </div>
         <div className="admin-landing-gallery-form__media">
           <GalleryPreview
             altText={form.altText}
-            imageUrl={form.imageUrl.trim()}
+            imageUrl={form.imageUrl}
             title={form.title}
           />
-          <label>
-            <span>Image URL</span>
+          <div className="admin-gallery-image-controls">
             <input
+              accept="image/jpeg,image/png,image/webp"
+              className="admin-image-file-input"
               disabled={isDisabled}
-              maxLength={1000}
-              onChange={(event) => update("imageUrl", event.target.value)}
-              placeholder="https://example.com/lookbook.jpg"
-              required
-              type="url"
-              value={form.imageUrl}
+              onChange={onFileChange}
+              ref={imageInputRef}
+              type="file"
             />
-            <small>
-              Only URL-based image management is used for this MVP. Images display
-              in the same 3:4 frame as category tiles.
-            </small>
-          </label>
+            <button
+              className="button button--secondary"
+              disabled={isDisabled}
+              onClick={() => imageInputRef.current?.click()}
+              type="button"
+            >
+              <Upload aria-hidden="true" size={17} />
+              Choose file
+            </button>
+            <div className="admin-gallery-image-meta">
+              <strong>{form.imageFilename || "No gallery image"}</strong>
+              <small>{getGalleryImageStatus(form)}</small>
+            </div>
+            {form.imageSource !== "none" ? (
+              <button
+                className="admin-link-button admin-link-button--delete"
+                disabled={isDisabled}
+                onClick={onRemoveImage}
+                type="button"
+              >
+                <Trash2 aria-hidden="true" size={15} />
+                Remove image
+              </button>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -647,7 +797,7 @@ function GalleryPreview({
   title,
 }: {
   altText: string | null;
-  imageUrl: string;
+  imageUrl: string | null;
   title: string | null;
 }) {
   const [hasFailed, setHasFailed] = useState(false);
@@ -667,7 +817,7 @@ function GalleryPreview({
       ) : (
         <span>
           <ImageIcon aria-hidden="true" size={22} />
-          {imageUrl ? "Image unavailable" : "No image URL"}
+          {imageUrl ? "Image unavailable" : "No image"}
         </span>
       )}
     </div>
@@ -688,6 +838,8 @@ function emptyGalleryForm(): GalleryFormState {
   return {
     altText: "",
     caption: "",
+    imageFilename: "",
+    imageSource: "none",
     imageUrl: "",
     isActive: true,
     sortOrder: "",
@@ -699,7 +851,15 @@ function galleryForm(image: AdminLandingGalleryImage): GalleryFormState {
   return {
     altText: image.altText || "",
     caption: image.caption || "",
-    imageUrl: image.imageUrl,
+    imageFilename:
+      image.managedImageAsset?.originalFilename ||
+      (image.imageUrl ? "Existing gallery image" : ""),
+    imageSource: image.managedImageAsset
+      ? "managed"
+      : image.imageUrl
+        ? "legacy"
+        : "none",
+    imageUrl: image.imageUrl || "",
     isActive: image.isActive,
     sortOrder: String(image.sortOrder),
     title: image.title || "",
@@ -712,20 +872,23 @@ function galleryPayload(
   return {
     altText: normalizeNullableText(form.altText),
     caption: normalizeNullableText(form.caption),
-    imageUrl: form.imageUrl.trim(),
+    ...(form.imageSource === "legacy"
+      ? { imageUrl: form.imageUrl }
+      : form.imageSource === "none"
+        ? { imageUrl: null }
+        : {}),
     isActive: form.isActive,
     sortOrder: form.sortOrder.trim() ? Number(form.sortOrder) : undefined,
     title: normalizeNullableText(form.title),
   };
 }
 
-function validateGalleryForm(form: GalleryFormState): string | undefined {
-  if (!form.imageUrl.trim()) {
-    return "Image URL is required.";
-  }
-
-  if (!isPublicHttpUrl(form.imageUrl)) {
-    return "Enter a valid public HTTP or HTTPS image URL.";
+function validateGalleryForm(
+  form: GalleryFormState,
+  mode: GalleryModalMode,
+): string | undefined {
+  if (mode === "create" && form.imageSource === "none") {
+    return "Choose a JPEG, PNG, or WebP image.";
   }
 
   if (form.title.trim().length > 80) {
@@ -750,13 +913,36 @@ function validateGalleryForm(form: GalleryFormState): string | undefined {
   return undefined;
 }
 
-function isPublicHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
+function areGalleryDetailsEqual(
+  first: GalleryFormState,
+  second: GalleryFormState,
+): boolean {
+  return (
+    first.altText.trim() === second.altText.trim() &&
+    first.caption.trim() === second.caption.trim() &&
+    first.isActive === second.isActive &&
+    first.sortOrder.trim() === second.sortOrder.trim() &&
+    first.title.trim() === second.title.trim()
+  );
+}
+
+function getGalleryImageStatus(form: GalleryFormState): string {
+  switch (form.imageSource) {
+    case "local":
+      return "Ready to upload";
+    case "managed":
+      return "Stored securely in Supabase";
+    case "legacy":
+      return "Existing URL image; choose a file to migrate it";
+    default:
+      return "Choose one image for this gallery entry";
   }
+}
+
+function releaseGalleryPreview(reference: { current?: string }): void {
+  if (!reference.current) return;
+  URL.revokeObjectURL(reference.current);
+  reference.current = undefined;
 }
 
 function getOrderedImages(

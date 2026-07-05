@@ -7,10 +7,13 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
@@ -18,6 +21,14 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
+import {
+  MAX_PRODUCT_IMAGE_BYTES,
+  type ProductImageUpload,
+} from '../assets/asset.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -63,6 +74,38 @@ export class AdminLandingGalleryController {
   @Post()
   createImage(@Body() dto: CreateLandingGalleryImageDto) {
     return this.landingGalleryService.createAdminImage(dto);
+  }
+
+  @ApiOperation({ summary: 'Upload or replace a managed gallery image' })
+  @ApiConsumes('multipart/form-data')
+  @Post(':imageId/image')
+  @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fieldNameSize: 100,
+        fields: 0,
+        fileSize: MAX_PRODUCT_IMAGE_BYTES,
+        files: 1,
+      },
+    }),
+  )
+  uploadImageFile(
+    @Param('imageId', new ParseUUIDPipe()) imageId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file?: ProductImageUpload,
+  ) {
+    return this.landingGalleryService.uploadAdminImage(
+      imageId,
+      user.id,
+      file,
+    );
+  }
+
+  @ApiOperation({ summary: 'Remove a managed or legacy gallery image file' })
+  @Delete(':imageId/image')
+  deleteImageFile(@Param('imageId', new ParseUUIDPipe()) imageId: string) {
+    return this.landingGalleryService.deleteAdminImageFile(imageId);
   }
 
   @ApiOperation({ summary: 'Reorder landing gallery images as an admin' })

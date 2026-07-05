@@ -2922,6 +2922,42 @@ img {
   aspect-ratio: 3 / 4;
 }
 
+.admin-gallery-image-controls,
+.admin-category-image-controls {
+  align-content: start;
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.admin-gallery-image-controls .button,
+.admin-category-image-controls .button,
+.admin-gallery-image-controls .admin-link-button {
+  justify-self: start;
+  width: auto;
+}
+
+.admin-gallery-image-meta,
+.admin-category-image-meta {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-gallery-image-meta strong,
+.admin-category-image-meta strong {
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-gallery-image-meta small,
+.admin-category-image-meta small {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
 @media (max-width: 720px) {
   .admin-gallery-count {
     text-align: center;

@@ -1,9 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsString,
   IsUrl,
@@ -14,16 +13,18 @@ const trimString = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
 export class CreateLandingGalleryImageDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
+    deprecated: true,
+    description: 'Legacy transition field. New gallery image URLs are rejected.',
     example: 'https://images.example.com/lookbook/daylight-denim.jpg',
     maxLength: 1000,
   })
   @Transform(trimString)
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(1000)
   @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
-  imageUrl: string;
+  imageUrl?: string | null;
 
   @ApiPropertyOptional({
     example: 'Daylight denim',

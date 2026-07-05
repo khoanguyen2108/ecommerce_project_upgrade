@@ -4,6 +4,7 @@ import type {
   AdminCategoriesListResponse,
   AdminCategoryQuery,
   AdminCategoryResponse,
+  AdminCategoryImageMutationResponse,
   AdminDeleteResponse,
   AdminProductQuery,
   AdminProductImageMutationResponse,
@@ -144,6 +145,33 @@ export function updateAdminProduct(
       credentials: "include",
       method: "PATCH",
     },
+  );
+}
+
+export function uploadAdminCategoryImage(
+  categoryId: string,
+  file: File,
+): Promise<AdminCategoryImageMutationResponse> {
+  const body = new FormData();
+  body.append("file", file);
+
+  return apiRequest<AdminCategoryImageMutationResponse>(
+    `/admin/categories/${encodeURIComponent(categoryId)}/image`,
+    {
+      auth: true,
+      body,
+      credentials: "include",
+      method: "POST",
+    },
+  );
+}
+
+export function deleteAdminCategoryImage(
+  categoryId: string,
+): Promise<AdminCategoryImageMutationResponse> {
+  return apiRequest<AdminCategoryImageMutationResponse>(
+    `/admin/categories/${encodeURIComponent(categoryId)}/image`,
+    { auth: true, credentials: "include", method: "DELETE" },
   );
 }
 

@@ -38,6 +38,9 @@ export class UpdateCategoryDto {
   description?: string | null;
 
   @ApiPropertyOptional({
+    deprecated: true,
+    description:
+      'Legacy transition field. Only retaining or clearing the existing legacy URL is allowed.',
     example: 'https://images.example.com/categories/graphic-t-shirts.jpg',
     maxLength: 2048,
     nullable: true,

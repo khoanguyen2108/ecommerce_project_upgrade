@@ -249,6 +249,234 @@ export class AssetService {
     ]);
   }
 
+  async uploadCategoryImage(
+    categoryId: string,
+    uploadedById: string,
+    file: ProductImageUpload | undefined,
+  ) {
+    const category = await this.prismaService.category.findUnique({
+      where: { id: categoryId },
+      select: {
+        id: true,
+        managedImageAsset: {
+          select: { id: true, storagePath: true },
+        },
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException({
+        code: 'ADMIN_CATEGORY_NOT_FOUND',
+        message: 'Category was not found.',
+      });
+    }
+
+    const upload = await this.uploadManagedObject(
+      `categories/${categoryId}`,
+      uploadedById,
+      file,
+    );
+
+    try {
+      await this.prismaService.$transaction(async (tx) => {
+        await tx.imageAsset.create({ data: upload.assetData });
+        await tx.category.update({
+          where: { id: categoryId },
+          data: {
+            imageUrl: upload.publicUrl,
+            managedImageAssetId: upload.assetData.id,
+          },
+        });
+      });
+    } catch (error) {
+      await this.rollbackUploadedObject(upload.storagePath);
+      throw error;
+    }
+
+    return category.managedImageAsset
+      ? this.deleteDetachedAsset(
+          category.managedImageAsset,
+          'The category image was replaced, but its previous Supabase object requires cleanup.',
+        )
+      : { storageDeleted: true, warning: undefined };
+  }
+
+  async deleteCategoryImage(categoryId: string) {
+    const category = await this.prismaService.category.findUnique({
+      where: { id: categoryId },
+      select: {
+        id: true,
+        managedImageAsset: {
+          select: { id: true, storagePath: true },
+        },
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException({
+        code: 'ADMIN_CATEGORY_NOT_FOUND',
+        message: 'Category was not found.',
+      });
+    }
+
+    await this.prismaService.category.update({
+      where: { id: categoryId },
+      data: { imageUrl: null, managedImageAssetId: null },
+    });
+
+    return category.managedImageAsset
+      ? this.deleteDetachedAsset(
+          category.managedImageAsset,
+          'The category image was removed, but its Supabase object requires cleanup.',
+        )
+      : { storageDeleted: true, warning: undefined };
+  }
+
+  async uploadLandingGalleryImage(
+    galleryImageId: string,
+    uploadedById: string,
+    file: ProductImageUpload | undefined,
+  ) {
+    const galleryImage = await this.prismaService.landingGalleryImage.findUnique({
+      where: { id: galleryImageId },
+      select: {
+        id: true,
+        managedImageAsset: {
+          select: { id: true, storagePath: true },
+        },
+      },
+    });
+
+    if (!galleryImage) {
+      throw new NotFoundException({
+        code: 'LANDING_GALLERY_IMAGE_NOT_FOUND',
+        message: 'Landing gallery image was not found.',
+      });
+    }
+
+    const upload = await this.uploadManagedObject(
+      `landing-gallery/${galleryImageId}`,
+      uploadedById,
+      file,
+    );
+
+    try {
+      await this.prismaService.$transaction(async (tx) => {
+        await tx.imageAsset.create({ data: upload.assetData });
+        await tx.landingGalleryImage.update({
+          where: { id: galleryImageId },
+          data: {
+            imageUrl: upload.publicUrl,
+            managedImageAssetId: upload.assetData.id,
+          },
+        });
+      });
+    } catch (error) {
+      await this.rollbackUploadedObject(upload.storagePath);
+      throw error;
+    }
+
+    return galleryImage.managedImageAsset
+      ? this.deleteDetachedAsset(
+          galleryImage.managedImageAsset,
+          'The gallery image was replaced, but its previous Supabase object requires cleanup.',
+        )
+      : { storageDeleted: true, warning: undefined };
+  }
+
+  async deleteLandingGalleryImage(galleryImageId: string) {
+    const galleryImage = await this.prismaService.landingGalleryImage.findUnique({
+      where: { id: galleryImageId },
+      select: {
+        id: true,
+        managedImageAsset: {
+          select: { id: true, storagePath: true },
+        },
+      },
+    });
+
+    if (!galleryImage) {
+      throw new NotFoundException({
+        code: 'LANDING_GALLERY_IMAGE_NOT_FOUND',
+        message: 'Landing gallery image was not found.',
+      });
+    }
+
+    await this.prismaService.landingGalleryImage.update({
+      where: { id: galleryImageId },
+      data: { imageUrl: null, managedImageAssetId: null },
+    });
+
+    return galleryImage.managedImageAsset
+      ? this.deleteDetachedAsset(
+          galleryImage.managedImageAsset,
+          'The gallery image was removed, but its Supabase object requires cleanup.',
+        )
+      : { storageDeleted: true, warning: undefined };
+  }
+
+  private async uploadManagedObject(
+    pathPrefix: string,
+    uploadedById: string,
+    file: ProductImageUpload | undefined,
+  ) {
+    const image = this.validateImage(file);
+    const assetId = randomUUID();
+    const storagePath = `${pathPrefix}/${assetId}.${IMAGE_TYPES[image.mimeType].extension}`;
+    const storedObject = await this.storageProvider.upload({
+      body: image.buffer,
+      contentType: image.mimeType,
+      path: storagePath,
+    });
+
+    return {
+      assetData: {
+        id: assetId,
+        provider: AssetProvider.SUPABASE,
+        bucket: storedObject.bucket,
+        storagePath: storedObject.path,
+        publicUrl: storedObject.publicUrl,
+        originalFilename: image.originalFilename,
+        mimeType: image.mimeType,
+        sizeBytes: image.buffer.length,
+        checksum: createHash('sha256').update(image.buffer).digest('hex'),
+        uploadedById,
+        status: AssetStatus.ACTIVE,
+      },
+      publicUrl: storedObject.publicUrl,
+      storagePath: storedObject.path,
+    };
+  }
+
+  private async rollbackUploadedObject(storagePath: string) {
+    try {
+      await this.storageProvider.delete(storagePath);
+    } catch {
+      throw new ServiceUnavailableException({
+        code: 'IMAGE_METADATA_SAVE_FAILED_CLEANUP_FAILED',
+        message:
+          'The image metadata could not be saved and its Storage object requires cleanup.',
+      });
+    }
+  }
+
+  private async deleteDetachedAsset(
+    asset: { id: string; storagePath: string },
+    warning: string,
+  ) {
+    try {
+      await this.storageProvider.delete(asset.storagePath);
+      await this.prismaService.imageAsset.delete({ where: { id: asset.id } });
+      return { storageDeleted: true, warning: undefined };
+    } catch {
+      await this.prismaService.imageAsset.updateMany({
+        where: { id: asset.id },
+        data: { status: AssetStatus.DELETE_FAILED },
+      });
+      return { storageDeleted: false, warning };
+    }
+  }
+
   private validateImage(file: ProductImageUpload | undefined): {
     buffer: Buffer;
     mimeType: AllowedImageMime;

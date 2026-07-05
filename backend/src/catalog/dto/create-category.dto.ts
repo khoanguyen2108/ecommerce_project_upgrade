@@ -34,6 +34,9 @@ export class CreateCategoryDto {
   description?: string | null;
 
   @ApiPropertyOptional({
+    deprecated: true,
+    description:
+      'Legacy transition field. New non-empty category image URLs are rejected.',
     example: 'https://images.example.com/categories/t-shirts.jpg',
     maxLength: 2048,
     nullable: true,

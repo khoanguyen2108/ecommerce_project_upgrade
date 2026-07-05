@@ -194,18 +194,20 @@ model ChatMessage {
 }
 
 model Category {
-  id                String            @id @default(uuid()) @db.Uuid
-  name              String            @db.VarChar(120)
-  slug              String            @unique @db.VarChar(160)
-  description       String?
-  imageUrl          String?           @db.VarChar(2048)
-  isFeatured        Boolean           @default(false)
-  featuredOrder     Int?              @unique
-  isActive          Boolean           @default(true)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  primaryProducts   Product[]         @relation("PrimaryProductCategory")
-  productCategories ProductCategory[]
+  id                  String            @id @default(uuid()) @db.Uuid
+  name                String            @db.VarChar(120)
+  slug                String            @unique @db.VarChar(160)
+  description         String?
+  imageUrl            String?           @db.VarChar(2048)
+  managedImageAssetId String?           @unique @db.Uuid
+  managedImageAsset   ImageAsset?       @relation("CategoryManagedImage", fields: [managedImageAssetId], references: [id], onDelete: SetNull)
+  isFeatured          Boolean           @default(false)
+  featuredOrder       Int?              @unique
+  isActive            Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  primaryProducts     Product[]         @relation("PrimaryProductCategory")
+  productCategories   ProductCategory[]
 
   @@index([isActive])
   @@index([isActive, isFeatured, featuredOrder])
@@ -222,15 +224,17 @@ model LandingPageSetting {
 }
 
 model LandingGalleryImage {
-  id        String   @id @default(uuid()) @db.Uuid
-  imageUrl  String   @db.VarChar(1000)
-  title     String?  @db.VarChar(80)
-  caption   String?  @db.VarChar(160)
-  altText   String?  @db.VarChar(160)
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String      @id @default(uuid()) @db.Uuid
+  imageUrl            String?     @db.VarChar(1000)
+  managedImageAssetId String?     @unique @db.Uuid
+  managedImageAsset   ImageAsset? @relation("LandingGalleryManagedImage", fields: [managedImageAssetId], references: [id], onDelete: SetNull)
+  title               String?     @db.VarChar(80)
+  caption             String?     @db.VarChar(160)
+  altText             String?     @db.VarChar(160)
+  sortOrder           Int         @default(0)
+  isActive            Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   @@index([isActive])
   @@index([sortOrder])
@@ -259,23 +263,25 @@ model Product {
 }
 
 model ImageAsset {
-  id               String        @id @default(uuid()) @db.Uuid
-  provider         AssetProvider @default(SUPABASE)
-  bucket           String        @db.VarChar(100)
-  storagePath      String        @db.VarChar(500)
-  publicUrl        String        @db.VarChar(2048)
-  originalFilename String?       @db.VarChar(255)
-  mimeType         String        @db.VarChar(100)
-  sizeBytes        Int
-  width            Int?
-  height           Int?
-  checksum         String?       @db.VarChar(64)
-  uploadedById     String        @db.Uuid
-  uploadedBy       User          @relation("UploadedImageAssets", fields: [uploadedById], references: [id], onDelete: Restrict)
-  status           AssetStatus   @default(ACTIVE)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  productImage     ProductImage?
+  id                  String               @id @default(uuid()) @db.Uuid
+  provider            AssetProvider        @default(SUPABASE)
+  bucket              String               @db.VarChar(100)
+  storagePath         String               @db.VarChar(500)
+  publicUrl           String               @db.VarChar(2048)
+  originalFilename    String?              @db.VarChar(255)
+  mimeType            String               @db.VarChar(100)
+  sizeBytes           Int
+  width               Int?
+  height              Int?
+  checksum            String?              @db.VarChar(64)
+  uploadedById        String               @db.Uuid
+  uploadedBy          User                 @relation("UploadedImageAssets", fields: [uploadedById], references: [id], onDelete: Restrict)
+  status              AssetStatus          @default(ACTIVE)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  productImage        ProductImage?
+  categoryImage       Category?            @relation("CategoryManagedImage")
+  landingGalleryImage LandingGalleryImage? @relation("LandingGalleryManagedImage")
 
   @@unique([provider, bucket, storagePath])
   @@index([uploadedById, createdAt])

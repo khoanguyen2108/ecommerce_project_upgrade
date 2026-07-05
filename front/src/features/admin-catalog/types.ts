@@ -42,6 +42,15 @@ export interface AdminCategory {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  managedImageAsset: AdminManagedSingleImageAsset | null;
+}
+
+export interface AdminManagedSingleImageAsset {
+  id: string;
+  originalFilename: string | null;
+  mimeType: string;
+  sizeBytes: number;
+  status: "ACTIVE" | "DELETE_FAILED";
 }
 
 export interface AdminProductCategorySummary {
@@ -205,6 +214,12 @@ export interface AdminCategoriesListResponse {
 
 export interface AdminCategoryResponse {
   category: AdminCategory;
+}
+
+export interface AdminCategoryImageMutationResponse
+  extends AdminCategoryResponse {
+  storageDeleted?: boolean;
+  warning?: string;
 }
 
 export interface AdminProductsListResponse {

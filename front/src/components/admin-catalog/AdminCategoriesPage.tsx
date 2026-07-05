@@ -10,17 +10,21 @@ import {
   RotateCcw,
   Save,
   Search,
+  Trash2,
+  Upload,
 } from "lucide-react";
-import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   activateAdminCategory,
   createAdminCategory,
   deactivateAdminCategory,
   deleteAdminCategory,
+  deleteAdminCategoryImage,
   getAdminCategory,
   listAdminCategories,
   updateAdminCategory,
+  uploadAdminCategoryImage,
 } from "@/features/admin-catalog/api";
 import type {
   AdminCategory,
@@ -39,6 +43,8 @@ import {
 } from "@/components/admin/admin-format";
 
 const CATEGORY_LIMIT = 8;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const CATEGORY_ERROR_MESSAGES: Record<string, string> = {
   ADMIN_CATEGORY_FEATURED_LIMIT_EXCEEDED:
@@ -49,6 +55,8 @@ const CATEGORY_ERROR_MESSAGES: Record<string, string> = {
     "Choose featured order 1, 2, or 3.",
   ADMIN_CATEGORY_IMAGE_URL_INVALID:
     "Enter a valid public HTTP or HTTPS image URL.",
+  CATEGORY_IMAGE_URL_INPUT_DISABLED:
+    "Choose a JPEG, PNG, or WebP file instead of entering an image URL.",
   ADMIN_CATEGORY_NOT_FOUND: "That category no longer exists.",
   AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
   BAD_REQUEST: "Some category fields are invalid. Review the form and try again.",
@@ -59,6 +67,9 @@ const CATEGORY_ERROR_MESSAGES: Record<string, string> = {
     "This category has products. Move or remove them before deleting.",
   FORBIDDEN: "This account is not allowed to manage catalog categories.",
   NETWORK_ERROR: "The category API could not be reached. Check the backend and retry.",
+  PRODUCT_IMAGE_EMPTY: "Choose a non-empty JPEG, PNG, or WebP image.",
+  PRODUCT_IMAGE_TOO_LARGE: "Category images must be 5 MB or smaller.",
+  PRODUCT_IMAGE_TYPE_INVALID: "Only genuine JPEG, PNG, and WebP images are allowed.",
   VALIDATION_ERROR: "Some category fields are invalid. Review the form and try again.",
 };
 
@@ -69,6 +80,9 @@ interface AdminCategoriesPageProps {
 interface CategoryFormState {
   description: string;
   featuredOrder: "" | "1" | "2" | "3";
+  imageFile?: File;
+  imageFilename: string;
+  imageSource: "legacy" | "local" | "managed" | "none";
   imageUrl: string;
   isActive: boolean;
   isFeatured: boolean;
@@ -105,6 +119,12 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   const [requestId, setRequestId] = useState<string>();
   const [successMessage, setSuccessMessage] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const localPreviewUrlRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    return () => releaseCategoryPreview(localPreviewUrlRef);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -185,6 +205,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   }
 
   function openCreatePanel() {
+    releaseCategoryPreview(localPreviewUrlRef);
     setPanelMode("create");
     setSelectedCategory(undefined);
     setForm(getEmptyCategoryForm());
@@ -195,6 +216,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   }
 
   async function openEditPanel(category: AdminCategory) {
+    releaseCategoryPreview(localPreviewUrlRef);
     setPanelMode("edit");
     setSelectedCategory(category);
     setForm(getCategoryForm(category));
@@ -223,6 +245,44 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
     }
   }
 
+  function handleCategoryImageSelection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      setActionError("Only JPEG, PNG, and WebP images are allowed.");
+      return;
+    }
+    if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
+      setActionError("Category images must be non-empty and 5 MB or smaller.");
+      return;
+    }
+
+    releaseCategoryPreview(localPreviewUrlRef);
+    const imageUrl = URL.createObjectURL(file);
+    localPreviewUrlRef.current = imageUrl;
+    setForm((current) => ({
+      ...current,
+      imageFile: file,
+      imageFilename: file.name,
+      imageSource: "local",
+      imageUrl,
+    }));
+    setActionError(undefined);
+  }
+
+  function removeCategoryImage() {
+    releaseCategoryPreview(localPreviewUrlRef);
+    setForm((current) => ({
+      ...current,
+      imageFile: undefined,
+      imageFilename: "",
+      imageSource: "none",
+      imageUrl: "",
+    }));
+  }
+
   async function handleCategorySave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setActionError(undefined);
@@ -247,39 +307,82 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
     }
 
     setIsSaving(true);
+    let latestCategory: AdminCategory | undefined;
+    const categoryDetailsChanged =
+      panelMode === "create" ||
+      !selectedCategory ||
+      !areCategoryDetailsEqual(form, getCategoryForm(selectedCategory));
 
     try {
       if (panelMode === "create") {
-        await createAdminCategory({
+        const response = await createAdminCategory({
           description: normalizeNullableText(form.description),
           featuredOrder: form.isFeatured ? Number(form.featuredOrder) : null,
-          imageUrl: normalizeNullableText(form.imageUrl),
+          imageUrl: null,
           isActive: form.isActive,
           isFeatured: form.isFeatured,
           name: form.name.trim(),
           slug: form.slug.trim(),
         });
-
-        setSuccessMessage("Category created.");
-      } else if (selectedCategory) {
+        latestCategory = response.category;
+      } else if (selectedCategory && categoryDetailsChanged) {
+        const legacyImageUrl =
+          form.imageSource === "legacy"
+            ? form.imageUrl
+            : form.imageSource === "none"
+              ? null
+              : undefined;
         const response = await updateAdminCategory(selectedCategory.id, {
           description: normalizeNullableText(form.description),
           featuredOrder: form.isFeatured ? Number(form.featuredOrder) : null,
-          imageUrl: normalizeNullableText(form.imageUrl),
+          ...(legacyImageUrl !== undefined ? { imageUrl: legacyImageUrl } : {}),
           isActive: form.isActive,
           isFeatured: form.isFeatured,
           name: form.name.trim(),
           slug: form.slug.trim(),
         });
-
-        setSelectedCategory(response.category);
-        setForm(getCategoryForm(response.category));
-        setSuccessMessage("Category updated.");
+        latestCategory = response.category;
+      } else if (selectedCategory) {
+        latestCategory = selectedCategory;
       }
 
+      if (!latestCategory) throw new Error("Category response was unavailable.");
+
+      let warning: string | undefined;
+      if (form.imageFile) {
+        const response = await uploadAdminCategoryImage(
+          latestCategory.id,
+          form.imageFile,
+        );
+        latestCategory = response.category;
+        warning = response.warning;
+        releaseCategoryPreview(localPreviewUrlRef);
+      } else if (
+        panelMode === "edit" &&
+        selectedCategory?.imageUrl &&
+        form.imageSource === "none"
+      ) {
+        const response = await deleteAdminCategoryImage(latestCategory.id);
+        latestCategory = response.category;
+        warning = response.warning;
+      }
+
+      setSelectedCategory(latestCategory);
+      setForm(getCategoryForm(latestCategory));
+      setPanelMode("edit");
+
       setRefreshKey((current) => current + 1);
-      setIsModalOpen(false);
+      if (warning) {
+        setSuccessMessage("Category image changes were saved.");
+        setActionError(warning);
+      } else {
+        setIsModalOpen(false);
+      }
     } catch (error) {
+      if (latestCategory) {
+        setPanelMode("edit");
+        setSelectedCategory(latestCategory);
+      }
       setActionError(
         getApiErrorMessage(
           error,
@@ -350,13 +453,16 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
     setSuccessMessage(undefined);
     setRequestId(undefined);
     try {
-      await deleteAdminCategory(category.id);
+      const response = await deleteAdminCategory(category.id);
       if (categories.length === 1 && (query.page || 1) > 1) {
         setQuery((current) => ({ ...current, page: Math.max(1, (current.page || 1) - 1) }));
       } else {
         setRefreshKey((current) => current + 1);
       }
       setSuccessMessage("Category deleted.");
+      if (response.warning) {
+        setActionError(response.warning);
+      }
     } catch (error) {
       setActionError(
         getApiErrorMessage(
@@ -619,7 +725,9 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
             >
               <Save aria-hidden="true" size={17} />
               {isSaving
-                ? "Saving"
+                ? form.imageFile
+                  ? "Uploading"
+                  : "Saving"
                 : panelMode === "create"
                   ? "Create"
                   : "Save"}
@@ -628,7 +736,10 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
         )}
         hasUnsavedChanges={hasUnsavedChanges}
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          releaseCategoryPreview(localPreviewUrlRef);
+          setIsModalOpen(false);
+        }}
         title={panelMode === "create" ? "New category" : "Edit category"}
       >
         {actionError ? (
@@ -661,15 +772,44 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               <div className="admin-form-section__heading">
                 <p className="eyebrow">Category image</p>
                 <h3 id="category-visual-heading">Category image</h3>
-                <p>Use one public HTTP or HTTPS image URL.</p>
+                <p>JPEG, PNG, or WebP. Maximum 5 MB.</p>
               </div>
               <div className="admin-category-visual-grid">
-                <CategoryImagePreview url={form.imageUrl.trim()} />
-                <label>
-                  <span>Image URL</span>
-                  <input disabled={isDetailLoading} maxLength={2048} onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))} placeholder="https://example.com/category.jpg" type="url" value={form.imageUrl} />
-                  <small>Landing and category views load this URL directly.</small>
-                </label>
+                <CategoryImagePreview url={form.imageUrl} />
+                <div className="admin-category-image-controls">
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    className="admin-image-file-input"
+                    disabled={isDetailLoading || isSaving}
+                    onChange={handleCategoryImageSelection}
+                    ref={imageInputRef}
+                    type="file"
+                  />
+                  <button
+                    className="button button--secondary"
+                    disabled={isDetailLoading || isSaving}
+                    onClick={() => imageInputRef.current?.click()}
+                    type="button"
+                  >
+                    <Upload aria-hidden="true" size={15} />
+                    Choose file
+                  </button>
+                  <div className="admin-category-image-meta">
+                    <strong>{getCategoryImageLabel(form)}</strong>
+                    <small>{getCategoryImageStatus(form)}</small>
+                  </div>
+                  {form.imageSource !== "none" ? (
+                    <button
+                      className="button button--secondary"
+                      disabled={isDetailLoading || isSaving}
+                      onClick={removeCategoryImage}
+                      type="button"
+                    >
+                      <Trash2 aria-hidden="true" size={15} />
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </section>
 
@@ -736,6 +876,8 @@ function getEmptyCategoryForm(): CategoryFormState {
   return {
     description: "",
     featuredOrder: "",
+    imageFilename: "",
+    imageSource: "none",
     imageUrl: "",
     isActive: true,
     isFeatured: false,
@@ -750,6 +892,14 @@ function getCategoryForm(category: AdminCategory): CategoryFormState {
     featuredOrder: category.featuredOrder
       ? (String(category.featuredOrder) as CategoryFormState["featuredOrder"])
       : "",
+    imageFilename:
+      category.managedImageAsset?.originalFilename ||
+      (category.imageUrl ? "Legacy category image" : ""),
+    imageSource: category.managedImageAsset
+      ? "managed"
+      : category.imageUrl
+        ? "legacy"
+        : "none",
     imageUrl: category.imageUrl || "",
     isActive: category.isActive,
     isFeatured: category.isFeatured,
@@ -765,7 +915,23 @@ function areCategoryFormsEqual(
   return (
     left.description === right.description &&
     left.featuredOrder === right.featuredOrder &&
+    left.imageFilename === right.imageFilename &&
+    left.imageSource === right.imageSource &&
     left.imageUrl === right.imageUrl &&
+    left.isActive === right.isActive &&
+    left.isFeatured === right.isFeatured &&
+    left.name === right.name &&
+    left.slug === right.slug
+  );
+}
+
+function areCategoryDetailsEqual(
+  left: CategoryFormState,
+  right: CategoryFormState,
+): boolean {
+  return (
+    left.description === right.description &&
+    left.featuredOrder === right.featuredOrder &&
     left.isActive === right.isActive &&
     left.isFeatured === right.isFeatured &&
     left.name === right.name &&
@@ -782,10 +948,6 @@ function validateCategoryForm(form: CategoryFormState): string | undefined {
     return "Category slug is required.";
   }
 
-  if (form.imageUrl.trim() && !isPublicHttpUrl(form.imageUrl)) {
-    return "Enter a valid public HTTP or HTTPS image URL.";
-  }
-
   if (form.isFeatured && !form.featuredOrder) {
     return "Choose featured order 1, 2, or 3.";
   }
@@ -793,12 +955,21 @@ function validateCategoryForm(form: CategoryFormState): string | undefined {
   return undefined;
 }
 
-function isPublicHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
+function getCategoryImageLabel(form: CategoryFormState): string {
+  return form.imageFilename || "No category image";
+}
+
+function getCategoryImageStatus(form: CategoryFormState): string {
+  if (form.imageSource === "local") return "Ready to upload";
+  if (form.imageSource === "managed") return "Managed in Supabase Storage";
+  if (form.imageSource === "legacy") return "Legacy URL image";
+  return "Choose one image from your device";
+}
+
+function releaseCategoryPreview(ref: { current: string | undefined }) {
+  if (ref.current) {
+    URL.revokeObjectURL(ref.current);
+    ref.current = undefined;
   }
 }
 

@@ -8,12 +8,15 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiConsumes,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -22,6 +25,14 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
+import {
+  MAX_PRODUCT_IMAGE_BYTES,
+  type ProductImageUpload,
+} from '../assets/asset.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -101,6 +112,34 @@ export class AdminCategoriesController {
   @Post()
   createCategory(@Body() dto: CreateCategoryDto) {
     return this.catalogService.createCategory(dto);
+  }
+
+  @ApiOperation({ summary: 'Upload or replace a managed category image' })
+  @ApiConsumes('multipart/form-data')
+  @Post(':id/image')
+  @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fieldNameSize: 100,
+        fields: 0,
+        fileSize: MAX_PRODUCT_IMAGE_BYTES,
+        files: 1,
+      },
+    }),
+  )
+  uploadCategoryImage(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file?: ProductImageUpload,
+  ) {
+    return this.catalogService.uploadCategoryImage(id, user.id, file);
+  }
+
+  @ApiOperation({ summary: 'Remove a managed or legacy category image' })
+  @Delete(':id/image')
+  deleteCategoryImage(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.catalogService.deleteCategoryImage(id);
   }
 
   @ApiOperation({ summary: 'Update a category as an admin' })

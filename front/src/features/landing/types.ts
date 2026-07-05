@@ -16,10 +16,19 @@ export interface LandingGalleryImage {
   sortOrder: number;
 }
 
-export interface AdminLandingGalleryImage extends LandingGalleryImage {
+export interface AdminLandingGalleryImage
+  extends Omit<LandingGalleryImage, "imageUrl"> {
+  imageUrl: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  managedImageAsset: {
+    id: string;
+    originalFilename: string | null;
+    mimeType: string;
+    sizeBytes: number;
+    status: "ACTIVE" | "DELETE_FAILED";
+  } | null;
 }
 
 export interface LandingGalleryResponse {
@@ -34,10 +43,12 @@ export interface AdminLandingGalleryResponse {
 
 export interface AdminLandingGalleryImageResponse {
   image: AdminLandingGalleryImage;
+  storageDeleted?: boolean;
+  warning?: string;
 }
 
 export interface CreateAdminLandingGalleryImageRequest {
-  imageUrl: string;
+  imageUrl?: string | null;
   title?: string | null;
   caption?: string | null;
   altText?: string | null;
@@ -57,4 +68,5 @@ export interface ReorderAdminLandingGalleryImagesRequest {
 
 export interface AdminLandingGalleryDeleteResponse {
   deletedId: string;
+  warning?: string;
 }

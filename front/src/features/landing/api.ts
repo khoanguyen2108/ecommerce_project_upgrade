@@ -62,6 +62,33 @@ export function updateAdminLandingGalleryImage(
   );
 }
 
+export function uploadAdminLandingGalleryImage(
+  imageId: string,
+  file: File,
+): Promise<AdminLandingGalleryImageResponse> {
+  const body = new FormData();
+  body.append("file", file);
+
+  return apiRequest<AdminLandingGalleryImageResponse>(
+    `/admin/landing-gallery/${encodeURIComponent(imageId)}/image`,
+    {
+      auth: true,
+      body,
+      credentials: "include",
+      method: "POST",
+    },
+  );
+}
+
+export function deleteAdminLandingGalleryImageFile(
+  imageId: string,
+): Promise<AdminLandingGalleryImageResponse> {
+  return apiRequest<AdminLandingGalleryImageResponse>(
+    `/admin/landing-gallery/${encodeURIComponent(imageId)}/image`,
+    { auth: true, credentials: "include", method: "DELETE" },
+  );
+}
+
 export function deleteAdminLandingGalleryImage(
   imageId: string,
 ): Promise<AdminLandingGalleryDeleteResponse> {

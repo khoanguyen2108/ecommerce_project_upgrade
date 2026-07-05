@@ -15,6 +15,9 @@ const trimString = ({ value }: { value: unknown }) =>
 
 export class UpdateLandingGalleryImageDto {
   @ApiPropertyOptional({
+    deprecated: true,
+    description:
+      'Legacy transition field. Only retaining or clearing the existing legacy URL is allowed.',
     example: 'https://images.example.com/lookbook/daylight-denim.jpg',
     maxLength: 1000,
   })

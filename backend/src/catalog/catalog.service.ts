@@ -57,6 +57,15 @@ const categorySelect: Prisma.CategorySelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  managedImageAsset: {
+    select: {
+      id: true,
+      originalFilename: true,
+      mimeType: true,
+      sizeBytes: true,
+      status: true,
+    },
+  },
 };
 
 const featuredCategorySelect: Prisma.CategorySelect = {
@@ -360,6 +369,9 @@ export class CatalogService {
 
   async createCategory(dto: CreateCategoryDto) {
     const slug = this.normalizeSlug(dto.slug);
+    if (this.normalizeCategoryImageUrl(dto.imageUrl)) {
+      throw this.categoryImageUrlInputDisabledException();
+    }
     const isActive = this.normalizeOptionalBoolean(
       dto.isActive,
       true,
@@ -385,7 +397,7 @@ export class CatalogService {
           name: this.normalizeRequiredText(dto.name, 'name'),
           slug,
           description: this.normalizeOptionalText(dto.description),
-          imageUrl: this.normalizeCategoryImageUrl(dto.imageUrl),
+          imageUrl: null,
           isFeatured,
           featuredOrder,
           isActive,
@@ -427,7 +439,11 @@ export class CatalogService {
     }
 
     if ('imageUrl' in dto) {
-      data.imageUrl = this.normalizeCategoryImageUrl(dto.imageUrl);
+      data.imageUrl = this.normalizeLegacyCategoryImageUrlSelection(
+        dto.imageUrl,
+        existingCategory.imageUrl,
+        existingCategory.managedImageAssetId,
+      );
     }
 
     if ('isActive' in dto) {
@@ -492,6 +508,26 @@ export class CatalogService {
     }
   }
 
+  async uploadCategoryImage(
+    categoryId: string,
+    uploadedById: string,
+    file: ProductImageUpload | undefined,
+  ) {
+    const result = await this.assetService.uploadCategoryImage(
+      categoryId,
+      uploadedById,
+      file,
+    );
+    const { category } = await this.getAdminCategory(categoryId);
+    return { category, ...result };
+  }
+
+  async deleteCategoryImage(categoryId: string) {
+    const result = await this.assetService.deleteCategoryImage(categoryId);
+    const { category } = await this.getAdminCategory(categoryId);
+    return { category, ...result };
+  }
+
   async deactivateCategory(id: string) {
     await this.getCategoryForAdmin(id);
 
@@ -527,6 +563,7 @@ export class CatalogService {
       where: { id },
       select: {
         id: true,
+        managedImageAssetId: true,
         _count: {
           select: {
             primaryProducts: true,
@@ -550,8 +587,11 @@ export class CatalogService {
       });
     }
 
+    const cleanup = category.managedImageAssetId
+      ? await this.assetService.deleteCategoryImage(id)
+      : { warning: undefined };
     await this.prismaService.category.delete({ where: { id } });
-    return { deletedId: id };
+    return { deletedId: id, warning: cleanup.warning };
   }
 
   async listProducts(query: ProductQueryDto) {
@@ -1491,8 +1531,10 @@ export class CatalogService {
       select: {
         featuredOrder: true,
         id: true,
+        imageUrl: true,
         isActive: true,
         isFeatured: true,
+        managedImageAssetId: true,
         slug: true,
       },
     });
@@ -1851,6 +1893,23 @@ export class CatalogService {
     return normalized;
   }
 
+  private normalizeLegacyCategoryImageUrlSelection(
+    value: string | null | undefined,
+    existingImageUrl: string | null,
+    managedImageAssetId: string | null,
+  ): string | null {
+    if (managedImageAssetId) {
+      return existingImageUrl;
+    }
+
+    const imageUrl = this.normalizeCategoryImageUrl(value);
+    if (imageUrl && imageUrl !== existingImageUrl) {
+      throw this.categoryImageUrlInputDisabledException();
+    }
+
+    return imageUrl;
+  }
+
   private normalizeFeaturedOrder(
     isFeatured: boolean,
     value: number | null | undefined,
@@ -2010,6 +2069,13 @@ export class CatalogService {
     return new BadRequestException({
       code: 'ADMIN_CATEGORY_IMAGE_URL_INVALID',
       message: 'Image URL must be a valid public HTTP or HTTPS URL.',
+    });
+  }
+
+  private categoryImageUrlInputDisabledException() {
+    return new BadRequestException({
+      code: 'CATEGORY_IMAGE_URL_INPUT_DISABLED',
+      message: 'New category images must be uploaded as JPEG, PNG, or WebP files.',
     });
   }
 
