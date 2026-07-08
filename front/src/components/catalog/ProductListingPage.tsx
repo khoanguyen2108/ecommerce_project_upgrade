@@ -145,6 +145,11 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
   const activeCategoryName =
     categories.find((category) => category.slug === query.categorySlug)?.name ||
     query.categorySlug;
+  const resultsHeading = activeCategoryName
+    ? activeCategoryName
+    : query.search
+      ? "Search results"
+      : "All products";
   const hasActiveFilters = Boolean(
     query.categorySlug || query.search || (query.sort && query.sort !== "newest"),
   );
@@ -225,18 +230,8 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
         <div className="catalog-results-heading">
           <div>
             <p className="eyebrow">Collection</p>
-            <h2>
-              {activeCategoryName || query.search ? "Filtered products" : "All products"}
-            </h2>
+            <h2>{resultsHeading}</h2>
           </div>
-          {activeCategoryName || query.search ? (
-            <p className="catalog-context">
-              Showing {activeCategoryName ? activeCategoryName : "all categories"}
-              {query.search ? ` matching “${query.search}”` : ""}
-            </p>
-          ) : (
-            <p className="catalog-context">Browse the complete Belikeme catalog.</p>
-          )}
         </div>
 
         {productError ? (
