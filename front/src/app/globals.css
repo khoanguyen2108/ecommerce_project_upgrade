@@ -161,14 +161,14 @@ img {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   height: 100%;
   margin: 0 auto;
-  max-width: var(--container);
+  max-width: min(var(--container), 1420px);
   padding: 0 clamp(20px, 4vw, 64px);
 }
 
 .brand-mark {
   display: inline-flex;
   font-family: Montserrat, Inter, sans-serif;
-  font-size: 1.28rem;
+  font-size: clamp(1.42rem, 1.6vw, 1.75rem);
   font-weight: 800;
   justify-self: center;
   line-height: 1;
