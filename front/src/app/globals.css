@@ -161,8 +161,8 @@ img {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   height: 100%;
   margin: 0 auto;
-  max-width: min(var(--container), 1420px);
-  padding: 0 clamp(20px, 4vw, 64px);
+  max-width: none;
+  padding: 0 clamp(18px, 2.5vw, 48px);
 }
 
 .brand-mark {
