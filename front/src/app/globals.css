@@ -187,10 +187,10 @@ img {
 .inline-placeholder {
   background: none;
   border: 0;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   display: inline-flex;
   font-size: 0.84rem;
-  font-weight: 700;
+  font-weight: 850;
   padding: 0;
   position: relative;
   text-transform: uppercase;
@@ -238,7 +238,7 @@ img {
   display: inline-flex;
   height: 40px;
   justify-content: center;
-  opacity: 0.8;
+  opacity: 0.95;
   padding: 0;
   position: relative;
   transition:
