@@ -52,7 +52,6 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           >
             Categories
           </Link>
-          <Link href="/#new-arrivals">New Arrivals</Link>
           {!isAdmin ? (
             <>
               <Link
@@ -84,6 +83,14 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           {showCustomerActions && isAuthenticated ? (
             <>
               <Link
+                aria-label="Orders"
+                className={`icon-button ${active === "orders" ? "is-active" : ""}`}
+                href="/orders"
+                title="Orders"
+              >
+                <ReceiptText size={20} strokeWidth={1.8} />
+              </Link>
+              <Link
                 aria-label="Profile"
                 className={`icon-button ${
                   active === "account" ? "is-active" : ""
@@ -92,14 +99,6 @@ export function SiteHeader({ active }: SiteHeaderProps) {
                 title="Profile"
               >
                 <User size={20} strokeWidth={1.8} />
-              </Link>
-              <Link
-                aria-label="Orders"
-                className={`icon-button ${active === "orders" ? "is-active" : ""}`}
-                href="/orders"
-                title="Orders"
-              >
-                <ReceiptText size={20} strokeWidth={1.8} />
               </Link>
             </>
           ) : null}
