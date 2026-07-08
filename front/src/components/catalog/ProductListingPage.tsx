@@ -1,6 +1,12 @@
 "use client";
 
-import { AlertCircle, RotateCcw, Search } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Search,
+} from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { getCategories, getProducts } from "@/features/catalog/api";
@@ -153,6 +159,7 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
   const hasActiveFilters = Boolean(
     query.categorySlug || query.search || (query.sort && query.sort !== "newest"),
   );
+  const totalPages = Math.max(1, pagination.totalPages);
 
   return (
     <main className="catalog-page catalog-page--shop">
@@ -277,30 +284,34 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
         </div>
 
         {!productError && pagination.totalPages > 1 ? (
-          <div className="catalog-pagination" aria-label="Product pagination">
+          <nav
+            className="catalog-pagination"
+            aria-label={`Product pagination, page ${pagination.page} of ${totalPages}`}
+          >
             <button
-              className="button button--secondary"
+              aria-label="Previous page"
+              className="catalog-pagination__button"
               disabled={isProductLoading || pagination.page <= 1}
               onClick={() => goToPage(Math.max(1, pagination.page - 1))}
+              title="Previous page"
               type="button"
             >
-              Previous
+              <ChevronLeft aria-hidden="true" size={28} strokeWidth={2.2} />
             </button>
-            <span>
-              Page {pagination.page} of {Math.max(1, pagination.totalPages)}
-            </span>
             <button
-              className="button button--secondary"
+              aria-label="Next page"
+              className="catalog-pagination__button"
               disabled={
                 isProductLoading ||
-                pagination.page >= Math.max(1, pagination.totalPages)
+                pagination.page >= totalPages
               }
               onClick={() => goToPage(pagination.page + 1)}
+              title="Next page"
               type="button"
             >
-              Next
+              <ChevronRight aria-hidden="true" size={28} strokeWidth={2.2} />
             </button>
-          </div>
+          </nav>
         ) : null}
       </section>
     </main>
