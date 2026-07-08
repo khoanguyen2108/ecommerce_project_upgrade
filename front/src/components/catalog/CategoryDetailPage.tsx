@@ -180,30 +180,33 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
   const totalPages = Math.max(1, state.pagination.totalPages);
 
   return (
-    <main className="catalog-page">
-      <section className="catalog-hero">
-        <p className="eyebrow">Category</p>
-        <h1>{state.category.name}</h1>
-        {state.category.description ? <p>{state.category.description}</p> : null}
-      </section>
-
-      <section className="catalog-shell" aria-labelledby="category-products-heading">
-        <div className="catalog-toolbar">
-          <div>
-            <p className="eyebrow">{productCountLabel}</p>
-            <h2 id="category-products-heading">
-              {state.category.name} products
-            </h2>
+    <main className="catalog-page catalog-page--category-detail">
+      <section
+        className="catalog-shell catalog-shell--category-detail"
+        aria-labelledby="category-products-heading"
+      >
+        <header className="category-detail-header">
+          <div className="category-detail-header__copy">
+            <div className="category-detail-header__meta">
+              <p className="eyebrow">Category</p>
+              <span>{productCountLabel}</span>
+            </div>
+            <h1 id="category-products-heading">{state.category.name}</h1>
+            {state.category.description ? (
+              <p className="category-detail-header__description">
+                {state.category.description}
+              </p>
+            ) : null}
           </div>
 
           <Link
-            className="button button--secondary"
+            className="button button--secondary category-detail-header__action"
             href={`/products?categorySlug=${encodeURIComponent(state.category.slug)}`}
           >
             Filter catalog
             <ArrowRight size={18} />
           </Link>
-        </div>
+        </header>
 
         {state.error ? (
           <div className="catalog-error" role="alert">
