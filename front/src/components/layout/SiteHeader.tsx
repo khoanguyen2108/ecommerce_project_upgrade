@@ -35,10 +35,6 @@ export function SiteHeader({ active }: SiteHeaderProps) {
   return (
     <header className="site-header">
       <div className="site-header__inner">
-        <Link className="brand-mark" href="/" aria-label="Belikeme home">
-          BELIKEME
-        </Link>
-
         <nav aria-label="Primary navigation" className="site-nav">
           <Link
             className={active === "shop" ? "is-active" : undefined}
@@ -64,6 +60,10 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           ) : null}
           <Link href="/#about">About</Link>
         </nav>
+
+        <Link className="brand-mark" href="/" aria-label="Belikeme home">
+          BELIKEME
+        </Link>
 
         <div className="site-actions">
           {showCustomerActions && isAuthenticated ? (
