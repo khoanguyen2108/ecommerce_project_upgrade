@@ -21,12 +21,7 @@ export function StyleAssistant() {
     <main className={styles.page}>
       <div className={styles.shell}>
         <section className={styles.intro}>
-          <div className={styles.introTopline}>
-            <span>AI Style Assistant</span>
-            <span>01 / Personal styling</span>
-          </div>
           <div className={styles.introCopy}>
-            <p className={styles.eyebrow}>BELIKEME · DRESSED WITH INTENTION</p>
             <h1>Your next look, thoughtfully edited.</h1>
             <p>
               Tell us the mood, the moment, or your budget. Our assistant will

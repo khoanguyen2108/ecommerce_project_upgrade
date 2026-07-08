@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowUpRight, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { FashionIllustration } from "@/components/ai/StyleAssistantEmpty";
@@ -27,16 +27,6 @@ export function StyleAssistantResult({ result }: StyleAssistantResultProps) {
 
   return (
     <section aria-live="polite" className={styles.resultCard}>
-      <div className={styles.resultTopline}>
-        <div>
-          <Sparkles aria-hidden="true" size={17} />
-          <span className={styles.resultLabel}>Your Belikeme edit</span>
-        </div>
-        <span className={styles.resultMode}>
-          {result.mode === "ai" ? "AI curated" : "Catalog edit"}
-        </span>
-      </div>
-
       <div className={styles.summary}>
         <span className={styles.stepNumber}>02</span>
         <div>
