@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { AiConversationMessage } from '../chat/chat.service';
 import { ChatSenderRole } from '../generated/prisma/enums';
-import type {
-  ConversationMemoryDto,
-  ConversationProductDto,
-} from './dto/support.dto';
+import type { ConversationMemoryDto } from './dto/support.dto';
 
 const RESET_MEMORY_PATTERN =
   /\b(?:reset (?:my )?(?:preferences|memory)|forget (?:my )?(?:preferences|choices|shopping preferences)|clear (?:my )?(?:preferences|memory)|start over)\b|\b(?:xoa|dat lai) (?:so thich|bo nho)\b/i;
@@ -49,13 +46,6 @@ const COLOR_VALUES = [
   'cream',
 ] as const;
 
-export interface AiSizeProfile {
-  heightCm?: number;
-  weightKg?: number;
-}
-
-export type AiPendingIntent = 'SIZE_RECOMMENDATION' | 'PRODUCT_COMPARISON';
-
 @Injectable()
 export class AiConversationMemoryService {
   build(
@@ -63,8 +53,6 @@ export class AiConversationMemoryService {
     currentMessage: string,
   ): {
     memory: ConversationMemoryDto;
-    pendingIntent?: AiPendingIntent;
-    sizeProfile: AiSizeProfile;
     reset: boolean;
   } {
     const reset = RESET_MEMORY_PATTERN.test(currentMessage);
@@ -72,7 +60,6 @@ export class AiConversationMemoryService {
     if (reset) {
       return {
         memory: { lastSelectedProducts: [] },
-        sizeProfile: {},
         reset: true,
       };
     }
@@ -83,64 +70,16 @@ export class AiConversationMemoryService {
       .map((message) => message.body)
       .concat(currentMessage);
     const memory: ConversationMemoryDto = {
-      lastSelectedProducts: this.readSelectedProducts(relevantMessages),
+      lastSelectedProducts: [],
     };
-    const sizeProfile: AiSizeProfile = {};
 
     for (const message of customerMessages) {
       this.applyPreferences(memory, message);
-      this.applySizeProfile(sizeProfile, message);
     }
 
     return {
       memory,
-      pendingIntent: this.getPendingIntent(messages),
-      sizeProfile,
       reset: false,
-    };
-  }
-
-  getPendingIntent(messages: AiConversationMessage[]): AiPendingIntent | undefined {
-    const relevantMessages = this.afterLastReset(messages);
-
-    for (const message of [...relevantMessages].reverse()) {
-      if (message.senderRole !== ChatSenderRole.AI || !this.isRecord(message.metadata)) {
-        continue;
-      }
-
-      const sizeRecommendation = message.metadata.sizeRecommendation;
-      const comparison = message.metadata.comparison;
-
-      if (
-        this.isRecord(sizeRecommendation) &&
-        sizeRecommendation.status === 'needs_information'
-      ) {
-        return 'SIZE_RECOMMENDATION';
-      }
-
-      if (this.isRecord(comparison) && comparison.status === 'needs_information') {
-        return 'PRODUCT_COMPARISON';
-      }
-
-      return undefined;
-    }
-
-    return undefined;
-  }
-
-  withSelectedProducts(
-    memory: ConversationMemoryDto,
-    products: ConversationProductDto[],
-  ): ConversationMemoryDto {
-    const bySlug = new Map<string, ConversationProductDto>();
-
-    for (const product of [...memory.lastSelectedProducts, ...products]) {
-      bySlug.set(product.slug, product);
-    }
-
-    return {
-      ...memory,
-      lastSelectedProducts: [...bySlug.values()].slice(-5),
     };
   }
 
@@ -298,102 +237,7 @@ export class AiConversationMemoryService {
     return undefined;
   }
 
-  private applySizeProfile(profile: AiSizeProfile, message: string) {
-    const heightCm = this.extractHeightCm(message);
-    const weightKg = this.extractWeightKg(message);
-
-    if (heightCm) {
-      profile.heightCm = heightCm;
-    }
-
-    if (weightKg) {
-      profile.weightKg = weightKg;
-    }
-  }
-
-  private extractHeightCm(message: string): number | undefined {
-    const centimeters = message.match(/\b(1\d{2}|2[0-4]\d)\s*cm\b/i);
-
-    if (centimeters) {
-      return Number(centimeters[1]);
-    }
-
-    const meters = message.match(/\b(1(?:\.\d{1,2})|2(?:\.\d{1,2}))\s*m\b/i);
-
-    if (meters) {
-      return Math.round(Number(meters[1]) * 100);
-    }
-
-    const imperial = message.match(/\b([4-7])\s*(?:ft|')\s*(\d{1,2})?\s*(?:in|")?/i);
-
-    if (imperial) {
-      const inches = Number(imperial[1]) * 12 + Number(imperial[2] ?? 0);
-      return Math.round(inches * 2.54);
-    }
-
-    return undefined;
-  }
-
-  private extractWeightKg(message: string): number | undefined {
-    const kilograms = message.match(/\b(3\d|[4-9]\d|1\d{2}|2[0-4]\d)\s*kg\b/i);
-
-    if (kilograms) {
-      return Number(kilograms[1]);
-    }
-
-    const pounds = message.match(/\b(6\d|[7-9]\d|1\d{2}|2\d{2}|3[0-9]\d|400)\s*(?:lb|lbs)\b/i);
-
-    if (pounds) {
-      return Math.round(Number(pounds[1]) * 0.453592 * 10) / 10;
-    }
-
-    return undefined;
-  }
-
-  private readSelectedProducts(
-    messages: AiConversationMessage[],
-  ): ConversationProductDto[] {
-    const products = new Map<string, ConversationProductDto>();
-
-    for (const message of messages) {
-      if (message.senderRole !== ChatSenderRole.AI || !this.isRecord(message.metadata)) {
-        continue;
-      }
-
-      const sizeRecommendation = message.metadata.sizeRecommendation;
-      const comparison = message.metadata.comparison;
-
-      if (this.isRecord(sizeRecommendation)) {
-        this.addProduct(products, sizeRecommendation.product);
-      }
-
-      if (this.isRecord(comparison)) {
-        this.addProduct(products, comparison.productA);
-        this.addProduct(products, comparison.productB);
-      }
-    }
-
-    return [...products.values()].slice(-5);
-  }
-
-  private addProduct(
-    products: Map<string, ConversationProductDto>,
-    value: unknown,
-  ) {
-    if (
-      this.isRecord(value) &&
-      typeof value.name === 'string' &&
-      typeof value.slug === 'string'
-    ) {
-      products.set(value.slug, { name: value.name, slug: value.slug });
-    }
-  }
-
   private containsWord(message: string, value: string): boolean {
     return new RegExp(`\\b${value.replace(/\s+/g, '\\s+')}\\b`, 'i').test(message);
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }

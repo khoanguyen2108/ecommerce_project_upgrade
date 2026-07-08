@@ -70,8 +70,6 @@ const CUSTOMER_CHAT_HIDDEN_PREFIXES = [
 
 const ORDER_DETAIL_PATH_PATTERN =
   /^\/orders\/(BK\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
-const PRODUCT_DETAIL_PATH_PATTERN =
-  /^\/products\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/?$/i;
 const ORDER_DETAIL_URL_PATTERN =
   /^\/orders\/(?:BK\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 const SUPPORT_ORDER_CARD_STATUSES = new Set([
@@ -81,18 +79,30 @@ const SUPPORT_ORDER_CARD_STATUSES = new Set([
   "IN_TRANSIT",
   "OUT_FOR_DELIVERY",
 ]);
+const SUPPORTED_AI_MESSAGE_TYPES = new Set<NonNullable<SupportResponse["type"]>>([
+  "text",
+  "single_order_card",
+  "order_cards",
+  "return_request_card",
+  "conversation_memory",
+]);
+const LEGACY_UNSUPPORTED_AI_MESSAGE_TYPES = new Set([
+  "size_recommendation",
+  "comparison_card",
+]);
+const LEGACY_UNSUPPORTED_AI_MESSAGE =
+  "Belikeme AI Support: This older AI message used a feature that is no longer available. You can keep chatting here for product questions, order tracking, returns, or human support.";
 
-const CUSTOMER_CHAT_WELCOME_MESSAGE = `Hi 👋
+const CUSTOMER_CHAT_WELCOME_MESSAGE = `Hi
 
 I'm Belikeme AI.
 
 I can help you with:
 
-• outfit suggestions
-• products
-• order status
-• shipping
-• sizing
+- outfit suggestions
+- products
+- order status
+- shipping
 
 If I can't solve it,
 
@@ -110,9 +120,7 @@ orders,
 
 products,
 
-shipping,
-
-and sizing.`;
+and shipping.`;
 
 const CUSTOMER_CHAT_QUICK_ACTIONS = [
   {
@@ -124,10 +132,6 @@ const CUSTOMER_CHAT_QUICK_ACTIONS = [
     label: "Request Return",
     message: "I want to return my order.",
     action: "RETURN_REQUEST",
-  },
-  {
-    label: "Sizing Guide",
-    message: "I need help choosing the right size.",
   },
 ] as const;
 
@@ -426,12 +430,10 @@ export function CustomerChatWidget() {
 
       try {
         const orderId = getOrderIdFromPathname(pathname);
-        const productId = getProductIdFromPathname(pathname);
         const response = await askAiSupport({
           message: body,
           ...(action ? { action } : {}),
           ...(orderId ? { orderId } : {}),
-          ...(productId ? { productId } : {}),
         });
 
         if (activeCustomerIdRef.current !== requestCustomerId) {
@@ -988,10 +990,6 @@ function getOrderIdFromPathname(pathname: string): string | undefined {
   return ORDER_DETAIL_PATH_PATTERN.exec(pathname)?.[1];
 }
 
-function getProductIdFromPathname(pathname: string): string | undefined {
-  return PRODUCT_DETAIL_PATH_PATTERN.exec(pathname)?.[1];
-}
-
 function isValidSupportResponse(response: SupportResponse): boolean {
   const hasValidBase = Boolean(
     response &&
@@ -1001,6 +999,12 @@ function isValidSupportResponse(response: SupportResponse): boolean {
   );
 
   if (!hasValidBase) {
+    return false;
+  }
+
+  const responseType = response.type ?? "text";
+
+  if (!SUPPORTED_AI_MESSAGE_TYPES.has(responseType)) {
     return false;
   }
 
@@ -1080,9 +1084,38 @@ function getPersistedAiResponse(
     return undefined;
   }
 
-  const response = message.metadata as SupportResponse | null;
+  const response = message.metadata;
 
-  return response && isValidSupportResponse(response) ? response : undefined;
+  if (!isRecord(response)) {
+    return undefined;
+  }
+
+  if (isLegacyUnsupportedAiResponse(response)) {
+    return {
+      mode: "ai",
+      type: "text",
+      answer: LEGACY_UNSUPPORTED_AI_MESSAGE,
+      sources: [],
+      handoff: { required: false },
+    };
+  }
+
+  const supportResponse = response as unknown as SupportResponse;
+
+  return isValidSupportResponse(supportResponse) ? supportResponse : undefined;
+}
+
+function isLegacyUnsupportedAiResponse(
+  response: Record<string, unknown>,
+): boolean {
+  return (
+    typeof response.type === "string" &&
+    LEGACY_UNSUPPORTED_AI_MESSAGE_TYPES.has(response.type)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function applyReturnStatusesToAiMessage(

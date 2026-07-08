@@ -14,22 +14,17 @@ import { ReturnsService } from '../returns/returns.service';
 import { AiConversationMemoryService } from './ai-conversation-memory.service';
 import { AiConfigService } from './ai-config.service';
 import { AiOrderToolService } from './ai-order-tool.service';
-import { AiProductComparisonService } from './ai-product-comparison.service';
-import { AiSizeRecommendationService } from './ai-size-recommendation.service';
 import {
   AiOutputValidationError,
   AiOutputValidator,
 } from './ai-output-validator';
 import type {
   ConversationMemoryDto,
-  ProductComparisonDto,
-  SizeRecommendationDto,
   SupportOrderSummaryDto,
   SupportRequestDto,
   SupportResponseDto,
   SupportSourceDto,
 } from './dto/support.dto';
-import type { AiPublicProduct } from './ai-product-context.service';
 import { AiProviderError, OpenRouterService } from './openrouter.service';
 import { AiQuotaService } from './ai-quota.service';
 import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
@@ -49,6 +44,10 @@ const RISKY_SUPPORT_PATTERN =
   /\b(refund|chargeback|dispute|charged(?:-| )but(?:-| )not(?:-| )paid|debited(?:-| )but(?:-| )not(?:-| )paid|charged but|debited but|failed webhook|reconciliation|cancel|cancellation|change (?:my |the )?address|address change|return eligibility|return eligible|eligible (?:for )?(?:a )?return|qualif(?:y|ies|ied) (?:for )?(?:a )?return|can i return|may i return|exception|exact measurements?|measurement chart|fit confirmation|guarantee(?:d)? fit|legal|lawyer|privacy|personal data|delete my data|threat|abuse)\b/i;
 const POSSIBLE_PII_PATTERN =
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|(?:\+?\d[\d .()-]{7,}\d)|\b(?:my name is|shipping address is|home address is)\b/i;
+const AI_SIZE_REQUEST_PATTERN =
+  /\b(?:what|which)\s+size\b|\bsize\s+(?:should|would)\s+i\s+(?:buy|get|choose|wear|pick)\b|\b(?:recommend|suggest|choose|pick|buy)\s+(?:a\s+)?size\b|\b(?:size recommendation|size guide|sizing guidance|sizing|help(?: me)? (?:choose|pick|find) (?:the )?(?:right )?size|choosing the right size|will (?:this|it) fit|fit me|fits me)\b|\b\d{2,3}\s*(?:cm|kg|lbs?)\b.{0,80}\b(?:size|fit)\b/i;
+const AI_COMPARISON_REQUEST_PATTERN =
+  /\b(?:compare|comparison|versus|vs\.?|choose between|difference between|which (?:one|product|item) is better)\b/i;
 const KNOWN_ORDER_STATUS_VALUES = [
   'PENDING_PAYMENT',
   'PAID',
@@ -83,8 +82,6 @@ export class AiSupportService {
     private readonly returnsService: ReturnsService,
     private readonly chatService: ChatService,
     private readonly conversationMemoryService: AiConversationMemoryService,
-    private readonly productComparisonService: AiProductComparisonService,
-    private readonly sizeRecommendationService: AiSizeRecommendationService,
   ) {}
 
   async getSupport(
@@ -135,6 +132,17 @@ export class AiSupportService {
           startedAt,
           memoryState.memory,
           true,
+        );
+      }
+
+      const unavailableFeature = this.getUnavailableAiFeature(message);
+
+      if (unavailableFeature) {
+        return this.buildUnavailableAiFeatureResponse(
+          context,
+          startedAt,
+          memoryState.memory,
+          unavailableFeature,
         );
       }
 
@@ -194,12 +202,7 @@ export class AiSupportService {
       try {
         intentContent = await this.openRouterService.requestSupportIntent(
           message,
-          {
-            ...memoryState.memory,
-            ...(memoryState.pendingIntent
-              ? { pendingIntent: memoryState.pendingIntent }
-              : {}),
-          },
+          memoryState.memory,
         );
       } catch (error) {
         const errorCode =
@@ -234,72 +237,12 @@ export class AiSupportService {
         );
       }
 
-      if (
-        memoryState.pendingIntent &&
-        (intent.intent === 'GENERAL_SUPPORT' ||
-          intent.intent === 'CONVERSATION_MEMORY')
-      ) {
-        intent = {
-          intent: memoryState.pendingIntent,
-          productQueries:
-            memoryState.pendingIntent === 'PRODUCT_COMPARISON' &&
-            intent.productQueries.length === 0
-              ? [message]
-              : intent.productQueries,
-        };
-      }
-
       if (intent.intent === 'TRACK_ORDER') {
         return this.getActiveOrderCards(context, startedAt);
       }
 
       if (intent.intent === 'RETURN_REQUEST') {
         return this.getReturnRequestCard(context, startedAt, dto.orderId);
-      }
-
-      if (intent.intent === 'SIZE_RECOMMENDATION') {
-        const result = await this.sizeRecommendationService.recommend({
-          currentProductId: dto.productId,
-          memory: memoryState.memory,
-          productQueries: intent.productQueries,
-          sizeProfile: memoryState.sizeProfile,
-        });
-        const memory = result.product
-          ? this.conversationMemoryService.withSelectedProducts(
-              memoryState.memory,
-              [this.toProductReference(result.product)],
-            )
-          : memoryState.memory;
-
-        return this.buildSizeRecommendationResponse(
-          context,
-          startedAt,
-          result.recommendation,
-          memory,
-        );
-      }
-
-      if (intent.intent === 'PRODUCT_COMPARISON') {
-        const productQueries =
-          intent.productQueries.length > 0
-            ? intent.productQueries
-            : this.extractComparisonQueries(message);
-        const result = await this.productComparisonService.compare({
-          currentProductId: dto.productId,
-          memory: memoryState.memory,
-          productQueries,
-        });
-        const memory = this.conversationMemoryService.withSelectedProducts(
-          memoryState.memory,
-          result.products.map((product) => this.toProductReference(product)),
-        );
-
-        return this.buildProductComparisonResponse(
-          context,
-          startedAt,
-          result.comparison,
-          memory,
-        );
       }
 
       if (intent.intent === 'CONVERSATION_MEMORY') {
@@ -512,78 +455,33 @@ export class AiSupportService {
     };
   }
 
-  private buildSizeRecommendationResponse(
+  private buildUnavailableAiFeatureResponse(
     context: SupportRequestContext,
     startedAt: number,
-    sizeRecommendation: SizeRecommendationDto,
     memory: ConversationMemoryDto,
+    feature: 'size' | 'comparison',
   ): SupportResponseDto {
     const answer =
-      sizeRecommendation.status === 'complete'
-        ? [
-            `Recommended size: ${sizeRecommendation.recommendedSize}.`,
-            `Confidence: ${sizeRecommendation.confidence}%.`,
-            sizeRecommendation.reason,
-            sizeRecommendation.alternativeSize
-              ? `Alternative: ${sizeRecommendation.alternativeSize}.`
-              : undefined,
-          ]
-            .filter(Boolean)
-            .join(' ')
-        : sizeRecommendation.question ??
-          sizeRecommendation.reason ??
-          'A size recommendation is not available right now.';
+      feature === 'size'
+        ? 'AI size recommendations are currently unavailable. I can still help with product questions, order tracking, returns, shipping, or connect you with Belikeme Support.'
+        : 'AI product comparison is currently unavailable. I can still help with product questions, order tracking, returns, shipping, or connect you with Belikeme Support.';
     const response: SupportResponseDto = {
       mode: 'ai',
-      type: 'size_recommendation',
+      type: 'text',
       answer: this.labelAnswer(answer),
       sources: [],
-      sizeRecommendation,
-      conversationMemory: memory,
+      ...(this.conversationMemoryService.hasRememberedPreferences(memory)
+        ? { conversationMemory: memory }
+        : {}),
       handoff: { required: false },
     };
 
-    this.logEvent('AI_SIZE_RECOMMENDATION_RETURNED', context, {
+    this.logEvent('AI_SUPPORT_UNAVAILABLE_FEATURE_RETURNED', context, {
       mode: response.mode,
       sourceCount: 0,
       hasOrderContext: false,
       latencyMs: Date.now() - startedAt,
-      errorCode:
-        sizeRecommendation.status === 'complete'
-          ? undefined
-          : sizeRecommendation.status.toLocaleUpperCase(),
-    });
-
-    return response;
-  }
-
-  private buildProductComparisonResponse(
-    context: SupportRequestContext,
-    startedAt: number,
-    comparison: ProductComparisonDto,
-    memory: ConversationMemoryDto,
-  ): SupportResponseDto {
-    const answer =
-      comparison.status === 'complete' && comparison.productA && comparison.productB
-        ? `${comparison.productA.name} vs ${comparison.productB.name}. ${comparison.recommendation}`
-        : comparison.question ?? 'Please choose two Belikeme products to compare.';
-    const response: SupportResponseDto = {
-      mode: 'ai',
-      type: 'comparison_card',
-      answer: this.labelAnswer(answer),
-      sources: [],
-      comparison,
-      conversationMemory: memory,
-      handoff: { required: false },
-    };
-
-    this.logEvent('AI_PRODUCT_COMPARISON_RETURNED', context, {
-      mode: response.mode,
-      sourceCount: 0,
-      hasOrderContext: false,
-      latencyMs: Date.now() - startedAt,
-      errorCode:
-        comparison.status === 'complete' ? undefined : 'NEEDS_INFORMATION',
+      errorCode: 'AI_FEATURE_UNAVAILABLE',
     });
 
     return response;
@@ -651,22 +549,18 @@ export class AiSupportService {
     return details.join(', ');
   }
 
-  private toProductReference(product: AiPublicProduct) {
-    return { name: product.name, slug: product.slug };
-  }
-
-  private extractComparisonQueries(message: string): string[] {
-    const match = message.match(
-      /\bcompare\s+(.+?)\s+(?:vs\.?|versus|with|and)\s+(.+?)(?:[?.!]|$)/i,
-    );
-
-    if (!match) {
-      return [];
+  private getUnavailableAiFeature(
+    message: string,
+  ): 'size' | 'comparison' | undefined {
+    if (AI_COMPARISON_REQUEST_PATTERN.test(message)) {
+      return 'comparison';
     }
 
-    return [match[1], match[2]]
-      .map((value) => value.trim().replace(/^["']|["']$/g, ''))
-      .filter(Boolean);
+    if (AI_SIZE_REQUEST_PATTERN.test(message)) {
+      return 'size';
+    }
+
+    return undefined;
   }
 
   private async getActiveOrderCards(
@@ -820,8 +714,8 @@ export class AiSupportService {
       type: 'text',
       answer: this.labelAnswer(
         locale === 'vi'
-          ? 'Mình có thể hỗ trợ bạn về sản phẩm Belikeme, size, đơn hàng, giao hàng hoặc đổi trả. Bạn thử hỏi về trải nghiệm mua sắm hoặc đơn hàng của mình nhé.'
-          : 'I can help with Belikeme products, sizing, shipping, returns, and your order status. For unrelated topics, please ask me something about your shopping or order experience.',
+          ? 'Mình có thể hỗ trợ bạn về sản phẩm Belikeme, đơn hàng, giao hàng hoặc đổi trả. Bạn thử hỏi về trải nghiệm mua sắm hoặc đơn hàng của mình nhé.'
+          : 'I can help with Belikeme products, shipping, returns, and your order status. For unrelated topics, please ask me something about your shopping or order experience.',
       ),
       sources: [],
       handoff: {

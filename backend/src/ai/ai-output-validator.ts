@@ -64,14 +64,11 @@ export interface ValidatedSupportOutput {
 export type ValidatedSupportIntent =
   | 'TRACK_ORDER'
   | 'RETURN_REQUEST'
-  | 'SIZE_RECOMMENDATION'
   | 'CONVERSATION_MEMORY'
-  | 'PRODUCT_COMPARISON'
   | 'GENERAL_SUPPORT';
 
 export interface ValidatedSupportRouting {
   intent: ValidatedSupportIntent;
-  productQueries: string[];
 }
 
 export class AiOutputValidationError extends Error {
@@ -105,24 +102,16 @@ export class AiOutputValidator {
 
     if (
       !this.isRecord(parsed) ||
-      !this.hasOnlyKeys(parsed, ['intent', 'productQueries']) ||
+      !this.hasOnlyKeys(parsed, ['intent']) ||
       (parsed.intent !== 'TRACK_ORDER' &&
         parsed.intent !== 'RETURN_REQUEST' &&
-        parsed.intent !== 'SIZE_RECOMMENDATION' &&
         parsed.intent !== 'CONVERSATION_MEMORY' &&
-        parsed.intent !== 'PRODUCT_COMPARISON' &&
-        parsed.intent !== 'GENERAL_SUPPORT') ||
-      !Array.isArray(parsed.productQueries) ||
-      parsed.productQueries.length > 2
+        parsed.intent !== 'GENERAL_SUPPORT')
     ) {
       throw new AiOutputValidationError();
     }
 
-    const productQueries = parsed.productQueries.map((query) =>
-      this.validatePlainText(query, 160),
-    );
-
-    return { intent: parsed.intent, productQueries };
+    return { intent: parsed.intent };
   }
 
   validateStyleAdvice(

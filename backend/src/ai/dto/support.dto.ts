@@ -90,87 +90,6 @@ export class ConversationMemoryDto {
   lastSelectedProducts: ConversationProductDto[];
 }
 
-export class SizeRecommendationDto {
-  @ApiProperty({ enum: ['complete', 'needs_information', 'unavailable'] })
-  status: 'complete' | 'needs_information' | 'unavailable';
-
-  @ApiPropertyOptional({ type: ConversationProductDto })
-  product?: ConversationProductDto;
-
-  @ApiPropertyOptional({ example: 'L' })
-  recommendedSize?: string;
-
-  @ApiPropertyOptional({ example: 88 })
-  confidence?: number;
-
-  @ApiPropertyOptional({ example: 'Closest available in-stock size for an oversized fit.' })
-  reason?: string;
-
-  @ApiPropertyOptional({ example: 'XL' })
-  alternativeSize?: string;
-
-  @ApiProperty({ type: [String], example: ['M', 'L', 'XL'] })
-  availableSizes: string[];
-
-  @ApiProperty({ type: [String], example: ['preferredFit'] })
-  missingFields: string[];
-
-  @ApiPropertyOptional({ example: 'What fit do you prefer: slim, regular, or oversized?' })
-  question?: string;
-}
-
-export class ComparisonProductDto extends ConversationProductDto {
-  @ApiProperty({ example: 249000 })
-  price: number;
-
-  @ApiProperty({ example: 'VND' })
-  currency: 'VND';
-
-  @ApiProperty({ example: 'T-Shirts' })
-  category: string;
-
-  @ApiPropertyOptional({ nullable: true, example: 'Cotton blend' })
-  material: string | null;
-
-  @ApiPropertyOptional({ nullable: true, example: 'Relaxed' })
-  fit: string | null;
-
-  @ApiPropertyOptional({ nullable: true, example: 'Vintage' })
-  style: string | null;
-
-  @ApiProperty({ type: [String], example: ['S', 'M', 'L'] })
-  availableSizes: string[];
-
-  @ApiProperty({ type: [String], example: ['Black', 'White'] })
-  availableColors: string[];
-
-  @ApiProperty({ example: true })
-  available: boolean;
-
-  @ApiProperty({ example: 'Vintage casual outfits' })
-  bestFor: string;
-}
-
-export class ProductComparisonDto {
-  @ApiProperty({ enum: ['complete', 'needs_information'] })
-  status: 'complete' | 'needs_information';
-
-  @ApiPropertyOptional({ type: ComparisonProductDto })
-  productA?: ComparisonProductDto;
-
-  @ApiPropertyOptional({ type: ComparisonProductDto })
-  productB?: ComparisonProductDto;
-
-  @ApiPropertyOptional({ example: 'Vintage Tee is the stronger match for your saved vintage style preference.' })
-  recommendation?: string;
-
-  @ApiPropertyOptional({ example: 'Which product did you mean by "Basic Tee"?' })
-  question?: string;
-
-  @ApiProperty({ type: [ConversationProductDto] })
-  ambiguousProducts: ConversationProductDto[];
-}
-
 export class SupportSourceDto {
   @ApiProperty({ example: 'support-human-handoff' })
   id: string;
@@ -264,8 +183,6 @@ export class SupportResponseDto {
       'single_order_card',
       'order_cards',
       'return_request_card',
-      'size_recommendation',
-      'comparison_card',
       'conversation_memory',
     ],
   })
@@ -274,8 +191,6 @@ export class SupportResponseDto {
     'single_order_card',
     'order_cards',
     'return_request_card',
-    'size_recommendation',
-    'comparison_card',
     'conversation_memory',
   ])
   type:
@@ -283,8 +198,6 @@ export class SupportResponseDto {
     | 'single_order_card'
     | 'order_cards'
     | 'return_request_card'
-    | 'size_recommendation'
-    | 'comparison_card'
     | 'conversation_memory';
 
   @ApiProperty({
@@ -310,12 +223,6 @@ export class SupportResponseDto {
 
   @ApiPropertyOptional({ type: [SupportReturnRequestCardDto] })
   returnRequests?: SupportReturnRequestCardDto[];
-
-  @ApiPropertyOptional({ type: SizeRecommendationDto })
-  sizeRecommendation?: SizeRecommendationDto;
-
-  @ApiPropertyOptional({ type: ProductComparisonDto })
-  comparison?: ProductComparisonDto;
 
   @ApiPropertyOptional({ type: ConversationMemoryDto })
   conversationMemory?: ConversationMemoryDto;
