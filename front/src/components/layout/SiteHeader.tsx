@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   ShoppingBag,
   User,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -50,8 +49,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
   const { currentUser, isAuthenticated, isLoading, logout } = useAuthSession();
   const { cartCount, openCart } = useCart();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const headerRef = useRef<HTMLElement>(null);
   const isAdmin = isAdminUser(currentUser);
   const showCustomerActions = !isLoading && !isAdmin;
   const primaryNavItems = PRIMARY_NAV_ITEMS.filter(
@@ -68,23 +66,30 @@ export function SiteHeader({ active }: SiteHeaderProps) {
       return;
     }
 
-    returnFocusRef.current = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsMobileMenuOpen(false);
       }
     }
 
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+
+      if (
+        target instanceof Node &&
+        headerRef.current &&
+        !headerRef.current.contains(target)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
+    }
+
     window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("pointerdown", handlePointerDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
-      returnFocusRef.current?.focus();
+      document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, [isMobileMenuOpen]);
 
@@ -118,7 +123,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
   }
 
   return (
-    <header className="site-header">
+    <header className="site-header" ref={headerRef}>
       <div className="site-header__inner">
         <button
           aria-controls={mobileMenuId}
@@ -132,11 +137,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
           type="button"
         >
-          {isMobileMenuOpen ? (
-            <X aria-hidden="true" size={25} strokeWidth={2} />
-          ) : (
-            <Menu aria-hidden="true" size={28} strokeWidth={2} />
-          )}
+          <Menu aria-hidden="true" size={28} strokeWidth={2} />
         </button>
 
         <nav aria-label="Primary navigation" className="site-nav">
@@ -233,57 +234,29 @@ export function SiteHeader({ active }: SiteHeaderProps) {
       </div>
 
       {isMobileMenuOpen ? (
-        <div
-          className="site-mobile-nav-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeMobileMenu();
-            }
-          }}
+        <nav
+          aria-label="Mobile primary navigation"
+          className="site-mobile-dropdown"
+          id={mobileMenuId}
         >
-          <aside
-            aria-labelledby="site-mobile-nav-heading"
-            aria-modal="true"
-            className="site-mobile-nav"
-            id={mobileMenuId}
-            role="dialog"
-          >
-            <header className="site-mobile-nav__header">
-              <h2 id="site-mobile-nav-heading">Menu</h2>
-              <button
-                aria-label="Close primary navigation"
-                className="icon-button site-mobile-nav__close"
-                onClick={closeMobileMenu}
-                ref={closeButtonRef}
-                type="button"
-              >
-                <X aria-hidden="true" size={22} />
-              </button>
-            </header>
-            <nav
-              aria-label="Mobile primary navigation"
-              className="site-mobile-nav__links"
-            >
-              {primaryNavItems.map((item) => {
-                const isActive = Boolean(item.active && active === item.active);
+          {primaryNavItems.map((item) => {
+            const isActive = Boolean(item.active && active === item.active);
 
-                return (
-                  <Link
-                    aria-current={isActive ? "page" : undefined}
-                    className={`site-mobile-nav__link${
-                      isActive ? " is-active" : ""
-                    }`}
-                    href={item.href}
-                    key={item.href}
-                    onClick={closeMobileMenu}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </aside>
-        </div>
+            return (
+              <Link
+                aria-current={isActive ? "page" : undefined}
+                className={`site-mobile-dropdown__link${
+                  isActive ? " is-active" : ""
+                }`}
+                href={item.href}
+                key={item.href}
+                onClick={closeMobileMenu}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
       ) : null}
     </header>
   );
