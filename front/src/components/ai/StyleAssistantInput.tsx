@@ -7,12 +7,12 @@ import { useEffect, useRef } from "react";
 import styles from "@/components/ai/StyleAssistant.module.css";
 
 const SUGGESTED_PROMPTS = [
-  "Minimal",
-  "Streetwear",
-  "Date Night",
-  "Coffee",
-  "Black Outfit",
-  "Oversized",
+  "All black gothic",
+  "Streetwear black tee",
+  "Cafe cream denim",
+  "Darkwear boots",
+  "No jacket fit",
+  "Chrome Hearts vibe",
 ] as const;
 
 interface StyleAssistantInputProps {

@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useState } from "react";
 import { FashionIllustration } from "@/components/ai/StyleAssistantEmpty";
 import styles from "@/components/ai/StyleAssistant.module.css";
-import { formatPrice } from "@/features/catalog/format";
 import type {
+  StyleAdviceOutfit,
+  StyleAdviceOutfitProduct,
+  StyleAdviceOutfitProductRole,
   StyleAdviceRecommendation,
   StyleAdviceResponse,
 } from "@/features/ai/types";
+import { formatPrice } from "@/features/catalog/format";
 
 interface StyleAssistantResultProps {
   result: StyleAdviceResponse;
@@ -20,10 +23,7 @@ export function StyleAssistantResult({ result }: StyleAssistantResultProps) {
     return <OutOfScopeResult result={result} />;
   }
 
-  const totalPrice = result.recommendations.reduce(
-    (total, recommendation) => total + recommendation.price,
-    0,
-  );
+  const outfits = result.outfits ?? [];
 
   return (
     <section aria-live="polite" className={styles.resultCard}>
@@ -35,30 +35,22 @@ export function StyleAssistantResult({ result }: StyleAssistantResultProps) {
         </div>
       </div>
 
-      <div className={styles.recommendationsSection}>
-        <div className={styles.sectionHeading}>
-          <h3>Recommended products</h3>
-          <span>
-            {result.recommendations.length} selected
-            {result.recommendations.length ? ` · ${formatPrice(totalPrice)} total` : ""}
-          </span>
-        </div>
-        {result.recommendations.length ? (
-          <div className={styles.productList}>
-            {result.recommendations.map((recommendation) => (
-              <RecommendationCard
-                key={recommendation.productId}
-                recommendation={recommendation}
-              />
+      {outfits.length ? (
+        <OutfitResults outfits={outfits} />
+      ) : (
+        <LegacyRecommendationResults recommendations={result.recommendations} />
+      )}
+
+      {result.warnings?.length ? (
+        <div className={styles.warningSection}>
+          <h3>Matching notes</h3>
+          <ul>
+            {result.warnings.map((warning, index) => (
+              <li key={`${index}-${warning}`}>{warning}</li>
             ))}
-          </div>
-        ) : (
-          <p className={styles.noProducts}>
-            No matching in-stock pieces were returned. Try broadening your
-            style, color, or budget description.
-          </p>
-        )}
-      </div>
+          </ul>
+        </div>
+      ) : null}
 
       {result.extraTips.length ? (
         <div className={styles.tipsSection}>
@@ -73,6 +65,158 @@ export function StyleAssistantResult({ result }: StyleAssistantResultProps) {
 
       {result.handoff?.required ? <HandoffCard /> : null}
     </section>
+  );
+}
+
+function OutfitResults({ outfits }: { outfits: StyleAdviceOutfit[] }) {
+  return (
+    <div className={styles.outfitsSection}>
+      <div className={styles.sectionHeading}>
+        <h3>Outfit recommendations</h3>
+        <span>
+          {outfits.length} option{outfits.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div className={styles.outfitList}>
+        {outfits.map((outfit, index) => (
+          <OutfitCard
+            key={`${outfit.title}-${index}-${outfit.products.map((product) => product.productId).join("-")}`}
+            outfit={outfit}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OutfitCard({ outfit }: { outfit: StyleAdviceOutfit }) {
+  const totalPrice = outfit.products.reduce(
+    (total, product) => total + product.price,
+    0,
+  );
+
+  return (
+    <article className={styles.outfitCard}>
+      <div className={styles.outfitHeader}>
+        <div>
+          <h4>{outfit.title}</h4>
+          <p>{outfit.reason}</p>
+        </div>
+        <div className={styles.outfitScore}>
+          <span>{outfit.score}</span>
+          <small>match</small>
+        </div>
+      </div>
+
+      <div className={styles.outfitMeta}>
+        <span>{outfit.products.length} pieces</span>
+        <span>{formatPrice(totalPrice)} total</span>
+      </div>
+
+      {outfit.matchedIntentTags.length ? (
+        <div aria-label="Matched style details" className={styles.matchedTags}>
+          {outfit.matchedIntentTags.slice(0, 6).map((tag) => (
+            <span key={tag}>{formatTag(tag)}</span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className={styles.outfitProductGrid}>
+        {outfit.products.map((product) => (
+          <OutfitProductCard
+            key={`${product.role}-${product.productId}`}
+            product={product}
+          />
+        ))}
+      </div>
+
+      {outfit.warnings.length ? (
+        <ul className={styles.outfitWarnings}>
+          {outfit.warnings.map((warning, index) => (
+            <li key={`${index}-${warning}`}>{warning}</li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
+  );
+}
+
+function OutfitProductCard({ product }: { product: StyleAdviceOutfitProduct }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  return (
+    <article className={styles.outfitProduct}>
+      <Link
+        aria-label={`View ${product.productName}`}
+        className={styles.outfitProductImageLink}
+        href={`/products/${encodeURIComponent(product.productSlug)}`}
+      >
+        {product.imageUrl && !imageFailed ? (
+          <img
+            alt={product.productName}
+            className={styles.outfitProductImage}
+            loading="lazy"
+            onError={() => setImageFailed(true)}
+            src={product.imageUrl}
+          />
+        ) : (
+          <span className={styles.productImageFallback}>BELIKEME</span>
+        )}
+      </Link>
+      <div className={styles.outfitProductBody}>
+        <span className={styles.roleBadge}>{formatRole(product.role)}</span>
+        <h5>{product.productName}</h5>
+        <strong>{formatPrice(product.price)}</strong>
+        {product.matchedTags.length ? (
+          <p>Matched: {product.matchedTags.slice(0, 3).map(formatTag).join(", ")}</p>
+        ) : null}
+        <Link
+          className={styles.productLink}
+          href={`/products/${encodeURIComponent(product.productSlug)}`}
+        >
+          View Product
+          <ArrowUpRight aria-hidden="true" size={16} />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function LegacyRecommendationResults({
+  recommendations,
+}: {
+  recommendations: StyleAdviceRecommendation[];
+}) {
+  const totalPrice = recommendations.reduce(
+    (total, recommendation) => total + recommendation.price,
+    0,
+  );
+
+  return (
+    <div className={styles.recommendationsSection}>
+      <div className={styles.sectionHeading}>
+        <h3>Recommended products</h3>
+        <span>
+          {recommendations.length} selected
+          {recommendations.length ? ` - ${formatPrice(totalPrice)} total` : ""}
+        </span>
+      </div>
+      {recommendations.length ? (
+        <div className={styles.productList}>
+          {recommendations.map((recommendation) => (
+            <RecommendationCard
+              key={recommendation.productId}
+              recommendation={recommendation}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className={styles.noProducts}>
+          No matching in-stock pieces were returned. Try broadening your style,
+          color, or budget description.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -133,8 +277,8 @@ function OutOfScopeResult({ result }: { result: StyleAdviceResponse }) {
   return (
     <section aria-live="polite" className={`${styles.stateCard} ${styles.outOfScopeCard}`}>
       <FashionIllustration compact />
-      <span className={styles.resultLabel}>Let&apos;s keep it stylish</span>
-      <h2>I&apos;m your Belikeme style specialist.</h2>
+      <span className={styles.resultLabel}>Let's keep it stylish</span>
+      <h2>I'm your Belikeme style specialist.</h2>
       <p>{result.summary}</p>
       {result.extraTips.length ? (
         <div className={styles.examples}>
@@ -178,4 +322,38 @@ function HandoffCard() {
       </button>
     </div>
   );
+}
+
+function formatRole(role: StyleAdviceOutfitProductRole): string {
+  const labels: Record<StyleAdviceOutfitProductRole, string> = {
+    top: "Top",
+    bottom: "Bottom",
+    shoes: "Shoes",
+    jacket: "Jacket",
+    handbag: "Bag",
+    accessory: "Accessory",
+  };
+
+  return labels[role];
+}
+
+function formatTag(tag: string): string {
+  const labels: Record<string, string> = {
+    avant_garde: "avant garde",
+    clean_fit: "clean fit",
+    cold_weather: "cold weather",
+    daily_wear: "daily wear",
+    date_outfit: "date outfit",
+    going_out: "going out",
+    long_sleeves: "long sleeves",
+    luxury_streetwear: "luxury streetwear",
+    silver_hardware: "silver hardware",
+    street_photo: "street photo",
+    tank_top: "tank top",
+    washed_black: "washed black",
+    washed_blue: "washed blue",
+    wide_leg: "wide leg",
+  };
+
+  return labels[tag] ?? tag.replace(/_/g, " ");
 }

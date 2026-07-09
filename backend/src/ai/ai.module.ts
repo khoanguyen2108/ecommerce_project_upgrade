@@ -15,6 +15,7 @@ import { AiController } from './ai.controller';
 import { AiOutputValidator } from './ai-output-validator';
 import { AiService } from './ai.service';
 import { OpenRouterService } from './openrouter.service';
+import { OutfitRecommendationService } from './outfit-recommendation.service';
 import { SupportKnowledgeService } from './support-knowledge.service';
 
 @Module({
@@ -32,6 +33,7 @@ import { SupportKnowledgeService } from './support-knowledge.service';
     AiSupportService,
     AiService,
     OpenRouterService,
+    OutfitRecommendationService,
     SupportKnowledgeService,
   ],
 })

@@ -52,6 +52,9 @@ import {
   RecommendProductsResponseDto,
 } from "./dto/recommend-products.dto";
 import {
+  StyleAdviceIntentDto,
+  StyleAdviceOutfitDto,
+  StyleAdviceOutfitProductDto,
   StyleAdviceRequestDto,
   StyleAdviceResponseDto,
 } from "./dto/style-advice.dto";
@@ -96,6 +99,9 @@ class AiRateLimitExceptionFilter implements ExceptionFilter {
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
 @ApiExtraModels(
   StyleAdviceResponseDto,
+  StyleAdviceIntentDto,
+  StyleAdviceOutfitDto,
+  StyleAdviceOutfitProductDto,
   RecommendProductsResponseDto,
   SupportResponseDto,
 )
@@ -339,13 +345,13 @@ export class AiController {
   }
 
   @ApiOperation({
-    summary: "Get grounded clothing style advice",
+    summary: "Get tag-based outfit recommendations",
     description:
-      "Returns AI advice or a clearly labelled deterministic catalog fallback. Only active products with active in-stock variants can be returned.",
+      "Extracts outfit intent from the customer prompt, matches active in-stock products by Internal AI Tags, and returns grounded outfit recommendations.",
   })
   @ApiOkResponse({
     description:
-      "Grounded style advice, catalog fallback, or an out-of-scope redirect returned.",
+      "Grounded tag-based outfits or an out-of-scope redirect returned.",
     schema: {
       type: "object",
       properties: {
@@ -390,32 +396,14 @@ export class AiController {
   )
   @ApiServiceUnavailableResponse({
     description:
-      "AI is disabled, not configured, unavailable, or the provider is busy. Disabled and transient unavailable states normally return catalog fallback when candidates exist.",
+      "The style assistant could not query the catalog or AI request capacity is temporarily unavailable.",
     content: {
       "application/json": {
         examples: {
-          disabled: {
-            value: errorEnvelopeExample(
-              "AI_DISABLED",
-              "The style assistant is disabled.",
-            ),
-          },
-          notConfigured: {
-            value: errorEnvelopeExample(
-              "AI_NOT_CONFIGURED",
-              "The style assistant is not configured.",
-            ),
-          },
           unavailable: {
             value: errorEnvelopeExample(
               "AI_UNAVAILABLE",
               "The style assistant is temporarily unavailable.",
-            ),
-          },
-          providerBusy: {
-            value: errorEnvelopeExample(
-              "AI_PROVIDER_BUSY",
-              "The style assistant is busy. Please try again shortly.",
             ),
           },
           quotaUnavailable: {
@@ -428,13 +416,6 @@ export class AiController {
       },
     },
   })
-  @ApiBadGatewayResponse(
-    errorEnvelopeResponse(
-      "The provider returned an invalid response and no fallback was available.",
-      "AI_INVALID_RESPONSE",
-      "The style assistant returned an invalid response.",
-    ),
-  )
   @Post("style-advice")
   @HttpCode(200)
   @Throttle({

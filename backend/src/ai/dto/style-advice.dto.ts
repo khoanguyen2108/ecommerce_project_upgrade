@@ -113,19 +113,109 @@ export class StyleAdviceRecommendationDto {
   stylingTip?: string;
 }
 
+export const STYLE_ADVICE_OUTFIT_PRODUCT_ROLES = [
+  'top',
+  'bottom',
+  'shoes',
+  'jacket',
+  'handbag',
+  'accessory',
+] as const;
+
+export type StyleAdviceOutfitProductRole =
+  (typeof STYLE_ADVICE_OUTFIT_PRODUCT_ROLES)[number];
+
+export class StyleAdviceIntentDto {
+  @ApiProperty({ example: ['tee', 'bottoms', 'shoes'], type: [String] })
+  categories: string[];
+
+  @ApiProperty({ example: ['black'], type: [String] })
+  colors: string[];
+
+  @ApiProperty({ example: ['gothic', 'streetwear'], type: [String] })
+  styles: string[];
+
+  @ApiProperty({ example: ['going_out'], type: [String] })
+  occasions: string[];
+
+  @ApiProperty({ example: ['oversized'], type: [String] })
+  fits: string[];
+
+  @ApiProperty({ example: ['no_jacket'], type: [String] })
+  negativeConstraints: string[];
+}
+
+export class StyleAdviceOutfitProductDto {
+  @ApiProperty({ enum: STYLE_ADVICE_OUTFIT_PRODUCT_ROLES, example: 'top' })
+  role: StyleAdviceOutfitProductRole;
+
+  @ApiProperty({ format: 'uuid' })
+  productId: string;
+
+  @ApiProperty({ example: 'oversized-black-t-shirt' })
+  productSlug: string;
+
+  @ApiProperty({ example: 'Oversized Black T-Shirt' })
+  productName: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/black-t-shirt.jpg' })
+  imageUrl?: string;
+
+  @ApiProperty({ example: 399000 })
+  price: number;
+
+  @ApiProperty({ example: ['black', 'gothic', 'streetwear'], type: [String] })
+  matchedTags: string[];
+}
+
+export class StyleAdviceOutfitDto {
+  @ApiProperty({ example: 'Black Gothic Going Out Fit 1' })
+  title: string;
+
+  @ApiProperty({
+    example:
+      'Built around black, gothic, going out matches from active in-stock Belikeme products.',
+  })
+  reason: string;
+
+  @ApiProperty({ example: 87 })
+  score: number;
+
+  @ApiProperty({ example: ['black', 'gothic', 'going_out'], type: [String] })
+  matchedIntentTags: string[];
+
+  @ApiProperty({ type: [StyleAdviceOutfitProductDto] })
+  products: StyleAdviceOutfitProductDto[];
+
+  @ApiProperty({ example: [], type: [String] })
+  warnings: string[];
+}
+
 export class StyleAdviceResponseDto {
   @ApiProperty({ enum: ['ai', 'catalog_fallback', 'out_of_scope'] })
   @IsIn(['ai', 'catalog_fallback', 'out_of_scope'])
   mode: 'ai' | 'catalog_fallback' | 'out_of_scope';
 
+  @ApiProperty({ example: 'I want an all black gothic outfit for going out.' })
+  query: string;
+
+  @ApiProperty({ type: StyleAdviceIntentDto })
+  intent: StyleAdviceIntentDto;
+
   @ApiProperty()
   summary: string;
+
+  @ApiProperty({ type: [StyleAdviceOutfitDto] })
+  outfits: StyleAdviceOutfitDto[];
 
   @ApiProperty({ type: [StyleAdviceRecommendationDto] })
   recommendations: StyleAdviceRecommendationDto[];
 
   @ApiProperty({ type: [String] })
   extraTips: string[];
+
+  @ApiProperty({ type: [String] })
+  warnings: string[];
 }
 
 export interface NormalizedStyleAdviceRequest {
