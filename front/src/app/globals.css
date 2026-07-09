@@ -297,6 +297,7 @@ img {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
   display: flex;
   gap: clamp(18px, 5vw, 34px);
+  justify-content: safe center;
   left: 0;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -9798,10 +9799,12 @@ img {
   .site-header__inner {
     gap: var(--space-2);
     grid-template-columns: auto minmax(0, 1fr) auto;
+    position: relative;
   }
 
   .icon-button.site-menu-button {
     display: inline-flex;
+    z-index: 2;
   }
 
   .site-nav {
@@ -9809,11 +9812,26 @@ img {
   }
 
   .brand-mark {
-    justify-self: center;
+    left: 50%;
+    position: absolute;
+    transform: translateX(-50%);
+    z-index: 1;
   }
 
   .site-actions {
+    gap: 4px;
     min-width: 0;
+    z-index: 2;
+  }
+
+  .site-actions .icon-button {
+    height: 34px;
+    width: 32px;
+  }
+
+  .site-actions .icon-button svg {
+    height: 18px;
+    width: 18px;
   }
 
   .customer-hero,
@@ -10041,7 +10059,7 @@ img {
   }
 
   .brand-mark {
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
 
   .icon-button {
@@ -10049,8 +10067,32 @@ img {
     width: 34px;
   }
 
+  .site-actions {
+    gap: 2px;
+  }
+
+  .site-actions .icon-button {
+    height: 30px;
+    width: 28px;
+  }
+
+  .site-actions .icon-button svg {
+    height: 17px;
+    width: 17px;
+  }
+
+  .icon-button__badge {
+    font-size: 0.6rem;
+    height: 15px;
+    min-width: 15px;
+    padding: 0 4px;
+    right: -1px;
+    top: -1px;
+  }
+
   .site-mobile-dropdown {
-    gap: 22px;
+    gap: 24px;
+    justify-content: safe center;
     padding-left: 16px;
     padding-right: 16px;
   }
@@ -10960,6 +11002,51 @@ img {
 
   .address-modal__actions .button {
     flex: 1 1 0;
+  }
+}
+
+@media (max-width: 360px) {
+  .site-header__inner {
+    padding-left: 10px;
+    padding-right: 8px;
+  }
+
+  .brand-mark {
+    font-size: 0.86rem;
+  }
+
+  .icon-button.site-menu-button {
+    height: 32px;
+    width: 30px;
+  }
+
+  .icon-button.site-menu-button svg {
+    height: 22px;
+    width: 22px;
+  }
+
+  .site-actions {
+    gap: 1px;
+  }
+
+  .site-actions .icon-button {
+    height: 28px;
+    width: 25px;
+  }
+
+  .site-actions .icon-button svg {
+    height: 15px;
+    width: 15px;
+  }
+
+  .site-mobile-dropdown {
+    gap: 18px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .site-mobile-dropdown__link {
+    font-size: 0.78rem;
   }
 }
 
