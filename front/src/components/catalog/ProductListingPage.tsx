@@ -2,13 +2,14 @@
 
 import {
   AlertCircle,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { getCategories, getProducts } from "@/features/catalog/api";
 import type {
@@ -20,6 +21,15 @@ import type {
 import { ApiClientError } from "@/lib/errors/api-error";
 
 const PRODUCT_LIMIT = 12;
+
+const SORT_OPTIONS: Array<{
+  label: string;
+  value: NonNullable<ProductQuery["sort"]>;
+}> = [
+  { label: "Newest", value: "newest" },
+  { label: "Price: low to high", value: "price_asc" },
+  { label: "Price: high to low", value: "price_desc" },
+];
 
 interface ProductListingPageProps {
   initialQuery: ProductQuery;
@@ -48,6 +58,8 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
   const [areFiltersVisible, setAreFiltersVisible] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const sortControlRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -154,6 +166,36 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
     };
   }, [isFilterDrawerOpen]);
 
+  useEffect(() => {
+    if (!isSortOpen) {
+      return;
+    }
+
+    function closeSortMenu(event: MouseEvent) {
+      if (
+        sortControlRef.current &&
+        event.target instanceof Node &&
+        !sortControlRef.current.contains(event.target)
+      ) {
+        setIsSortOpen(false);
+      }
+    }
+
+    function closeSortOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsSortOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", closeSortMenu);
+    document.addEventListener("keydown", closeSortOnEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", closeSortMenu);
+      document.removeEventListener("keydown", closeSortOnEscape);
+    };
+  }, [isSortOpen]);
+
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -182,6 +224,7 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
       page: 1,
       sort: sort || undefined,
     }));
+    setIsSortOpen(false);
   }
 
   function handleReset() {
@@ -224,6 +267,9 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
     query.categorySlug || query.search || (query.sort && query.sort !== "newest"),
   );
   const totalPages = Math.max(1, pagination.totalPages);
+  const activeSort = query.sort || "newest";
+  const activeSortLabel =
+    SORT_OPTIONS.find((option) => option.value === activeSort)?.label || "Newest";
   const filtersToggleLabel =
     isMobileViewport
       ? isFilterDrawerOpen
@@ -286,20 +332,42 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
               <SlidersHorizontal aria-hidden="true" size={20} strokeWidth={1.8} />
             </button>
 
-            <label className="catalog-sort-control">
+            <div className="catalog-sort-control" ref={sortControlRef}>
               <span>Sort By</span>
-              <select
-                aria-label="Sort products"
-                onChange={(event) =>
-                  handleSortChange(event.target.value as ProductQuery["sort"] | "")
-                }
-                value={query.sort || "newest"}
+              <button
+                aria-expanded={isSortOpen}
+                aria-haspopup="listbox"
+                className="catalog-sort-trigger"
+                onClick={() => setIsSortOpen((current) => !current)}
+                type="button"
               >
-                <option value="newest">Newest</option>
-                <option value="price_asc">Price: low to high</option>
-                <option value="price_desc">Price: high to low</option>
-              </select>
-            </label>
+                <span>{activeSortLabel}</span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={isSortOpen ? "is-open" : undefined}
+                  size={18}
+                  strokeWidth={2}
+                />
+              </button>
+              {isSortOpen ? (
+                <div className="catalog-sort-menu" role="listbox">
+                  {SORT_OPTIONS.map((option) => (
+                    <button
+                      aria-selected={activeSort === option.value}
+                      className={
+                        activeSort === option.value ? "is-selected" : undefined
+                      }
+                      key={option.value}
+                      onClick={() => handleSortChange(option.value)}
+                      role="option"
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
