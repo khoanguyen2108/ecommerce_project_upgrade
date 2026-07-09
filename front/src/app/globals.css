@@ -1422,12 +1422,17 @@ img {
 
 .catalog-shop-layout {
   align-items: start;
+  column-gap: 0;
   display: grid;
-  gap: clamp(28px, 3vw, 44px);
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 0px) minmax(0, 1fr);
+  row-gap: clamp(28px, 3vw, 44px);
+  transition:
+    column-gap 240ms ease,
+    grid-template-columns 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .catalog-shop-layout--filters-visible {
+  column-gap: clamp(28px, 3vw, 44px);
   grid-template-columns: minmax(190px, 230px) minmax(0, 1fr);
 }
 
@@ -1439,10 +1444,23 @@ img {
   align-self: start;
   max-height: calc(100vh - var(--header-height) - 48px);
   min-width: 0;
+  opacity: 1;
   overflow-y: auto;
   padding-right: var(--space-6);
   position: sticky;
   top: calc(var(--header-height) + 24px);
+  transform: translateX(0);
+  transition:
+    opacity 180ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+.catalog-filter-sidebar--hidden {
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateX(-14px);
 }
 
 .catalog-filter-sidebar__header {

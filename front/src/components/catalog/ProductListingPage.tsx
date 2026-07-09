@@ -235,9 +235,6 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
   const filterPanelIsVisible = isMobileViewport
     ? isFilterDrawerOpen
     : areFiltersVisible;
-  const shouldRenderFilterPanel = isMobileViewport
-    ? isFilterDrawerOpen
-    : areFiltersVisible;
 
   return (
     <main className="catalog-page catalog-page--shop">
@@ -326,69 +323,67 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
             areFiltersVisible ? "catalog-shop-layout--filters-visible" : ""
           }`}
         >
-          {shouldRenderFilterPanel ? (
-            <aside
-              aria-hidden={!filterPanelIsVisible}
-              aria-label="Product filters"
-              className={`catalog-filter-sidebar ${
-                isFilterDrawerOpen ? "catalog-filter-sidebar--open" : ""
-              }`}
-            >
-              <div className="catalog-filter-sidebar__header">
-                <h2>Filters</h2>
+          <aside
+            aria-hidden={!filterPanelIsVisible}
+            aria-label="Product filters"
+            className={`catalog-filter-sidebar ${
+              !filterPanelIsVisible ? "catalog-filter-sidebar--hidden" : ""
+            } ${isFilterDrawerOpen ? "catalog-filter-sidebar--open" : ""}`}
+          >
+            <div className="catalog-filter-sidebar__header">
+              <h2>Filters</h2>
+              <button
+                aria-label="Close filters"
+                className="catalog-filter-sidebar__close"
+                onClick={() => setIsFilterDrawerOpen(false)}
+                type="button"
+              >
+                <X aria-hidden="true" size={20} strokeWidth={1.9} />
+              </button>
+            </div>
+
+            <div className="catalog-filter-section">
+              <div className="catalog-filter-section__heading">
+                <h3>Categories</h3>
+              </div>
+
+              <div className="catalog-category-list">
                 <button
-                  aria-label="Close filters"
-                  className="catalog-filter-sidebar__close"
-                  onClick={() => setIsFilterDrawerOpen(false)}
+                  aria-pressed={!query.categorySlug}
+                  className={!query.categorySlug ? "is-active" : undefined}
+                  onClick={() => handleCategoryChange("")}
                   type="button"
                 >
-                  <X aria-hidden="true" size={20} strokeWidth={1.9} />
+                  All products
                 </button>
+                {isCategoryLoading ? (
+                  <p className="catalog-filter-note">Loading categories...</p>
+                ) : null}
+                {!isCategoryLoading && !categoryError
+                  ? categories.map((category) => (
+                      <button
+                        aria-pressed={query.categorySlug === category.slug}
+                        className={
+                          query.categorySlug === category.slug
+                            ? "is-active"
+                            : undefined
+                        }
+                        key={category.id}
+                        onClick={() => handleCategoryChange(category.slug)}
+                        type="button"
+                      >
+                        {category.name}
+                      </button>
+                    ))
+                  : null}
+                {categoryError ? (
+                  <p className="catalog-filter-note">
+                    Categories are unavailable right now.
+                  </p>
+                ) : null}
               </div>
-
-              <div className="catalog-filter-section">
-                <div className="catalog-filter-section__heading">
-                  <h3>Categories</h3>
-                </div>
-
-                <div className="catalog-category-list">
-                  <button
-                    aria-pressed={!query.categorySlug}
-                    className={!query.categorySlug ? "is-active" : undefined}
-                    onClick={() => handleCategoryChange("")}
-                    type="button"
-                  >
-                    All products
-                  </button>
-                  {isCategoryLoading ? (
-                    <p className="catalog-filter-note">Loading categories...</p>
-                  ) : null}
-                  {!isCategoryLoading && !categoryError
-                    ? categories.map((category) => (
-                        <button
-                          aria-pressed={query.categorySlug === category.slug}
-                          className={
-                            query.categorySlug === category.slug
-                              ? "is-active"
-                              : undefined
-                          }
-                          key={category.id}
-                          onClick={() => handleCategoryChange(category.slug)}
-                          type="button"
-                        >
-                          {category.name}
-                        </button>
-                      ))
-                    : null}
-                  {categoryError ? (
-                    <p className="catalog-filter-note">
-                      Categories are unavailable right now.
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            </aside>
-          ) : null}
+            </div>
+          </aside>
 
           <div className="catalog-products-panel">
             {productError ? (
