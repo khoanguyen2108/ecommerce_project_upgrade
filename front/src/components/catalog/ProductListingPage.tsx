@@ -247,29 +247,14 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
       >
         <div className="catalog-listing-header">
           <div className="catalog-listing-heading">
-            <p className="catalog-breadcrumb">
-              <span>Shop</span>
-              {activeCategoryName ? (
-                <>
-                  <span aria-hidden="true">/</span>
-                  <span>{activeCategoryName}</span>
-                </>
+            <h1>
+              {resultsHeading}
+              {!isProductLoading ? (
+                <span className="catalog-heading-count">
+                  ({pagination.total.toLocaleString()})
+                </span>
               ) : null}
-            </p>
-            <h1>{resultsHeading}</h1>
-            <div className="catalog-listing-meta">
-              <span>{formatProductCount(pagination.total, isProductLoading)}</span>
-              {hasActiveFilters ? (
-                <button
-                  className="catalog-inline-reset"
-                  disabled={isProductLoading}
-                  onClick={handleReset}
-                  type="button"
-                >
-                  Clear all
-                </button>
-              ) : null}
-            </div>
+            </h1>
           </div>
 
           <div className="catalog-listing-actions">
@@ -364,15 +349,6 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
               <div className="catalog-filter-section">
                 <div className="catalog-filter-section__heading">
                   <h3>Categories</h3>
-                  {hasActiveFilters ? (
-                    <button
-                      disabled={isProductLoading}
-                      onClick={handleReset}
-                      type="button"
-                    >
-                      Clear
-                    </button>
-                  ) : null}
                 </div>
 
                 <div className="catalog-category-list">
@@ -508,12 +484,4 @@ function getCatalogErrorMessage(error: unknown): string {
   }
 
   return "The catalog could not be loaded right now. Please try again soon.";
-}
-
-function formatProductCount(total: number, isLoading: boolean): string {
-  if (isLoading) {
-    return "Loading products";
-  }
-
-  return `${total.toLocaleString()} ${total === 1 ? "product" : "products"}`;
 }

@@ -1296,17 +1296,6 @@ img {
   min-width: 0;
 }
 
-.catalog-breadcrumb {
-  align-items: center;
-  color: var(--color-text);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 0.9rem;
-  font-weight: 750;
-  gap: 7px;
-  margin: 0 0 var(--space-1);
-}
-
 .catalog-listing-heading h1 {
   font-family: Montserrat, Inter, sans-serif;
   font-size: clamp(2rem, 3vw, 3rem);
@@ -1316,30 +1305,9 @@ img {
   margin: 0;
 }
 
-.catalog-listing-meta {
-  align-items: center;
-  color: var(--color-text-muted);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 0.92rem;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.catalog-inline-reset {
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid currentColor;
-  color: var(--color-text);
-  font-size: 0.82rem;
-  font-weight: 750;
-  padding: 0 0 2px;
-}
-
-.catalog-inline-reset:disabled {
-  color: var(--color-text-muted);
-  cursor: not-allowed;
-  opacity: 0.55;
+.catalog-heading-count {
+  margin-left: 0.25em;
+  white-space: nowrap;
 }
 
 .catalog-listing-actions {
@@ -1445,9 +1413,7 @@ img {
 
 .catalog-filter-toggle:focus-visible,
 .catalog-sort-control select:focus-visible,
-.catalog-inline-reset:focus-visible,
 .catalog-category-list button:focus-visible,
-.catalog-filter-section__heading button:focus-visible,
 .catalog-filter-sidebar__close:focus-visible,
 .catalog-compact-search__button:focus-visible {
   outline: 2px solid var(--color-border-strong);
@@ -1524,22 +1490,6 @@ img {
   font-size: 1rem;
   font-weight: 750;
   margin: 0;
-}
-
-.catalog-filter-section__heading button {
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid currentColor;
-  color: var(--color-text);
-  font-size: 0.78rem;
-  font-weight: 750;
-  padding: 0 0 2px;
-}
-
-.catalog-filter-section__heading button:disabled {
-  color: var(--color-text-muted);
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .catalog-category-list {
