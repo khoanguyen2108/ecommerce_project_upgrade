@@ -1298,7 +1298,7 @@ img {
 
 .catalog-listing-heading h1 {
   font-family: Montserrat, Inter, sans-serif;
-  font-size: clamp(2rem, 3vw, 3rem);
+  font-size: clamp(1.8rem, 2.45vw, 2.5rem);
   font-weight: 760;
   letter-spacing: 0;
   line-height: 1.08;
@@ -1313,15 +1313,15 @@ img {
 .catalog-listing-actions {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
-  gap: clamp(14px, 2vw, 26px);
+  flex-wrap: nowrap;
+  gap: clamp(14px, 1.5vw, 24px);
   justify-content: flex-end;
   min-width: 0;
 }
 
 .catalog-listing-search {
   flex: 0 1 270px;
-  min-width: min(270px, 100%);
+  min-width: min(250px, 100%);
 }
 
 .catalog-compact-search {
@@ -2115,6 +2115,7 @@ img {
   }
 
   .catalog-listing-actions {
+    flex-wrap: wrap;
     justify-content: flex-start;
   }
 
