@@ -116,7 +116,7 @@ function CategoryCard({ category }: { category: Category }) {
 
   return (
     <article className="categories-card">
-      <Link href={`/categories/${category.slug}`}>
+      <Link href={getCategoryProductsHref(category.slug)}>
         <div className="categories-card__media">
           {showImage ? (
             <img
@@ -143,6 +143,10 @@ function CategoryCard({ category }: { category: Category }) {
       </Link>
     </article>
   );
+}
+
+function getCategoryProductsHref(slug: string): string {
+  return `/products?categorySlug=${encodeURIComponent(slug)}`;
 }
 
 function CategoriesSkeleton({ count }: { count: number }) {

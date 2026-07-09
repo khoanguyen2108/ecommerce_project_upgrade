@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { CategoryDetailPage } from "@/components/catalog/CategoryDetailPage";
-import { SiteFooter } from "@/components/layout/SiteFooter";
-import { SiteHeader } from "@/components/layout/SiteHeader";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Category",
@@ -16,11 +14,5 @@ interface CategoryPageProps {
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
 
-  return (
-    <>
-      <SiteHeader active="categories" />
-      <CategoryDetailPage slug={slug} />
-      <SiteFooter />
-    </>
-  );
+  redirect(`/products?categorySlug=${encodeURIComponent(slug)}`);
 }

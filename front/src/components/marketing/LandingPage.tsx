@@ -218,7 +218,7 @@ function CategoryTile({
   category: FeaturedCategory;
 }) {
   return (
-    <Link className="category-tile" href={`/categories/${category.slug}`}>
+    <Link className="category-tile" href={getCategoryProductsHref(category.slug)}>
       {category.imageUrl ? (
         <img
           alt={`${category.name} category`}
@@ -235,6 +235,10 @@ function CategoryTile({
       </div>
     </Link>
   );
+}
+
+function getCategoryProductsHref(slug: string): string {
+  return `/products?categorySlug=${encodeURIComponent(slug)}`;
 }
 
 function CatalogSkeleton({ count }: { count: number }) {

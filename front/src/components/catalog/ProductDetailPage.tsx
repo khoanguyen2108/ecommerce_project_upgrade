@@ -329,7 +329,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           <div className="product-detail-copy__topline">
             <div className="product-detail-copy__categories">
               {categories.map((category) => (
-                <Link href={`/categories/${category.slug}`} key={category.id}>
+                <Link href={getCategoryProductsHref(category.slug)} key={category.id}>
                   {category.name}
                 </Link>
               ))}
@@ -548,6 +548,10 @@ function getCatalogErrorMessage(error: unknown): string {
   return error instanceof ApiClientError
     ? error.message
     : "This product could not be loaded right now. Please try again soon.";
+}
+
+function getCategoryProductsHref(slug: string): string {
+  return `/products?categorySlug=${encodeURIComponent(slug)}`;
 }
 
 function isUuid(value: string): boolean {
