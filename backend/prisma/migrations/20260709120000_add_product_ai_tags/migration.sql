@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Product"
+ADD COLUMN "aiTags" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

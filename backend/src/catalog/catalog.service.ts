@@ -11,6 +11,8 @@ import {
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  MAX_PRODUCT_AI_TAG_LENGTH,
+  MAX_PRODUCT_AI_TAGS,
   MAX_PRODUCT_VARIANTS,
   PRODUCT_VARIANT_LIMIT_MESSAGE,
 } from './catalog.constants';
@@ -157,6 +159,11 @@ const productSelect = {
     select: variantSelect,
     orderBy: variantOrderBy,
   },
+} satisfies Prisma.ProductSelect;
+
+const adminProductSelect = {
+  ...productSelect,
+  aiTags: true,
 } satisfies Prisma.ProductSelect;
 
 const publicProductSelect = {
@@ -649,7 +656,7 @@ export class CatalogService {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: this.getAdminProductOrderBy(query.sort, query.order),
-        select: productSelect,
+        select: adminProductSelect,
       }),
     ]);
 
@@ -688,7 +695,7 @@ export class CatalogService {
       where: {
         id,
       },
-      select: productSelect,
+      select: adminProductSelect,
     });
 
     if (!product) {
@@ -870,6 +877,7 @@ export class CatalogService {
           description: this.normalizeOptionalText(dto.description),
           basePrice: dto.basePrice,
           imageUrls: [],
+          aiTags: this.normalizeAiTags(dto.aiTags),
           isActive: this.normalizeOptionalBoolean(dto.isActive, true, 'isActive'),
           ...(variants.length > 0
             ? {
@@ -879,7 +887,7 @@ export class CatalogService {
               }
             : {}),
         },
-        select: productSelect,
+        select: adminProductSelect,
       });
 
       return { product: serializeProduct(product, true) };
@@ -957,6 +965,10 @@ export class CatalogService {
             );
     }
 
+    if ('aiTags' in dto) {
+      data.aiTags = this.normalizeAiTags(dto.aiTags);
+    }
+
     if ('isActive' in dto) {
       data.isActive = this.normalizeOptionalBoolean(
         dto.isActive,
@@ -973,7 +985,7 @@ export class CatalogService {
           id,
         },
         data,
-        select: productSelect,
+        select: adminProductSelect,
       });
 
       return { product: serializeProduct(product, true) };
@@ -1026,7 +1038,7 @@ export class CatalogService {
       data: {
         isActive: false,
       },
-      select: productSelect,
+      select: adminProductSelect,
     });
 
     return { product: serializeProduct(product, true) };
@@ -1038,7 +1050,7 @@ export class CatalogService {
     const product = await this.prismaService.product.update({
       where: { id },
       data: { isActive: true },
-      select: productSelect,
+      select: adminProductSelect,
     });
 
     return { product: serializeProduct(product, true) };
@@ -1750,6 +1762,47 @@ export class CatalogService {
     const normalized = value.trim().replace(/\s+/g, ' ');
 
     return normalized.length > 0 ? normalized : null;
+  }
+
+  private normalizeAiTags(value: string[] | null | undefined): string[] {
+    if (value === null || value === undefined) {
+      return [];
+    }
+
+    if (!Array.isArray(value) || value.length > MAX_PRODUCT_AI_TAGS) {
+      throw this.invalidFieldException('aiTags');
+    }
+
+    const seenTags = new Set<string>();
+    const tags: string[] = [];
+
+    for (const tag of value) {
+      if (typeof tag !== 'string') {
+        throw this.invalidFieldException('aiTags');
+      }
+
+      const normalized = tag.trim().replace(/\s+/g, ' ');
+
+      if (!normalized) {
+        continue;
+      }
+
+      if (normalized.length > MAX_PRODUCT_AI_TAG_LENGTH) {
+        throw this.invalidFieldException('aiTags');
+      }
+
+      const key = normalized.toLocaleLowerCase();
+      if (!seenTags.has(key)) {
+        seenTags.add(key);
+        tags.push(normalized);
+      }
+    }
+
+    if (tags.length > MAX_PRODUCT_AI_TAGS) {
+      throw this.invalidFieldException('aiTags');
+    }
+
+    return tags;
   }
 
   private normalizeSlug(value: string | null | undefined): string {

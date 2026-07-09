@@ -103,6 +103,7 @@ export interface AdminProduct {
   description: string | null;
   basePrice: number;
   imageUrls: string[];
+  aiTags: string[];
   managedImages: AdminManagedProductImage[];
   isActive: boolean;
   createdAt: string;
@@ -174,6 +175,7 @@ export interface CreateAdminProductRequest {
   description?: string | null;
   basePrice: number;
   imageUrls?: string[];
+  aiTags?: string[];
   isActive?: boolean;
   variants?: CreateAdminProductVariantRequest[];
 }
@@ -186,6 +188,7 @@ export interface UpdateAdminProductRequest {
   description?: string | null;
   basePrice?: number;
   imageUrls?: string[];
+  aiTags?: string[];
   isActive?: boolean;
 }
 

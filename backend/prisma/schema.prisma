@@ -249,6 +249,7 @@ model Product {
   description       String?
   basePrice         Int
   imageUrls         String[]          @default([])
+  aiTags            String[]          @default([])
   isActive          Boolean           @default(true)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt

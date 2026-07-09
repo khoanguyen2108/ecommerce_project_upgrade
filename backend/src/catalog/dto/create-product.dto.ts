@@ -16,6 +16,8 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
+  MAX_PRODUCT_AI_TAG_LENGTH,
+  MAX_PRODUCT_AI_TAGS,
   MAX_PRODUCT_VARIANTS,
   PRODUCT_VARIANT_LIMIT_MESSAGE,
 } from '../catalog.constants';
@@ -95,6 +97,21 @@ export class CreateProductDto {
   @IsUrl({ require_protocol: true }, { each: true })
   @MaxLength(2048, { each: true })
   imageUrls?: string[] | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Internal admin-only tags for future AI product matching. Hidden from public storefront responses.',
+    example: ['streetwear', 'black leather', 'chrome hearts'],
+    maxItems: MAX_PRODUCT_AI_TAGS,
+    nullable: true,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_PRODUCT_AI_TAGS)
+  @IsString({ each: true })
+  @MaxLength(MAX_PRODUCT_AI_TAG_LENGTH, { each: true })
+  aiTags?: string[] | null;
 
   @ApiPropertyOptional({
     default: true,

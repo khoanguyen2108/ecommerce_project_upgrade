@@ -12,10 +12,12 @@ import {
   RotateCcw,
   Save,
   Search,
+  Tag,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
-import type { ChangeEvent, FormEvent } from "react";
+import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   createAdminProduct,
@@ -76,6 +78,8 @@ const ALLOWED_PRODUCT_IMAGE_TYPES = new Set([
 ]);
 const MAX_PRODUCT_VARIANTS = 50;
 const PRODUCT_VARIANT_LIMIT_MESSAGE = "Maximum 50 variants per product.";
+const MAX_PRODUCT_AI_TAGS = 30;
+const MAX_PRODUCT_AI_TAG_LENGTH = 60;
 
 const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
   AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
@@ -113,6 +117,8 @@ interface AdminProductsPageProps {
 }
 
 interface ProductFormState {
+  aiTagInput: string;
+  aiTags: string[];
   basePrice: string;
   categoryIds: string[];
   description: string;
@@ -868,6 +874,45 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     }
   }
 
+  function handleAddAiTags() {
+    const parsedTags = parseAiTagInput(productForm.aiTagInput);
+
+    if (parsedTags.length === 0) {
+      return;
+    }
+
+    const nextTags = mergeAiTags(productForm.aiTags, parsedTags);
+    const validationError = getAiTagsValidationError(nextTags);
+
+    if (validationError) {
+      setActionError(validationError);
+      return;
+    }
+
+    setProductForm((current) => ({
+      ...current,
+      aiTagInput: "",
+      aiTags: mergeAiTags(current.aiTags, parsedTags),
+    }));
+    setActionError(undefined);
+  }
+
+  function handleAiTagInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter" && event.key !== ",") {
+      return;
+    }
+
+    event.preventDefault();
+    handleAddAiTags();
+  }
+
+  function handleRemoveAiTag(tagIndex: number) {
+    setProductForm((current) => ({
+      ...current,
+      aiTags: current.aiTags.filter((_, index) => index !== tagIndex),
+    }));
+  }
+
   function handleImageSelection(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
@@ -1440,6 +1485,55 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     value={productForm.description}
                   />
                 </label>
+                <fieldset className="admin-ai-tags admin-compact-field--wide">
+                  <legend>Internal AI tags</legend>
+                  <small>Admin only. Hidden from storefront.</small>
+                  <div className="admin-ai-tags__input-row">
+                    <div className="admin-ai-tags__input-wrap">
+                      <Tag aria-hidden="true" size={15} />
+                      <input
+                        disabled={isPanelLoading}
+                        maxLength={2000}
+                        onChange={(event) =>
+                          setProductForm((current) => ({
+                            ...current,
+                            aiTagInput: event.target.value,
+                          }))
+                        }
+                        onKeyDown={handleAiTagInputKeyDown}
+                        placeholder="streetwear, black leather, oversized"
+                        value={productForm.aiTagInput}
+                      />
+                    </div>
+                    <button
+                      className="button button--secondary"
+                      disabled={isPanelLoading || !productForm.aiTagInput.trim()}
+                      onClick={handleAddAiTags}
+                      type="button"
+                    >
+                      <Plus aria-hidden="true" size={15} />
+                      Add
+                    </button>
+                  </div>
+                  <div className="admin-ai-tags__chips" aria-label="Internal AI tags">
+                    {productForm.aiTags.length === 0 ? (
+                      <p className="admin-ai-tags__empty">No internal tags yet.</p>
+                    ) : null}
+                    {productForm.aiTags.map((tag, index) => (
+                      <span className="admin-ai-tag-chip" key={`${tag}:${index}`}>
+                        {tag}
+                        <button
+                          aria-label={`Remove AI tag ${tag}`}
+                          disabled={isPanelLoading}
+                          onClick={() => handleRemoveAiTag(index)}
+                          type="button"
+                        >
+                          <X aria-hidden="true" size={13} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </fieldset>
                 <label>
                   <span>Base price (&#8363;)</span>
                   <input
@@ -1955,6 +2049,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
 function getEmptyProductForm(): ProductFormState {
   return {
+    aiTagInput: "",
+    aiTags: [],
     basePrice: "",
     categoryIds: [],
     description: "",
@@ -1968,6 +2064,8 @@ function getEmptyProductForm(): ProductFormState {
 
 function getProductForm(product: AdminProduct): ProductFormState {
   return {
+    aiTagInput: "",
+    aiTags: mergeAiTags(product.aiTags ?? [], []),
     basePrice: String(product.basePrice),
     categoryIds: getProductCategories(product).map((category) => category.id),
     description: product.description || "",
@@ -2028,6 +2126,7 @@ function areProductFormsEqual(
 ): boolean {
   return (
     left.basePrice === right.basePrice &&
+    serializeAiTags(left) === serializeAiTags(right) &&
     left.categoryIds.join("|") === right.categoryIds.join("|") &&
     left.description === right.description &&
     serializeImageItems(left.imageItems) === serializeImageItems(right.imageItems) &&
@@ -2060,6 +2159,7 @@ function getProductPayload(form: ProductFormState):
         categoryIds: string[];
         description: string | null;
         imageUrls: string[];
+        aiTags: string[];
         isActive: boolean;
         name: string;
         slug: string;
@@ -2085,6 +2185,13 @@ function getProductPayload(form: ProductFormState):
     return { error: "Base price must be a whole number greater than or equal to 0." };
   }
 
+  const aiTags = getProductFormAiTags(form);
+  const aiTagsError = getAiTagsValidationError(aiTags);
+
+  if (aiTagsError) {
+    return { error: aiTagsError };
+  }
+
   return {
     payload: {
       basePrice,
@@ -2094,6 +2201,7 @@ function getProductPayload(form: ProductFormState):
       imageUrls: form.imageItems
         .filter((image) => image.source === "legacy")
         .map((image) => image.url),
+      aiTags,
       isActive: form.isActive,
       name: form.name.trim(),
       slug: form.slug.trim(),
@@ -2218,6 +2326,60 @@ function getDuplicateVariantError(
   return undefined;
 }
 
+function parseAiTagInput(value: string): string[] {
+  return value
+    .split(/[,\n]+/)
+    .map(normalizeAiTag)
+    .filter(Boolean);
+}
+
+function normalizeAiTag(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function mergeAiTags(currentTags: string[], nextTags: string[]): string[] {
+  const tags: string[] = [];
+  const seenTags = new Set<string>();
+
+  [...currentTags, ...nextTags].forEach((tag) => {
+    const normalized = normalizeAiTag(tag);
+
+    if (!normalized) {
+      return;
+    }
+
+    const key = normalized.toLocaleLowerCase();
+    if (!seenTags.has(key)) {
+      seenTags.add(key);
+      tags.push(normalized);
+    }
+  });
+
+  return tags;
+}
+
+function getProductFormAiTags(form: ProductFormState): string[] {
+  return mergeAiTags(form.aiTags, parseAiTagInput(form.aiTagInput));
+}
+
+function serializeAiTags(form: ProductFormState): string {
+  return getProductFormAiTags(form)
+    .map((tag) => tag.toLocaleLowerCase())
+    .join("|");
+}
+
+function getAiTagsValidationError(tags: string[]): string | undefined {
+  if (tags.length > MAX_PRODUCT_AI_TAGS) {
+    return `Add up to ${MAX_PRODUCT_AI_TAGS} internal AI tags.`;
+  }
+
+  if (tags.some((tag) => tag.length > MAX_PRODUCT_AI_TAG_LENGTH)) {
+    return `Each internal AI tag must be ${MAX_PRODUCT_AI_TAG_LENGTH} characters or fewer.`;
+  }
+
+  return undefined;
+}
+
 function parseOptionalInteger(value: string): {
   error?: true;
   value?: number;
@@ -2263,6 +2425,7 @@ function areProductDetailsEqual(
 ): boolean {
   return (
     left.basePrice === right.basePrice &&
+    serializeAiTags(left) === serializeAiTags(right) &&
     left.categoryIds.join("|") === right.categoryIds.join("|") &&
     left.description === right.description &&
     left.isActive === right.isActive &&
