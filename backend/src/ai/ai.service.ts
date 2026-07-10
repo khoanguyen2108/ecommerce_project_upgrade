@@ -14,6 +14,7 @@ import type {
 } from './dto/style-advice.dto';
 import { OutfitRecommendationService } from './outfit-recommendation.service';
 import { inferBudgetFromStylePrompt } from './style-advice-fallback';
+import { detectStyleAdviceLocale } from './style-advice-locale';
 
 const MAX_TOTAL_USER_TEXT_LENGTH = 800;
 const DISALLOWED_CONTROL_CHARACTERS =
@@ -50,6 +51,7 @@ export class AiService {
 
     try {
       const request = this.normalizeRequest(dto);
+      const locale = detectStyleAdviceLocale(request);
       const scopeDecision = this.aiScopeService.evaluateStyleAdvice(request);
 
       this.aiScopeService.logDecision(
@@ -69,12 +71,16 @@ export class AiService {
 
       try {
         const result =
-          await this.outfitRecommendationService.recommendOutfits(request);
+          await this.outfitRecommendationService.recommendOutfits(
+            request,
+            locale,
+          );
         candidateCount = result.candidateCount;
         resultCount = result.resultCount;
 
         const response: StyleAdviceResponseDto = {
           mode: 'deterministic_tag_recommender',
+          locale,
           ...result.response,
         };
 
@@ -202,6 +208,7 @@ export class AiService {
 
     return {
       mode: 'out_of_scope',
+      locale,
       query,
       intent: {
         categories: [],

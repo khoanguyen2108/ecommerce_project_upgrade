@@ -7,6 +7,7 @@ import type {
   StyleAdviceOutfitProductDto,
   StyleAdviceRecommendationDto,
 } from './dto/style-advice.dto';
+import type { StyleAdviceLocale } from './style-advice-locale';
 
 type OutfitRole = 'top' | 'bottom' | 'shoes' | 'jacket' | 'handbag' | 'accessory';
 
@@ -344,12 +345,59 @@ const CLEAN_LABELS: Record<string, string> = {
   y2k: 'Y2K',
 };
 
+const VIETNAMESE_LABELS: Record<string, string> = {
+  accessories: 'phụ kiện',
+  accessory: 'phụ kiện',
+  avant_garde: 'avant-garde',
+  beige: 'màu be',
+  biker: 'phong cách biker',
+  black: 'màu đen',
+  bottom: 'quần',
+  bottoms: 'quần',
+  casual: 'phong cách thường ngày',
+  clean_fit: 'phong cách gọn gàng',
+  coffee: 'đi cafe',
+  cold_weather: 'thời tiết lạnh',
+  cream: 'màu kem',
+  daily_wear: 'mặc hằng ngày',
+  darkwear: 'phong cách darkwear',
+  date_outfit: 'đi hẹn hò',
+  denim: 'denim',
+  flared: 'ống loe',
+  going_out: 'đi chơi',
+  gothic: 'phong cách gothic',
+  handbag: 'túi',
+  jacket: 'áo khoác',
+  layering: 'phối nhiều lớp',
+  long_sleeves: 'áo tay dài',
+  luxury_streetwear: 'streetwear cao cấp',
+  minimal: 'phong cách tối giản',
+  oversized: 'form rộng',
+  party: 'đi tiệc',
+  school: 'đi học',
+  shoes: 'giày',
+  silver: 'màu bạc',
+  silver_hardware: 'chi tiết kim loại bạc',
+  street_photo: 'chụp ảnh đường phố',
+  streetwear: 'phong cách streetwear',
+  summer: 'mùa hè',
+  tank_top: 'áo ba lỗ',
+  tee: 'áo thun',
+  top: 'áo',
+  travel: 'đi du lịch',
+  washed_black: 'đen wash',
+  washed_blue: 'xanh wash',
+  wide_leg: 'ống rộng',
+  y2k: 'phong cách Y2K',
+};
+
 @Injectable()
 export class OutfitRecommendationService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async recommendOutfits(
     request: NormalizedStyleAdviceRequest,
+    locale: StyleAdviceLocale = 'en',
   ): Promise<OutfitRecommendationPayload> {
     const query = this.buildPrompt(request);
     const intent = this.extractIntent(query);
@@ -357,10 +405,26 @@ export class OutfitRecommendationService {
     const preparedProducts = products.map((product) =>
       this.prepareProduct(product),
     );
-    const outfits = this.composeOutfits(preparedProducts, intent, request.budget);
-    const warnings = this.buildWarnings(outfits, preparedProducts, intent);
-    const recommendations = this.flattenPrimaryRecommendations(outfits);
-    const summary = this.buildSummary(intent, outfits.length, warnings);
+    const outfits = this.composeOutfits(
+      preparedProducts,
+      intent,
+      request.budget,
+      locale,
+    );
+    const warnings = this.buildWarnings(
+      outfits,
+      preparedProducts,
+      intent,
+      locale,
+    );
+    const recommendations = this.flattenPrimaryRecommendations(outfits, locale);
+    const summary = this.buildSummary(
+      intent,
+      outfits.length,
+      warnings,
+      locale,
+      request.budget !== undefined,
+    );
 
     return {
       candidateCount: preparedProducts.length,
@@ -382,7 +446,7 @@ export class OutfitRecommendationService {
         recommendations,
         summary,
         warnings,
-        extraTips: this.buildExtraTips(warnings, outfits.length),
+        extraTips: this.buildExtraTips(warnings, outfits.length, locale),
       },
     };
   }
@@ -546,6 +610,7 @@ export class OutfitRecommendationService {
     products: PreparedProduct[],
     intent: ExtractedIntent,
     budgetMax?: number,
+    locale: StyleAdviceLocale = 'en',
   ): StyleAdviceOutfitDto[] {
     const scoredByRole = new Map<OutfitRole, ScoredProduct[]>();
 
@@ -580,7 +645,12 @@ export class OutfitRecommendationService {
             : [];
 
     if (selectedCandidates.length === 0) {
-      return this.composeIncompleteOutfit(scoredByRole, intent, budgetMax);
+      return this.composeIncompleteOutfit(
+        scoredByRole,
+        intent,
+        budgetMax,
+        locale,
+      );
     }
 
     const needsBudgetWarning = budgetMax !== undefined && coreCandidates.length === 0;
@@ -593,6 +663,7 @@ export class OutfitRecommendationService {
         index + 1,
         budgetMax,
         needsBudgetWarning,
+        locale,
       ),
     );
   }
@@ -804,6 +875,7 @@ export class OutfitRecommendationService {
     optionNumber: number,
     budgetMax: number | undefined,
     needsBudgetWarning: boolean,
+    locale: StyleAdviceLocale,
   ): StyleAdviceOutfitDto {
     const selectedIds = new Set(
       candidate.products.map((product) => product.product.record.id),
@@ -814,7 +886,7 @@ export class OutfitRecommendationService {
       .filter((product) => this.isWeakMatch(product, intent))
       .map(
         (product) =>
-          `No strong ${this.cleanLabel(product.role)} match was found, so this uses the closest in-stock option.`,
+          this.buildWeakRoleWarning(product.role, locale),
       );
     let totalPrice = candidate.totalPrice;
 
@@ -851,7 +923,7 @@ export class OutfitRecommendationService {
     );
 
     if (needsBudgetWarning && budgetMax !== undefined) {
-      outfitWarnings.unshift(this.buildBudgetWarning(budgetMax));
+      outfitWarnings.unshift(this.buildBudgetWarning(budgetMax, locale));
     }
 
     const uniqueProducts = this.keepHighestScoringProductPerRole(selectedProducts);
@@ -859,8 +931,13 @@ export class OutfitRecommendationService {
     const scoreTotal = uniqueProducts.reduce((total, product) => total + product.score, 0);
 
     return {
-      title: this.buildOutfitTitle(intent, optionNumber),
-      reason: this.buildOutfitReason(intent, outfitProducts, outfitWarnings),
+      title: this.buildOutfitTitle(intent, optionNumber, locale),
+      reason: this.buildOutfitReason(
+        intent,
+        outfitProducts,
+        outfitWarnings,
+        locale,
+      ),
       score: Math.min(
         100,
         Math.max(0, Math.round(scoreTotal / uniqueProducts.length)),
@@ -877,6 +954,7 @@ export class OutfitRecommendationService {
     scoredByRole: Map<OutfitRole, ScoredProduct[]>,
     intent: ExtractedIntent,
     budgetMax?: number,
+    locale: StyleAdviceLocale = 'en',
   ): StyleAdviceOutfitDto[] {
     const selectedIds = new Set<string>();
     const selectedProducts: ScoredProduct[] = [];
@@ -891,9 +969,7 @@ export class OutfitRecommendationService {
       );
 
       if (!scoredProduct) {
-        outfitWarnings.push(
-          `No in-stock ${this.cleanLabel(role)} was available from tagged products.`,
-        );
+        outfitWarnings.push(this.buildUnavailableRoleWarning(role, locale));
         continue;
       }
 
@@ -909,9 +985,7 @@ export class OutfitRecommendationService {
       totalPrice += scoredProduct.product.price;
 
       if (this.isWeakMatch(scoredProduct, intent)) {
-        outfitWarnings.push(
-          `No strong ${this.cleanLabel(role)} match was found, so this uses the closest in-stock option.`,
-        );
+        outfitWarnings.push(this.buildWeakRoleWarning(role, locale));
       }
     }
 
@@ -920,7 +994,7 @@ export class OutfitRecommendationService {
     }
 
     if (budgetMax !== undefined) {
-      outfitWarnings.unshift(this.buildBudgetWarning(budgetMax));
+      outfitWarnings.unshift(this.buildBudgetWarning(budgetMax, locale));
     }
 
     const uniqueProducts = this.keepHighestScoringProductPerRole(selectedProducts);
@@ -929,8 +1003,13 @@ export class OutfitRecommendationService {
 
     return [
       {
-        title: this.buildOutfitTitle(intent, 1),
-        reason: this.buildOutfitReason(intent, outfitProducts, outfitWarnings),
+        title: this.buildOutfitTitle(intent, 1, locale),
+        reason: this.buildOutfitReason(
+          intent,
+          outfitProducts,
+          outfitWarnings,
+          locale,
+        ),
         score: Math.min(
           100,
           Math.max(0, Math.round(scoreTotal / uniqueProducts.length)),
@@ -1011,8 +1090,17 @@ export class OutfitRecommendationService {
     );
   }
 
-  private buildBudgetWarning(budgetMax: number): string {
-    return `No complete outfit under ${budgetMax} VND was found. Showing the closest available outfit.`;
+  private buildBudgetWarning(
+    budgetMax: number,
+    locale: StyleAdviceLocale,
+  ): string {
+    const formattedBudget = new Intl.NumberFormat(
+      locale === 'vi' ? 'vi-VN' : 'en-US',
+    ).format(budgetMax);
+
+    return locale === 'vi'
+      ? `Không tìm được outfit hoàn chỉnh dưới ${formattedBudget} VND. Đang hiển thị lựa chọn gần nhất.`
+      : `No complete outfit under ${formattedBudget} VND was found. Showing the closest available option.`;
   }
 
   private scoreProductsForRole(
@@ -1190,6 +1278,7 @@ export class OutfitRecommendationService {
 
   private flattenPrimaryRecommendations(
     outfits: StyleAdviceOutfitDto[],
+    locale: StyleAdviceLocale,
   ): StyleAdviceRecommendationDto[] {
     const firstOutfit = outfits[0];
 
@@ -1203,7 +1292,10 @@ export class OutfitRecommendationService {
       productName: product.productName,
       ...(product.imageUrl ? { imageUrl: product.imageUrl } : {}),
       price: product.price,
-      reason: `${this.cleanLabel(product.role)} selected for this outfit.`,
+      reason:
+        locale === 'vi'
+          ? `Đã chọn ${this.localizedLabel(product.role, locale)} cho outfit này.`
+          : `${this.localizedLabel(product.role, locale)} selected for this outfit.`,
     }));
   }
 
@@ -1211,15 +1303,24 @@ export class OutfitRecommendationService {
     outfits: StyleAdviceOutfitDto[],
     products: PreparedProduct[],
     intent: ExtractedIntent,
+    locale: StyleAdviceLocale,
   ): string[] {
     const warnings = new Set<string>();
 
     if (products.length === 0) {
-      warnings.add('No active in-stock products were available for outfit matching.');
+      warnings.add(
+        locale === 'vi'
+          ? 'Hiện chưa có sản phẩm còn hàng phù hợp để tạo outfit.'
+          : 'No active in-stock products were available for outfit matching.',
+      );
     }
 
     if (products.every((product) => product.tagSet.size === 0)) {
-      warnings.add('No active in-stock products currently have Internal AI Tags.');
+      warnings.add(
+        locale === 'vi'
+          ? 'Các sản phẩm đang còn hàng chưa có đủ thông tin phối đồ để tạo gợi ý phù hợp.'
+          : 'Available products do not currently have enough styling information for outfit matching.',
+      );
     }
 
     for (const role of COMPLETE_OUTFIT_ROLES) {
@@ -1228,7 +1329,7 @@ export class OutfitRecommendationService {
       }
 
       if (!products.some((product) => product.roles.has(role))) {
-        warnings.add(`No active in-stock ${this.cleanLabel(role)} products are tagged for outfit matching.`);
+        warnings.add(this.buildUnavailableRoleWarning(role, locale));
       }
     }
 
@@ -1245,69 +1346,110 @@ export class OutfitRecommendationService {
     intent: ExtractedIntent,
     outfitCount: number,
     warnings: string[],
+    locale: StyleAdviceLocale,
+    hasBudget: boolean,
   ): string {
-    const intentLabels = this.cleanTags([
-      ...intent.colors,
-      ...intent.styles,
-      ...intent.occasions,
-      ...intent.fits,
-    ]).slice(0, 4);
-
     if (outfitCount === 0) {
-      return 'I could not build an outfit from active in-stock tagged products for that prompt.';
+      return locale === 'vi'
+        ? 'Mình chưa thể tạo outfit phù hợp từ các sản phẩm đang còn hàng. Bạn có thể thử nới ngân sách hoặc mô tả rộng hơn.'
+        : 'I could not build an outfit from the active in-stock products for that prompt. Try broadening the budget or description.';
     }
 
+    const criteria = this.buildSummaryCriteria(intent, hasBudget, locale);
     const base =
-      intentLabels.length > 0
-        ? `I matched ${intentLabels.map((tag) => this.cleanLabel(tag)).join(', ')} against Belikeme tagged products and built ${outfitCount} outfit option${outfitCount === 1 ? '' : 's'}.`
-        : `I matched your prompt against Belikeme tagged products and built ${outfitCount} outfit option${outfitCount === 1 ? '' : 's'}.`;
+      locale === 'vi'
+        ? `Mình đã tạo ${outfitCount} gợi ý outfit dựa trên ${criteria} bạn đưa ra.`
+        : `I built ${outfitCount} outfit option${outfitCount === 1 ? '' : 's'} based on your requested ${criteria}.`;
 
     return warnings.length > 0
-      ? `${base} Some categories needed relaxed matching.`
+      ? locale === 'vi'
+        ? `${base} Một vài hạng mục dùng lựa chọn còn hàng gần nhất.`
+        : `${base} Some categories use the closest available match.`
       : base;
   }
 
-  private buildExtraTips(warnings: string[], outfitCount: number): string[] {
+  private buildExtraTips(
+    warnings: string[],
+    outfitCount: number,
+    locale: StyleAdviceLocale,
+  ): string[] {
     if (outfitCount === 0) {
-      return [
-        'Try adding a color, style, occasion, or core item such as tee, jeans, boots, or accessories.',
-      ];
+      return locale === 'vi'
+        ? [
+            'Hãy thử thêm màu sắc, phong cách, dịp sử dụng hoặc món chính như áo thun, quần jeans hay giày.',
+          ]
+        : [
+            'Try adding a color, style, occasion, or core item such as a tee, jeans, or shoes.',
+          ];
     }
 
     return [
-      'Open each product to confirm the current color, size, and price before adding it to cart.',
+      locale === 'vi'
+        ? 'Bạn có thể bấm vào từng sản phẩm để xem size, màu và tồn kho trước khi thêm vào giỏ.'
+        : 'Open each product to confirm the current color, size, and price before adding it to your cart.',
       ...warnings.slice(0, 2),
     ];
   }
 
-  private buildOutfitTitle(intent: ExtractedIntent, optionNumber: number): string {
+  private buildOutfitTitle(
+    intent: ExtractedIntent,
+    optionNumber: number,
+    locale: StyleAdviceLocale,
+  ): string {
     const labels = this.cleanTags([
       ...intent.colors.slice(0, 1),
-      ...intent.styles.slice(0, 2),
+      ...intent.styles.slice(0, 1),
       ...intent.occasions.slice(0, 1),
     ]);
-    const titleBase =
-      labels.length > 0
-        ? labels.map((tag) => this.toTitleCase(this.cleanLabel(tag))).join(' ')
-        : 'Belikeme Tagged';
+    const localizedLabels = labels.map((tag) =>
+      this.localizedLabel(tag, locale),
+    );
 
-    return `${titleBase} Fit ${optionNumber}`;
+    if (locale === 'vi') {
+      return `Gợi ý ${optionNumber}: Outfit ${localizedLabels.join(' ') || 'phù hợp với yêu cầu'}`;
+    }
+
+    const titleBase =
+      localizedLabels.length > 0
+        ? localizedLabels.map((label) => this.toTitleCase(label)).join(' ')
+        : 'Belikeme';
+
+    return `Option ${optionNumber}: ${titleBase} outfit`;
   }
 
   private buildOutfitReason(
     intent: ExtractedIntent,
     products: StyleAdviceOutfitProductDto[],
     warnings: string[],
+    locale: StyleAdviceLocale,
   ): string {
     const matches = this.cleanTags(this.getMatchedIntentTags(products, intent));
+    const productRoles = this.cleanTags(products.map((product) => product.role));
+    const roleList = this.joinLocalizedList(
+      productRoles.map((role) => this.localizedLabel(role, locale)),
+      locale,
+    );
 
     if (matches.length === 0) {
+      if (locale === 'vi') {
+        return warnings.length > 0
+          ? `Set này kết hợp ${roleList} từ những lựa chọn còn hàng gần nhất.`
+          : `Set này kết hợp ${roleList} từ các sản phẩm Belikeme đang còn hàng.`;
+      }
+
       return warnings.length > 0
-        ? 'Built from the closest active in-stock tagged products available.'
-        : 'Built from active in-stock Belikeme products that fit the requested outfit structure.';
+        ? `This set combines ${roleList} from the closest available in-stock options.`
+        : `This set combines ${roleList} from active in-stock Belikeme products.`;
     }
 
-    return `Built around ${matches.map((tag) => this.cleanLabel(tag)).join(', ')} matches from active in-stock Belikeme products.`;
+    const matchList = this.joinLocalizedList(
+      matches.map((tag) => this.localizedLabel(tag, locale)),
+      locale,
+    );
+
+    return locale === 'vi'
+      ? `Set này kết hợp ${roleList} và ưu tiên ${matchList} để giữ đúng yêu cầu của bạn.`
+      : `This set combines ${roleList} and prioritizes ${matchList} to match your request.`;
   }
 
   private getMatchedIntentTags(
@@ -1508,6 +1650,80 @@ export class OutfitRecommendationService {
     return new RegExp(`(?:^| )${escapedAlias}(?: |$)`).test(comparablePrompt);
   }
 
+  private buildWeakRoleWarning(
+    role: OutfitRole,
+    locale: StyleAdviceLocale,
+  ): string {
+    const roleLabel = this.localizedLabel(role, locale);
+
+    return locale === 'vi'
+      ? `Không tìm được ${roleLabel} phù hợp mạnh với yêu cầu này, nên set dùng lựa chọn còn hàng gần nhất.`
+      : `No strong ${roleLabel} match was found, so this set uses the closest in-stock option.`;
+  }
+
+  private buildUnavailableRoleWarning(
+    role: OutfitRole,
+    locale: StyleAdviceLocale,
+  ): string {
+    const roleLabel = this.localizedLabel(role, locale);
+
+    return locale === 'vi'
+      ? `Không tìm được ${roleLabel} còn hàng phù hợp với yêu cầu này.`
+      : `No active in-stock ${roleLabel} was available for this request.`;
+  }
+
+  private buildSummaryCriteria(
+    intent: ExtractedIntent,
+    hasBudget: boolean,
+    locale: StyleAdviceLocale,
+  ): string {
+    const criteria: string[] = [];
+
+    if (intent.colors.length > 0) {
+      criteria.push(locale === 'vi' ? 'màu sắc' : 'color');
+    }
+
+    if (intent.styles.length > 0 || intent.fits.length > 0) {
+      criteria.push(locale === 'vi' ? 'phong cách' : 'style');
+    }
+
+    if (intent.occasions.length > 0) {
+      criteria.push(locale === 'vi' ? 'dịp sử dụng' : 'occasion');
+    }
+
+    if (hasBudget) {
+      criteria.push(locale === 'vi' ? 'ngân sách' : 'budget');
+    }
+
+    return criteria.length > 0
+      ? this.joinLocalizedList(criteria, locale)
+      : locale === 'vi'
+        ? 'các tiêu chí'
+        : 'preferences';
+  }
+
+  private joinLocalizedList(
+    values: string[],
+    locale: StyleAdviceLocale,
+  ): string {
+    const uniqueValues = [...new Set(values)];
+
+    if (uniqueValues.length <= 1) {
+      return uniqueValues[0] ?? '';
+    }
+
+    if (uniqueValues.length === 2) {
+      return uniqueValues.join(locale === 'vi' ? ' và ' : ' and ');
+    }
+
+    const lastValue = uniqueValues[uniqueValues.length - 1];
+    const firstValues = uniqueValues.slice(0, -1).join(', ');
+
+    return locale === 'vi'
+      ? `${firstValues} và ${lastValue}`
+      : `${firstValues}, and ${lastValue}`;
+  }
+
   private buildPrompt(request: NormalizedStyleAdviceRequest): string {
     return [
       request.occasion,
@@ -1558,6 +1774,15 @@ export class OutfitRecommendationService {
   private cleanLabel(tag: string): string {
     const normalizedTag = this.normalizeTag(tag);
     return CLEAN_LABELS[normalizedTag] ?? normalizedTag.replace(/_/g, ' ');
+  }
+
+  private localizedLabel(tag: string, locale: StyleAdviceLocale): string {
+    const normalizedTag = this.normalizeTag(tag);
+
+    return locale === 'vi'
+      ? VIETNAMESE_LABELS[normalizedTag] ??
+          normalizedTag.replace(/_/g, ' ')
+      : this.cleanLabel(normalizedTag);
   }
 
   private toTitleCase(value: string): string {

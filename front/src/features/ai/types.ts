@@ -60,6 +60,7 @@ export interface StyleAdviceResponse {
     | "catalog_fallback"
     | "deterministic_tag_recommender"
     | "out_of_scope";
+  locale?: "vi" | "en";
   query?: string;
   intent?: StyleAdviceIntent;
   summary: string;

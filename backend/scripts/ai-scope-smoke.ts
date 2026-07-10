@@ -4,6 +4,7 @@ import type { NormalizedStyleAdviceRequest } from '../src/ai/dto/style-advice.dt
 interface ScopeSmokeCase {
   prompt: string;
   expected: AiScopeResult;
+  locale?: 'vi' | 'en';
 }
 
 const cases: ScopeSmokeCase[] = [
@@ -14,18 +15,22 @@ const cases: ScopeSmokeCase[] = [
   {
     prompt: 'I want an all black gothic outfit for going out.',
     expected: 'allowed',
+    locale: 'en',
   },
   {
     prompt: 'No jacket, just tee, pants and shoes.',
     expected: 'allowed',
+    locale: 'en',
   },
   {
     prompt: 'Cho tui outfit streetwear có áo thun đen form rộng.',
     expected: 'allowed',
+    locale: 'vi',
   },
   {
     prompt: 'tui muốn outfit đi cafe màu kem với quần jeans tầm 500k',
     expected: 'allowed',
+    locale: 'vi',
   },
   { prompt: 'What is the weather today?', expected: 'out_of_scope' },
   { prompt: 'Explain JavaScript promises.', expected: 'out_of_scope' },
@@ -55,6 +60,12 @@ for (const smokeCase of cases) {
   if (decision.result !== smokeCase.expected) {
     failures.push(
       `${JSON.stringify(smokeCase.prompt)}: expected ${smokeCase.expected}, received ${decision.result}`,
+    );
+  }
+
+  if (smokeCase.locale && decision.locale !== smokeCase.locale) {
+    failures.push(
+      `${JSON.stringify(smokeCase.prompt)}: expected locale ${smokeCase.locale}, received ${decision.locale}`,
     );
   }
 }

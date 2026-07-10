@@ -198,6 +198,9 @@ export class StyleAdviceResponseDto {
   @IsIn(['ai', 'catalog_fallback', 'deterministic_tag_recommender', 'out_of_scope'])
   mode: 'ai' | 'catalog_fallback' | 'deterministic_tag_recommender' | 'out_of_scope';
 
+  @ApiPropertyOptional({ enum: ['vi', 'en'], example: 'vi' })
+  locale?: 'vi' | 'en';
+
   @ApiProperty({ example: 'I want an all black gothic outfit for going out.' })
   query: string;
 
