@@ -10,6 +10,7 @@
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
+    "ai:smoke:scope": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/ai-scope-smoke.ts",
     "ai:smoke:real-provider": "node scripts/ai-smoke-real-provider.mjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
