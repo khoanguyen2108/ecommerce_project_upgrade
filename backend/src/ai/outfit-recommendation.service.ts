@@ -80,6 +80,18 @@ interface ScoredProduct {
   score: number;
 }
 
+interface CoreOutfitCandidate {
+  key: string;
+  products: ScoredProduct[];
+  scoreTotal: number;
+  totalPrice: number;
+}
+
+interface BudgetCoreCandidateSelection {
+  affordable: CoreOutfitCandidate[];
+  closestOverBudget?: CoreOutfitCandidate;
+}
+
 interface OutfitRecommendationPayload {
   candidateCount: number;
   response: StyleAdviceResponseWithoutMode;
@@ -97,7 +109,9 @@ interface StyleAdviceResponseWithoutMode {
 }
 
 const MAX_CANDIDATE_PRODUCTS = 200;
-const MAX_OUTFITS = 3;
+const MAX_OUTFITS = 2;
+const MAX_CORE_ROLE_CANDIDATES = 32;
+const MAX_PRIMARY_CORE_CANDIDATES = 16;
 const COMPLETE_OUTFIT_ROLES: OutfitRole[] = ['top', 'bottom', 'shoes'];
 const DISALLOWED_CONTROL_CHARACTERS =
   /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
@@ -343,7 +357,7 @@ export class OutfitRecommendationService {
     const preparedProducts = products.map((product) =>
       this.prepareProduct(product),
     );
-    const outfits = this.composeOutfits(preparedProducts, intent);
+    const outfits = this.composeOutfits(preparedProducts, intent, request.budget);
     const warnings = this.buildWarnings(outfits, preparedProducts, intent);
     const recommendations = this.flattenPrimaryRecommendations(outfits);
     const summary = this.buildSummary(intent, outfits.length, warnings);
@@ -531,6 +545,7 @@ export class OutfitRecommendationService {
   private composeOutfits(
     products: PreparedProduct[],
     intent: ExtractedIntent,
+    budgetMax?: number,
   ): StyleAdviceOutfitDto[] {
     const scoredByRole = new Map<OutfitRole, ScoredProduct[]>();
 
@@ -547,80 +562,457 @@ export class OutfitRecommendationService {
       scoredByRole.set('handbag', this.scoreProductsForRole(products, 'handbag', intent));
     }
 
-    const outfitKeys = new Set<string>();
-    const outfits: StyleAdviceOutfitDto[] = [];
+    const budgetCandidates =
+      budgetMax === undefined
+        ? undefined
+        : this.findBudgetCoreCandidates(scoredByRole, budgetMax);
+    const coreCandidates =
+      budgetMax === undefined
+        ? this.buildCoreOutfitCandidates(scoredByRole)
+        : budgetCandidates?.affordable ?? [];
+    const selectedCandidates =
+      budgetMax === undefined
+        ? coreCandidates.slice(0, MAX_OUTFITS)
+        : coreCandidates.length > 0
+          ? coreCandidates
+          : budgetCandidates?.closestOverBudget
+            ? [budgetCandidates.closestOverBudget]
+            : [];
 
-    for (let index = 0; index < MAX_OUTFITS; index += 1) {
-      const selectedIds = new Set<string>();
-      const outfitProducts: StyleAdviceOutfitProductDto[] = [];
-      const outfitWarnings: string[] = [];
-      let scoreTotal = 0;
-
-      for (const role of COMPLETE_OUTFIT_ROLES) {
-        if (intent.negativeCategories.includes(role)) {
-          outfitWarnings.push(`Skipped ${this.cleanLabel(role)} because the prompt asked not to include it.`);
-          continue;
-        }
-
-        const scoredProduct = this.pickForRole(
-          scoredByRole.get(role) ?? [],
-          index,
-          selectedIds,
-        );
-
-        if (!scoredProduct) {
-          outfitWarnings.push(`No in-stock ${this.cleanLabel(role)} was available from tagged products.`);
-          continue;
-        }
-
-        if (this.isWeakMatch(scoredProduct, intent)) {
-          outfitWarnings.push(
-            `No strong ${this.cleanLabel(role)} match was found, so this uses the closest in-stock option.`,
-          );
-        }
-
-        selectedIds.add(scoredProduct.product.record.id);
-        outfitProducts.push(this.mapOutfitProduct(scoredProduct));
-        scoreTotal += scoredProduct.score;
-      }
-
-      for (const role of this.getOptionalRoles(intent)) {
-        const scoredProduct = this.pickForRole(
-          scoredByRole.get(role) ?? [],
-          index,
-          selectedIds,
-        );
-
-        if (!scoredProduct || this.isWeakOptionalMatch(scoredProduct, intent)) {
-          continue;
-        }
-
-        selectedIds.add(scoredProduct.product.record.id);
-        outfitProducts.push(this.mapOutfitProduct(scoredProduct));
-        scoreTotal += scoredProduct.score;
-      }
-
-      if (outfitProducts.length === 0) {
-        continue;
-      }
-
-      const outfitKey = [...selectedIds].sort().join(':');
-      if (outfitKeys.has(outfitKey)) {
-        continue;
-      }
-
-      outfitKeys.add(outfitKey);
-      outfits.push({
-        title: this.buildOutfitTitle(intent, outfits.length + 1),
-        reason: this.buildOutfitReason(intent, outfitProducts, outfitWarnings),
-        score: Math.min(100, Math.max(0, Math.round(scoreTotal / outfitProducts.length))),
-        matchedIntentTags: this.cleanTags(this.getMatchedIntentTags(outfitProducts, intent)),
-        products: outfitProducts,
-        warnings: outfitWarnings,
-      });
+    if (selectedCandidates.length === 0) {
+      return this.composeIncompleteOutfit(scoredByRole, intent, budgetMax);
     }
 
-    return outfits;
+    const needsBudgetWarning = budgetMax !== undefined && coreCandidates.length === 0;
+
+    return selectedCandidates.map((candidate, index) =>
+      this.buildOutfitFromCoreCandidate(
+        candidate,
+        scoredByRole,
+        intent,
+        index + 1,
+        budgetMax,
+        needsBudgetWarning,
+      ),
+    );
+  }
+
+  private buildCoreOutfitCandidates(
+    scoredByRole: Map<OutfitRole, ScoredProduct[]>,
+  ): CoreOutfitCandidate[] {
+    const [tops, bottoms, shoes] = COMPLETE_OUTFIT_ROLES.map((role) =>
+      this.limitCoreRoleCandidates(scoredByRole.get(role) ?? []),
+    );
+
+    if (tops.length === 0 || bottoms.length === 0 || shoes.length === 0) {
+      return [];
+    }
+
+    const candidates: CoreOutfitCandidate[] = [];
+
+    for (const top of tops) {
+      for (const bottom of bottoms) {
+        if (top.product.record.id === bottom.product.record.id) {
+          continue;
+        }
+
+        for (const shoe of shoes) {
+          const products = [top, bottom, shoe];
+          const productIds = products.map((product) => product.product.record.id);
+
+          if (new Set(productIds).size !== products.length) {
+            continue;
+          }
+
+          candidates.push({
+            key: [...productIds].sort().join(':'),
+            products,
+            scoreTotal: products.reduce((total, product) => total + product.score, 0),
+            totalPrice: products.reduce(
+              (total, product) => total + product.product.price,
+              0,
+            ),
+          });
+        }
+      }
+    }
+
+    return candidates.sort((left, right) => this.compareCoreCandidates(left, right));
+  }
+
+  private limitCoreRoleCandidates(
+    candidates: ScoredProduct[],
+  ): ScoredProduct[] {
+    if (candidates.length <= MAX_CORE_ROLE_CANDIDATES) {
+      return candidates;
+    }
+
+    const selectedByProductId = new Map<string, ScoredProduct>();
+    const cheapestCandidates = [...candidates]
+      .sort(
+        (left, right) =>
+          left.product.price - right.product.price ||
+          right.score - left.score ||
+          left.product.record.name.localeCompare(right.product.record.name),
+      )
+      .slice(0, MAX_CORE_ROLE_CANDIDATES - MAX_PRIMARY_CORE_CANDIDATES);
+
+    for (const candidate of [
+      ...candidates.slice(0, MAX_PRIMARY_CORE_CANDIDATES),
+      ...cheapestCandidates,
+    ]) {
+      selectedByProductId.set(candidate.product.record.id, candidate);
+    }
+
+    return [...selectedByProductId.values()]
+      .sort((left, right) => this.compareScoredProducts(left, right))
+      .slice(0, MAX_CORE_ROLE_CANDIDATES);
+  }
+
+  private findBudgetCoreCandidates(
+    scoredByRole: Map<OutfitRole, ScoredProduct[]>,
+    budgetMax: number,
+  ): BudgetCoreCandidateSelection {
+    const [tops, bottoms, shoes] = COMPLETE_OUTFIT_ROLES.map(
+      (role) => scoredByRole.get(role) ?? [],
+    );
+    const affordable: CoreOutfitCandidate[] = [];
+
+    for (const top of tops) {
+      for (const bottom of bottoms) {
+        if (top.product.record.id === bottom.product.record.id) {
+          continue;
+        }
+
+        const remainingBudget = budgetMax - top.product.price - bottom.product.price;
+        if (remainingBudget < 0) {
+          continue;
+        }
+
+        let retainedShoes = 0;
+        for (const shoe of shoes) {
+          if (
+            shoe.product.record.id === top.product.record.id ||
+            shoe.product.record.id === bottom.product.record.id ||
+            shoe.product.price > remainingBudget
+          ) {
+            continue;
+          }
+
+          this.retainBestCoreCandidate(
+            affordable,
+            this.createCoreOutfitCandidate([top, bottom, shoe]),
+          );
+          retainedShoes += 1;
+
+          if (retainedShoes === MAX_OUTFITS) {
+            break;
+          }
+        }
+      }
+    }
+
+    if (affordable.length > 0) {
+      return { affordable };
+    }
+
+    const closestOverBudget = this.findLowestPricedCoreCandidate(tops, bottoms, shoes);
+
+    return { affordable, ...(closestOverBudget ? { closestOverBudget } : {}) };
+  }
+
+  private findLowestPricedCoreCandidate(
+    tops: ScoredProduct[],
+    bottoms: ScoredProduct[],
+    shoes: ScoredProduct[],
+  ): CoreOutfitCandidate | undefined {
+    const shoesByPrice = [...shoes].sort(
+      (left, right) =>
+        left.product.price - right.product.price ||
+        this.compareScoredProducts(left, right),
+    );
+    let closest: CoreOutfitCandidate | undefined;
+
+    for (const top of tops) {
+      for (const bottom of bottoms) {
+        if (top.product.record.id === bottom.product.record.id) {
+          continue;
+        }
+
+        const shoe = shoesByPrice.find(
+          (candidate) =>
+            candidate.product.record.id !== top.product.record.id &&
+            candidate.product.record.id !== bottom.product.record.id,
+        );
+
+        if (!shoe) {
+          continue;
+        }
+
+        const candidate = this.createCoreOutfitCandidate([top, bottom, shoe]);
+
+        if (
+          !closest ||
+          candidate.totalPrice < closest.totalPrice ||
+          (candidate.totalPrice === closest.totalPrice &&
+            this.compareCoreCandidates(candidate, closest) < 0)
+        ) {
+          closest = candidate;
+        }
+      }
+    }
+
+    return closest;
+  }
+
+  private retainBestCoreCandidate(
+    candidates: CoreOutfitCandidate[],
+    candidate: CoreOutfitCandidate,
+  ) {
+    if (
+      candidates.length === MAX_OUTFITS &&
+      this.compareCoreCandidates(candidate, candidates[MAX_OUTFITS - 1]) >= 0
+    ) {
+      return;
+    }
+
+    candidates.push(candidate);
+    candidates.sort((left, right) => this.compareCoreCandidates(left, right));
+    candidates.splice(MAX_OUTFITS);
+  }
+
+  private createCoreOutfitCandidate(
+    products: [ScoredProduct, ScoredProduct, ScoredProduct],
+  ): CoreOutfitCandidate {
+    const productIds = products.map((product) => product.product.record.id);
+
+    return {
+      key: [...productIds].sort().join(':'),
+      products,
+      scoreTotal: products.reduce((total, product) => total + product.score, 0),
+      totalPrice: products.reduce(
+        (total, product) => total + product.product.price,
+        0,
+      ),
+    };
+  }
+
+  private buildOutfitFromCoreCandidate(
+    candidate: CoreOutfitCandidate,
+    scoredByRole: Map<OutfitRole, ScoredProduct[]>,
+    intent: ExtractedIntent,
+    optionNumber: number,
+    budgetMax: number | undefined,
+    needsBudgetWarning: boolean,
+  ): StyleAdviceOutfitDto {
+    const selectedIds = new Set(
+      candidate.products.map((product) => product.product.record.id),
+    );
+    const selectedRoles = new Set(candidate.products.map((product) => product.role));
+    const selectedProducts = [...candidate.products];
+    const outfitWarnings = candidate.products
+      .filter((product) => this.isWeakMatch(product, intent))
+      .map(
+        (product) =>
+          `No strong ${this.cleanLabel(product.role)} match was found, so this uses the closest in-stock option.`,
+      );
+    let totalPrice = candidate.totalPrice;
+
+    const jacket = this.pickForRole(
+      scoredByRole.get('jacket') ?? [],
+      optionNumber - 1,
+      selectedIds,
+    );
+    totalPrice = this.addOptionalProduct(
+      jacket,
+      intent,
+      budgetMax,
+      selectedIds,
+      selectedRoles,
+      selectedProducts,
+      totalPrice,
+    );
+
+    const accessoryOrBag = this.pickForRole(
+      [...(scoredByRole.get('accessory') ?? []), ...(scoredByRole.get('handbag') ?? [])].sort(
+        (left, right) => this.compareScoredProducts(left, right),
+      ),
+      optionNumber - 1,
+      selectedIds,
+    );
+    totalPrice = this.addOptionalProduct(
+      accessoryOrBag,
+      intent,
+      budgetMax,
+      selectedIds,
+      selectedRoles,
+      selectedProducts,
+      totalPrice,
+    );
+
+    if (needsBudgetWarning && budgetMax !== undefined) {
+      outfitWarnings.unshift(this.buildBudgetWarning(budgetMax));
+    }
+
+    const uniqueProducts = this.keepHighestScoringProductPerRole(selectedProducts);
+    const outfitProducts = uniqueProducts.map((product) => this.mapOutfitProduct(product));
+    const scoreTotal = uniqueProducts.reduce((total, product) => total + product.score, 0);
+
+    return {
+      title: this.buildOutfitTitle(intent, optionNumber),
+      reason: this.buildOutfitReason(intent, outfitProducts, outfitWarnings),
+      score: Math.min(
+        100,
+        Math.max(0, Math.round(scoreTotal / uniqueProducts.length)),
+      ),
+      matchedIntentTags: this.cleanTags(
+        this.getMatchedIntentTags(outfitProducts, intent),
+      ),
+      products: outfitProducts,
+      warnings: [...new Set(outfitWarnings)],
+    };
+  }
+
+  private composeIncompleteOutfit(
+    scoredByRole: Map<OutfitRole, ScoredProduct[]>,
+    intent: ExtractedIntent,
+    budgetMax?: number,
+  ): StyleAdviceOutfitDto[] {
+    const selectedIds = new Set<string>();
+    const selectedProducts: ScoredProduct[] = [];
+    const outfitWarnings: string[] = [];
+    let totalPrice = 0;
+
+    for (const role of COMPLETE_OUTFIT_ROLES) {
+      const scoredProduct = this.pickForRole(
+        scoredByRole.get(role) ?? [],
+        0,
+        selectedIds,
+      );
+
+      if (!scoredProduct) {
+        outfitWarnings.push(
+          `No in-stock ${this.cleanLabel(role)} was available from tagged products.`,
+        );
+        continue;
+      }
+
+      if (
+        budgetMax !== undefined &&
+        totalPrice + scoredProduct.product.price > budgetMax
+      ) {
+        continue;
+      }
+
+      selectedIds.add(scoredProduct.product.record.id);
+      selectedProducts.push(scoredProduct);
+      totalPrice += scoredProduct.product.price;
+
+      if (this.isWeakMatch(scoredProduct, intent)) {
+        outfitWarnings.push(
+          `No strong ${this.cleanLabel(role)} match was found, so this uses the closest in-stock option.`,
+        );
+      }
+    }
+
+    if (selectedProducts.length === 0) {
+      return [];
+    }
+
+    if (budgetMax !== undefined) {
+      outfitWarnings.unshift(this.buildBudgetWarning(budgetMax));
+    }
+
+    const uniqueProducts = this.keepHighestScoringProductPerRole(selectedProducts);
+    const outfitProducts = uniqueProducts.map((product) => this.mapOutfitProduct(product));
+    const scoreTotal = uniqueProducts.reduce((total, product) => total + product.score, 0);
+
+    return [
+      {
+        title: this.buildOutfitTitle(intent, 1),
+        reason: this.buildOutfitReason(intent, outfitProducts, outfitWarnings),
+        score: Math.min(
+          100,
+          Math.max(0, Math.round(scoreTotal / uniqueProducts.length)),
+        ),
+        matchedIntentTags: this.cleanTags(
+          this.getMatchedIntentTags(outfitProducts, intent),
+        ),
+        products: outfitProducts,
+        warnings: [...new Set(outfitWarnings)],
+      },
+    ];
+  }
+
+  private addOptionalProduct(
+    scoredProduct: ScoredProduct | undefined,
+    intent: ExtractedIntent,
+    budgetMax: number | undefined,
+    selectedIds: Set<string>,
+    selectedRoles: Set<OutfitRole>,
+    selectedProducts: ScoredProduct[],
+    totalPrice: number,
+  ): number {
+    if (
+      !scoredProduct ||
+      this.isWeakOptionalMatch(scoredProduct, intent) ||
+      selectedIds.has(scoredProduct.product.record.id) ||
+      selectedRoles.has(scoredProduct.role) ||
+      (budgetMax !== undefined &&
+        totalPrice + scoredProduct.product.price > budgetMax)
+    ) {
+      return totalPrice;
+    }
+
+    selectedIds.add(scoredProduct.product.record.id);
+    selectedRoles.add(scoredProduct.role);
+    selectedProducts.push(scoredProduct);
+
+    return totalPrice + scoredProduct.product.price;
+  }
+
+  private keepHighestScoringProductPerRole(
+    products: ScoredProduct[],
+  ): ScoredProduct[] {
+    const bestByRole = new Map<OutfitRole, ScoredProduct>();
+
+    for (const product of products) {
+      const existing = bestByRole.get(product.role);
+
+      if (!existing || this.compareScoredProducts(product, existing) < 0) {
+        bestByRole.set(product.role, product);
+      }
+    }
+
+    return products.filter(
+      (product) => bestByRole.get(product.role) === product,
+    );
+  }
+
+  private compareCoreCandidates(
+    left: CoreOutfitCandidate,
+    right: CoreOutfitCandidate,
+  ): number {
+    return (
+      right.scoreTotal - left.scoreTotal ||
+      left.totalPrice - right.totalPrice ||
+      left.key.localeCompare(right.key)
+    );
+  }
+
+  private compareScoredProducts(
+    left: ScoredProduct,
+    right: ScoredProduct,
+  ): number {
+    return (
+      right.score - left.score ||
+      left.product.price - right.product.price ||
+      left.product.record.name.localeCompare(right.product.record.name)
+    );
+  }
+
+  private buildBudgetWarning(budgetMax: number): string {
+    return `No complete outfit under ${budgetMax} VND was found. Showing the closest available outfit.`;
   }
 
   private scoreProductsForRole(
@@ -636,12 +1028,7 @@ export class OutfitRecommendationService {
       .filter((product) => product.roles.has(role))
       .map((product, index) => this.scoreProduct(product, role, intent, index))
       .filter((product) => product.score > Number.NEGATIVE_INFINITY)
-      .sort(
-        (left, right) =>
-          right.score - left.score ||
-          left.product.price - right.product.price ||
-          left.product.record.name.localeCompare(right.product.record.name),
-      );
+      .sort((left, right) => this.compareScoredProducts(left, right));
   }
 
   private scoreProduct(
@@ -817,9 +1204,6 @@ export class OutfitRecommendationService {
       ...(product.imageUrl ? { imageUrl: product.imageUrl } : {}),
       price: product.price,
       reason: `${this.cleanLabel(product.role)} selected for this outfit.`,
-      ...(product.matchedTags.length > 0
-        ? { stylingTip: `Matched: ${product.matchedTags.map((tag) => this.cleanLabel(tag)).join(', ')}.` }
-        : {}),
     }));
   }
 
@@ -973,26 +1357,6 @@ export class OutfitRecommendationService {
     ].some((tag) =>
       ['accessories', 'handbag', 'gothic', 'darkwear', 'luxury_streetwear', 'silver'].includes(tag),
     );
-  }
-
-  private getOptionalRoles(intent: ExtractedIntent): OutfitRole[] {
-    const roles: OutfitRole[] = [];
-
-    if (this.shouldIncludeJacket(intent)) {
-      roles.push('jacket');
-    }
-
-    if (this.shouldIncludeAccessories(intent)) {
-      if (!intent.negativeCategories.includes('accessory')) {
-        roles.push('accessory');
-      }
-
-      if (!intent.negativeCategories.includes('handbag')) {
-        roles.push('handbag');
-      }
-    }
-
-    return roles;
   }
 
   private isWeakMatch(scoredProduct: ScoredProduct, intent: ExtractedIntent): boolean {

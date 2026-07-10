@@ -259,7 +259,10 @@ export function inferBudgetFromStylePrompt(
   const shorthandBudget = comparable.match(
     /\b([0-9]+(?:[.,][0-9]+)*)\s*(tram nghin|tram ngan|tram|nghin|ngan|k|trieu|m|million)\b/,
   );
-  const match = constrainedBudget ?? shorthandBudget;
+  const groupedBudget = comparable.match(
+    /\b([0-9]{1,3}(?:[.,][0-9]{3})+)\b/,
+  );
+  const match = constrainedBudget ?? shorthandBudget ?? groupedBudget;
 
   if (!match) {
     return undefined;

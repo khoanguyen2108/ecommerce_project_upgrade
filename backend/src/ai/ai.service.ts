@@ -74,16 +74,15 @@ export class AiService {
         resultCount = result.resultCount;
 
         const response: StyleAdviceResponseDto = {
-          mode: 'catalog_fallback',
+          mode: 'deterministic_tag_recommender',
           ...result.response,
         };
 
-        this.logEvent('AI_STYLE_ADVICE_FALLBACK', context, {
+        this.logEvent('AI_STYLE_ADVICE_RECOMMENDED', context, {
           mode: response.mode,
           candidateCount,
           resultCount,
           latencyMs: Date.now() - startedAt,
-          errorCode: 'TAG_MATCH_RECOMMENDER',
         });
 
         return response;

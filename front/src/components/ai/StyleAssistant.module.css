@@ -577,20 +577,6 @@
   padding-top: 14px;
 }
 
-.matchedTags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.matchedTags span {
-  background: var(--color-text);
-  color: var(--color-surface);
-  font-size: 0.65rem;
-  font-weight: 800;
-  padding: 6px 9px;
-}
-
 .outfitProductGrid {
   display: grid;
   gap: 14px;

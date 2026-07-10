@@ -55,7 +55,11 @@ export interface StyleAdviceHandoff {
 }
 
 export interface StyleAdviceResponse {
-  mode: "ai" | "catalog_fallback" | "out_of_scope";
+  mode:
+    | "ai"
+    | "catalog_fallback"
+    | "deterministic_tag_recommender"
+    | "out_of_scope";
   query?: string;
   intent?: StyleAdviceIntent;
   summary: string;

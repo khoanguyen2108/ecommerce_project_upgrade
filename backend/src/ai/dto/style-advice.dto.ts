@@ -192,9 +192,11 @@ export class StyleAdviceOutfitDto {
 }
 
 export class StyleAdviceResponseDto {
-  @ApiProperty({ enum: ['ai', 'catalog_fallback', 'out_of_scope'] })
-  @IsIn(['ai', 'catalog_fallback', 'out_of_scope'])
-  mode: 'ai' | 'catalog_fallback' | 'out_of_scope';
+  @ApiProperty({
+    enum: ['ai', 'catalog_fallback', 'deterministic_tag_recommender', 'out_of_scope'],
+  })
+  @IsIn(['ai', 'catalog_fallback', 'deterministic_tag_recommender', 'out_of_scope'])
+  mode: 'ai' | 'catalog_fallback' | 'deterministic_tag_recommender' | 'out_of_scope';
 
   @ApiProperty({ example: 'I want an all black gothic outfit for going out.' })
   query: string;

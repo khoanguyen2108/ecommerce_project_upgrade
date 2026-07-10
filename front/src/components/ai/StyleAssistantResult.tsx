@@ -69,16 +69,18 @@ export function StyleAssistantResult({ result }: StyleAssistantResultProps) {
 }
 
 function OutfitResults({ outfits }: { outfits: StyleAdviceOutfit[] }) {
+  const displayedOutfits = outfits.slice(0, 2);
+
   return (
     <div className={styles.outfitsSection}>
       <div className={styles.sectionHeading}>
         <h3>Outfit recommendations</h3>
         <span>
-          {outfits.length} option{outfits.length === 1 ? "" : "s"}
+          {displayedOutfits.length} option{displayedOutfits.length === 1 ? "" : "s"}
         </span>
       </div>
       <div className={styles.outfitList}>
-        {outfits.map((outfit, index) => (
+        {displayedOutfits.map((outfit, index) => (
           <OutfitCard
             key={`${outfit.title}-${index}-${outfit.products.map((product) => product.productId).join("-")}`}
             outfit={outfit}
@@ -112,14 +114,6 @@ function OutfitCard({ outfit }: { outfit: StyleAdviceOutfit }) {
         <span>{outfit.products.length} pieces</span>
         <span>{formatPrice(totalPrice)} total</span>
       </div>
-
-      {outfit.matchedIntentTags.length ? (
-        <div aria-label="Matched style details" className={styles.matchedTags}>
-          {outfit.matchedIntentTags.slice(0, 6).map((tag) => (
-            <span key={tag}>{formatTag(tag)}</span>
-          ))}
-        </div>
-      ) : null}
 
       <div className={styles.outfitProductGrid}>
         {outfit.products.map((product) => (
@@ -167,9 +161,6 @@ function OutfitProductCard({ product }: { product: StyleAdviceOutfitProduct }) {
         <span className={styles.roleBadge}>{formatRole(product.role)}</span>
         <h5>{product.productName}</h5>
         <strong>{formatPrice(product.price)}</strong>
-        {product.matchedTags.length ? (
-          <p>Matched: {product.matchedTags.slice(0, 3).map(formatTag).join(", ")}</p>
-        ) : null}
         <Link
           className={styles.productLink}
           href={`/products/${encodeURIComponent(product.productSlug)}`}
@@ -335,25 +326,4 @@ function formatRole(role: StyleAdviceOutfitProductRole): string {
   };
 
   return labels[role];
-}
-
-function formatTag(tag: string): string {
-  const labels: Record<string, string> = {
-    avant_garde: "avant garde",
-    clean_fit: "clean fit",
-    cold_weather: "cold weather",
-    daily_wear: "daily wear",
-    date_outfit: "date outfit",
-    going_out: "going out",
-    long_sleeves: "long sleeves",
-    luxury_streetwear: "luxury streetwear",
-    silver_hardware: "silver hardware",
-    street_photo: "street photo",
-    tank_top: "tank top",
-    washed_black: "washed black",
-    washed_blue: "washed blue",
-    wide_leg: "wide leg",
-  };
-
-  return labels[tag] ?? tag.replace(/_/g, " ");
 }
