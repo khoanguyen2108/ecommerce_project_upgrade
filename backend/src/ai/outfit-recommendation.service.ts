@@ -186,6 +186,12 @@ const ROLE_TAGS: Record<OutfitRole, string[]> = {
 
 const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
   {
+    tag: 'top',
+    role: 'top',
+    aliases: ['top', 'ao', 'ao tren'],
+    impliedTags: ['top'],
+  },
+  {
     tag: 'tee',
     role: 'top',
     aliases: ['tee', 't shirt', 't-shirt', 'tshirt', 'ao thun', 'ao phong'],
@@ -212,13 +218,23 @@ const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
   {
     tag: 'bottoms',
     role: 'bottom',
-    aliases: ['bottoms', 'pants', 'trousers', 'jeans', 'denim', 'shorts', 'quan'],
+    aliases: [
+      'bottom',
+      'bottoms',
+      'pants',
+      'trousers',
+      'jeans',
+      'quan jeans',
+      'denim',
+      'shorts',
+      'quan',
+    ],
     impliedTags: ['bottoms', 'pants'],
   },
   {
     tag: 'shoes',
     role: 'shoes',
-    aliases: ['shoes', 'sneakers', 'boots', 'boot', 'giay'],
+    aliases: ['shoes', 'sneakers', 'boots', 'boot', 'giay', 'doi giay'],
     impliedTags: ['shoes'],
   },
   {
@@ -230,7 +246,17 @@ const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
   {
     tag: 'accessories',
     role: 'accessory',
-    aliases: ['accessories', 'accessory', 'belt', 'ring', 'bracelet', 'phu kien'],
+    aliases: [
+      'accessories',
+      'accessory',
+      'belt',
+      'ring',
+      'bracelet',
+      'phu kien',
+      'trang suc',
+      'vong',
+      'nhan',
+    ],
     impliedTags: ['accessories'],
   },
 ];
@@ -241,7 +267,11 @@ const COLOR_ENTRIES: DictionaryEntry[] = [
   { tag: 'cream', aliases: ['cream', 'mau kem', 'kem'], impliedTags: ['cream', 'beige'] },
   { tag: 'beige', aliases: ['beige', 'tan'], impliedTags: ['beige', 'cream'] },
   { tag: 'brown', aliases: ['brown', 'mau nau', 'nau'] },
-  { tag: 'blue', aliases: ['blue', 'mau xanh', 'xanh duong'], impliedTags: ['blue', 'denim'] },
+  {
+    tag: 'blue',
+    aliases: ['blue', 'xanh', 'xanh duong', 'xanh blue', 'mau xanh'],
+    impliedTags: ['blue', 'denim'],
+  },
   { tag: 'washed_blue', aliases: ['washed blue', 'light denim'], impliedTags: ['washed_blue', 'denim', 'blue'] },
   { tag: 'washed_black', aliases: ['washed black', 'faded black'], impliedTags: ['washed_black', 'black'] },
   { tag: 'silver', aliases: ['silver', 'bac'], impliedTags: ['silver', 'silver_hardware'] },
@@ -256,12 +286,37 @@ const STYLE_ENTRIES: DictionaryEntry[] = [
   { tag: 'vintage', aliases: ['vintage', 'retro'] },
   { tag: 'grunge', aliases: ['grunge'] },
   { tag: 'punk', aliases: ['punk'] },
-  { tag: 'minimal', aliases: ['minimal', 'minimalist', 'toi gian', 'basic'] },
-  { tag: 'clean_fit', aliases: ['clean fit', 'clean', 'not too loud', 'simple'] },
+  {
+    tag: 'minimal',
+    aliases: ['minimal', 'minimalist', 'toi gian', 'don gian', 'basic'],
+  },
+  {
+    tag: 'clean_fit',
+    aliases: [
+      'clean fit',
+      'clean',
+      'simple',
+      'de mac',
+      'not too loud',
+      'not too flashy',
+      'not flashy',
+      'khong qua noi',
+      'khong loe loet',
+      'khong qua lo',
+    ],
+  },
   { tag: 'biker', aliases: ['biker', 'motorcycle', 'leather biker'], impliedTags: ['biker', 'leather'] },
   { tag: 'y2k', aliases: ['y2k'] },
   { tag: 'avant_garde', aliases: ['avant garde', 'avant-garde'] },
-  { tag: 'casual', aliases: ['casual', 'daily', 'hang ngay'] },
+  {
+    tag: 'casual',
+    aliases: ['casual', 'daily', 'hang ngay', 'thuong ngay', 'de mac'],
+  },
+  {
+    tag: 'rick_owens_style',
+    aliases: ['rick owens style', 'rick owens vibe', 'rick owens'],
+    impliedTags: ['darkwear', 'avant_garde'],
+  },
   { tag: 'statement', aliases: ['statement', 'ngau', 'ca tinh'], impliedTags: ['statement', 'streetwear'] },
   { tag: 'denim', aliases: ['denim', 'jeans'], impliedTags: ['denim', 'washed_blue'] },
 ];
@@ -277,7 +332,16 @@ const FIT_ENTRIES: DictionaryEntry[] = [
 ];
 
 const OCCASION_ENTRIES: DictionaryEntry[] = [
-  { tag: 'daily_wear', aliases: ['daily wear', 'daily', 'everyday', 'hang ngay'] },
+  {
+    tag: 'daily_wear',
+    aliases: [
+      'daily wear',
+      'daily',
+      'everyday',
+      'hang ngay',
+      'thuong ngay',
+    ],
+  },
   { tag: 'going_out', aliases: ['going out', 'di choi', 'hangout', 'night out'] },
   { tag: 'date_outfit', aliases: ['date', 'date outfit', 'date night', 'hen ho'] },
   { tag: 'party', aliases: ['party', 'event', 'di tiec'] },
@@ -299,6 +363,7 @@ const COMPATIBLE_TAGS: Record<string, string[]> = {
   darkwear: ['darkwear', 'black', 'gothic'],
   streetwear: ['streetwear', 'oversized', 'boxy'],
   luxury_streetwear: ['luxury_streetwear', 'streetwear', 'silver_hardware'],
+  rick_owens_style: ['rick_owens_style', 'darkwear', 'avant_garde', 'gothic'],
   denim: ['denim', 'jeans', 'washed_blue'],
   shoes: ['shoes', 'sneakers', 'boots'],
 };
@@ -329,6 +394,7 @@ const CLEAN_LABELS: Record<string, string> = {
   minimal: 'minimal',
   oversized: 'oversized',
   party: 'party',
+  rick_owens_style: 'Rick Owens-inspired',
   school: 'school',
   shoes: 'shoes',
   silver: 'silver',
@@ -372,6 +438,7 @@ const VIETNAMESE_LABELS: Record<string, string> = {
   long_sleeves: 'áo tay dài',
   luxury_streetwear: 'streetwear cao cấp',
   minimal: 'phong cách tối giản',
+  rick_owens_style: 'phong cách lấy cảm hứng từ Rick Owens',
   oversized: 'form rộng',
   party: 'đi tiệc',
   school: 'đi học',
@@ -1547,6 +1614,24 @@ export class OutfitRecommendationService {
     tag: string,
     comparableAlias: string,
   ): boolean {
+    if (
+      tag === 'blue' &&
+      comparableAlias === 'xanh' &&
+      /\bxanh\s+(?:la|luc|reu)\b/.test(comparablePrompt)
+    ) {
+      return false;
+    }
+
+    if (
+      tag === 'top' &&
+      comparableAlias === 'ao' &&
+      /\bao\s+(?:khoac|thun|phong|tay dai|ba lo|tank)\b/.test(
+        comparablePrompt,
+      )
+    ) {
+      return false;
+    }
+
     if (tag !== 'handbag' || comparableAlias !== 'tui') {
       return this.hasAlias(comparablePrompt, comparableAlias);
     }
@@ -1563,16 +1648,30 @@ export class OutfitRecommendationService {
 
   private extractNegativeCategories(comparablePrompt: string): OutfitRole[] {
     const negatives = new Set<OutfitRole>();
+    const negativePrefix =
+      '(?:no|without|skip|khong(?: can)?|bo|dung(?: them)?)';
 
-    if (/\b(?:no|without|skip)\s+(?:jacket|coat|outerwear|ao khoac)\b/.test(comparablePrompt)) {
+    if (
+      new RegExp(
+        `\\b${negativePrefix}\\s+(?:jacket|coat|outerwear|ao khoac)\\b`,
+      ).test(comparablePrompt)
+    ) {
       negatives.add('jacket');
     }
 
-    if (/\b(?:no|without|skip)\s+(?:accessories|accessory|belt|ring|bracelet|phu kien)\b/.test(comparablePrompt)) {
+    if (
+      new RegExp(
+        `\\b${negativePrefix}\\s+(?:accessories|accessory|belt|ring|bracelet|phu kien|trang suc)\\b`,
+      ).test(comparablePrompt)
+    ) {
       negatives.add('accessory');
     }
 
-    if (/\b(?:no|without|skip)\s+(?:bag|handbag|tote|tui)\b/.test(comparablePrompt)) {
+    if (
+      new RegExp(
+        `\\b${negativePrefix}\\s+(?:bag|handbag|tote|tui|tui xach)\\b`,
+      ).test(comparablePrompt)
+    ) {
       negatives.add('handbag');
     }
 
@@ -1587,7 +1686,11 @@ export class OutfitRecommendationService {
       negatives.add('gothic');
     }
 
-    if (/\b(?:not too loud|not loud|simple|khong qua loe loet)\b/.test(comparablePrompt)) {
+    if (
+      /\b(?:not too loud|not too flashy|not flashy|not loud|simple|khong qua noi|khong loe loet|khong qua lo|khong qua loe loet)\b/.test(
+        comparablePrompt,
+      )
+    ) {
       negatives.add('statement');
       negatives.add('punk');
       negatives.add('avant_garde');
