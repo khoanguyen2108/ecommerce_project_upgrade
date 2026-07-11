@@ -1,15 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import type { NormalizedStyleAdviceRequest } from './dto/style-advice.dto';
 import type {
+  NormalizedStyleAdviceRequest,
   StyleAdviceIntentDto,
   StyleAdviceOutfitDto,
   StyleAdviceOutfitProductDto,
+  StyleAdviceOutfitProductRole,
+  StyleAdvicePreviousOutfitDto,
   StyleAdviceRecommendationDto,
+  StyleAdviceRefinementAction,
+  StyleAdviceRefinementDto,
 } from './dto/style-advice.dto';
 import type { StyleAdviceLocale } from './style-advice-locale';
 
-type OutfitRole = 'top' | 'bottom' | 'shoes' | 'jacket' | 'handbag' | 'accessory';
+type OutfitRole = StyleAdviceOutfitProductRole;
 
 interface DictionaryEntry {
   tag: string;
@@ -106,6 +110,29 @@ interface StyleAdviceResponseWithoutMode {
   query: string;
   recommendations: StyleAdviceRecommendationDto[];
   summary: string;
+  warnings: string[];
+  refinement?: StyleAdviceRefinementDto;
+}
+
+interface ParsedRefinement {
+  action: StyleAdviceRefinementAction;
+  cheaper: boolean;
+  explicitOptionReference: boolean;
+  hasRefinementIntent: boolean;
+  keepRoles: OutfitRole[];
+  removeRoles: OutfitRole[];
+  replaceRoles: OutfitRole[];
+  replacementRoleBySource: Map<OutfitRole, OutfitRole>;
+  replacementTags: Map<OutfitRole, string[]>;
+  requiresPreviousContext: boolean;
+  sourceOptionIndex?: number;
+  targetRoles: OutfitRole[];
+  vagueOptionReference: boolean;
+}
+
+interface RefinedOutfitResult {
+  outfit?: StyleAdviceOutfitDto;
+  refinement: StyleAdviceRefinementDto;
   warnings: string[];
 }
 
@@ -467,11 +494,68 @@ export class OutfitRecommendationService {
     locale: StyleAdviceLocale = 'en',
   ): Promise<OutfitRecommendationPayload> {
     const query = this.buildPrompt(request);
-    const intent = this.extractIntent(query);
+    const currentIntent = this.extractIntent(query);
+    const parsedRefinement = this.parseRefinement(query, request.budget);
     const products = await this.loadTaggedProducts();
     const preparedProducts = products.map((product) =>
       this.prepareProduct(product),
     );
+
+    if (
+      parsedRefinement.requiresPreviousContext &&
+      (request.previousOutfits?.length ?? 0) === 0
+    ) {
+      return this.buildMissingContextPayload(
+        query,
+        currentIntent,
+        preparedProducts.length,
+        parsedRefinement,
+        locale,
+      );
+    }
+
+    if (
+      parsedRefinement.hasRefinementIntent &&
+      (request.previousOutfits?.length ?? 0) > 0
+    ) {
+      const intent = this.mergePreviousIntent(
+        currentIntent,
+        request.previousIntent,
+      );
+      const refined = this.refinePreviousOutfit(
+        preparedProducts,
+        intent,
+        currentIntent,
+        parsedRefinement,
+        request.previousOutfits ?? [],
+        request.budget,
+        request.previousBudget,
+        locale,
+      );
+      const outfits = refined.outfit ? [refined.outfit] : [];
+      const recommendations = this.flattenPrimaryRecommendations(outfits, locale);
+
+      return {
+        candidateCount: preparedProducts.length,
+        resultCount: recommendations.length,
+        response: {
+          query,
+          intent: this.mapIntentDto(intent),
+          outfits,
+          recommendations,
+          summary: this.buildRefinementSummary(
+            refined.refinement,
+            outfits.length,
+            locale,
+          ),
+          warnings: refined.warnings,
+          extraTips: this.buildExtraTips(refined.warnings, outfits.length, locale),
+          refinement: refined.refinement,
+        },
+      };
+    }
+
+    const intent = currentIntent;
     const outfits = this.composeOutfits(
       preparedProducts,
       intent,
@@ -498,17 +582,7 @@ export class OutfitRecommendationService {
       resultCount: recommendations.length,
       response: {
         query,
-        intent: {
-          categories: intent.categories,
-          colors: intent.colors,
-          styles: intent.styles,
-          occasions: intent.occasions,
-          fits: intent.fits,
-          negativeConstraints: [
-            ...intent.negativeCategories.map((role) => `no_${role}`),
-            ...intent.negativeTags,
-          ],
-        },
+        intent: this.mapIntentDto(intent),
         outfits,
         recommendations,
         summary,
@@ -590,6 +664,814 @@ export class OutfitRecommendationService {
         },
       },
     });
+  }
+
+  private parseRefinement(
+    query: string,
+    requestBudget?: number,
+  ): ParsedRefinement {
+    const comparable = this.normalizeComparable(query);
+    const numberedOption = comparable.match(
+      /\b(?:option|outfit|set|goi y)\s*(?:so\s*)?([12])\b/,
+    );
+    const firstOptionReference =
+      /\b(?:cai dau|option dau|outfit dau|set dau|goi y dau)\b/.test(
+        comparable,
+      );
+    const vagueOptionReference =
+      /\b(?:option do|outfit do|set do|cai do|goi y do)\b/.test(comparable);
+    const explicitOptionReference = Boolean(numberedOption || firstOptionReference);
+    const sourceOptionIndex = numberedOption
+      ? Number(numberedOption[1])
+      : firstOptionReference
+        ? 1
+        : undefined;
+    const keepRoles = new Set<OutfitRole>();
+    const replaceRoles = new Set<OutfitRole>();
+    const removeRoles = new Set<OutfitRole>();
+    const replacementRoleBySource = new Map<OutfitRole, OutfitRole>();
+    const replacementTags = new Map<OutfitRole, string[]>();
+    const allMentionedRoles = this.findMentionedRoles(comparable);
+    const actionMatches = [
+      ...comparable.matchAll(
+        /\b(?:keep|giu(?: lai)?|change|replace|doi|thay(?: bang)?|remove|bo(?: bot)?|khong can|without|skip|no)\b/g,
+      ),
+    ];
+    let hasKeepKeyword = false;
+    let hasReplaceKeyword = false;
+    let hasRemoveKeyword = false;
+
+    for (const [index, match] of actionMatches.entries()) {
+      const keyword = match[0];
+      const start = match.index ?? 0;
+      const end = actionMatches[index + 1]?.index ?? comparable.length;
+      const actionSegment = comparable.slice(start, end);
+      const actionRoles = this.findMentionedRoles(actionSegment);
+
+      if (/^(?:keep|giu(?: lai)?)$/.test(keyword)) {
+        hasKeepKeyword = true;
+        for (const role of actionRoles) {
+          keepRoles.add(role);
+        }
+      }
+
+      if (/^(?:change|replace|doi|thay(?: bang)?)$/.test(keyword)) {
+        hasReplaceKeyword = true;
+        for (const role of actionRoles) {
+          replaceRoles.add(role);
+        }
+      }
+
+      if (/^(?:remove|bo(?: bot)?|khong can|without|skip|no)$/.test(keyword)) {
+        hasRemoveKeyword = true;
+        for (const role of actionRoles) {
+          removeRoles.add(role);
+        }
+      }
+    }
+
+    if (hasKeepKeyword && keepRoles.size === 0) {
+      for (const role of allMentionedRoles) {
+        keepRoles.add(role);
+      }
+    }
+    if (hasReplaceKeyword && replaceRoles.size === 0) {
+      for (const role of allMentionedRoles) {
+        replaceRoles.add(role);
+      }
+    }
+    if (hasRemoveKeyword && removeRoles.size === 0) {
+      for (const role of allMentionedRoles) {
+        removeRoles.add(role);
+      }
+    }
+
+    if (
+      hasReplaceKeyword &&
+      allMentionedRoles.includes('accessory') &&
+      allMentionedRoles.includes('handbag') &&
+      /\b(?:bang|with|to|sang)\b/.test(comparable)
+    ) {
+      replaceRoles.delete('handbag');
+      replaceRoles.add('accessory');
+      replacementRoleBySource.set('accessory', 'handbag');
+    }
+
+    if (hasReplaceKeyword && /\bboots?\b/.test(comparable)) {
+      replacementTags.set('shoes', ['boots']);
+      replaceRoles.add('shoes');
+    }
+
+    const cheaper = /\b(?:cheaper|less expensive|re hon)\b/.test(comparable);
+    const hasBudgetWording =
+      /\b(?:under|below|duoi|tam|budget|ngan sach)\b/.test(comparable);
+    const hasBudgetRefinement =
+      cheaper ||
+      (requestBudget !== undefined &&
+        (hasBudgetWording || explicitOptionReference || vagueOptionReference));
+    const hasRoleAction =
+      keepRoles.size > 0 || replaceRoles.size > 0 || removeRoles.size > 0;
+    const hasRefinementIntent =
+      hasRoleAction ||
+      hasBudgetRefinement ||
+      ((explicitOptionReference || vagueOptionReference) &&
+        (hasKeepKeyword || hasReplaceKeyword || hasRemoveKeyword));
+    const requiresPreviousContext =
+      explicitOptionReference ||
+      vagueOptionReference ||
+      hasKeepKeyword ||
+      hasReplaceKeyword;
+    const targetRoles = [
+      ...keepRoles,
+      ...replaceRoles,
+      ...removeRoles,
+      ...replacementRoleBySource.values(),
+    ].filter((role, index, roles) => roles.indexOf(role) === index);
+    const action: StyleAdviceRefinementAction =
+      replaceRoles.size > 0
+        ? 'replace'
+        : removeRoles.size > 0
+          ? 'remove'
+          : hasBudgetRefinement
+            ? 'budget'
+            : keepRoles.size > 0
+              ? 'keep'
+              : 'fresh';
+
+    return {
+      action,
+      cheaper,
+      explicitOptionReference,
+      hasRefinementIntent,
+      keepRoles: [...keepRoles],
+      removeRoles: [...removeRoles],
+      replaceRoles: [...replaceRoles],
+      replacementRoleBySource,
+      replacementTags,
+      requiresPreviousContext,
+      sourceOptionIndex,
+      targetRoles,
+      vagueOptionReference,
+    };
+  }
+
+  private findMentionedRoles(comparable: string): OutfitRole[] {
+    const roles = new Set<OutfitRole>();
+
+    if (/\b(?:jacket|coat|outerwear|ao khoac)\b/.test(comparable)) {
+      roles.add('jacket');
+    }
+    if (/\b(?:bottom|bottoms|pants|trousers|jeans|quan)\b/.test(comparable)) {
+      roles.add('bottom');
+    }
+    if (/\b(?:shoes?|sneakers?|boots?|giay|doi giay)\b/.test(comparable)) {
+      roles.add('shoes');
+    }
+    if (/\b(?:accessor(?:y|ies)|phu kien|trang suc)\b/.test(comparable)) {
+      roles.add('accessory');
+    }
+    if (
+      /\b(?:handbags?|bags?|tui xach)\b/.test(comparable) ||
+      (/\btui\b/.test(comparable) &&
+        !/\btui\s+(?:muon|can|thich|dang|nen|se|co|khong)\b/.test(
+          comparable,
+        ))
+    ) {
+      roles.add('handbag');
+    }
+    if (
+      /\b(?:top|tee|t shirt|tshirt|shirt|ao thun|ao phong|ao)\b/.test(
+        comparable,
+      ) &&
+      !/\bao khoac\b/.test(comparable)
+    ) {
+      roles.add('top');
+    }
+
+    return [...roles];
+  }
+
+  private mergePreviousIntent(
+    current: ExtractedIntent,
+    previous: NormalizedStyleAdviceRequest['previousIntent'],
+  ): ExtractedIntent {
+    if (!previous) {
+      return current;
+    }
+
+    const previousNegativeCategories = (previous.negativeConstraints ?? [])
+      .filter((value) => /^no_(?:top|bottom|shoes|jacket|handbag|accessory)$/.test(value))
+      .map((value) => value.slice(3) as OutfitRole);
+    const previousNegativeTags = (previous.negativeConstraints ?? []).filter(
+      (value) => !value.startsWith('no_'),
+    );
+    const categories = this.mergeTags(previous.categories, current.categories);
+    const colors =
+      current.colors.length > 0
+        ? current.colors
+        : this.cleanTags(previous.colors ?? []);
+    const styles =
+      current.styles.length > 0
+        ? current.styles
+        : this.cleanTags(previous.styles ?? []);
+    const occasions =
+      current.occasions.length > 0
+        ? current.occasions
+        : this.cleanTags(previous.occasions ?? []);
+    const fits =
+      current.fits.length > 0
+        ? current.fits
+        : this.cleanTags(previous.fits ?? []);
+    const negativeCategories = [
+      ...previousNegativeCategories,
+      ...current.negativeCategories,
+    ].filter((role, index, roles) => roles.indexOf(role) === index);
+    const negativeTags = this.mergeTags(
+      previousNegativeTags,
+      current.negativeTags,
+    );
+
+    return {
+      categories,
+      colors,
+      styles,
+      occasions,
+      fits,
+      negativeCategories,
+      negativeTags,
+      searchTags: this.cleanTags([
+        ...categories,
+        ...colors,
+        ...styles,
+        ...occasions,
+        ...fits,
+        ...current.searchTags,
+      ]),
+    };
+  }
+
+  private mergeTags(
+    previous: string[] | undefined,
+    current: string[],
+  ): string[] {
+    return this.cleanTags([...(previous ?? []), ...current]);
+  }
+
+  private mapIntentDto(intent: ExtractedIntent): StyleAdviceIntentDto {
+    return {
+      categories: intent.categories,
+      colors: intent.colors,
+      styles: intent.styles,
+      occasions: intent.occasions,
+      fits: intent.fits,
+      negativeConstraints: [
+        ...intent.negativeCategories.map((role) => `no_${role}`),
+        ...intent.negativeTags,
+      ],
+    };
+  }
+
+  private buildMissingContextPayload(
+    query: string,
+    intent: ExtractedIntent,
+    candidateCount: number,
+    parsed: ParsedRefinement,
+    locale: StyleAdviceLocale,
+  ): OutfitRecommendationPayload {
+    const warning =
+      locale === 'vi'
+        ? 'M\u00ecnh ch\u01b0a c\u00f3 outfit tr\u01b0\u1edbc \u0111\u00f3 \u0111\u1ec3 ch\u1ec9nh. B\u1ea1n h\u00e3y t\u1ea1o outfit tr\u01b0\u1edbc r\u1ed3i y\u00eau c\u1ea7u \u0111\u1ed5i qu\u1ea7n, \u0111\u1ed5i gi\u00e0y ho\u1eb7c b\u1ecf \u00e1o kho\u00e1c.'
+        : 'I do not have a previous outfit to refine yet. Please generate an outfit first, then ask me to change a role.';
+
+    return {
+      candidateCount,
+      resultCount: 0,
+      response: {
+        query,
+        intent: this.mapIntentDto(intent),
+        outfits: [],
+        recommendations: [],
+        summary: warning,
+        warnings: [warning],
+        extraTips: [],
+        refinement: {
+          applied: false,
+          action: 'fresh',
+          ...(parsed.sourceOptionIndex
+            ? { sourceOptionIndex: parsed.sourceOptionIndex }
+            : {}),
+          targetRoles: parsed.targetRoles,
+          keptProductIds: [],
+          removedProductIds: [],
+          replacedProductIds: [],
+        },
+      },
+    };
+  }
+
+  private refinePreviousOutfit(
+    products: PreparedProduct[],
+    intent: ExtractedIntent,
+    currentIntent: ExtractedIntent,
+    parsed: ParsedRefinement,
+    previousOutfits: StyleAdvicePreviousOutfitDto[],
+    requestBudget: number | undefined,
+    previousBudget: number | undefined,
+    locale: StyleAdviceLocale,
+  ): RefinedOutfitResult {
+    const sourceOptionIndex = parsed.sourceOptionIndex ?? 1;
+    const sourceOutfit = previousOutfits.find(
+      (outfit) => outfit.optionIndex === sourceOptionIndex,
+    );
+    const baseRefinement = {
+      action: parsed.action,
+      sourceOptionIndex,
+      targetRoles: parsed.targetRoles,
+    } as const;
+
+    if (!sourceOutfit) {
+      const warning =
+        locale === 'vi'
+          ? `M\u00ecnh kh\u00f4ng nh\u1eadn \u0111\u01b0\u1ee3c g\u1ee3i \u00fd ${sourceOptionIndex} trong k\u1ebft qu\u1ea3 tr\u01b0\u1edbc \u0111\u00f3 n\u00ean ch\u01b0a th\u1ec3 ch\u1ec9nh set n\u00e0y.`
+          : `Option ${sourceOptionIndex} was not included in the previous result, so I could not refine it.`;
+
+      return {
+        refinement: {
+          applied: false,
+          ...baseRefinement,
+          keptProductIds: [],
+          removedProductIds: [],
+          replacedProductIds: [],
+        },
+        warnings: [warning],
+      };
+    }
+
+    const warnings: string[] = [];
+    if (!parsed.explicitOptionReference && previousOutfits.length > 1) {
+      warnings.push(
+        locale === 'vi'
+          ? 'B\u1ea1n ch\u01b0a n\u00eau r\u00f5 s\u1ed1 g\u1ee3i \u00fd, n\u00ean m\u00ecnh \u0111ang ch\u1ec9nh g\u1ee3i \u00fd 1.'
+          : 'You did not specify an option number, so I refined option 1.',
+      );
+    }
+
+    const productsById = new Map(
+      products.map((product) => [product.record.id, product]),
+    );
+    const selectedByRole = new Map<OutfitRole, ScoredProduct>();
+    const sourceProductIds = new Set<string>();
+    const removedProductIds = new Set<string>();
+    const replacedProductIds = new Set<string>();
+    const excludedProductIds = new Set<string>();
+
+    for (const contextProduct of sourceOutfit.products) {
+      const product = productsById.get(contextProduct.productId);
+      sourceProductIds.add(contextProduct.productId);
+
+      if (
+        !product ||
+        !product.roles.has(contextProduct.role) ||
+        selectedByRole.has(contextProduct.role) ||
+        [...selectedByRole.values()].some(
+          (selected) => selected.product.record.id === contextProduct.productId,
+        )
+      ) {
+        removedProductIds.add(contextProduct.productId);
+        warnings.push(
+          this.buildPreviousProductUnavailableWarning(
+            contextProduct.role,
+            locale,
+          ),
+        );
+        continue;
+      }
+
+      selectedByRole.set(
+        contextProduct.role,
+        this.scoreProduct(product, contextProduct.role, intent, 0),
+      );
+    }
+
+    const sourceTotal = [...selectedByRole.values()].reduce(
+      (total, product) => total + product.product.price,
+      0,
+    );
+
+    for (const role of parsed.removeRoles) {
+      const removed = selectedByRole.get(role);
+      if (removed) {
+        removedProductIds.add(removed.product.record.id);
+        excludedProductIds.add(removed.product.record.id);
+      }
+      selectedByRole.delete(role);
+    }
+
+    for (const sourceRole of parsed.replaceRoles) {
+      const targetRole = parsed.replacementRoleBySource.get(sourceRole) ?? sourceRole;
+      const removed = selectedByRole.get(sourceRole);
+
+      if (removed) {
+        removedProductIds.add(removed.product.record.id);
+        excludedProductIds.add(removed.product.record.id);
+      }
+      selectedByRole.delete(sourceRole);
+
+      if (targetRole !== sourceRole && selectedByRole.has(targetRole)) {
+        continue;
+      }
+
+      const replacementIntent = this.buildReplacementIntent(
+        intent,
+        currentIntent,
+        parsed.replacementTags.get(targetRole) ?? [],
+      );
+      const replacement = this.selectReplacementProduct(
+        products,
+        targetRole,
+        replacementIntent,
+        selectedByRole,
+        excludedProductIds,
+      );
+
+      if (replacement) {
+        selectedByRole.set(targetRole, replacement);
+        replacedProductIds.add(replacement.product.record.id);
+      } else {
+        warnings.push(this.buildReplacementUnavailableWarning(targetRole, locale));
+      }
+    }
+
+    for (const role of COMPLETE_OUTFIT_ROLES) {
+      if (
+        selectedByRole.has(role) ||
+        parsed.removeRoles.includes(role) ||
+        intent.negativeCategories.includes(role)
+      ) {
+        continue;
+      }
+
+      const replacement = this.selectReplacementProduct(
+        products,
+        role,
+        this.buildReplacementIntent(intent, currentIntent, []),
+        selectedByRole,
+        excludedProductIds,
+      );
+
+      if (replacement) {
+        selectedByRole.set(role, replacement);
+        replacedProductIds.add(replacement.product.record.id);
+      } else {
+        warnings.push(this.buildReplacementUnavailableWarning(role, locale));
+      }
+    }
+
+    const budgetTarget =
+      requestBudget ??
+      (parsed.cheaper && sourceTotal > 0 ? sourceTotal - 1 : previousBudget);
+    const budgetChangedRoles =
+      budgetTarget === undefined
+        ? []
+        : this.applyRefinementBudget(
+            products,
+            selectedByRole,
+            intent,
+            new Set(parsed.keepRoles),
+            excludedProductIds,
+            removedProductIds,
+            replacedProductIds,
+            budgetTarget,
+          );
+    const totalPrice = [...selectedByRole.values()].reduce(
+      (total, product) => total + product.product.price,
+      0,
+    );
+
+    if (budgetTarget !== undefined && totalPrice > budgetTarget) {
+      warnings.push(
+        parsed.cheaper && requestBudget === undefined
+          ? this.buildNoCheaperOutfitWarning(locale)
+          : this.buildBudgetWarning(budgetTarget, locale),
+      );
+    }
+
+    const orderedProducts = this.orderRefinedProducts(selectedByRole);
+    const outfitProducts = orderedProducts.map((product) =>
+      this.mapOutfitProduct(product),
+    );
+    const keptProductIds = outfitProducts
+      .map((product) => product.productId)
+      .filter((productId) => sourceProductIds.has(productId));
+    const targetRoles = [
+      ...parsed.targetRoles,
+      ...budgetChangedRoles,
+    ].filter((role, index, roles) => roles.indexOf(role) === index);
+    const refinement: StyleAdviceRefinementDto = {
+      applied: true,
+      ...baseRefinement,
+      targetRoles,
+      keptProductIds,
+      removedProductIds: [...removedProductIds],
+      replacedProductIds: [...replacedProductIds],
+    };
+
+    if (orderedProducts.length === 0) {
+      return { refinement, warnings };
+    }
+
+    const scoreTotal = orderedProducts.reduce(
+      (total, product) => total + product.score,
+      0,
+    );
+    const outfit: StyleAdviceOutfitDto = {
+      title: this.buildOutfitTitle(intent, 1, locale),
+      reason: this.buildOutfitReason(intent, outfitProducts, warnings, locale),
+      score: Math.min(
+        100,
+        Math.max(0, Math.round(scoreTotal / orderedProducts.length)),
+      ),
+      matchedIntentTags: this.cleanTags(
+        this.getMatchedIntentTags(outfitProducts, intent),
+      ),
+      products: outfitProducts,
+      warnings: [...new Set(warnings)],
+    };
+
+    return {
+      outfit,
+      refinement,
+      warnings: [...new Set(warnings)],
+    };
+  }
+
+  private buildReplacementIntent(
+    merged: ExtractedIntent,
+    current: ExtractedIntent,
+    exactCategoryTags: string[],
+  ): ExtractedIntent {
+    return {
+      ...merged,
+      colors: current.colors.length > 0 ? current.colors : merged.colors,
+      styles: current.styles.length > 0 ? current.styles : merged.styles,
+      occasions:
+        current.occasions.length > 0 ? current.occasions : merged.occasions,
+      fits: current.fits.length > 0 ? current.fits : merged.fits,
+      categories: this.cleanTags([
+        ...merged.categories,
+        ...exactCategoryTags,
+      ]),
+      searchTags: this.cleanTags([
+        ...merged.searchTags,
+        ...exactCategoryTags,
+      ]),
+    };
+  }
+
+  private selectReplacementProduct(
+    products: PreparedProduct[],
+    role: OutfitRole,
+    intent: ExtractedIntent,
+    selectedByRole: Map<OutfitRole, ScoredProduct>,
+    excludedProductIds: Set<string>,
+  ): ScoredProduct | undefined {
+    const selectedIds = new Set(
+      [...selectedByRole.values()].map((product) => product.product.record.id),
+    );
+
+    return this.scoreProductsForRole(products, role, intent).find(
+      (candidate) =>
+        !selectedIds.has(candidate.product.record.id) &&
+        !excludedProductIds.has(candidate.product.record.id),
+    );
+  }
+
+  private applyRefinementBudget(
+    products: PreparedProduct[],
+    selectedByRole: Map<OutfitRole, ScoredProduct>,
+    intent: ExtractedIntent,
+    keepRoles: Set<OutfitRole>,
+    excludedProductIds: Set<string>,
+    removedProductIds: Set<string>,
+    replacedProductIds: Set<string>,
+    budgetTarget: number,
+  ): OutfitRole[] {
+    const currentProducts = this.orderRefinedProducts(selectedByRole);
+    const currentTotal = currentProducts.reduce(
+      (sum, product) => sum + product.product.price,
+      0,
+    );
+
+    if (currentTotal <= budgetTarget) {
+      return [];
+    }
+
+    const choicesByRole = currentProducts.map((currentProduct) => {
+      if (keepRoles.has(currentProduct.role)) {
+        return [currentProduct] as Array<ScoredProduct | undefined>;
+      }
+
+      const scored = this.scoreProductsForRole(
+        products,
+        currentProduct.role,
+        intent,
+      ).filter(
+        (candidate) =>
+          candidate.product.record.id !== currentProduct.product.record.id &&
+          !excludedProductIds.has(candidate.product.record.id),
+      );
+      const cheapest = [...scored]
+        .sort(
+          (left, right) =>
+            left.product.price - right.product.price ||
+            this.compareScoredProducts(left, right),
+        )
+        .slice(0, 2);
+      const alternatives = [...scored.slice(0, 2), ...cheapest].filter(
+        (candidate, index, candidates) =>
+          candidates.findIndex(
+            (entry) => entry.product.record.id === candidate.product.record.id,
+          ) === index,
+      );
+      const choices: Array<ScoredProduct | undefined> = [
+        currentProduct,
+        ...alternatives,
+      ];
+
+      if (['jacket', 'accessory', 'handbag'].includes(currentProduct.role)) {
+        choices.push(undefined);
+      }
+
+      return choices;
+    });
+    let best:
+      | {
+          changes: number;
+          products: ScoredProduct[];
+          score: number;
+          total: number;
+        }
+      | undefined;
+    let closestOver:
+      | {
+          changes: number;
+          products: ScoredProduct[];
+          score: number;
+          total: number;
+        }
+      | undefined;
+
+    const search = (
+      roleIndex: number,
+      selected: ScoredProduct[],
+      selectedIds: Set<string>,
+      changes: number,
+      total: number,
+      score: number,
+    ) => {
+      if (best && changes > best.changes) {
+        return;
+      }
+
+      if (roleIndex === currentProducts.length) {
+        if (total <= budgetTarget) {
+          if (
+            !best ||
+            changes < best.changes ||
+            (changes === best.changes && score > best.score) ||
+            (changes === best.changes && score === best.score && total > best.total)
+          ) {
+            best = { changes, products: [...selected], score, total };
+          }
+        } else if (
+          !best &&
+          (!closestOver ||
+            total < closestOver.total ||
+            (total === closestOver.total && changes < closestOver.changes) ||
+            (total === closestOver.total &&
+              changes === closestOver.changes &&
+              score > closestOver.score))
+        ) {
+          closestOver = { changes, products: [...selected], score, total };
+        }
+        return;
+      }
+
+      const currentProduct = currentProducts[roleIndex];
+      for (const choice of choicesByRole[roleIndex]) {
+        if (choice && selectedIds.has(choice.product.record.id)) {
+          continue;
+        }
+
+        const changed =
+          !choice ||
+          choice.product.record.id !== currentProduct.product.record.id;
+        if (choice) {
+          selected.push(choice);
+          selectedIds.add(choice.product.record.id);
+        }
+        search(
+          roleIndex + 1,
+          selected,
+          selectedIds,
+          changes + (changed ? 1 : 0),
+          total + (choice?.product.price ?? 0),
+          score + (choice?.score ?? 0),
+        );
+        if (choice) {
+          selected.pop();
+          selectedIds.delete(choice.product.record.id);
+        }
+      }
+    };
+
+    search(0, [], new Set<string>(), 0, 0, 0);
+
+    const selectedBudgetResult = best ?? closestOver;
+
+    if (!selectedBudgetResult) {
+      return [];
+    }
+
+    const bestByRole = new Map(
+      selectedBudgetResult.products.map((product) => [product.role, product]),
+    );
+    const changedRoles: OutfitRole[] = [];
+
+    for (const currentProduct of currentProducts) {
+      const replacement = bestByRole.get(currentProduct.role);
+      if (
+        replacement?.product.record.id === currentProduct.product.record.id
+      ) {
+        continue;
+      }
+
+      changedRoles.push(currentProduct.role);
+      removedProductIds.add(currentProduct.product.record.id);
+      excludedProductIds.add(currentProduct.product.record.id);
+      replacedProductIds.delete(currentProduct.product.record.id);
+
+      if (replacement) {
+        selectedByRole.set(currentProduct.role, replacement);
+        replacedProductIds.add(replacement.product.record.id);
+      } else {
+        selectedByRole.delete(currentProduct.role);
+      }
+    }
+
+    return changedRoles;
+  }
+
+  private orderRefinedProducts(
+    selectedByRole: Map<OutfitRole, ScoredProduct>,
+  ): ScoredProduct[] {
+    return (
+      ['top', 'bottom', 'shoes', 'jacket', 'handbag', 'accessory'] as OutfitRole[]
+    )
+      .map((role) => selectedByRole.get(role))
+      .filter((product): product is ScoredProduct => Boolean(product));
+  }
+
+  private buildPreviousProductUnavailableWarning(
+    role: OutfitRole,
+    locale: StyleAdviceLocale,
+  ): string {
+    const roleLabel = this.localizedLabel(role, locale);
+    return locale === 'vi'
+      ? `${this.toTitleCase(roleLabel)} trong g\u1ee3i \u00fd tr\u01b0\u1edbc kh\u00f4ng c\u00f2n kh\u1ea3 d\u1ee5ng, n\u00ean m\u00ecnh \u0111\u00e3 b\u1ecf m\u00f3n \u0111\u00f3 v\u00e0 t\u00ecm l\u1ef1a ch\u1ecdn c\u00f2n h\u00e0ng khi c\u1ea7n.`
+      : `The previous ${roleLabel} is no longer active and in stock, so I removed it and looked for an available replacement where needed.`;
+  }
+
+  private buildReplacementUnavailableWarning(
+    role: OutfitRole,
+    locale: StyleAdviceLocale,
+  ): string {
+    const roleLabel = this.localizedLabel(role, locale);
+    return locale === 'vi'
+      ? `Kh\u00f4ng t\u00ecm \u0111\u01b0\u1ee3c ${roleLabel} thay th\u1ebf c\u00f2n h\u00e0ng ph\u00f9 h\u1ee3p.`
+      : `No suitable active in-stock replacement ${roleLabel} was available.`;
+  }
+
+  private buildNoCheaperOutfitWarning(locale: StyleAdviceLocale): string {
+    return locale === 'vi'
+      ? 'M\u00ecnh ch\u01b0a t\u00ecm \u0111\u01b0\u1ee3c outfit r\u1ebb h\u01a1n t\u1eeb c\u00e1c s\u1ea3n ph\u1ea9m \u0111ang c\u00f2n h\u00e0ng, n\u00ean \u0111\u00e2y l\u00e0 l\u1ef1a ch\u1ecdn g\u1ea7n nh\u1ea5t.'
+      : 'I could not find a cheaper outfit from the active in-stock catalog, so this is the closest available option.';
+  }
+
+  private buildRefinementSummary(
+    refinement: StyleAdviceRefinementDto,
+    outfitCount: number,
+    locale: StyleAdviceLocale,
+  ): string {
+    if (!refinement.applied || outfitCount === 0) {
+      return locale === 'vi'
+        ? 'M\u00ecnh ch\u01b0a th\u1ec3 \u00e1p d\u1ee5ng y\u00eau c\u1ea7u ch\u1ec9nh outfit n\u00e0y.'
+        : 'I could not apply this outfit refinement.';
+    }
+
+    return locale === 'vi'
+      ? `M\u00ecnh \u0111\u00e3 ch\u1ec9nh g\u1ee3i \u00fd ${refinement.sourceOptionIndex ?? 1} theo y\u00eau c\u1ea7u m\u1edbi v\u00e0 ki\u1ec3m tra l\u1ea1i t\u1ed3n kho hi\u1ec7n t\u1ea1i.`
+      : `I refined option ${refinement.sourceOptionIndex ?? 1} with your new request and rechecked current availability.`;
   }
 
   private extractIntent(query: string): ExtractedIntent {

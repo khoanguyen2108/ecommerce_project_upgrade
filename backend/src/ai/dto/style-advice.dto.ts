@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayUnique,
@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 
 const normalizeText = ({ value }: { value: unknown }) =>
@@ -26,6 +27,157 @@ const normalizeStringArray = ({ value }: { value: unknown }) =>
 
 const normalizedArrayIdentity = (value: unknown) =>
   typeof value === 'string' ? value.toLocaleLowerCase() : value;
+
+export const STYLE_ADVICE_OUTFIT_PRODUCT_ROLES = [
+  'top',
+  'bottom',
+  'shoes',
+  'jacket',
+  'handbag',
+  'accessory',
+] as const;
+
+export type StyleAdviceOutfitProductRole =
+  (typeof STYLE_ADVICE_OUTFIT_PRODUCT_ROLES)[number];
+
+export class StyleAdvicePreviousOutfitProductDto {
+  @ApiProperty({ enum: STYLE_ADVICE_OUTFIT_PRODUCT_ROLES, example: 'top' })
+  @IsIn(STYLE_ADVICE_OUTFIT_PRODUCT_ROLES)
+  role: StyleAdviceOutfitProductRole;
+
+  @ApiProperty({ example: 'product-id' })
+  @Transform(normalizeText)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  productId: string;
+
+  @ApiPropertyOptional({ example: 'oversized-black-t-shirt', maxLength: 160 })
+  @IsOptional()
+  @Transform(normalizeText)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  productSlug?: string;
+
+  @ApiPropertyOptional({ example: 'Oversized Black T-Shirt', maxLength: 160 })
+  @IsOptional()
+  @Transform(normalizeText)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  productName?: string;
+
+  @ApiPropertyOptional({ example: 399000, maximum: 2_000_000_000, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2_000_000_000)
+  price?: number;
+}
+
+export class StyleAdvicePreviousOutfitDto {
+  @ApiProperty({ example: 1, maximum: 2, minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(2)
+  optionIndex: number;
+
+  @ApiPropertyOptional({ example: 'Option 1: Black gothic outfit', maxLength: 160 })
+  @IsOptional()
+  @Transform(normalizeText)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  title?: string;
+
+  @ApiPropertyOptional({ example: 890000, maximum: 12_000_000, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(12_000_000)
+  totalPrice?: number;
+
+  @ApiPropertyOptional({ enum: ['vi', 'en'], example: 'vi' })
+  @IsOptional()
+  @IsIn(['vi', 'en'])
+  locale?: 'vi' | 'en';
+
+  @ApiProperty({ maxItems: 6, type: [StyleAdvicePreviousOutfitProductDto] })
+  @IsArray()
+  @ArrayMaxSize(6)
+  @ValidateNested({ each: true })
+  @Type(() => StyleAdvicePreviousOutfitProductDto)
+  products: StyleAdvicePreviousOutfitProductDto[];
+}
+
+export class StyleAdvicePreviousIntentDto {
+  @ApiPropertyOptional({ maxItems: 12, type: [String] })
+  @IsOptional()
+  @Transform(normalizeStringArray)
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ArrayUnique(normalizedArrayIdentity)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(40, { each: true })
+  categories?: string[];
+
+  @ApiPropertyOptional({ maxItems: 12, type: [String] })
+  @IsOptional()
+  @Transform(normalizeStringArray)
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ArrayUnique(normalizedArrayIdentity)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(40, { each: true })
+  colors?: string[];
+
+  @ApiPropertyOptional({ maxItems: 12, type: [String] })
+  @IsOptional()
+  @Transform(normalizeStringArray)
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ArrayUnique(normalizedArrayIdentity)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(40, { each: true })
+  styles?: string[];
+
+  @ApiPropertyOptional({ maxItems: 12, type: [String] })
+  @IsOptional()
+  @Transform(normalizeStringArray)
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ArrayUnique(normalizedArrayIdentity)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(40, { each: true })
+  occasions?: string[];
+
+  @ApiPropertyOptional({ maxItems: 12, type: [String] })
+  @IsOptional()
+  @Transform(normalizeStringArray)
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ArrayUnique(normalizedArrayIdentity)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(40, { each: true })
+  fits?: string[];
+
+  @ApiPropertyOptional({ maxItems: 12, type: [String] })
+  @IsOptional()
+  @Transform(normalizeStringArray)
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ArrayUnique(normalizedArrayIdentity)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(40, { each: true })
+  negativeConstraints?: string[];
+}
 
 export class StyleAdviceRequestDto {
   @ApiPropertyOptional({ example: 'A summer wedding', maxLength: 80 })
@@ -88,6 +240,28 @@ export class StyleAdviceRequestDto {
   @MinLength(1)
   @MaxLength(500)
   notes?: string;
+
+  @ApiPropertyOptional({ maxItems: 2, type: [StyleAdvicePreviousOutfitDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(2)
+  @ArrayUnique((outfit: StyleAdvicePreviousOutfitDto) => outfit.optionIndex)
+  @ValidateNested({ each: true })
+  @Type(() => StyleAdvicePreviousOutfitDto)
+  previousOutfits?: StyleAdvicePreviousOutfitDto[];
+
+  @ApiPropertyOptional({ type: StyleAdvicePreviousIntentDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StyleAdvicePreviousIntentDto)
+  previousIntent?: StyleAdvicePreviousIntentDto;
+
+  @ApiPropertyOptional({ example: 800000, maximum: 2_000_000_000, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2_000_000_000)
+  previousBudget?: number;
 }
 
 export class StyleAdviceRecommendationDto {
@@ -112,18 +286,6 @@ export class StyleAdviceRecommendationDto {
   @ApiPropertyOptional({ example: 'Pair it with neutral trousers.' })
   stylingTip?: string;
 }
-
-export const STYLE_ADVICE_OUTFIT_PRODUCT_ROLES = [
-  'top',
-  'bottom',
-  'shoes',
-  'jacket',
-  'handbag',
-  'accessory',
-] as const;
-
-export type StyleAdviceOutfitProductRole =
-  (typeof STYLE_ADVICE_OUTFIT_PRODUCT_ROLES)[number];
 
 export class StyleAdviceIntentDto {
   @ApiProperty({ example: ['tee', 'bottoms', 'shoes'], type: [String] })
@@ -191,6 +353,40 @@ export class StyleAdviceOutfitDto {
   warnings: string[];
 }
 
+export const STYLE_ADVICE_REFINEMENT_ACTIONS = [
+  'replace',
+  'remove',
+  'keep',
+  'budget',
+  'fresh',
+] as const;
+
+export type StyleAdviceRefinementAction =
+  (typeof STYLE_ADVICE_REFINEMENT_ACTIONS)[number];
+
+export class StyleAdviceRefinementDto {
+  @ApiProperty({ example: true })
+  applied: boolean;
+
+  @ApiPropertyOptional({ example: 1, maximum: 2, minimum: 1 })
+  sourceOptionIndex?: number;
+
+  @ApiPropertyOptional({ enum: STYLE_ADVICE_REFINEMENT_ACTIONS, example: 'replace' })
+  action?: StyleAdviceRefinementAction;
+
+  @ApiPropertyOptional({ enum: STYLE_ADVICE_OUTFIT_PRODUCT_ROLES, isArray: true })
+  targetRoles?: StyleAdviceOutfitProductRole[];
+
+  @ApiPropertyOptional({ type: [String] })
+  keptProductIds?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  removedProductIds?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  replacedProductIds?: string[];
+}
+
 export class StyleAdviceResponseDto {
   @ApiProperty({
     enum: ['ai', 'catalog_fallback', 'deterministic_tag_recommender', 'out_of_scope'],
@@ -221,6 +417,12 @@ export class StyleAdviceResponseDto {
 
   @ApiProperty({ type: [String] })
   warnings: string[];
+
+  @ApiPropertyOptional({ example: 800000, maximum: 2_000_000_000, minimum: 0 })
+  budget?: number;
+
+  @ApiPropertyOptional({ type: StyleAdviceRefinementDto })
+  refinement?: StyleAdviceRefinementDto;
 }
 
 export interface NormalizedStyleAdviceRequest {
@@ -231,4 +433,7 @@ export interface NormalizedStyleAdviceRequest {
   preferredColors: string[];
   preferredSizes: string[];
   notes?: string;
+  previousOutfits?: StyleAdvicePreviousOutfitDto[];
+  previousIntent?: StyleAdvicePreviousIntentDto;
+  previousBudget?: number;
 }

@@ -81,6 +81,7 @@ export class AiService {
         const response: StyleAdviceResponseDto = {
           mode: 'deterministic_tag_recommender',
           locale,
+          ...(request.budget !== undefined ? { budget: request.budget } : {}),
           ...result.response,
         };
 
@@ -124,6 +125,13 @@ export class AiService {
       preferredColors: this.normalizeUserTextArray(dto.preferredColors),
       preferredSizes: this.normalizeUserTextArray(dto.preferredSizes),
       ...(dto.notes ? { notes: this.normalizeUserText(dto.notes) } : {}),
+      previousOutfits: this.normalizePreviousOutfits(dto.previousOutfits),
+      ...(dto.previousIntent
+        ? { previousIntent: this.normalizePreviousIntent(dto.previousIntent) }
+        : {}),
+      ...(dto.previousBudget !== undefined
+        ? { previousBudget: dto.previousBudget }
+        : {}),
     };
 
     const inferredBudget = inferBudgetFromStylePrompt(request);
@@ -139,6 +147,15 @@ export class AiService {
         request.budget > 2_000_000_000)
     ) {
       throw this.invalidRequestException('Budget is invalid.');
+    }
+
+    if (
+      request.previousBudget !== undefined &&
+      (!Number.isInteger(request.previousBudget) ||
+        request.previousBudget < 0 ||
+        request.previousBudget > 2_000_000_000)
+    ) {
+      throw this.invalidRequestException('Previous budget is invalid.');
     }
 
     this.assertDistinctValues(request.preferredColors);
@@ -228,6 +245,78 @@ export class AiService {
 
   private normalizeUserTextArray(values: string[] | undefined): string[] {
     return (values ?? []).map((value) => this.normalizeUserText(value));
+  }
+
+  private normalizePreviousOutfits(
+    outfits: StyleAdviceRequestDto['previousOutfits'],
+  ): NormalizedStyleAdviceRequest['previousOutfits'] {
+    if ((outfits?.length ?? 0) > 2) {
+      throw this.invalidRequestException('At most two previous outfits are allowed.');
+    }
+
+    if (
+      outfits &&
+      new Set(outfits.map((outfit) => outfit.optionIndex)).size !== outfits.length
+    ) {
+      throw this.invalidRequestException(
+        'Previous outfit option indexes must be unique.',
+      );
+    }
+
+    return (outfits ?? []).map((outfit) => {
+      if (outfit.products.length > 6) {
+        throw this.invalidRequestException(
+          'Previous outfits can contain at most six products.',
+        );
+      }
+
+      return {
+        optionIndex: outfit.optionIndex,
+        ...(outfit.title
+          ? { title: this.normalizeUserText(outfit.title) }
+          : {}),
+        ...(outfit.totalPrice !== undefined
+          ? { totalPrice: outfit.totalPrice }
+          : {}),
+        ...(outfit.locale ? { locale: outfit.locale } : {}),
+        products: outfit.products.map((product) => ({
+          role: product.role,
+          productId: this.normalizeUserText(product.productId),
+          ...(product.productSlug
+            ? { productSlug: this.normalizeUserText(product.productSlug) }
+            : {}),
+          ...(product.productName
+            ? { productName: this.normalizeUserText(product.productName) }
+            : {}),
+          ...(product.price !== undefined ? { price: product.price } : {}),
+        })),
+      };
+    });
+  }
+
+  private normalizePreviousIntent(
+    intent: NonNullable<StyleAdviceRequestDto['previousIntent']>,
+  ): NonNullable<NormalizedStyleAdviceRequest['previousIntent']> {
+    return {
+      categories: this.normalizeContextArray(intent.categories),
+      colors: this.normalizeContextArray(intent.colors),
+      styles: this.normalizeContextArray(intent.styles),
+      occasions: this.normalizeContextArray(intent.occasions),
+      fits: this.normalizeContextArray(intent.fits),
+      negativeConstraints: this.normalizeContextArray(
+        intent.negativeConstraints,
+      ),
+    };
+  }
+
+  private normalizeContextArray(values: string[] | undefined): string[] {
+    if ((values?.length ?? 0) > 12) {
+      throw this.invalidRequestException(
+        'Previous intent fields can contain at most twelve values.',
+      );
+    }
+
+    return this.normalizeUserTextArray(values);
   }
 
   private normalizeUserText(value: string): string {

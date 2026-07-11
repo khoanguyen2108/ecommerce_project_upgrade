@@ -37,6 +37,13 @@ export function StyleAssistant() {
             onSubmit={() => void generate(prompt)}
             value={prompt}
           />
+          {status === "success" && result?.mode !== "out_of_scope" ? (
+            <p className={styles.refinementHint}>
+              {result?.locale === "vi"
+                ? "B\u1ea1n c\u00f3 th\u1ec3 y\u00eau c\u1ea7u: \u201c\u0111\u1ed5i qu\u1ea7n option 1\u201d, \u201cb\u1ecf \u00e1o kho\u00e1c\u201d, ho\u1eb7c \u201c\u0111\u1ed5i gi\u00e0y sang boots\u201d."
+                : "You can ask: \u201cchange the pants in option 1\u201d, \u201cremove the jacket\u201d, or \u201cswitch the shoes to boots\u201d."}
+            </p>
+          ) : null}
           <p className={styles.disclaimer}>
             Recommendations use current catalog availability. Confirm live color,
             size, and price on the product page.

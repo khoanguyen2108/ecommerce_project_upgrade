@@ -1,5 +1,8 @@
 export interface StyleAdviceRequest {
   notes: string;
+  previousOutfits?: StyleAdvicePreviousOutfit[];
+  previousIntent?: StyleAdviceIntent;
+  previousBudget?: number;
 }
 
 export interface StyleAdviceRecommendation {
@@ -48,6 +51,32 @@ export interface StyleAdviceOutfit {
   warnings: string[];
 }
 
+export interface StyleAdvicePreviousOutfitProduct {
+  role: StyleAdviceOutfitProductRole;
+  productId: string;
+  productSlug?: string;
+  productName?: string;
+  price?: number;
+}
+
+export interface StyleAdvicePreviousOutfit {
+  optionIndex: number;
+  title?: string;
+  totalPrice?: number;
+  locale?: "vi" | "en";
+  products: StyleAdvicePreviousOutfitProduct[];
+}
+
+export interface StyleAdviceRefinement {
+  applied: boolean;
+  sourceOptionIndex?: number;
+  action?: "replace" | "remove" | "keep" | "budget" | "fresh";
+  targetRoles?: StyleAdviceOutfitProductRole[];
+  keptProductIds?: string[];
+  removedProductIds?: string[];
+  replacedProductIds?: string[];
+}
+
 export interface StyleAdviceHandoff {
   required: boolean;
   reason?: string;
@@ -68,6 +97,8 @@ export interface StyleAdviceResponse {
   recommendations: StyleAdviceRecommendation[];
   extraTips: string[];
   warnings?: string[];
+  budget?: number;
+  refinement?: StyleAdviceRefinement;
   handoff?: StyleAdviceHandoff;
 }
 

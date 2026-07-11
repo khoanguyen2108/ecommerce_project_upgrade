@@ -13,6 +13,7 @@
     "ai:smoke:scope": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/ai-scope-smoke.ts",
     "ai:smoke:style-intent": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/ai-style-intent-smoke.ts",
     "ai:smoke:style-localization": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/ai-style-localization-smoke.ts",
+    "ai:smoke:style-refinement": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/ai-style-refinement-smoke.ts",
     "ai:smoke:real-provider": "node scripts/ai-smoke-real-provider.mjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
