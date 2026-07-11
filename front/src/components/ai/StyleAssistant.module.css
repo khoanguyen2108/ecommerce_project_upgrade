@@ -27,6 +27,7 @@
 .resultColumn {
   align-items: center;
   display: flex;
+  flex-direction: column;
 }
 
 .introCopy {
@@ -575,6 +576,54 @@
   margin-top: 18px;
 }
 
+.saveOutfitButton,
+.savingOutfitStatus,
+.savedOutfitViewButton,
+.savedOutfitDeleteButton {
+  align-items: center;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 850;
+  gap: 7px;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  min-height: 38px;
+  padding: 8px 12px;
+  text-transform: uppercase;
+}
+
+.saveOutfitButton,
+.savedOutfitViewButton {
+  background: var(--color-text);
+  border: 1px solid var(--color-text);
+  color: var(--color-surface);
+}
+
+.saveOutfitButton:hover,
+.savedOutfitViewButton:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+}
+
+.savingOutfitStatus {
+  color: var(--color-text-muted);
+}
+
+.savedOutfitFeedback {
+  border: 1px solid currentColor;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+}
+
+.savedOutfitError {
+  color: var(--color-danger);
+}
+
+.savedOutfitSuccess {
+  color: var(--color-success);
+}
+
 .outfitProductGrid {
   display: grid;
   gap: 14px;
@@ -714,6 +763,146 @@
   color: var(--color-text-muted);
   font-size: 0.8rem;
   margin: 3px 0 0;
+}
+
+.savedOutfitsSection {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: var(--shadow-subtle);
+  margin-top: 28px;
+  max-width: 760px;
+  padding: clamp(24px, 3.5vw, 36px);
+  width: 100%;
+}
+
+.savedOutfitsHeading,
+.savedOutfitsHeading > div,
+.savedOutfitActions {
+  align-items: center;
+  display: flex;
+}
+
+.savedOutfitsHeading {
+  justify-content: space-between;
+}
+
+.savedOutfitsHeading > div {
+  gap: 12px;
+}
+
+.savedOutfitsHeading h2,
+.savedOutfitBody h3 {
+  font-family: Montserrat, Inter, sans-serif;
+  margin: 0;
+}
+
+.savedOutfitsHeading h2 {
+  font-size: 1.05rem;
+}
+
+.savedOutfitsState {
+  align-items: center;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  display: flex;
+  font-size: 0.82rem;
+  gap: 9px;
+  line-height: 1.55;
+  margin: 22px 0 0;
+  padding: 18px;
+}
+
+.savedOutfitList {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.savedOutfitCard {
+  border: 1px solid var(--color-border);
+  display: grid;
+  grid-template-columns: 144px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.savedOutfitThumbnails {
+  align-content: stretch;
+  background: var(--color-surface-muted);
+  display: grid;
+  gap: 2px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 144px;
+  padding: 2px;
+}
+
+.savedOutfitThumbnail,
+.savedOutfitThumbnailFallback {
+  aspect-ratio: 1;
+  height: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.savedOutfitThumbnail {
+  object-fit: cover;
+}
+
+.savedOutfitThumbnailFallback {
+  align-items: center;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  display: flex;
+  font-size: 0.46rem;
+  font-weight: 850;
+  justify-content: center;
+  letter-spacing: 0.08em;
+  overflow: hidden;
+}
+
+.savedOutfitBody {
+  min-width: 0;
+  padding: 18px;
+}
+
+.savedOutfitBody h3 {
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.savedOutfitMeta {
+  color: var(--color-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.7rem;
+  gap: 7px 14px;
+  margin-top: 12px;
+}
+
+.savedOutfitMeta strong {
+  color: var(--color-text);
+}
+
+.savedOutfitActions {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.savedOutfitDeleteButton {
+  background: transparent;
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+}
+
+.savedOutfitDeleteButton:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.savedOutfitViewButton:disabled,
+.savedOutfitDeleteButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .outOfScopeCard {
@@ -973,7 +1162,8 @@
 
   .stateCard,
   .resultCard,
-  .skeletonCard {
+  .skeletonCard,
+  .savedOutfitsSection {
     padding: 22px;
   }
 
@@ -1018,6 +1208,21 @@
 
   .outfitProductGrid {
     grid-template-columns: 1fr;
+  }
+
+  .savedOutfitCard {
+    grid-template-columns: 1fr;
+  }
+
+  .savedOutfitThumbnails {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    min-height: 0;
+  }
+
+  .savedOutfitActions,
+  .savedOutfitViewButton,
+  .savedOutfitDeleteButton {
+    width: 100%;
   }
 
   .productLink {

@@ -19,6 +19,7 @@ export function useStyleAdvice() {
     useState<CurrentOutfitContext>();
   const [error, setError] = useState<string>();
   const [lastPrompt, setLastPrompt] = useState("");
+  const [lastSuccessfulPrompt, setLastSuccessfulPrompt] = useState("");
 
   const generate = useCallback(
     async (prompt: string) => {
@@ -49,6 +50,7 @@ export function useStyleAdvice() {
               : {}),
             ...(response.locale ? { locale: response.locale } : {}),
           });
+          setLastSuccessfulPrompt(notes);
         }
         setStatus("success");
       } catch (requestError) {
@@ -59,6 +61,23 @@ export function useStyleAdvice() {
     [currentOutfitContext],
   );
 
+  const loadCurrentOutfit = useCallback(
+    ({ locale, outfit, sourcePrompt }: LoadCurrentOutfitInput) => {
+      setResult({
+        type: "outfit",
+        locale,
+        message: outfit.summary,
+        outfit,
+      });
+      setCurrentOutfitContext({ outfit, locale });
+      setLastPrompt(sourcePrompt);
+      setLastSuccessfulPrompt(sourcePrompt);
+      setError(undefined);
+      setStatus("success");
+    },
+    [],
+  );
+
   const retry = useCallback(() => {
     if (lastPrompt) {
       void generate(lastPrompt);
@@ -66,12 +85,21 @@ export function useStyleAdvice() {
   }, [generate, lastPrompt]);
 
   return {
+    currentOutfit: result ? getCurrentStyleAdviceOutfit(result) : undefined,
     error,
     generate,
+    lastSuccessfulPrompt,
+    loadCurrentOutfit,
     result,
     retry,
     status,
   };
+}
+
+interface LoadCurrentOutfitInput {
+  locale: "vi" | "en";
+  outfit: StyleAdviceCanonicalOutfit;
+  sourcePrompt: string;
 }
 
 interface CurrentOutfitContext {

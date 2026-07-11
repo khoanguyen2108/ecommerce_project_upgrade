@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, MessageCircle } from "lucide-react";
+import { ArrowUpRight, Loader2, MessageCircle, Save } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { FashionIllustration } from "@/components/ai/StyleAssistantEmpty";
@@ -15,7 +15,11 @@ import type {
 import { formatPrice } from "@/features/catalog/format";
 
 interface StyleAssistantResultProps {
+  isSavingOutfit?: boolean;
+  onSaveOutfit?: () => void;
   result: StyleAdviceResponse;
+  saveError?: string;
+  saveSuccess?: string;
 }
 
 type ResultLocale = "vi" | "en";
@@ -32,6 +36,8 @@ const RESULT_COPY = {
     outOfScopeHeading: "I'm your Belikeme style specialist.",
     outOfScopeLabel: "Let's keep it stylish",
     pieceCount: (count: number) => `${count} piece${count === 1 ? "" : "s"}`,
+    saveOutfit: "Save outfit",
+    savingOutfit: "Saving outfit…",
     summary: "Summary",
     total: (value: string) => `${value} total`,
     tryAsking: "Try asking",
@@ -39,6 +45,8 @@ const RESULT_COPY = {
     viewProductAria: (name: string) => `View ${name}`,
   },
   vi: {
+    saveOutfit: "Lưu outfit",
+    savingOutfit: "Đang lưu outfit…",
     currentOutfit: "Outfit hiện tại",
     handoffAction: "Mở chat hỗ trợ",
     handoffBody: "Trò chuyện với stylist của Belikeme.",
@@ -57,7 +65,13 @@ const RESULT_COPY = {
   },
 } as const;
 
-export function StyleAssistantResult({ result }: StyleAssistantResultProps) {
+export function StyleAssistantResult({
+  isSavingOutfit = false,
+  onSaveOutfit,
+  result,
+  saveError,
+  saveSuccess,
+}: StyleAssistantResultProps) {
   const locale: ResultLocale = result.locale === "vi" ? "vi" : "en";
 
   if (result.type === "clarification") {
@@ -68,7 +82,16 @@ export function StyleAssistantResult({ result }: StyleAssistantResultProps) {
     return <OutOfScopeResult locale={locale} result={result} />;
   }
 
-  return <CurrentOutfitResult locale={locale} result={result} />;
+  return (
+    <CurrentOutfitResult
+      isSavingOutfit={isSavingOutfit}
+      locale={locale}
+      onSaveOutfit={onSaveOutfit}
+      result={result}
+      saveError={saveError}
+      saveSuccess={saveSuccess}
+    />
+  );
 }
 
 function ClarificationResult({
@@ -100,11 +123,19 @@ function ClarificationResult({
 }
 
 function CurrentOutfitResult({
+  isSavingOutfit,
   locale,
+  onSaveOutfit,
   result,
+  saveError,
+  saveSuccess,
 }: {
+  isSavingOutfit: boolean;
   locale: ResultLocale;
+  onSaveOutfit?: () => void;
   result: StyleAdviceResponse;
+  saveError?: string;
+  saveSuccess?: string;
 }) {
   const copy = RESULT_COPY[locale];
   const outfit = getCurrentStyleAdviceOutfit(result);
@@ -121,7 +152,14 @@ function CurrentOutfitResult({
       </div>
 
       {outfit ? (
-        <CurrentOutfit locale={locale} outfit={outfit} />
+        <CurrentOutfit
+          isSavingOutfit={isSavingOutfit}
+          locale={locale}
+          onSaveOutfit={onSaveOutfit}
+          outfit={outfit}
+          saveError={saveError}
+          saveSuccess={saveSuccess}
+        />
       ) : (
         <div className={styles.outfitsSection}>
           <div className={styles.sectionHeading}>
@@ -144,11 +182,19 @@ function CurrentOutfitResult({
 }
 
 function CurrentOutfit({
+  isSavingOutfit,
   locale,
+  onSaveOutfit,
   outfit,
+  saveError,
+  saveSuccess,
 }: {
+  isSavingOutfit: boolean;
   locale: ResultLocale;
+  onSaveOutfit?: () => void;
   outfit: StyleAdviceCanonicalOutfit;
+  saveError?: string;
+  saveSuccess?: string;
 }) {
   const copy = RESULT_COPY[locale];
 
@@ -156,7 +202,38 @@ function CurrentOutfit({
     <div className={styles.outfitsSection}>
       <div className={styles.sectionHeading}>
         <h3>{copy.currentOutfit}</h3>
+        {isSavingOutfit ? (
+          <span className={styles.savingOutfitStatus} role="status">
+            <Loader2 aria-hidden="true" className={styles.spinner} size={16} />
+            {copy.savingOutfit}
+          </span>
+        ) : onSaveOutfit ? (
+          <button
+            className={styles.saveOutfitButton}
+            onClick={onSaveOutfit}
+            type="button"
+          >
+            <Save aria-hidden="true" size={16} />
+            {copy.saveOutfit}
+          </button>
+        ) : null}
       </div>
+      {saveError ? (
+        <p
+          className={`${styles.savedOutfitFeedback} ${styles.savedOutfitError}`}
+          role="alert"
+        >
+          {saveError}
+        </p>
+      ) : null}
+      {saveSuccess ? (
+        <p
+          className={`${styles.savedOutfitFeedback} ${styles.savedOutfitSuccess}`}
+          role="status"
+        >
+          {saveSuccess}
+        </p>
+      ) : null}
       <article className={`${styles.outfitCard} ${styles.currentOutfitCard}`}>
         <div className={styles.outfitMeta}>
           <span>{copy.pieceCount(outfit.items.length)}</span>

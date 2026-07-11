@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SavedOutfitsSection } from "@/components/ai/SavedOutfitsSection";
 import { StyleAssistantEmpty } from "@/components/ai/StyleAssistantEmpty";
 import { StyleAssistantError } from "@/components/ai/StyleAssistantError";
 import { StyleAssistantInput } from "@/components/ai/StyleAssistantInput";
@@ -8,18 +9,99 @@ import styles from "@/components/ai/StyleAssistant.module.css";
 import { StyleAssistantResult } from "@/components/ai/StyleAssistantResult";
 import { StyleAssistantSkeleton } from "@/components/ai/StyleAssistantSkeleton";
 import { useStyleAdvice } from "@/features/ai/hooks";
-import { getCurrentStyleAdviceOutfit } from "@/features/ai/normalize";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { useSavedOutfits } from "@/features/saved-outfits/hooks";
+import type { SavedOutfit } from "@/features/saved-outfits/types";
 
 export function StyleAssistant() {
   const [prompt, setPrompt] = useState("");
-  const { error, generate, result, retry, status } = useStyleAdvice();
+  const {
+    currentOutfit,
+    error,
+    generate,
+    lastSuccessfulPrompt,
+    loadCurrentOutfit,
+    result,
+    retry,
+    status,
+  } = useStyleAdvice();
   const { isAuthenticated, isLoading: isSessionLoading } = useAuthSession();
+  const locale = result?.locale === "vi" ? "vi" : "en";
+  const {
+    clearSavedOutfitFeedback,
+    deletingSavedOutfitId,
+    isLoadingSavedOutfits,
+    isSavingOutfit,
+    removeSavedOutfit,
+    savedOutfitError,
+    savedOutfits,
+    saveOutfit,
+    saveSuccessFeedback,
+  } = useSavedOutfits({
+    enabled: !isSessionLoading && isAuthenticated,
+    locale,
+  });
   const isLoading = status === "loading";
   const isLocked = !isSessionLoading && !isAuthenticated;
-  const hasCurrentOutfit = result
-    ? Boolean(getCurrentStyleAdviceOutfit(result))
-    : false;
+  const hasCurrentOutfit = Boolean(currentOutfit);
+  const sourcePrompt = lastSuccessfulPrompt || prompt.trim();
+  const canSaveCurrentOutfit = Boolean(
+    isAuthenticated && currentOutfit?.items.length && sourcePrompt,
+  );
+
+  function handleGenerate() {
+    clearSavedOutfitFeedback();
+    void generate(prompt);
+  }
+
+  async function handleSaveCurrentOutfit() {
+    if (!currentOutfit?.items.length || !sourcePrompt) {
+      return;
+    }
+
+    await saveOutfit({
+      sourcePrompt,
+      locale,
+      summary: currentOutfit.summary,
+      items: currentOutfit.items.map((item) => ({
+        role: item.role,
+        productId: item.productId,
+        productNameSnapshot: item.productName,
+        productSlugSnapshot: item.productSlug,
+        ...(item.imageUrl ? { imageUrlSnapshot: item.imageUrl } : {}),
+        unitPriceSnapshot: item.price,
+        quantity: 1,
+      })),
+    });
+  }
+
+  function handleViewSavedOutfit(savedOutfit: SavedOutfit) {
+    clearSavedOutfitFeedback();
+    const loadedWarning =
+      savedOutfit.locale === "vi"
+        ? "Outfit đã lưu được tải lên để chỉnh tiếp. Tồn kho và giá sẽ được kiểm tra lại khi bạn chỉnh outfit."
+        : "Saved outfit loaded for editing. Stock and prices will be rechecked when you make changes.";
+
+    loadCurrentOutfit({
+      locale: savedOutfit.locale,
+      sourcePrompt: savedOutfit.sourcePrompt,
+      outfit: {
+        summary: savedOutfit.summary,
+        totalPrice: savedOutfit.totalPriceSnapshot,
+        items: savedOutfit.items.map((item) => ({
+          role: item.role,
+          productId: item.productId,
+          productSlug: item.productSlugSnapshot,
+          productName: item.productNameSnapshot,
+          ...(item.imageUrlSnapshot
+            ? { imageUrl: item.imageUrlSnapshot }
+            : {}),
+          price: item.unitPriceSnapshot,
+        })),
+        warnings: [loadedWarning],
+      },
+    });
+  }
 
   return (
     <main className={styles.page}>
@@ -38,7 +120,7 @@ export function StyleAssistant() {
             isLocked={isLocked}
             isLoading={isLoading}
             onChange={setPrompt}
-            onSubmit={() => void generate(prompt)}
+            onSubmit={handleGenerate}
             value={prompt}
           />
           {status === "success" && hasCurrentOutfit ? (
@@ -64,7 +146,37 @@ export function StyleAssistant() {
             />
           ) : null}
           {status === "success" && result ? (
-            <StyleAssistantResult result={result} />
+            <StyleAssistantResult
+              isSavingOutfit={isSavingOutfit}
+              onSaveOutfit={
+                canSaveCurrentOutfit
+                  ? () => void handleSaveCurrentOutfit()
+                  : undefined
+              }
+              result={result}
+              saveError={
+                savedOutfitError?.action === "save"
+                  ? savedOutfitError.message
+                  : undefined
+              }
+              saveSuccess={saveSuccessFeedback}
+            />
+          ) : null}
+
+          {!isSessionLoading && isAuthenticated ? (
+            <SavedOutfitsSection
+              deletingSavedOutfitId={deletingSavedOutfitId}
+              error={
+                savedOutfitError?.action !== "save"
+                  ? savedOutfitError?.message
+                  : undefined
+              }
+              isLoading={isLoadingSavedOutfits}
+              locale={locale}
+              onDelete={removeSavedOutfit}
+              onView={handleViewSavedOutfit}
+              savedOutfits={savedOutfits}
+            />
           ) : null}
         </aside>
       </div>
