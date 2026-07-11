@@ -40,7 +40,7 @@ const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
     active: "ai",
     hideForAdmin: true,
     href: "/ai/style-assistant",
-    label: "AI Style Assistant",
+    label: "Style Assistant",
   },
   { href: "/#about", label: "About" },
 ];

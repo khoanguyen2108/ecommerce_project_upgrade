@@ -4,7 +4,7 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "AI Style Assistant",
+  title: "Style Assistant",
   description:
     "Create a personalized outfit edit from Belikeme's current catalog.",
 };
