@@ -3076,7 +3076,7 @@ img {
   --color-text-muted: #646767;
   background: var(--color-background);
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 224px minmax(0, 1fr);
   min-height: 100svh;
 }
 
