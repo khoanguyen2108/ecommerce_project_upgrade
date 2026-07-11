@@ -2,7 +2,10 @@
 
 import { useCallback, useState } from "react";
 import { getStyleAdvice } from "@/features/ai/api";
+import { getCurrentStyleAdviceOutfit } from "@/features/ai/normalize";
 import type {
+  StyleAdviceCanonicalOutfit,
+  StyleAdviceIntent,
   StyleAdviceRequest,
   StyleAdviceResponse,
   StyleAdviceStatus,
@@ -12,7 +15,8 @@ import { ApiClientError } from "@/lib/errors/api-error";
 export function useStyleAdvice() {
   const [status, setStatus] = useState<StyleAdviceStatus>("idle");
   const [result, setResult] = useState<StyleAdviceResponse>();
-  const [contextResult, setContextResult] = useState<StyleAdviceResponse>();
+  const [currentOutfitContext, setCurrentOutfitContext] =
+    useState<CurrentOutfitContext>();
   const [error, setError] = useState<string>();
   const [lastPrompt, setLastPrompt] = useState("");
 
@@ -30,12 +34,20 @@ export function useStyleAdvice() {
 
       try {
         const response = await getStyleAdvice(
-          buildStyleAdviceRequest(notes, contextResult),
+          buildStyleAdviceRequest(notes, currentOutfitContext),
         );
 
         setResult(response);
-        if ((response.outfits?.length ?? 0) > 0) {
-          setContextResult(response);
+        const currentOutfit = getCurrentStyleAdviceOutfit(response);
+
+        if (currentOutfit?.items.length) {
+          setCurrentOutfitContext({
+            outfit: currentOutfit,
+            ...(response.intent ? { intent: response.intent } : {}),
+            ...(response.budget !== undefined
+              ? { budget: response.budget }
+              : {}),
+          });
         }
         setStatus("success");
       } catch (requestError) {
@@ -43,7 +55,7 @@ export function useStyleAdvice() {
         setStatus("error");
       }
     },
-    [contextResult],
+    [currentOutfitContext],
   );
 
   const retry = useCallback(() => {
@@ -61,40 +73,50 @@ export function useStyleAdvice() {
   };
 }
 
-function buildStyleAdviceRequest(
-  notes: string,
-  previousResult: StyleAdviceResponse | undefined,
-): StyleAdviceRequest {
-  const outfits = previousResult?.outfits?.slice(0, 2) ?? [];
+interface CurrentOutfitContext {
+  outfit: StyleAdviceCanonicalOutfit;
+  intent?: StyleAdviceIntent;
+  budget?: number;
+}
 
-  if (outfits.length === 0) {
-    return { notes };
+function buildStyleAdviceRequest(
+  message: string,
+  currentContext: CurrentOutfitContext | undefined,
+): StyleAdviceRequest {
+  if (!currentContext) {
+    return { message };
   }
 
   return {
-    notes,
-    previousOutfits: outfits.map((outfit, index) => ({
-      optionIndex: index + 1,
-      title: outfit.title,
-      totalPrice: outfit.products.reduce(
-        (total, product) => total + product.price,
-        0,
-      ),
-      ...(previousResult?.locale ? { locale: previousResult.locale } : {}),
-      products: outfit.products.slice(0, 6).map((product) => ({
-        role: product.role,
-        productId: product.productId,
-        productSlug: product.productSlug,
-        productName: product.productName,
-        price: product.price,
-      })),
-    })),
-    ...(previousResult?.intent
-      ? { previousIntent: previousResult.intent }
+    message,
+    // The backend does not accept canonical currentOutfit yet. Keep the
+    // compatibility envelope bounded to exactly one outfit and public IDs/roles.
+    previousOutfits: [
+      {
+        optionIndex: 1,
+        products: currentContext.outfit.items.slice(0, 6).map((item) => ({
+          role: item.role,
+          productId: item.productId,
+        })),
+      },
+    ],
+    ...(currentContext.intent
+      ? { previousIntent: toSafePreviousIntent(currentContext.intent) }
       : {}),
-    ...(previousResult?.budget !== undefined
-      ? { previousBudget: previousResult.budget }
+    ...(currentContext.budget !== undefined
+      ? { previousBudget: currentContext.budget }
       : {}),
+  };
+}
+
+function toSafePreviousIntent(intent: StyleAdviceIntent): StyleAdviceIntent {
+  return {
+    categories: intent.categories.slice(0, 12),
+    colors: intent.colors.slice(0, 12),
+    styles: intent.styles.slice(0, 12),
+    occasions: intent.occasions.slice(0, 12),
+    fits: intent.fits.slice(0, 12),
+    negativeConstraints: intent.negativeConstraints.slice(0, 12),
   };
 }
 

@@ -8,6 +8,7 @@ import styles from "@/components/ai/StyleAssistant.module.css";
 import { StyleAssistantResult } from "@/components/ai/StyleAssistantResult";
 import { StyleAssistantSkeleton } from "@/components/ai/StyleAssistantSkeleton";
 import { useStyleAdvice } from "@/features/ai/hooks";
+import { getCurrentStyleAdviceOutfit } from "@/features/ai/normalize";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
 export function StyleAssistant() {
@@ -16,6 +17,9 @@ export function StyleAssistant() {
   const { isAuthenticated, isLoading: isSessionLoading } = useAuthSession();
   const isLoading = status === "loading";
   const isLocked = !isSessionLoading && !isAuthenticated;
+  const hasCurrentOutfit = result
+    ? Boolean(getCurrentStyleAdviceOutfit(result))
+    : false;
 
   return (
     <main className={styles.page}>
@@ -37,11 +41,11 @@ export function StyleAssistant() {
             onSubmit={() => void generate(prompt)}
             value={prompt}
           />
-          {status === "success" && result?.mode !== "out_of_scope" ? (
+          {status === "success" && hasCurrentOutfit ? (
             <p className={styles.refinementHint}>
               {result?.locale === "vi"
-                ? "B\u1ea1n c\u00f3 th\u1ec3 y\u00eau c\u1ea7u: \u201c\u0111\u1ed5i qu\u1ea7n option 1\u201d, \u201cb\u1ecf \u00e1o kho\u00e1c\u201d, ho\u1eb7c \u201c\u0111\u1ed5i gi\u00e0y sang boots\u201d."
-                : "You can ask: \u201cchange the pants in option 1\u201d, \u201cremove the jacket\u201d, or \u201cswitch the shoes to boots\u201d."}
+                ? "B\u1ea1n c\u00f3 th\u1ec3 y\u00eau c\u1ea7u: \u201c\u0111\u1ed5i qu\u1ea7n\u201d, \u201c\u0111\u1ed5i gi\u00e0y sang boots\u201d, ho\u1eb7c \u201cb\u1ecf \u00e1o kho\u00e1c\u201d."
+                : "You can ask: \u201cchange the pants\u201d, \u201cswitch the shoes to boots\u201d, or \u201cremove the jacket\u201d."}
             </p>
           ) : null}
           <p className={styles.disclaimer}>
