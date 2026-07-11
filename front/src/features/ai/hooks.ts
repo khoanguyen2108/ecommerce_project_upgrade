@@ -47,6 +47,7 @@ export function useStyleAdvice() {
             ...(response.budget !== undefined
               ? { budget: response.budget }
               : {}),
+            ...(response.locale ? { locale: response.locale } : {}),
           });
         }
         setStatus("success");
@@ -77,6 +78,7 @@ interface CurrentOutfitContext {
   outfit: StyleAdviceCanonicalOutfit;
   intent?: StyleAdviceIntent;
   budget?: number;
+  locale?: "vi" | "en";
 }
 
 function buildStyleAdviceRequest(
@@ -89,27 +91,23 @@ function buildStyleAdviceRequest(
 
   return {
     message,
-    // The backend does not accept canonical currentOutfit yet. Keep the
-    // compatibility envelope bounded to exactly one outfit and public IDs/roles.
-    previousOutfits: [
-      {
-        optionIndex: 1,
-        products: currentContext.outfit.items.slice(0, 6).map((item) => ({
-          role: item.role,
-          productId: item.productId,
-        })),
-      },
-    ],
-    ...(currentContext.intent
-      ? { previousIntent: toSafePreviousIntent(currentContext.intent) }
-      : {}),
-    ...(currentContext.budget !== undefined
-      ? { previousBudget: currentContext.budget }
-      : {}),
+    currentOutfit: {
+      items: currentContext.outfit.items.slice(0, 6).map((item) => ({
+        role: item.role,
+        productId: item.productId,
+      })),
+      ...(currentContext.intent
+        ? { intent: toSafeIntent(currentContext.intent) }
+        : {}),
+      ...(currentContext.budget !== undefined
+        ? { budget: currentContext.budget }
+        : {}),
+      ...(currentContext.locale ? { locale: currentContext.locale } : {}),
+    },
   };
 }
 
-function toSafePreviousIntent(intent: StyleAdviceIntent): StyleAdviceIntent {
+function toSafeIntent(intent: StyleAdviceIntent): StyleAdviceIntent {
   return {
     categories: intent.categories.slice(0, 12),
     colors: intent.colors.slice(0, 12),

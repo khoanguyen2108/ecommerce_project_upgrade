@@ -111,7 +111,7 @@ export class StyleAdvicePreviousOutfitDto {
   products: StyleAdvicePreviousOutfitProductDto[];
 }
 
-export class StyleAdvicePreviousIntentDto {
+export class StyleAdviceOutfitIntentContextDto {
   @ApiPropertyOptional({ maxItems: 12, type: [String] })
   @IsOptional()
   @Transform(normalizeStringArray)
@@ -177,6 +177,56 @@ export class StyleAdvicePreviousIntentDto {
   @MinLength(1, { each: true })
   @MaxLength(40, { each: true })
   negativeConstraints?: string[];
+}
+
+export class StyleAdviceCurrentOutfitItemDto {
+  @ApiProperty({ enum: STYLE_ADVICE_OUTFIT_PRODUCT_ROLES, example: 'top' })
+  @IsIn(STYLE_ADVICE_OUTFIT_PRODUCT_ROLES)
+  role: StyleAdviceOutfitProductRole;
+
+  @ApiProperty({ example: 'product-id', maxLength: 80 })
+  @Transform(normalizeText)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  productId: string;
+
+  @ApiPropertyOptional({ example: 'variant-id', maxLength: 80 })
+  @IsOptional()
+  @Transform(normalizeText)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  variantId?: string;
+}
+
+export class StyleAdviceCurrentOutfitDto {
+  @ApiProperty({ maxItems: 6, type: [StyleAdviceCurrentOutfitItemDto] })
+  @IsArray()
+  @ArrayMaxSize(6)
+  @ArrayUnique((item: StyleAdviceCurrentOutfitItemDto) => item.role)
+  @ArrayUnique((item: StyleAdviceCurrentOutfitItemDto) => item.productId)
+  @ValidateNested({ each: true })
+  @Type(() => StyleAdviceCurrentOutfitItemDto)
+  items: StyleAdviceCurrentOutfitItemDto[];
+
+  @ApiPropertyOptional({ type: StyleAdviceOutfitIntentContextDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StyleAdviceOutfitIntentContextDto)
+  intent?: StyleAdviceOutfitIntentContextDto;
+
+  @ApiPropertyOptional({ example: 800000, maximum: 2_000_000_000, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2_000_000_000)
+  budget?: number;
+
+  @ApiPropertyOptional({ enum: ['vi', 'en'], example: 'vi' })
+  @IsOptional()
+  @IsIn(['vi', 'en'])
+  locale?: 'vi' | 'en';
 }
 
 export class StyleAdviceRequestDto {
@@ -252,6 +302,13 @@ export class StyleAdviceRequestDto {
   @MaxLength(500)
   notes?: string;
 
+  @ApiPropertyOptional({ type: StyleAdviceCurrentOutfitDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StyleAdviceCurrentOutfitDto)
+  currentOutfit?: StyleAdviceCurrentOutfitDto;
+
+  // Deprecated request compatibility. New clients send currentOutfit.
   @ApiPropertyOptional({ maxItems: 2, type: [StyleAdvicePreviousOutfitDto] })
   @IsOptional()
   @IsArray()
@@ -261,11 +318,11 @@ export class StyleAdviceRequestDto {
   @Type(() => StyleAdvicePreviousOutfitDto)
   previousOutfits?: StyleAdvicePreviousOutfitDto[];
 
-  @ApiPropertyOptional({ type: StyleAdvicePreviousIntentDto })
+  @ApiPropertyOptional({ type: StyleAdviceOutfitIntentContextDto })
   @IsOptional()
   @ValidateNested()
-  @Type(() => StyleAdvicePreviousIntentDto)
-  previousIntent?: StyleAdvicePreviousIntentDto;
+  @Type(() => StyleAdviceOutfitIntentContextDto)
+  previousIntent?: StyleAdviceOutfitIntentContextDto;
 
   @ApiPropertyOptional({ example: 800000, maximum: 2_000_000_000, minimum: 0 })
   @IsOptional()
@@ -273,29 +330,6 @@ export class StyleAdviceRequestDto {
   @Min(0)
   @Max(2_000_000_000)
   previousBudget?: number;
-}
-
-export class StyleAdviceRecommendationDto {
-  @ApiProperty({ format: 'uuid' })
-  productId: string;
-
-  @ApiProperty({ example: 'relaxed-oxford-shirt' })
-  productSlug: string;
-
-  @ApiProperty({ example: 'Relaxed Oxford Shirt' })
-  productName: string;
-
-  @ApiPropertyOptional({ example: 'https://example.com/oxford-shirt.jpg' })
-  imageUrl?: string;
-
-  @ApiProperty({ example: 499000 })
-  price: number;
-
-  @ApiProperty({ example: 'A versatile option that fits the requested look.' })
-  reason: string;
-
-  @ApiPropertyOptional({ example: 'Pair it with neutral trousers.' })
-  stylingTip?: string;
 }
 
 export class StyleAdviceIntentDto {
@@ -421,9 +455,6 @@ export class StyleAdviceRefinementDto {
   @ApiProperty({ example: true })
   applied: boolean;
 
-  @ApiPropertyOptional({ example: 1, maximum: 2, minimum: 1 })
-  sourceOptionIndex?: number;
-
   @ApiPropertyOptional({ enum: STYLE_ADVICE_REFINEMENT_ACTIONS, example: 'replace' })
   action?: StyleAdviceRefinementAction;
 
@@ -477,9 +508,6 @@ export class StyleAdviceResponseDto {
   @ApiProperty({ type: [StyleAdviceOutfitDto] })
   outfits: StyleAdviceOutfitDto[];
 
-  @ApiProperty({ type: [StyleAdviceRecommendationDto] })
-  recommendations: StyleAdviceRecommendationDto[];
-
   @ApiProperty({ type: [String] })
   extraTips: string[];
 
@@ -502,7 +530,5 @@ export interface NormalizedStyleAdviceRequest {
   preferredColors: string[];
   preferredSizes: string[];
   notes?: string;
-  previousOutfits?: StyleAdvicePreviousOutfitDto[];
-  previousIntent?: StyleAdvicePreviousIntentDto;
-  previousBudget?: number;
+  currentOutfit?: StyleAdviceCurrentOutfitDto;
 }

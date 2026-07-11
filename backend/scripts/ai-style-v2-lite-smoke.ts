@@ -103,7 +103,6 @@ async function run() {
     );
     check(response.outfit === undefined, smokeCase.prompt, 'canonical outfit was exposed');
     check(response.outfits.length === 0, smokeCase.prompt, 'legacy outfit was exposed');
-    check(response.recommendations.length === 0, smokeCase.prompt, 'product cards were exposed');
     check(catalogQueries === catalogBefore, smokeCase.prompt, 'catalog was queried');
     check(quotaAcquisitions === quotaBefore, smokeCase.prompt, 'quota was acquired');
     report(smokeCase.prompt, response);
@@ -166,6 +165,51 @@ async function run() {
   }
   report(refinementPrompt, refined);
 
+  const cafeSource = outfitResponses.get('\u0111i cafe m\u00e0u kem d\u01b0\u1edbi 700k');
+  if (!cafeSource) {
+    throw new Error('Missing cafe source response');
+  }
+  const oldShoesId = cafeSource.outfit?.items.find((item) => item.role === 'shoes')?.productId;
+  const bootsPrompt = '\u0111\u1ed5i gi\u00e0y sang boots';
+  const bootsRefined = await aiService.getStyleAdvice(
+    buildFollowUpRequest(bootsPrompt, cafeSource),
+    { userId: 'v2-lite-boots-refinement-smoke-user' },
+  );
+  verifyOutfitResponse(bootsPrompt, bootsRefined);
+  check(
+    oldShoesId !== undefined &&
+      bootsRefined.outfit?.items.every((item) => item.productId !== oldShoesId) === true,
+    bootsPrompt,
+    'old shoes were not excluded',
+  );
+  check(
+    bootsRefined.outfit?.items.some(
+      (item) => item.role === 'shoes' && item.productSlug.includes('boots'),
+    ) === true,
+    bootsPrompt,
+    'boots were not prioritized',
+  );
+  report(bootsPrompt, bootsRefined);
+
+  const missingPrompt = '\u0111\u1ed5i qu\u1ea7n kh\u00e1c';
+  const missing = await aiService.getStyleAdvice(
+    { message: missingPrompt },
+    { userId: 'v2-lite-missing-context-smoke-user' },
+  );
+  check(missing.type === 'clarification', missingPrompt, `type was ${missing.type}`);
+  check(missing.outfit === undefined, missingPrompt, 'invented an outfit');
+  check(missing.outfits.length === 0, missingPrompt, 'returned a legacy outfit');
+  report(missingPrompt, missing);
+
+  const legacyPrompt = '\u0111\u1ed5i qu\u1ea7n kh\u00e1c';
+  const legacyRefined = await aiService.getStyleAdvice(
+    buildLegacyFollowUpRequest(legacyPrompt, previous),
+    { userId: 'v2-lite-legacy-context-smoke-user' },
+  );
+  verifyOutfitResponse(legacyPrompt, legacyRefined);
+  check(legacyRefined.refinement?.applied === true, legacyPrompt, 'legacy context was not adapted');
+  report(`${legacyPrompt} [legacy previousOutfits]`, legacyRefined);
+
   const outOfScopePrompt = 'What is the weather today?';
   const outOfScope = await aiService.getStyleAdvice(
     { notes: outOfScopePrompt },
@@ -196,19 +240,32 @@ function verifyOutfitResponse(prompt: string, response: StyleAdviceResponseDto) 
     prompt,
     'canonical and compatibility outfits diverged',
   );
-  check(
-    response.recommendations.map((product) => product.productId).join(',') === productIds.join(','),
-    prompt,
-    'canonical and compatibility recommendations diverged',
-  );
 }
 
 function buildFollowUpRequest(
-  notes: string,
+  message: string,
   previous: StyleAdviceResponseDto,
 ): StyleAdviceRequestDto {
   return {
-    notes,
+    message,
+    currentOutfit: {
+      items: (previous.outfit?.items ?? []).map((item) => ({
+        role: item.role,
+        productId: item.productId,
+      })),
+      intent: previous.intent,
+      ...(previous.budget !== undefined ? { budget: previous.budget } : {}),
+      ...(previous.locale ? { locale: previous.locale } : {}),
+    },
+  };
+}
+
+function buildLegacyFollowUpRequest(
+  message: string,
+  previous: StyleAdviceResponseDto,
+): StyleAdviceRequestDto {
+  return {
+    message,
     previousOutfits: previous.outfits.slice(0, 1).map((outfit) => ({
       optionIndex: 1,
       title: outfit.title,
@@ -242,7 +299,6 @@ function report(prompt: string, response: StyleAdviceResponseDto) {
     clarificationQuestion: response.clarificationQuestion,
     canonicalOutfitExists: Boolean(response.outfit),
     legacyOutfitsLength: response.outfits.length,
-    recommendationsLength: response.recommendations.length,
     productIds,
     roles,
     duplicateRoles: new Set(roles).size !== roles.length,

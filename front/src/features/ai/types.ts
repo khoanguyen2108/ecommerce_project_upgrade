@@ -13,9 +13,18 @@ export type StyleAdviceOutfitProductRole =
 
 export interface StyleAdviceRequest {
   message: string;
-  previousOutfits?: StyleAdvicePreviousOutfit[];
-  previousIntent?: StyleAdviceIntent;
-  previousBudget?: number;
+  currentOutfit?: StyleAdviceCurrentOutfitRequest;
+}
+
+export interface StyleAdviceCurrentOutfitRequest {
+  items: Array<{
+    role: StyleAdviceOutfitProductRole;
+    productId: string;
+    variantId?: string;
+  }>;
+  intent?: StyleAdviceIntent;
+  budget?: number;
+  locale?: "vi" | "en";
 }
 
 export interface StyleAdviceCanonicalOutfitItem {
@@ -44,44 +53,18 @@ export interface StyleAdviceIntent {
   negativeConstraints: string[];
 }
 
-export interface StyleAdvicePreviousOutfitProduct {
-  role: StyleAdviceOutfitProductRole;
-  productId: string;
-}
-
-export interface StyleAdvicePreviousOutfit {
-  optionIndex: number;
-  products: StyleAdvicePreviousOutfitProduct[];
-}
-
 // Deprecated response types remain only for the rollout fallback.
-export interface StyleAdviceRecommendation {
-  productId: string;
-  productSlug: string;
-  productName: string;
-  imageUrl?: string;
-  price: number;
-  reason: string;
-  stylingTip?: string;
-}
-
-export interface StyleAdviceOutfitProduct
-  extends StyleAdviceCanonicalOutfitItem {
-  matchedTags?: string[];
-}
+export type StyleAdviceOutfitProduct = StyleAdviceCanonicalOutfitItem;
 
 export interface StyleAdviceOutfit {
   title: string;
   reason: string;
-  score?: number;
-  matchedIntentTags?: string[];
   products: StyleAdviceOutfitProduct[];
   warnings: string[];
 }
 
 export interface StyleAdviceRefinement {
   applied: boolean;
-  sourceOptionIndex?: number;
   action?: "replace" | "remove" | "keep" | "budget" | "fresh";
   targetRoles?: StyleAdviceOutfitProductRole[];
   keptProductIds?: string[];
@@ -105,12 +88,6 @@ export interface StyleAdviceResponse {
   // Deprecated compatibility fields. Customer rendering reads canonical fields
   // first and uses only outfits[0] when the canonical outfit is absent.
   outfits?: StyleAdviceOutfit[];
-  recommendations?: StyleAdviceRecommendation[];
-  mode?:
-    | "ai"
-    | "catalog_fallback"
-    | "deterministic_tag_recommender"
-    | "out_of_scope";
   query?: string;
   intent?: StyleAdviceIntent;
   summary?: string;

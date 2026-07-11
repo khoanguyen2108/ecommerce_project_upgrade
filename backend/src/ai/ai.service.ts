@@ -101,13 +101,19 @@ export class AiService {
           legacyResponse.summary,
           legacyResponse.warnings,
         );
+        const missingContext =
+          legacyResponse.refinement?.applied === false &&
+          legacyResponse.outfits.length === 0;
         const response: StyleAdviceResponseDto = {
-          type: 'outfit',
+          type: missingContext ? 'clarification' : 'outfit',
           mode: 'deterministic_tag_recommender',
           locale,
           ...(request.budget !== undefined ? { budget: request.budget } : {}),
           ...legacyResponse,
           message: legacyResponse.summary,
+          ...(missingContext
+            ? { clarificationQuestion: legacyResponse.summary }
+            : {}),
           ...(canonicalOutfit ? { outfit: canonicalOutfit } : {}),
         };
 
@@ -154,13 +160,7 @@ export class AiService {
       preferredColors: this.normalizeUserTextArray(dto.preferredColors),
       preferredSizes: this.normalizeUserTextArray(dto.preferredSizes),
       ...(dto.notes ? { notes: this.normalizeUserText(dto.notes) } : {}),
-      previousOutfits: this.normalizePreviousOutfits(dto.previousOutfits),
-      ...(dto.previousIntent
-        ? { previousIntent: this.normalizePreviousIntent(dto.previousIntent) }
-        : {}),
-      ...(dto.previousBudget !== undefined
-        ? { previousBudget: dto.previousBudget }
-        : {}),
+      ...this.normalizeCurrentOutfitContext(dto),
     };
 
     const inferredBudget = inferBudgetFromStylePrompt(request);
@@ -176,15 +176,6 @@ export class AiService {
         request.budget > 2_000_000_000)
     ) {
       throw this.invalidRequestException('Budget is invalid.');
-    }
-
-    if (
-      request.previousBudget !== undefined &&
-      (!Number.isInteger(request.previousBudget) ||
-        request.previousBudget < 0 ||
-        request.previousBudget > 2_000_000_000)
-    ) {
-      throw this.invalidRequestException('Previous budget is invalid.');
     }
 
     this.assertDistinctValues(request.preferredColors);
@@ -270,7 +261,6 @@ export class AiService {
       },
       summary,
       outfits: [],
-      recommendations: [],
       extraTips: tips,
       warnings: [],
     };
@@ -308,7 +298,6 @@ export class AiService {
       },
       // Deprecated compatibility fields intentionally carry no products here.
       outfits: [],
-      recommendations: [],
       extraTips: [],
       warnings: [],
       ...(request.budget !== undefined ? { budget: request.budget } : {}),
@@ -337,7 +326,7 @@ export class AiService {
         productName: product.productName,
         ...(product.imageUrl ? { imageUrl: product.imageUrl } : {}),
         price: product.price,
-        // Product-level recommendations cannot prove that size/color selection
+        // Product-level outfit items cannot prove that size/color selection
         // is unnecessary, so V2-lite never guesses a variant.
         variantRequired: true,
       })),
@@ -377,9 +366,14 @@ export class AiService {
     return (values ?? []).map((value) => this.normalizeUserText(value));
   }
 
-  private normalizePreviousOutfits(
-    outfits: StyleAdviceRequestDto['previousOutfits'],
-  ): NormalizedStyleAdviceRequest['previousOutfits'] {
+  private normalizeCurrentOutfitContext(
+    dto: StyleAdviceRequestDto,
+  ): Pick<NormalizedStyleAdviceRequest, 'currentOutfit'> | Record<string, never> {
+    if (dto.currentOutfit) {
+      return { currentOutfit: this.normalizeCurrentOutfit(dto.currentOutfit) };
+    }
+
+    const outfits = dto.previousOutfits;
     if ((outfits?.length ?? 0) > 2) {
       throw this.invalidRequestException('At most two previous outfits are allowed.');
     }
@@ -393,40 +387,66 @@ export class AiService {
       );
     }
 
-    return (outfits ?? []).map((outfit) => {
-      if (outfit.products.length > 6) {
-        throw this.invalidRequestException(
-          'Previous outfits can contain at most six products.',
-        );
-      }
+    const first = outfits?.[0];
+    if (!first) return {};
+    if (first.products.length > 6) {
+      throw this.invalidRequestException(
+        'Previous outfits can contain at most six products.',
+      );
+    }
 
-      return {
-        optionIndex: outfit.optionIndex,
-        ...(outfit.title
-          ? { title: this.normalizeUserText(outfit.title) }
-          : {}),
-        ...(outfit.totalPrice !== undefined
-          ? { totalPrice: outfit.totalPrice }
-          : {}),
-        ...(outfit.locale ? { locale: outfit.locale } : {}),
-        products: outfit.products.map((product) => ({
-          role: product.role,
-          productId: this.normalizeUserText(product.productId),
-          ...(product.productSlug
-            ? { productSlug: this.normalizeUserText(product.productSlug) }
-            : {}),
-          ...(product.productName
-            ? { productName: this.normalizeUserText(product.productName) }
-            : {}),
-          ...(product.price !== undefined ? { price: product.price } : {}),
-        })),
-      };
-    });
+    return {
+      currentOutfit: this.normalizeCurrentOutfit({
+        items: first.products.map(({ role, productId }) => ({ role, productId })),
+        ...(dto.previousIntent ? { intent: dto.previousIntent } : {}),
+        ...(dto.previousBudget !== undefined ? { budget: dto.previousBudget } : {}),
+        ...(first.locale ? { locale: first.locale } : {}),
+      }),
+    };
   }
 
-  private normalizePreviousIntent(
+  private normalizeCurrentOutfit(
+    outfit: NonNullable<StyleAdviceRequestDto['currentOutfit']>,
+  ): NonNullable<NormalizedStyleAdviceRequest['currentOutfit']> {
+    if (outfit.items.length > 6) {
+      throw this.invalidRequestException('Current outfit can contain at most six items.');
+    }
+
+    const items = outfit.items.map((item) => ({
+      role: item.role,
+      productId: this.normalizeUserText(item.productId),
+      ...(item.variantId
+        ? { variantId: this.normalizeUserText(item.variantId) }
+        : {}),
+    }));
+    if (new Set(items.map((item) => item.role)).size !== items.length) {
+      throw this.invalidRequestException('Current outfit roles must be unique.');
+    }
+    if (new Set(items.map((item) => item.productId)).size !== items.length) {
+      throw this.invalidRequestException('Current outfit product IDs must be unique.');
+    }
+    if (
+      outfit.budget !== undefined &&
+      (!Number.isInteger(outfit.budget) ||
+        outfit.budget < 0 ||
+        outfit.budget > 2_000_000_000)
+    ) {
+      throw this.invalidRequestException('Current outfit budget is invalid.');
+    }
+
+    return {
+      items,
+      ...(outfit.intent
+        ? { intent: this.normalizeCurrentIntent(outfit.intent) }
+        : {}),
+      ...(outfit.budget !== undefined ? { budget: outfit.budget } : {}),
+      ...(outfit.locale ? { locale: outfit.locale } : {}),
+    };
+  }
+
+  private normalizeCurrentIntent(
     intent: NonNullable<StyleAdviceRequestDto['previousIntent']>,
-  ): NonNullable<NormalizedStyleAdviceRequest['previousIntent']> {
+  ): NonNullable<NormalizedStyleAdviceRequest['currentOutfit']>['intent'] {
     return {
       categories: this.normalizeContextArray(intent.categories),
       colors: this.normalizeContextArray(intent.colors),
@@ -442,7 +462,7 @@ export class AiService {
   private normalizeContextArray(values: string[] | undefined): string[] {
     if ((values?.length ?? 0) > 12) {
       throw this.invalidRequestException(
-        'Previous intent fields can contain at most twelve values.',
+        'Current outfit intent fields can contain at most twelve values.',
       );
     }
 

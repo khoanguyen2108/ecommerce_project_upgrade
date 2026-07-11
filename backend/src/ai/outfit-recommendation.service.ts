@@ -6,8 +6,7 @@ import type {
   StyleAdviceOutfitDto,
   StyleAdviceOutfitProductDto,
   StyleAdviceOutfitProductRole,
-  StyleAdvicePreviousOutfitDto,
-  StyleAdviceRecommendationDto,
+  StyleAdviceCurrentOutfitDto,
   StyleAdviceRefinementAction,
   StyleAdviceRefinementDto,
 } from './dto/style-advice.dto';
@@ -108,7 +107,6 @@ interface StyleAdviceResponseWithoutMode {
   intent: StyleAdviceIntentDto;
   outfits: StyleAdviceOutfitDto[];
   query: string;
-  recommendations: StyleAdviceRecommendationDto[];
   summary: string;
   warnings: string[];
   refinement?: StyleAdviceRefinementDto;
@@ -117,7 +115,7 @@ interface StyleAdviceResponseWithoutMode {
 interface ParsedRefinement {
   action: StyleAdviceRefinementAction;
   cheaper: boolean;
-  explicitOptionReference: boolean;
+  legacyOptionReference: boolean;
   hasRefinementIntent: boolean;
   keepRoles: OutfitRole[];
   removeRoles: OutfitRole[];
@@ -125,9 +123,7 @@ interface ParsedRefinement {
   replacementRoleBySource: Map<OutfitRole, OutfitRole>;
   replacementTags: Map<OutfitRole, string[]>;
   requiresPreviousContext: boolean;
-  sourceOptionIndex?: number;
   targetRoles: OutfitRole[];
-  vagueOptionReference: boolean;
 }
 
 interface RefinedOutfitResult {
@@ -503,7 +499,7 @@ export class OutfitRecommendationService {
 
     if (
       parsedRefinement.requiresPreviousContext &&
-      (request.previousOutfits?.length ?? 0) === 0
+      !request.currentOutfit
     ) {
       return this.buildMissingContextPayload(
         query,
@@ -516,33 +512,31 @@ export class OutfitRecommendationService {
 
     if (
       parsedRefinement.hasRefinementIntent &&
-      (request.previousOutfits?.length ?? 0) > 0
+      request.currentOutfit
     ) {
-      const intent = this.mergePreviousIntent(
+      const intent = this.mergeCurrentIntent(
         currentIntent,
-        request.previousIntent,
+        request.currentOutfit.intent,
       );
-      const refined = this.refinePreviousOutfit(
+      const refined = this.refineCurrentOutfit(
         preparedProducts,
         intent,
         currentIntent,
         parsedRefinement,
-        request.previousOutfits ?? [],
+        request.currentOutfit,
         request.budget,
-        request.previousBudget,
+        request.currentOutfit.budget,
         locale,
       );
       const outfits = refined.outfit ? [refined.outfit] : [];
-      const recommendations = this.flattenPrimaryRecommendations(outfits, locale);
 
       return {
         candidateCount: preparedProducts.length,
-        resultCount: recommendations.length,
+        resultCount: outfits[0]?.products.length ?? 0,
         response: {
           query,
           intent: this.mapIntentDto(intent),
           outfits,
-          recommendations,
           summary: this.buildRefinementSummary(
             refined.refinement,
             outfits.length,
@@ -570,7 +564,6 @@ export class OutfitRecommendationService {
       intent,
       locale,
     );
-    const recommendations = this.flattenPrimaryRecommendations(outfits, locale);
     const summary = this.buildSummary(
       intent,
       outfits.length,
@@ -581,12 +574,11 @@ export class OutfitRecommendationService {
 
     return {
       candidateCount: preparedProducts.length,
-      resultCount: recommendations.length,
+      resultCount: outfits[0]?.products.length ?? 0,
       response: {
         query,
         intent: this.mapIntentDto(intent),
         outfits,
-        recommendations,
         summary,
         warnings,
         extraTips: this.buildExtraTips(warnings, outfits.length, locale),
@@ -682,12 +674,11 @@ export class OutfitRecommendationService {
       );
     const vagueOptionReference =
       /\b(?:option do|outfit do|set do|cai do|goi y do)\b/.test(comparable);
-    const explicitOptionReference = Boolean(numberedOption || firstOptionReference);
-    const sourceOptionIndex = numberedOption
-      ? Number(numberedOption[1])
-      : firstOptionReference
-        ? 1
-        : undefined;
+    // Deprecated text compatibility only. Option numbers never select a
+    // different source; refinement always edits the one current outfit.
+    const legacyOptionReference = Boolean(
+      numberedOption || firstOptionReference || vagueOptionReference,
+    );
     const keepRoles = new Set<OutfitRole>();
     const replaceRoles = new Set<OutfitRole>();
     const removeRoles = new Set<OutfitRole>();
@@ -770,17 +761,16 @@ export class OutfitRecommendationService {
     const hasBudgetRefinement =
       cheaper ||
       (requestBudget !== undefined &&
-        (hasBudgetWording || explicitOptionReference || vagueOptionReference));
+        (hasBudgetWording || legacyOptionReference));
     const hasRoleAction =
       keepRoles.size > 0 || replaceRoles.size > 0 || removeRoles.size > 0;
     const hasRefinementIntent =
       hasRoleAction ||
       hasBudgetRefinement ||
-      ((explicitOptionReference || vagueOptionReference) &&
+      (legacyOptionReference &&
         (hasKeepKeyword || hasReplaceKeyword || hasRemoveKeyword));
     const requiresPreviousContext =
-      explicitOptionReference ||
-      vagueOptionReference ||
+      legacyOptionReference ||
       hasKeepKeyword ||
       hasReplaceKeyword;
     const targetRoles = [
@@ -803,7 +793,7 @@ export class OutfitRecommendationService {
     return {
       action,
       cheaper,
-      explicitOptionReference,
+      legacyOptionReference,
       hasRefinementIntent,
       keepRoles: [...keepRoles],
       removeRoles: [...removeRoles],
@@ -811,9 +801,7 @@ export class OutfitRecommendationService {
       replacementRoleBySource,
       replacementTags,
       requiresPreviousContext,
-      sourceOptionIndex,
       targetRoles,
-      vagueOptionReference,
     };
   }
 
@@ -853,9 +841,9 @@ export class OutfitRecommendationService {
     return [...roles];
   }
 
-  private mergePreviousIntent(
+  private mergeCurrentIntent(
     current: ExtractedIntent,
-    previous: NormalizedStyleAdviceRequest['previousIntent'],
+    previous: NonNullable<NormalizedStyleAdviceRequest['currentOutfit']>['intent'],
   ): ExtractedIntent {
     if (!previous) {
       return current;
@@ -942,8 +930,8 @@ export class OutfitRecommendationService {
   ): OutfitRecommendationPayload {
     const warning =
       locale === 'vi'
-        ? 'M\u00ecnh ch\u01b0a c\u00f3 outfit tr\u01b0\u1edbc \u0111\u00f3 \u0111\u1ec3 ch\u1ec9nh. B\u1ea1n h\u00e3y t\u1ea1o outfit tr\u01b0\u1edbc r\u1ed3i y\u00eau c\u1ea7u \u0111\u1ed5i qu\u1ea7n, \u0111\u1ed5i gi\u00e0y ho\u1eb7c b\u1ecf \u00e1o kho\u00e1c.'
-        : 'I do not have a previous outfit to refine yet. Please generate an outfit first, then ask me to change a role.';
+        ? 'M\u00ecnh ch\u01b0a c\u00f3 outfit hi\u1ec7n t\u1ea1i \u0111\u1ec3 ch\u1ec9nh. B\u1ea1n h\u00e3y t\u1ea1o outfit tr\u01b0\u1edbc, r\u1ed3i y\u00eau c\u1ea7u \u0111\u1ed5i qu\u1ea7n, \u0111\u1ed5i gi\u00e0y ho\u1eb7c b\u1ecf \u00e1o kho\u00e1c.'
+        : 'I do not have a current outfit to edit yet. Generate an outfit first, then ask me to change the pants, shoes, or jacket.';
 
     return {
       candidateCount,
@@ -952,16 +940,12 @@ export class OutfitRecommendationService {
         query,
         intent: this.mapIntentDto(intent),
         outfits: [],
-        recommendations: [],
         summary: warning,
         warnings: [warning],
         extraTips: [],
         refinement: {
           applied: false,
           action: 'fresh',
-          ...(parsed.sourceOptionIndex
-            ? { sourceOptionIndex: parsed.sourceOptionIndex }
-            : {}),
           targetRoles: parsed.targetRoles,
           keptProductIds: [],
           removedProductIds: [],
@@ -971,52 +955,22 @@ export class OutfitRecommendationService {
     };
   }
 
-  private refinePreviousOutfit(
+  private refineCurrentOutfit(
     products: PreparedProduct[],
     intent: ExtractedIntent,
     currentIntent: ExtractedIntent,
     parsed: ParsedRefinement,
-    previousOutfits: StyleAdvicePreviousOutfitDto[],
+    currentOutfit: StyleAdviceCurrentOutfitDto,
     requestBudget: number | undefined,
-    previousBudget: number | undefined,
+    carriedBudget: number | undefined,
     locale: StyleAdviceLocale,
   ): RefinedOutfitResult {
-    const sourceOptionIndex = parsed.sourceOptionIndex ?? 1;
-    const sourceOutfit = previousOutfits.find(
-      (outfit) => outfit.optionIndex === sourceOptionIndex,
-    );
     const baseRefinement = {
       action: parsed.action,
-      sourceOptionIndex,
       targetRoles: parsed.targetRoles,
     } as const;
 
-    if (!sourceOutfit) {
-      const warning =
-        locale === 'vi'
-          ? `M\u00ecnh kh\u00f4ng nh\u1eadn \u0111\u01b0\u1ee3c g\u1ee3i \u00fd ${sourceOptionIndex} trong k\u1ebft qu\u1ea3 tr\u01b0\u1edbc \u0111\u00f3 n\u00ean ch\u01b0a th\u1ec3 ch\u1ec9nh set n\u00e0y.`
-          : `Option ${sourceOptionIndex} was not included in the previous result, so I could not refine it.`;
-
-      return {
-        refinement: {
-          applied: false,
-          ...baseRefinement,
-          keptProductIds: [],
-          removedProductIds: [],
-          replacedProductIds: [],
-        },
-        warnings: [warning],
-      };
-    }
-
     const warnings: string[] = [];
-    if (!parsed.explicitOptionReference && previousOutfits.length > 1) {
-      warnings.push(
-        locale === 'vi'
-          ? 'B\u1ea1n ch\u01b0a n\u00eau r\u00f5 s\u1ed1 g\u1ee3i \u00fd, n\u00ean m\u00ecnh \u0111ang ch\u1ec9nh g\u1ee3i \u00fd 1.'
-          : 'You did not specify an option number, so I refined option 1.',
-      );
-    }
 
     const productsById = new Map(
       products.map((product) => [product.record.id, product]),
@@ -1027,7 +981,7 @@ export class OutfitRecommendationService {
     const replacedProductIds = new Set<string>();
     const excludedProductIds = new Set<string>();
 
-    for (const contextProduct of sourceOutfit.products) {
+    for (const contextProduct of currentOutfit.items) {
       const product = productsById.get(contextProduct.productId);
       sourceProductIds.add(contextProduct.productId);
 
@@ -1041,7 +995,7 @@ export class OutfitRecommendationService {
       ) {
         removedProductIds.add(contextProduct.productId);
         warnings.push(
-          this.buildPreviousProductUnavailableWarning(
+          this.buildCurrentProductUnavailableWarning(
             contextProduct.role,
             locale,
           ),
@@ -1131,7 +1085,7 @@ export class OutfitRecommendationService {
 
     const budgetTarget =
       requestBudget ??
-      (parsed.cheaper && sourceTotal > 0 ? sourceTotal - 1 : previousBudget);
+      (parsed.cheaper && sourceTotal > 0 ? sourceTotal - 1 : carriedBudget);
     const budgetChangedRoles =
       budgetTarget === undefined
         ? []
@@ -1434,14 +1388,14 @@ export class OutfitRecommendationService {
       .filter((product): product is ScoredProduct => Boolean(product));
   }
 
-  private buildPreviousProductUnavailableWarning(
+  private buildCurrentProductUnavailableWarning(
     role: OutfitRole,
     locale: StyleAdviceLocale,
   ): string {
     const roleLabel = this.localizedLabel(role, locale);
     return locale === 'vi'
-      ? `${this.toTitleCase(roleLabel)} trong g\u1ee3i \u00fd tr\u01b0\u1edbc kh\u00f4ng c\u00f2n kh\u1ea3 d\u1ee5ng, n\u00ean m\u00ecnh \u0111\u00e3 b\u1ecf m\u00f3n \u0111\u00f3 v\u00e0 t\u00ecm l\u1ef1a ch\u1ecdn c\u00f2n h\u00e0ng khi c\u1ea7n.`
-      : `The previous ${roleLabel} is no longer active and in stock, so I removed it and looked for an available replacement where needed.`;
+      ? `${this.toTitleCase(roleLabel)} trong outfit hi\u1ec7n t\u1ea1i kh\u00f4ng c\u00f2n kh\u1ea3 d\u1ee5ng, n\u00ean m\u00ecnh \u0111\u00e3 b\u1ecf m\u00f3n \u0111\u00f3 v\u00e0 t\u00ecm l\u1ef1a ch\u1ecdn c\u00f2n h\u00e0ng khi c\u1ea7n.`
+      : `The current ${roleLabel} is no longer active and in stock, so I removed it and looked for an available replacement where needed.`;
   }
 
   private buildReplacementUnavailableWarning(
@@ -1472,8 +1426,8 @@ export class OutfitRecommendationService {
     }
 
     return locale === 'vi'
-      ? `M\u00ecnh \u0111\u00e3 ch\u1ec9nh g\u1ee3i \u00fd ${refinement.sourceOptionIndex ?? 1} theo y\u00eau c\u1ea7u m\u1edbi v\u00e0 ki\u1ec3m tra l\u1ea1i t\u1ed3n kho hi\u1ec7n t\u1ea1i.`
-      : `I refined option ${refinement.sourceOptionIndex ?? 1} with your new request and rechecked current availability.`;
+      ? 'M\u00ecnh \u0111\u00e3 ch\u1ec9nh outfit hi\u1ec7n t\u1ea1i theo y\u00eau c\u1ea7u m\u1edbi v\u00e0 ki\u1ec3m tra l\u1ea1i t\u1ed3n kho.'
+      : 'I refined the current outfit with your new request and rechecked current availability.';
   }
 
   private extractIntent(query: string): ExtractedIntent {
@@ -2225,29 +2179,6 @@ export class OutfitRecommendationService {
       price: scoredProduct.product.price,
       matchedTags: scoredProduct.matchedTags,
     };
-  }
-
-  private flattenPrimaryRecommendations(
-    outfits: StyleAdviceOutfitDto[],
-    locale: StyleAdviceLocale,
-  ): StyleAdviceRecommendationDto[] {
-    const firstOutfit = outfits[0];
-
-    if (!firstOutfit) {
-      return [];
-    }
-
-    return firstOutfit.products.map((product) => ({
-      productId: product.productId,
-      productSlug: product.productSlug,
-      productName: product.productName,
-      ...(product.imageUrl ? { imageUrl: product.imageUrl } : {}),
-      price: product.price,
-      reason:
-        locale === 'vi'
-          ? `Đã chọn ${this.localizedLabel(product.role, locale)} cho outfit này.`
-          : `${this.localizedLabel(product.role, locale)} selected for this outfit.`,
-    }));
   }
 
   private buildWarnings(

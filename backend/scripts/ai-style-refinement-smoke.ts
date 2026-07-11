@@ -93,7 +93,6 @@ async function run() {
     {
       locale: 'vi',
       action: 'replace',
-      sourceOptionIndex: 1,
       targetRoles: ['bottom'],
       replacedRole: 'bottom',
     },
@@ -104,7 +103,6 @@ async function run() {
     {
       locale: 'vi',
       action: 'replace',
-      sourceOptionIndex: 1,
       targetRoles: ['top', 'shoes'],
       keptRole: 'top',
       replacedRole: 'shoes',
@@ -117,7 +115,6 @@ async function run() {
     {
       locale: 'vi',
       action: 'replace',
-      sourceOptionIndex: 1,
       targetRoles: ['accessory', 'handbag'],
       replacedRole: 'accessory',
       expectedRole: 'handbag',
@@ -129,7 +126,6 @@ async function run() {
     {
       locale: 'en',
       action: 'budget',
-      sourceOptionIndex: 1,
       maxTotal: 500_000,
     },
   );
@@ -139,7 +135,6 @@ async function run() {
     {
       locale: 'en',
       action: 'replace',
-      sourceOptionIndex: 1,
       targetRoles: ['top', 'bottom'],
       keptRole: 'top',
       replacedRole: 'bottom',
@@ -151,7 +146,6 @@ async function run() {
     {
       locale: 'vi',
       action: 'budget',
-      sourceOptionIndex: 1,
       cheaperThanSource: true,
       expectedStyle: 'gothic',
     },
@@ -162,7 +156,6 @@ async function run() {
     {
       locale: 'vi',
       action: 'replace',
-      sourceOptionIndex: 1,
       targetRoles: ['shoes'],
       replacedRole: 'shoes',
     },
@@ -181,7 +174,7 @@ async function run() {
     'Keep the top, change the pants to black.',
     initialStreetwear,
   );
-  const staleTop = staleRequest.previousOutfits?.[0]?.products.find(
+  const staleTop = staleRequest.currentOutfit?.items.find(
     (product) => product.role === 'top',
   );
   if (staleTop) {
@@ -270,6 +263,39 @@ async function verifyRequestValidation() {
       },
     ],
   });
+  const duplicateCurrentRoles = plainToInstance(StyleAdviceRequestDto, {
+    notes: 'Change the pants.',
+    currentOutfit: {
+      items: [
+        { role: 'top', productId: 'top-1' },
+        { role: 'top', productId: 'top-2' },
+      ],
+    },
+  });
+  const duplicateCurrentProducts = plainToInstance(StyleAdviceRequestDto, {
+    notes: 'Change the pants.',
+    currentOutfit: {
+      items: [
+        { role: 'top', productId: 'same-product' },
+        { role: 'bottom', productId: 'same-product' },
+      ],
+    },
+  });
+  const tooManyCurrentItems = plainToInstance(StyleAdviceRequestDto, {
+    notes: 'Change the pants.',
+    currentOutfit: {
+      items: Array.from({ length: 7 }, (_, index) => ({
+        role: 'top',
+        productId: `product-${index}`,
+      })),
+    },
+  });
+  const unsafeCurrentField = plainToInstance(StyleAdviceRequestDto, {
+    notes: 'Change the pants.',
+    currentOutfit: {
+      items: [{ role: 'top', productId: 'top-1', price: 1 }],
+    },
+  });
   const validationOptions = {
     forbidNonWhitelisted: true,
     whitelist: true,
@@ -287,6 +313,22 @@ async function verifyRequestValidation() {
     (await validate(unsafeNestedField, validationOptions)).length > 0,
     'Request validation accepted an unknown nested context field',
   );
+  check(
+    (await validate(duplicateCurrentRoles, validationOptions)).length > 0,
+    'Request validation accepted duplicate current outfit roles',
+  );
+  check(
+    (await validate(duplicateCurrentProducts, validationOptions)).length > 0,
+    'Request validation accepted duplicate current outfit product IDs',
+  );
+  check(
+    (await validate(tooManyCurrentItems, validationOptions)).length > 0,
+    'Request validation accepted more than six current outfit items',
+  );
+  check(
+    (await validate(unsafeCurrentField, validationOptions)).length > 0,
+    'Request validation accepted an unknown current outfit item field',
+  );
 }
 
 interface RefinementExpectation {
@@ -300,7 +342,6 @@ interface RefinementExpectation {
   removedRole?: OutfitRole;
   replacedRole?: OutfitRole;
   replacementSlugIncludes?: string;
-  sourceOptionIndex: number;
   targetRoles?: OutfitRole[];
 }
 
@@ -309,7 +350,7 @@ async function verifyRefinement(
   previous: StyleAdviceResponseDto,
   expected: RefinementExpectation,
 ) {
-  const source = previous.outfits[expected.sourceOptionIndex - 1];
+  const source = previous.outfits[0];
   const oldRoleProduct = expected.replacedRole
     ? source?.products.find((product) => product.role === expected.replacedRole)
     : undefined;
@@ -323,10 +364,6 @@ async function verifyRefinement(
 
   check(response.locale === expected.locale, `${JSON.stringify(prompt)} locale mismatch`);
   check(response.refinement?.applied === true, `${JSON.stringify(prompt)} did not apply refinement`);
-  check(
-    response.refinement?.sourceOptionIndex === expected.sourceOptionIndex,
-    `${JSON.stringify(prompt)} source option mismatch`,
-  );
   check(response.refinement?.action === expected.action, `${JSON.stringify(prompt)} action mismatch`);
   check(Boolean(outfit), `${JSON.stringify(prompt)} did not return a refined outfit`);
 
@@ -423,21 +460,15 @@ function buildFollowUpRequest(
 ): StyleAdviceRequestDto {
   return {
     notes,
-    previousOutfits: previous.outfits.slice(0, 2).map((outfit, index) => ({
-      optionIndex: index + 1,
-      title: outfit.title,
-      totalPrice: outfit.products.reduce((sum, product) => sum + product.price, 0),
-      locale: previous.locale,
-      products: outfit.products.slice(0, 6).map((product) => ({
-        role: product.role,
-        productId: product.productId,
-        productSlug: product.productSlug,
-        productName: product.productName,
-        price: product.price,
+    currentOutfit: {
+      items: (previous.outfit?.items ?? []).slice(0, 6).map((item) => ({
+        role: item.role,
+        productId: item.productId,
       })),
-    })),
-    previousIntent: previous.intent,
-    ...(previous.budget !== undefined ? { previousBudget: previous.budget } : {}),
+      intent: previous.intent,
+      ...(previous.budget !== undefined ? { budget: previous.budget } : {}),
+      ...(previous.locale ? { locale: previous.locale } : {}),
+    },
   };
 }
 
@@ -483,7 +514,6 @@ function report(
       scope,
       locale: response.locale,
       refinementApplied: response.refinement?.applied ?? false,
-      sourceOptionIndex: response.refinement?.sourceOptionIndex,
       action: response.refinement?.action,
       targetRoles: response.refinement?.targetRoles ?? [],
       keptProductIds: response.refinement?.keptProductIds ?? [],
