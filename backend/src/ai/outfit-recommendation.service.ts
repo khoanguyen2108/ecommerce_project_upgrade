@@ -556,12 +556,14 @@ export class OutfitRecommendationService {
     }
 
     const intent = currentIntent;
+    // V2-lite exposes only the highest-ranked candidate. Candidate evaluation
+    // remains unchanged so scoring, budget, and stock behavior stay stable.
     const outfits = this.composeOutfits(
       preparedProducts,
       intent,
       request.budget,
       locale,
-    );
+    ).slice(0, 1);
     const warnings = this.buildWarnings(
       outfits,
       preparedProducts,
@@ -2710,6 +2712,10 @@ export class OutfitRecommendationService {
   }
 
   private buildPrompt(request: NormalizedStyleAdviceRequest): string {
+    if (request.message) {
+      return request.message;
+    }
+
     return [
       request.occasion,
       request.style,

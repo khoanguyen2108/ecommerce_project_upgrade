@@ -163,16 +163,18 @@ export class AiScopeService {
   evaluateStyleAdvice(
     request: NormalizedStyleAdviceRequest,
   ): AiScopeDecision {
-    const text = [
-      request.occasion,
-      request.style,
-      request.bodyType,
-      request.notes,
-      ...request.preferredColors,
-      ...request.preferredSizes,
-    ]
-      .filter((value): value is string => Boolean(value))
-      .join(' ');
+    const text =
+      request.message ??
+      [
+        request.occasion,
+        request.style,
+        request.bodyType,
+        request.notes,
+        ...request.preferredColors,
+        ...request.preferredSizes,
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(' ');
     const comparable = this.normalizeComparable(text);
     const earlyDecision = this.classifyExplicit(text, comparable);
 
@@ -181,12 +183,13 @@ export class AiScopeService {
     }
 
     const hasStructuredStyleIntent =
-      request.budget !== undefined ||
-      Boolean(request.occasion) ||
-      Boolean(request.style) ||
-      Boolean(request.bodyType) ||
-      request.preferredColors.length > 0 ||
-      request.preferredSizes.length > 0;
+      request.message === undefined &&
+      (request.budget !== undefined ||
+        Boolean(request.occasion) ||
+        Boolean(request.style) ||
+        Boolean(request.bodyType) ||
+        request.preferredColors.length > 0 ||
+        request.preferredSizes.length > 0);
 
     return this.finishClassification(
       text,

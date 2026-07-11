@@ -1,0 +1,280 @@
+import { AiQuotaService } from '../src/ai/ai-quota.service';
+import { AiScopeService } from '../src/ai/ai-scope.service';
+import { AiService } from '../src/ai/ai.service';
+import {
+  type StyleAdviceRequestDto,
+  type StyleAdviceResponseDto,
+} from '../src/ai/dto/style-advice.dto';
+import { OutfitRecommendationService } from '../src/ai/outfit-recommendation.service';
+import { PrismaService } from '../src/prisma/prisma.service';
+
+const PRODUCT_FIXTURES = [
+  buildProduct('top-1', 'Cream Oversized Tee', 'cream-oversized-tee', 150_000, [
+    'top', 'tee', 'cream', 'black', 'streetwear', 'gothic', 'darkwear',
+    'minimal', 'clean_fit', 'oversized', 'coffee', 'school',
+  ]),
+  buildProduct('top-2', 'Black Street Tee', 'black-street-tee', 120_000, [
+    'top', 'tee', 'black', 'streetwear', 'gothic', 'darkwear', 'oversized',
+  ]),
+  buildProduct('bottom-1', 'Cream Cafe Pants', 'cream-cafe-pants', 170_000, [
+    'bottom', 'bottoms', 'pants', 'cream', 'minimal', 'clean_fit', 'coffee', 'school',
+  ]),
+  buildProduct('bottom-2', 'Black Gothic Pants', 'black-gothic-pants', 140_000, [
+    'bottom', 'bottoms', 'pants', 'black', 'streetwear', 'gothic', 'darkwear',
+  ]),
+  buildProduct('bottom-3', 'Black Denim Jeans', 'black-denim-jeans', 130_000, [
+    'bottom', 'bottoms', 'pants', 'jeans', 'black', 'streetwear', 'gothic', 'darkwear',
+  ]),
+  buildProduct('shoes-1', 'Cream Cafe Sneakers', 'cream-cafe-sneakers', 160_000, [
+    'shoes', 'sneakers', 'cream', 'minimal', 'clean_fit', 'coffee', 'school',
+  ]),
+  buildProduct('shoes-2', 'Black Gothic Boots', 'black-gothic-boots', 150_000, [
+    'shoes', 'boots', 'black', 'streetwear', 'gothic', 'darkwear',
+  ]),
+  buildProduct('jacket-1', 'Black Gothic Jacket', 'black-gothic-jacket', 180_000, [
+    'jacket', 'outerwear', 'black', 'gothic', 'darkwear',
+  ]),
+  buildProduct('accessory-1', 'Silver Ring', 'silver-ring', 70_000, [
+    'accessory', 'accessories', 'silver', 'silver_hardware', 'gothic', 'darkwear',
+  ]),
+] as const;
+
+let catalogQueries = 0;
+let quotaAcquisitions = 0;
+const prismaService = {
+  product: {
+    findMany: async () => {
+      catalogQueries += 1;
+      return PRODUCT_FIXTURES;
+    },
+  },
+} as unknown as PrismaService;
+const quotaService = {
+  acquire: async () => {
+    quotaAcquisitions += 1;
+    return { lockKey: 'v2-lite-smoke', lockToken: 'smoke' };
+  },
+  release: async () => undefined,
+} as unknown as AiQuotaService;
+const scopeService = new AiScopeService();
+const aiService = new AiService(
+  scopeService,
+  quotaService,
+  new OutfitRecommendationService(prismaService),
+);
+const failures: string[] = [];
+
+const CLARIFICATION_CASES = [
+  { prompt: '\u0111i ch\u01a1i', locale: 'vi' },
+  { prompt: 'cho tui outfit', locale: 'vi' },
+  { prompt: 'm\u1eb7c g\u00ec \u0111\u1eb9p', locale: 'vi' },
+  { prompt: 'recommend outfit', locale: 'en', useMessage: true },
+  { prompt: 'style me', locale: 'en' },
+] as const;
+
+const OUTFIT_CASES = [
+  { prompt: '\u0111i cafe m\u00e0u kem d\u01b0\u1edbi 700k', locale: 'vi' },
+  { prompt: 'all black gothic \u0111i ch\u01a1i t\u1ed1i' },
+  { prompt: 'streetwear \u00e1o thun \u0111en form r\u1ed9ng v\u1edbi boots' },
+  { prompt: 'outfit \u0111\u01a1n gi\u1ea3n \u0111i h\u1ecdc d\u01b0\u1edbi 500k', locale: 'vi', maxBudget: 500_000 },
+  { prompt: 'No jacket, just tee, pants and shoes.', noJacket: true },
+  { prompt: 'Recommend darkwear with boots and silver accessories.' },
+] as const;
+
+async function run() {
+  for (const smokeCase of CLARIFICATION_CASES) {
+    const catalogBefore = catalogQueries;
+    const quotaBefore = quotaAcquisitions;
+    const request: StyleAdviceRequestDto =
+      'useMessage' in smokeCase && smokeCase.useMessage
+      ? { message: smokeCase.prompt }
+      : { notes: smokeCase.prompt };
+    const response = await aiService.getStyleAdvice(request, {
+      userId: 'v2-lite-clarification-smoke-user',
+    });
+
+    check(response.type === 'clarification', smokeCase.prompt, 'type was not clarification');
+    check(response.locale === smokeCase.locale, smokeCase.prompt, `locale was ${response.locale}`);
+    check(Boolean(response.clarificationQuestion), smokeCase.prompt, 'question was missing');
+    check(
+      (response.clarificationQuestion?.match(/\?/g) ?? []).length === 1,
+      smokeCase.prompt,
+      'response did not contain exactly one question',
+    );
+    check(response.outfit === undefined, smokeCase.prompt, 'canonical outfit was exposed');
+    check(response.outfits.length === 0, smokeCase.prompt, 'legacy outfit was exposed');
+    check(response.recommendations.length === 0, smokeCase.prompt, 'product cards were exposed');
+    check(catalogQueries === catalogBefore, smokeCase.prompt, 'catalog was queried');
+    check(quotaAcquisitions === quotaBefore, smokeCase.prompt, 'quota was acquired');
+    report(smokeCase.prompt, response);
+  }
+
+  const outfitResponses = new Map<string, StyleAdviceResponseDto>();
+  for (const smokeCase of OUTFIT_CASES) {
+    const response = await aiService.getStyleAdvice(
+      { notes: smokeCase.prompt },
+      { userId: 'v2-lite-outfit-smoke-user' },
+    );
+    outfitResponses.set(smokeCase.prompt, response);
+    verifyOutfitResponse(smokeCase.prompt, response);
+    if ('locale' in smokeCase && smokeCase.locale) {
+      check(response.locale === smokeCase.locale, smokeCase.prompt, `locale was ${response.locale}`);
+    }
+    if ('maxBudget' in smokeCase && smokeCase.maxBudget) {
+      check(
+        response.outfit !== undefined && response.outfit.totalPrice <= smokeCase.maxBudget,
+        smokeCase.prompt,
+        `total exceeded ${smokeCase.maxBudget}`,
+      );
+    }
+    if ('noJacket' in smokeCase && smokeCase.noJacket) {
+      check(
+        response.outfit?.items.every((item) => item.role !== 'jacket') === true,
+        smokeCase.prompt,
+        'jacket was returned',
+      );
+    }
+    report(smokeCase.prompt, response);
+  }
+
+  const streetwearPrompt = 'streetwear \u00e1o thun \u0111en form r\u1ed9ng v\u1edbi boots';
+  const previous = outfitResponses.get(streetwearPrompt);
+  if (!previous) {
+    throw new Error('Missing streetwear source response');
+  }
+  const oldBottomId = previous.outfit?.items.find((item) => item.role === 'bottom')?.productId;
+  const refinementPrompt = 'Tui th\u00edch option 1 nh\u01b0ng \u0111\u1ed5i qu\u1ea7n kh\u00e1c.';
+  const refined = await aiService.getStyleAdvice(
+    buildFollowUpRequest(refinementPrompt, previous),
+    { userId: 'v2-lite-refinement-smoke-user' },
+  );
+  verifyOutfitResponse(refinementPrompt, refined);
+  check(refined.refinement?.applied === true, refinementPrompt, 'refinement was not applied');
+  check(
+    oldBottomId !== undefined &&
+      refined.outfit?.items.every((item) => item.productId !== oldBottomId) === true,
+    refinementPrompt,
+    'old bottom was not excluded',
+  );
+  for (const sourceItem of previous.outfit?.items ?? []) {
+    if (sourceItem.role === 'bottom') continue;
+    check(
+      refined.outfit?.items.some((item) => item.productId === sourceItem.productId) === true,
+      refinementPrompt,
+      `non-target ${sourceItem.role} was not kept`,
+    );
+  }
+  report(refinementPrompt, refined);
+
+  const outOfScopePrompt = 'What is the weather today?';
+  const outOfScope = await aiService.getStyleAdvice(
+    { notes: outOfScopePrompt },
+    { userId: 'v2-lite-scope-smoke-user' },
+  );
+  check(outOfScope.type === 'out_of_scope', outOfScopePrompt, `type was ${outOfScope.type}`);
+  check(outOfScope.outfit === undefined, outOfScopePrompt, 'canonical outfit was exposed');
+  check(outOfScope.outfits.length === 0, outOfScopePrompt, 'legacy outfit was exposed');
+  report(outOfScopePrompt, outOfScope);
+
+  if (failures.length > 0) {
+    throw new Error(failures.join('\n'));
+  }
+}
+
+function verifyOutfitResponse(prompt: string, response: StyleAdviceResponseDto) {
+  const items = response.outfit?.items ?? [];
+  const productIds = items.map((item) => item.productId);
+  const roles = items.map((item) => item.role);
+  check(response.type === 'outfit', prompt, `type was ${response.type}`);
+  check(Boolean(response.outfit), prompt, 'canonical outfit was missing');
+  check(response.outfits.length === 1, prompt, `legacy outfits length was ${response.outfits.length}`);
+  check(new Set(productIds).size === productIds.length, prompt, 'duplicate canonical product IDs');
+  check(new Set(roles).size === roles.length, prompt, 'duplicate canonical roles');
+  check(items.every((item) => item.variantRequired), prompt, 'variantRequired was not safe');
+  check(
+    response.outfits[0]?.products.map((product) => product.productId).join(',') === productIds.join(','),
+    prompt,
+    'canonical and compatibility outfits diverged',
+  );
+  check(
+    response.recommendations.map((product) => product.productId).join(',') === productIds.join(','),
+    prompt,
+    'canonical and compatibility recommendations diverged',
+  );
+}
+
+function buildFollowUpRequest(
+  notes: string,
+  previous: StyleAdviceResponseDto,
+): StyleAdviceRequestDto {
+  return {
+    notes,
+    previousOutfits: previous.outfits.slice(0, 1).map((outfit) => ({
+      optionIndex: 1,
+      title: outfit.title,
+      totalPrice: outfit.products.reduce((total, product) => total + product.price, 0),
+      locale: previous.locale,
+      products: outfit.products.map((product) => ({
+        role: product.role,
+        productId: product.productId,
+        productSlug: product.productSlug,
+        productName: product.productName,
+        price: product.price,
+      })),
+    })),
+    previousIntent: previous.intent,
+    ...(previous.budget !== undefined ? { previousBudget: previous.budget } : {}),
+  };
+}
+
+function report(prompt: string, response: StyleAdviceResponseDto) {
+  const productIds = response.outfit?.items.map((item) => item.productId) ?? [];
+  const roles = response.outfit?.items.map((item) => item.role) ?? [];
+  console.log(JSON.stringify({
+    prompt,
+    scope: scopeService.evaluateStyleAdvice({
+      notes: prompt,
+      preferredColors: [],
+      preferredSizes: [],
+    }).result,
+    locale: response.locale,
+    type: response.type,
+    clarificationQuestion: response.clarificationQuestion,
+    canonicalOutfitExists: Boolean(response.outfit),
+    legacyOutfitsLength: response.outfits.length,
+    recommendationsLength: response.recommendations.length,
+    productIds,
+    roles,
+    duplicateRoles: new Set(roles).size !== roles.length,
+    duplicateProductIds: new Set(productIds).size !== productIds.length,
+    warnings: response.outfit?.warnings ?? response.warnings,
+    verdict: failures.length === 0 ? 'PASS' : 'CHECK_FAILURES',
+  }));
+}
+
+function check(condition: boolean, prompt: string, message: string) {
+  if (!condition) failures.push(`${JSON.stringify(prompt)}: ${message}`);
+}
+
+function buildProduct(
+  id: string,
+  name: string,
+  slug: string,
+  price: number,
+  aiTags: string[],
+) {
+  return {
+    aiTags,
+    basePrice: price,
+    category: { name: 'Catalog', slug: 'catalog' },
+    id,
+    imageUrls: [`https://example.com/${slug}.jpg`],
+    managedImages: [],
+    name,
+    productCategories: [],
+    slug,
+    variants: [{ color: 'Black', priceOverride: null, size: 'M' }],
+  };
+}
+
+void run();

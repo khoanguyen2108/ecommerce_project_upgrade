@@ -53,6 +53,8 @@ import {
 } from "./dto/recommend-products.dto";
 import {
   StyleAdviceIntentDto,
+  StyleAdviceCanonicalOutfitDto,
+  StyleAdviceCanonicalOutfitItemDto,
   StyleAdviceOutfitDto,
   StyleAdviceOutfitProductDto,
   StyleAdviceRequestDto,
@@ -99,6 +101,8 @@ class AiRateLimitExceptionFilter implements ExceptionFilter {
 @ApiBearerAuth(SWAGGER_BEARER_AUTH_NAME)
 @ApiExtraModels(
   StyleAdviceResponseDto,
+  StyleAdviceCanonicalOutfitDto,
+  StyleAdviceCanonicalOutfitItemDto,
   StyleAdviceIntentDto,
   StyleAdviceOutfitDto,
   StyleAdviceOutfitProductDto,

@@ -249,9 +249,10 @@ export function inferBudgetFromStylePrompt(
   }
 
   const comparable = normalizeComparable(
-    [request.occasion, request.style, request.notes]
-      .filter((value): value is string => Boolean(value))
-      .join(' '),
+    request.message ??
+      [request.occasion, request.style, request.notes]
+        .filter((value): value is string => Boolean(value))
+        .join(' '),
   );
   const constrainedBudget = comparable.match(
     /\b(?:budget|ngan sach|under|below|max|maximum|duoi|toi da|khong qua)\s*(?:la|of)?\s*([0-9]+(?:[.,][0-9]+)*)\s*(tram nghin|tram ngan|tram|nghin|ngan|k|trieu|m|million|vnd|dong|d)?\b/,
@@ -622,6 +623,10 @@ function buildStylingTip(
 }
 
 function buildPrompt(request: NormalizedStyleAdviceRequest): string {
+  if (request.message) {
+    return request.message;
+  }
+
   return [
     request.occasion,
     request.style,

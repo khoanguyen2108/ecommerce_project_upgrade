@@ -64,6 +64,10 @@ export function detectStyleAdviceLocale(
 }
 
 function buildLocaleText(request: NormalizedStyleAdviceRequest): string {
+  if (request.message) {
+    return request.message;
+  }
+
   return [
     request.notes,
     request.style,

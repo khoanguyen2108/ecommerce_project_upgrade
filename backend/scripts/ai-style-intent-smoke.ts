@@ -22,6 +22,7 @@ interface IntentExpectation {
 interface IntentSmokeCase {
   expectedIntent?: IntentExpectation;
   expectedLocale?: 'vi' | 'en';
+  expectedOutfitCount?: number;
   expectedScope: AiScopeResult;
   forbiddenRoles?: OutfitRole[];
   prompt: string;
@@ -159,12 +160,14 @@ const CASES: IntentSmokeCase[] = [
     prompt: 'Tui thích option 1 nhưng đổi quần.',
     expectedScope: 'allowed',
     expectedLocale: 'vi',
+    expectedOutfitCount: 0,
     expectedIntent: { categories: ['bottoms'] },
   },
   {
     prompt: 'Keep the top, change the pants to black.',
     expectedScope: 'allowed',
     expectedLocale: 'en',
+    expectedOutfitCount: 0,
     expectedIntent: { categories: ['top', 'bottoms'], colors: ['black'] },
   },
   {
@@ -266,7 +269,11 @@ async function run() {
 
     if (smokeCase.expectedScope === 'allowed') {
       check(response.mode === 'deterministic_tag_recommender', smokeCase, 'allowed prompt did not use deterministic recommender');
-      check(response.outfits.length <= 2, smokeCase, 'returned more than two outfits');
+      check(
+        response.outfits.length === (smokeCase.expectedOutfitCount ?? 1),
+        smokeCase,
+        `expected ${smokeCase.expectedOutfitCount ?? 1} outfit(s), received ${response.outfits.length}`,
+      );
       check(roleUniqueness, smokeCase, 'returned duplicate roles within an outfit');
       checkIntent(response.intent, smokeCase.expectedIntent, smokeCase);
 

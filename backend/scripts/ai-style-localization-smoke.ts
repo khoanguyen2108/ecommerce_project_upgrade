@@ -117,8 +117,8 @@ async function run() {
       `${JSON.stringify(smokeCase.prompt)} expected locale ${smokeCase.locale}, received ${response.locale}`,
     );
     check(
-      response.outfits.length <= 2,
-      `${JSON.stringify(smokeCase.prompt)} returned more than two outfits`,
+      response.outfits.length === 1,
+      `${JSON.stringify(smokeCase.prompt)} did not return exactly one outfit`,
     );
     checkLocalizedText(customerText, smokeCase.locale, smokeCase.prompt);
 

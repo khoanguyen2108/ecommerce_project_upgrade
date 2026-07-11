@@ -84,7 +84,7 @@ async function run() {
   );
 
   check(initialStreetwear.outfits.length > 0, 'Initial streetwear result was empty');
-  check(initialGothic.outfits.length === 2, 'Initial gothic result did not provide option 2');
+  check(initialGothic.outfits.length === 1, 'Initial gothic result was not one outfit');
   check(initialCafe.outfits.length > 0, 'Initial cafe result was empty');
 
   await verifyRefinement(
@@ -109,17 +109,6 @@ async function run() {
       keptRole: 'top',
       replacedRole: 'shoes',
       replacementSlugIncludes: 'boots',
-    },
-  );
-  await verifyRefinement(
-    'Option 2 \u0111\u1eb9p nh\u01b0ng b\u1ecf jacket.',
-    initialGothic,
-    {
-      locale: 'vi',
-      action: 'remove',
-      sourceOptionIndex: 2,
-      targetRoles: ['jacket'],
-      removedRole: 'jacket',
     },
   );
   await verifyRefinement(
@@ -453,7 +442,7 @@ function buildFollowUpRequest(
 }
 
 function verifySharedInvariants(prompt: string, response: StyleAdviceResponseDto) {
-  check(response.outfits.length <= 2, `${JSON.stringify(prompt)} returned more than two outfits`);
+  check(response.outfits.length <= 1, `${JSON.stringify(prompt)} returned more than one outfit`);
   for (const outfit of response.outfits) {
     const roles = outfit.products.map((product) => product.role);
     const ids = outfit.products.map((product) => product.productId);

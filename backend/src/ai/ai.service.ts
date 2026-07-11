@@ -9,6 +9,8 @@ import { AiQuotaService } from './ai-quota.service';
 import { AiScopeService, type AiScopeLocale } from './ai-scope.service';
 import type {
   NormalizedStyleAdviceRequest,
+  StyleAdviceCanonicalOutfitDto,
+  StyleAdviceOutfitDto,
   StyleAdviceRequestDto,
   StyleAdviceResponseDto,
 } from './dto/style-advice.dto';
@@ -19,6 +21,17 @@ import { detectStyleAdviceLocale } from './style-advice-locale';
 const MAX_TOTAL_USER_TEXT_LENGTH = 800;
 const DISALLOWED_CONTROL_CHARACTERS =
   /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
+const VAGUE_STYLE_PROMPTS = new Set([
+  'di choi',
+  'cho tui outfit',
+  'cho toi outfit',
+  'mac gi dep',
+  'phoi do cho tui',
+  'recommend outfit',
+  'style me',
+  'give me an outfit',
+  'what should i wear',
+]);
 
 export interface StyleAdviceRequestContext {
   requestId?: string;
@@ -64,6 +77,10 @@ export class AiService {
         return this.buildOutOfScopeResponse(request, scopeDecision.locale);
       }
 
+      if (this.needsClarification(request)) {
+        return this.buildClarificationResponse(request, locale);
+      }
+
       const quotaLease = await this.aiQuotaService.acquire(
         'style-advice',
         context.userId,
@@ -78,11 +95,20 @@ export class AiService {
         candidateCount = result.candidateCount;
         resultCount = result.resultCount;
 
+        const legacyResponse = result.response;
+        const canonicalOutfit = this.buildCanonicalOutfit(
+          legacyResponse.outfits[0],
+          legacyResponse.summary,
+          legacyResponse.warnings,
+        );
         const response: StyleAdviceResponseDto = {
+          type: 'outfit',
           mode: 'deterministic_tag_recommender',
           locale,
           ...(request.budget !== undefined ? { budget: request.budget } : {}),
-          ...result.response,
+          ...legacyResponse,
+          message: legacyResponse.summary,
+          ...(canonicalOutfit ? { outfit: canonicalOutfit } : {}),
         };
 
         this.logEvent('AI_STYLE_ADVICE_RECOMMENDED', context, {
@@ -114,6 +140,9 @@ export class AiService {
     dto: StyleAdviceRequestDto,
   ): NormalizedStyleAdviceRequest {
     const request: NormalizedStyleAdviceRequest = {
+      ...(dto.message
+        ? { message: this.normalizeUserText(dto.message) }
+        : {}),
       ...(dto.occasion
         ? { occasion: this.normalizeUserText(dto.occasion) }
         : {}),
@@ -162,6 +191,7 @@ export class AiService {
     this.assertDistinctValues(request.preferredSizes);
 
     const textLength = [
+      request.message,
       request.occasion,
       request.style,
       request.bodyType,
@@ -178,6 +208,7 @@ export class AiService {
 
     const hasMeaningfulField =
       request.budget !== undefined ||
+      Boolean(request.message) ||
       Boolean(request.occasion) ||
       Boolean(request.style) ||
       Boolean(request.bodyType) ||
@@ -198,7 +229,7 @@ export class AiService {
     request: NormalizedStyleAdviceRequest,
     locale: AiScopeLocale,
   ): StyleAdviceResponseDto {
-    const query = [
+    const query = request.message ?? [
       request.occasion,
       request.style,
       request.bodyType,
@@ -224,9 +255,11 @@ export class AiService {
           ];
 
     return {
+      type: 'out_of_scope',
       mode: 'out_of_scope',
       locale,
       query,
+      message: summary,
       intent: {
         categories: [],
         colors: [],
@@ -241,6 +274,103 @@ export class AiService {
       extraTips: tips,
       warnings: [],
     };
+  }
+
+  private needsClarification(request: NormalizedStyleAdviceRequest): boolean {
+    const prompt = this.buildCustomerPrompt(request);
+    return VAGUE_STYLE_PROMPTS.has(this.normalizeComparable(prompt));
+  }
+
+  private buildClarificationResponse(
+    request: NormalizedStyleAdviceRequest,
+    locale: 'vi' | 'en',
+  ): StyleAdviceResponseDto {
+    const question =
+      locale === 'vi'
+        ? 'B\u1ea1n mu\u1ed1n outfit cho d\u1ecbp n\u00e0o, vibe g\u00ec v\u00e0 ng\u00e2n s\u00e1ch kho\u1ea3ng bao nhi\u00eau?'
+        : 'What occasion, vibe, and budget should I style this outfit for?';
+
+    return {
+      type: 'clarification',
+      mode: 'deterministic_tag_recommender',
+      locale,
+      query: this.buildCustomerPrompt(request),
+      message: question,
+      clarificationQuestion: question,
+      summary: question,
+      intent: {
+        categories: [],
+        colors: [],
+        styles: [],
+        occasions: [],
+        fits: [],
+        negativeConstraints: [],
+      },
+      // Deprecated compatibility fields intentionally carry no products here.
+      outfits: [],
+      recommendations: [],
+      extraTips: [],
+      warnings: [],
+      ...(request.budget !== undefined ? { budget: request.budget } : {}),
+    };
+  }
+
+  private buildCanonicalOutfit(
+    outfit: StyleAdviceOutfitDto | undefined,
+    summary: string,
+    warnings: string[],
+  ): StyleAdviceCanonicalOutfitDto | undefined {
+    if (!outfit) {
+      return undefined;
+    }
+
+    return {
+      summary,
+      totalPrice: outfit.products.reduce(
+        (total, product) => total + product.price,
+        0,
+      ),
+      items: outfit.products.map((product) => ({
+        role: product.role,
+        productId: product.productId,
+        productSlug: product.productSlug,
+        productName: product.productName,
+        ...(product.imageUrl ? { imageUrl: product.imageUrl } : {}),
+        price: product.price,
+        // Product-level recommendations cannot prove that size/color selection
+        // is unnecessary, so V2-lite never guesses a variant.
+        variantRequired: true,
+      })),
+      warnings: [...new Set([...warnings, ...outfit.warnings])],
+    };
+  }
+
+  private buildCustomerPrompt(request: NormalizedStyleAdviceRequest): string {
+    if (request.message) {
+      return request.message;
+    }
+
+    return [
+      request.occasion,
+      request.style,
+      request.bodyType,
+      request.notes,
+      ...request.preferredColors,
+      ...request.preferredSizes,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(' ');
+  }
+
+  private normalizeComparable(value: string): string {
+    return value
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\u0111/gi, 'd')
+      .toLocaleLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private normalizeUserTextArray(values: string[] | undefined): string[] {

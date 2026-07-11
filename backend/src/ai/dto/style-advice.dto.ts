@@ -180,6 +180,17 @@ export class StyleAdvicePreviousIntentDto {
 }
 
 export class StyleAdviceRequestDto {
+  @ApiPropertyOptional({
+    example: 'I want an all black gothic outfit for going out.',
+    maxLength: 500,
+  })
+  @IsOptional()
+  @Transform(normalizeText)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(500)
+  message?: string;
+
   @ApiPropertyOptional({ example: 'A summer wedding', maxLength: 80 })
   @IsOptional()
   @Transform(normalizeText)
@@ -353,6 +364,48 @@ export class StyleAdviceOutfitDto {
   warnings: string[];
 }
 
+export type StyleAdviceResponseType =
+  | 'clarification'
+  | 'outfit'
+  | 'out_of_scope';
+
+export class StyleAdviceCanonicalOutfitItemDto {
+  @ApiProperty({ enum: STYLE_ADVICE_OUTFIT_PRODUCT_ROLES, example: 'top' })
+  role: StyleAdviceOutfitProductRole;
+
+  @ApiProperty({ format: 'uuid' })
+  productId: string;
+
+  @ApiProperty({ example: 'oversized-black-t-shirt' })
+  productSlug: string;
+
+  @ApiProperty({ example: 'Oversized Black T-Shirt' })
+  productName: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/black-t-shirt.jpg' })
+  imageUrl?: string;
+
+  @ApiProperty({ example: 399000 })
+  price: number;
+
+  @ApiProperty({ example: true })
+  variantRequired: boolean;
+}
+
+export class StyleAdviceCanonicalOutfitDto {
+  @ApiProperty({ example: 'One grounded outfit matching your preferences.' })
+  summary: string;
+
+  @ApiProperty({ example: 890000 })
+  totalPrice: number;
+
+  @ApiProperty({ type: [StyleAdviceCanonicalOutfitItemDto] })
+  items: StyleAdviceCanonicalOutfitItemDto[];
+
+  @ApiProperty({ type: [String] })
+  warnings: string[];
+}
+
 export const STYLE_ADVICE_REFINEMENT_ACTIONS = [
   'replace',
   'remove',
@@ -388,6 +441,21 @@ export class StyleAdviceRefinementDto {
 }
 
 export class StyleAdviceResponseDto {
+  @ApiProperty({ enum: ['clarification', 'outfit', 'out_of_scope'] })
+  type: StyleAdviceResponseType;
+
+  @ApiProperty({ example: 'One grounded outfit matching your preferences.' })
+  message: string;
+
+  @ApiPropertyOptional({
+    example: 'What occasion, vibe, and budget should I style this outfit for?',
+  })
+  clarificationQuestion?: string;
+
+  @ApiPropertyOptional({ type: StyleAdviceCanonicalOutfitDto })
+  outfit?: StyleAdviceCanonicalOutfitDto;
+
+  // Deprecated compatibility fields remain until the frontend contract migrates.
   @ApiProperty({
     enum: ['ai', 'catalog_fallback', 'deterministic_tag_recommender', 'out_of_scope'],
   })
@@ -426,6 +494,7 @@ export class StyleAdviceResponseDto {
 }
 
 export interface NormalizedStyleAdviceRequest {
+  message?: string;
   occasion?: string;
   style?: string;
   budget?: number;
