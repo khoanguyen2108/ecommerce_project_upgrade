@@ -23,6 +23,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { ReturnsModule } from './returns/returns.module';
+import { SavedOutfitsModule } from './saved-outfits/saved-outfits.module';
 import { RequestLoggingMiddleware } from './common/middleware/request-logging.middleware';
 
 const secondsToMilliseconds = (seconds: number) => seconds * 1000;
@@ -58,6 +59,7 @@ const getPositiveNumber = (
     PrismaModule,
     RedisModule,
     ReturnsModule,
+    SavedOutfitsModule,
     AiModule,
     AuthModule,
     AddressesModule,

@@ -15,6 +15,7 @@
     "ai:smoke:style-localization": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/ai-style-localization-smoke.ts",
     "ai:smoke:style-refinement": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/ai-style-refinement-smoke.ts",
     "ai:smoke:style-v2-lite": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/ai-style-v2-lite-smoke.ts",
+    "saved-outfits:smoke": "ts-node --project tsconfig.json -r tsconfig-paths/register scripts/saved-outfits-smoke.ts",
     "ai:smoke:real-provider": "node scripts/ai-smoke-real-provider.mjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
