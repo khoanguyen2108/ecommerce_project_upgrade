@@ -21,6 +21,21 @@ const adminNavItems = [
     label: "Dashboard",
   },
   {
+    href: "/admin/chats",
+    icon: MessageCircle,
+    label: "Chats",
+  },
+  {
+    href: "/admin/orders",
+    icon: ClipboardList,
+    label: "Orders",
+  },
+  {
+    href: "/admin/returns",
+    icon: RotateCcw,
+    label: "Returns",
+  },
+  {
     href: "/admin/users",
     icon: Users,
     label: "Users",
@@ -44,21 +59,6 @@ const adminNavItems = [
     href: "/admin/vouchers",
     icon: TicketPercent,
     label: "Vouchers",
-  },
-  {
-    href: "/admin/chats",
-    icon: MessageCircle,
-    label: "Chats",
-  },
-  {
-    href: "/admin/orders",
-    icon: ClipboardList,
-    label: "Orders",
-  },
-  {
-    href: "/admin/returns",
-    icon: RotateCcw,
-    label: "Returns",
   },
 ] as const;
 
