@@ -84,13 +84,16 @@ export class CartService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async getCart(user: AuthenticatedUser) {
-    const cart = await this.prismaService.$transaction(async (tx) => {
-      const cartSummary = await this.getOrCreateCartSummary(tx, user.id);
-
-      return this.getCartRecordById(tx, cartSummary.id);
+    const cart = await this.prismaService.cart.findUnique({
+      where: {
+        userId: user.id,
+      },
+      select: cartSelect,
     });
 
-    return { cart: this.toCartResponse(cart) };
+    return {
+      cart: cart ? this.toCartResponse(cart) : this.toEmptyCartResponse(user.id),
+    };
   }
 
   async addItem(user: AuthenticatedUser, dto: AddCartItemDto) {
@@ -227,7 +230,18 @@ export class CartService {
 
   async clearCart(user: AuthenticatedUser) {
     const cart = await this.prismaService.$transaction(async (tx) => {
-      const cartSummary = await this.getOrCreateCartSummary(tx, user.id);
+      const cartSummary = await tx.cart.findUnique({
+        where: {
+          userId: user.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!cartSummary) {
+        return null;
+      }
 
       await tx.cartItem.deleteMany({
         where: {
@@ -239,7 +253,9 @@ export class CartService {
       return this.getCartRecordById(tx, cartSummary.id);
     });
 
-    return { cart: this.toCartResponse(cart) };
+    return {
+      cart: cart ? this.toCartResponse(cart) : this.toEmptyCartResponse(user.id),
+    };
   }
 
   private async getOrCreateCartSummary(
@@ -356,6 +372,18 @@ export class CartService {
       ),
       createdAt: cart.createdAt,
       updatedAt: cart.updatedAt,
+    };
+  }
+
+  private toEmptyCartResponse(userId: string): CartResponseDto {
+    return {
+      id: null,
+      userId,
+      items: [],
+      totalQuantity: 0,
+      estimatedSubtotal: 0,
+      createdAt: null,
+      updatedAt: null,
     };
   }
 

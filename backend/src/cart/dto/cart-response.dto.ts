@@ -87,8 +87,8 @@ export class CartItemResponseDto {
 }
 
 export class CartResponseDto {
-  @ApiProperty()
-  id: string;
+  @ApiProperty({ nullable: true })
+  id: string | null;
 
   @ApiProperty()
   userId: string;
@@ -102,9 +102,9 @@ export class CartResponseDto {
   @ApiProperty({ example: 498000 })
   estimatedSubtotal: number;
 
-  @ApiProperty()
-  createdAt: Date;
+  @ApiProperty({ nullable: true })
+  createdAt: Date | null;
 
-  @ApiProperty()
-  updatedAt: Date;
+  @ApiProperty({ nullable: true })
+  updatedAt: Date | null;
 }

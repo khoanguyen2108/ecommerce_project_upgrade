@@ -35,13 +35,13 @@ export interface CartItem {
 }
 
 export interface Cart {
-  id: string;
+  id: string | null;
   userId: string;
   items: CartItem[];
   totalQuantity: number;
   estimatedSubtotal: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface CartResponse {
