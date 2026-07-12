@@ -71,7 +71,6 @@ export function SavedOutfitsSection({
     >
       <div className={styles.savedOutfitsHeading}>
         <div>
-          <span className={styles.stepNumber}>03</span>
           <h2 id="saved-outfits-heading">{copy.heading}</h2>
         </div>
         {isLoading && savedOutfits.length > 0 ? (

@@ -112,20 +112,6 @@
   font-size: 0.95rem;
 }
 
-.stepNumber {
-  align-items: center;
-  background: var(--color-text);
-  border-radius: 50%;
-  color: var(--color-surface);
-  display: inline-flex;
-  flex: 0 0 auto;
-  font-size: 0.6rem;
-  font-weight: 800;
-  height: 24px;
-  justify-content: center;
-  width: 24px;
-}
-
 .signInPrompt {
   align-items: center;
   background: var(--color-surface-muted);

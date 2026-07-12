@@ -155,7 +155,6 @@ function CurrentOutfitResult({
   return (
     <section aria-live="polite" className={styles.resultCard}>
       <div className={styles.summary}>
-        <span className={styles.stepNumber}>02</span>
         <div>
           <h2>{copy.summary}</h2>
           <p>{summary}</p>

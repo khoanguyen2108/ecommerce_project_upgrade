@@ -62,7 +62,6 @@ export function StyleAssistantInput({
     >
       <div className={styles.inputHeading}>
         <div>
-          <span className={styles.stepNumber}>01</span>
           <h2>Tell us what you need</h2>
         </div>
       </div>
