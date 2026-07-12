@@ -309,6 +309,22 @@ export const cartDataExample = {
   cart: cartExample,
 };
 
+export const outfitCartDataExample = {
+  cart: {
+    ...cartExample,
+    totalQuantity: 3,
+    estimatedSubtotal: 747000,
+  },
+  addedItems: [
+    {
+      productId: productExample.id,
+      variantId: productVariantExample.id,
+      quantity: 1,
+      currentUnitPrice: 249000,
+    },
+  ],
+};
+
 export const checkoutSummaryDataExample = {
   summary: {
     items: [

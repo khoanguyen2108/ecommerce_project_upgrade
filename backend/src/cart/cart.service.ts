@@ -7,10 +7,16 @@ import type { AuthenticatedUser } from '../auth/types/authenticated-user';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AddCartItemDto } from './dto/add-cart-item.dto';
+import type {
+  AddOutfitCartItemDto,
+  AddOutfitCartItemsDto,
+} from './dto/add-outfit-cart-items.dto';
 import type { CartResponseDto } from './dto/cart-response.dto';
 import type { UpdateCartItemDto } from './dto/update-cart-item.dto';
 
 const MAX_CART_ITEM_QUANTITY = 99;
+const MAX_OUTFIT_CART_ITEMS = 6;
+const OUTFIT_CART_ITEM_QUANTITY = 1;
 
 const cartItemVariantSelect = {
   id: true,
@@ -74,10 +80,45 @@ const cartItemForUpdateSelect = {
   },
 } as const satisfies Prisma.CartItemSelect;
 
+const outfitCartProductSelect = {
+  id: true,
+  isActive: true,
+  category: {
+    select: {
+      isActive: true,
+    },
+  },
+} as const satisfies Prisma.ProductSelect;
+
 type CartRecord = Prisma.CartGetPayload<{ select: typeof cartSelect }>;
 type VariantForCart = Prisma.ProductVariantGetPayload<{
   select: typeof cartItemVariantSelect;
 }>;
+type ProductForOutfitCart = Prisma.ProductGetPayload<{
+  select: typeof outfitCartProductSelect;
+}>;
+
+type OutfitCartErrorCode =
+  | 'OUTFIT_CART_DUPLICATE_PRODUCT'
+  | 'OUTFIT_CART_DUPLICATE_VARIANT'
+  | 'OUTFIT_CART_INSUFFICIENT_STOCK'
+  | 'OUTFIT_CART_ITEMS_REQUIRED'
+  | 'OUTFIT_CART_PRODUCT_UNAVAILABLE'
+  | 'OUTFIT_CART_QUANTITY_INVALID'
+  | 'OUTFIT_CART_TOO_MANY_ITEMS'
+  | 'OUTFIT_CART_VARIANT_PRODUCT_MISMATCH'
+  | 'OUTFIT_CART_VARIANT_UNAVAILABLE';
+
+interface OutfitCartInvalidItem {
+  code: OutfitCartErrorCode;
+  productId: string;
+  variantId: string;
+}
+
+interface ExistingOutfitCartItem {
+  quantity: number;
+  variantId: string;
+}
 
 @Injectable()
 export class CartService {
@@ -151,6 +192,134 @@ export class CartService {
     });
 
     return { cart: this.toCartResponse(cart) };
+  }
+
+  async addOutfitItems(user: AuthenticatedUser, dto: AddOutfitCartItemsDto) {
+    this.assertOutfitItemsRequest(dto.items);
+    this.assertNoDuplicateOutfitValues(
+      dto.items,
+      (item) => item.variantId,
+      'OUTFIT_CART_DUPLICATE_VARIANT',
+    );
+    this.assertNoDuplicateOutfitValues(
+      dto.items,
+      (item) => item.productId,
+      'OUTFIT_CART_DUPLICATE_PRODUCT',
+    );
+
+    const result = await this.prismaService.$transaction(async (tx) => {
+      const productIds = dto.items.map((item) => item.productId);
+      const variantIds = dto.items.map((item) => item.variantId);
+      const [products, variants, currentCart] = await Promise.all([
+        tx.product.findMany({
+          where: {
+            id: {
+              in: productIds,
+            },
+          },
+          select: outfitCartProductSelect,
+        }),
+        tx.productVariant.findMany({
+          where: {
+            id: {
+              in: variantIds,
+            },
+          },
+          select: cartItemVariantSelect,
+        }),
+        tx.cart.findUnique({
+          where: {
+            userId: user.id,
+          },
+          select: {
+            id: true,
+            items: {
+              where: {
+                variantId: {
+                  in: variantIds,
+                },
+              },
+              select: {
+                quantity: true,
+                variantId: true,
+              },
+            },
+          },
+        }),
+      ]);
+
+      const productById = new Map(
+        products.map((product) => [product.id, product]),
+      );
+      const variantById = new Map(
+        variants.map((variant) => [variant.id, variant]),
+      );
+      const existingQuantities = this.toExistingQuantityMap(
+        currentCart?.items ?? [],
+      );
+      const validationIssues = this.getOutfitCartValidationIssues(
+        dto.items,
+        productById,
+        variantById,
+        existingQuantities,
+      );
+
+      if (validationIssues.length > 0) {
+        throw this.outfitCartInvalidItemsException(validationIssues);
+      }
+
+      const cartSummary =
+        currentCart ?? (await this.getOrCreateCartSummary(tx, user.id));
+      const addedItems = dto.items.map((item) => {
+        const variant = variantById.get(item.variantId)!;
+
+        return {
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: OUTFIT_CART_ITEM_QUANTITY,
+          currentUnitPrice:
+            variant.priceOverride ?? variant.product.basePrice,
+        };
+      });
+
+      for (const item of dto.items) {
+        const nextQuantity =
+          (existingQuantities.get(item.variantId) ?? 0) +
+          OUTFIT_CART_ITEM_QUANTITY;
+
+        await tx.cartItem.upsert({
+          where: {
+            cartId_variantId: {
+              cartId: cartSummary.id,
+              variantId: item.variantId,
+            },
+          },
+          create: {
+            cartId: cartSummary.id,
+            variantId: item.variantId,
+            quantity: nextQuantity,
+          },
+          update: {
+            quantity: nextQuantity,
+          },
+          select: {
+            id: true,
+          },
+        });
+      }
+
+      await this.touchCart(tx, cartSummary.id);
+
+      return {
+        addedItems,
+        cart: await this.getCartRecordById(tx, cartSummary.id),
+      };
+    });
+
+    return {
+      cart: this.toCartResponse(result.cart),
+      addedItems: result.addedItems,
+    };
   }
 
   async updateItem(
@@ -256,6 +425,196 @@ export class CartService {
     return {
       cart: cart ? this.toCartResponse(cart) : this.toEmptyCartResponse(user.id),
     };
+  }
+
+  private assertOutfitItemsRequest(
+    items: AddOutfitCartItemsDto['items'] | undefined,
+  ): asserts items is AddOutfitCartItemDto[] {
+    if (!Array.isArray(items) || items.length === 0) {
+      throw this.outfitCartBadRequestException(
+        'OUTFIT_CART_ITEMS_REQUIRED',
+      );
+    }
+
+    if (items.length > MAX_OUTFIT_CART_ITEMS) {
+      throw this.outfitCartBadRequestException(
+        'OUTFIT_CART_TOO_MANY_ITEMS',
+      );
+    }
+
+    const invalidItems = items
+      .filter(
+        (item) =>
+          !Number.isInteger(item.quantity) ||
+          item.quantity !== OUTFIT_CART_ITEM_QUANTITY,
+      )
+      .map((item) => this.toOutfitCartInvalidItem(
+        item,
+        'OUTFIT_CART_QUANTITY_INVALID',
+      ));
+
+    if (invalidItems.length > 0) {
+      throw this.outfitCartInvalidItemsException(invalidItems);
+    }
+  }
+
+  private assertNoDuplicateOutfitValues(
+    items: AddOutfitCartItemDto[],
+    getValue: (item: AddOutfitCartItemDto) => string,
+    code: Extract<
+      OutfitCartErrorCode,
+      'OUTFIT_CART_DUPLICATE_PRODUCT' | 'OUTFIT_CART_DUPLICATE_VARIANT'
+    >,
+  ) {
+    const counts = new Map<string, number>();
+
+    for (const item of items) {
+      const value = getValue(item);
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+
+    const duplicateValues = new Set(
+      [...counts.entries()]
+        .filter(([, count]) => count > 1)
+        .map(([value]) => value),
+    );
+
+    if (duplicateValues.size === 0) {
+      return;
+    }
+
+    throw this.outfitCartInvalidItemsException(
+      items
+        .filter((item) => duplicateValues.has(getValue(item)))
+        .map((item) => this.toOutfitCartInvalidItem(item, code)),
+    );
+  }
+
+  private getOutfitCartValidationIssues(
+    items: AddOutfitCartItemDto[],
+    productById: Map<string, ProductForOutfitCart>,
+    variantById: Map<string, VariantForCart>,
+    existingQuantities: Map<string, number>,
+  ): OutfitCartInvalidItem[] {
+    const issues: OutfitCartInvalidItem[] = [];
+
+    for (const item of items) {
+      const product = productById.get(item.productId);
+
+      if (!product || !product.isActive || !product.category.isActive) {
+        issues.push(
+          this.toOutfitCartInvalidItem(
+            item,
+            'OUTFIT_CART_PRODUCT_UNAVAILABLE',
+          ),
+        );
+        continue;
+      }
+
+      const variant = variantById.get(item.variantId);
+
+      if (!variant || !variant.isActive) {
+        issues.push(
+          this.toOutfitCartInvalidItem(
+            item,
+            'OUTFIT_CART_VARIANT_UNAVAILABLE',
+          ),
+        );
+        continue;
+      }
+
+      if (variant.product.id !== item.productId) {
+        issues.push(
+          this.toOutfitCartInvalidItem(
+            item,
+            'OUTFIT_CART_VARIANT_PRODUCT_MISMATCH',
+          ),
+        );
+        continue;
+      }
+
+      const nextQuantity =
+        (existingQuantities.get(item.variantId) ?? 0) +
+        OUTFIT_CART_ITEM_QUANTITY;
+
+      if (nextQuantity > MAX_CART_ITEM_QUANTITY) {
+        issues.push(
+          this.toOutfitCartInvalidItem(
+            item,
+            'OUTFIT_CART_QUANTITY_INVALID',
+          ),
+        );
+        continue;
+      }
+
+      if (variant.stock <= 0 || nextQuantity > variant.stock) {
+        issues.push(
+          this.toOutfitCartInvalidItem(
+            item,
+            'OUTFIT_CART_INSUFFICIENT_STOCK',
+          ),
+        );
+      }
+    }
+
+    return issues;
+  }
+
+  private toExistingQuantityMap(items: ExistingOutfitCartItem[]) {
+    return new Map(items.map((item) => [item.variantId, item.quantity]));
+  }
+
+  private toOutfitCartInvalidItem(
+    item: AddOutfitCartItemDto,
+    code: OutfitCartErrorCode,
+  ): OutfitCartInvalidItem {
+    return {
+      productId: item.productId,
+      variantId: item.variantId,
+      code,
+    };
+  }
+
+  private outfitCartInvalidItemsException(issues: OutfitCartInvalidItem[]) {
+    const primaryIssue = issues[0];
+
+    return new BadRequestException({
+      code: primaryIssue.code,
+      message: this.getOutfitCartErrorMessage(primaryIssue.code),
+      details: {
+        invalidItems: issues,
+      },
+    });
+  }
+
+  private outfitCartBadRequestException(code: OutfitCartErrorCode) {
+    return new BadRequestException({
+      code,
+      message: this.getOutfitCartErrorMessage(code),
+    });
+  }
+
+  private getOutfitCartErrorMessage(code: OutfitCartErrorCode): string {
+    switch (code) {
+      case 'OUTFIT_CART_DUPLICATE_PRODUCT':
+        return 'Each outfit product can be submitted only once.';
+      case 'OUTFIT_CART_DUPLICATE_VARIANT':
+        return 'Each outfit variant can be submitted only once.';
+      case 'OUTFIT_CART_INSUFFICIENT_STOCK':
+        return 'Requested quantity is not available for one or more outfit items.';
+      case 'OUTFIT_CART_ITEMS_REQUIRED':
+        return 'At least one outfit item is required.';
+      case 'OUTFIT_CART_PRODUCT_UNAVAILABLE':
+        return 'One or more products are currently unavailable.';
+      case 'OUTFIT_CART_QUANTITY_INVALID':
+        return 'Outfit item quantity must be exactly 1.';
+      case 'OUTFIT_CART_TOO_MANY_ITEMS':
+        return 'Outfit cart requests can include at most 6 items.';
+      case 'OUTFIT_CART_VARIANT_PRODUCT_MISMATCH':
+        return 'One or more variants do not belong to the submitted product.';
+      case 'OUTFIT_CART_VARIANT_UNAVAILABLE':
+        return 'One or more product variants are currently unavailable.';
+    }
   }
 
   private async getOrCreateCartSummary(

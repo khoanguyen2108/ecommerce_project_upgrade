@@ -13,6 +13,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -21,16 +22,21 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user';
 import { SWAGGER_BEARER_AUTH_NAME } from '../common/swagger/api-docs.constants';
 import {
   cartDataExample,
   envelopeResponse,
   errorEnvelopeResponse,
+  outfitCartDataExample,
 } from '../common/swagger/api-examples';
+import { UserRole } from '../generated/prisma/enums';
 import { CartService } from './cart.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
+import { AddOutfitCartItemsDto } from './dto/add-outfit-cart-items.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 
 @ApiTags('cart')
@@ -80,6 +86,38 @@ export class CartController {
     @Body() dto: AddCartItemDto,
   ) {
     return this.cartService.addItem(user, dto);
+  }
+
+  @ApiOperation({
+    summary: 'Atomically add selected outfit variants to the current customer cart',
+    description:
+      'Customer-only endpoint for adding 1 to 6 selected product/variant pairs as one all-or-nothing cart mutation. Quantity is fixed to 1 for each item. The backend validates current product, primary category, variant, stock, existing cart quantity, and price from catalog data. It does not create an order, create or update payment, invoke checkout, reserve stock, decrement stock, or use saved-outfit/AI snapshot data.',
+  })
+  @ApiCreatedResponse(
+    envelopeResponse('Outfit items added to cart.', outfitCartDataExample),
+  )
+  @ApiBadRequestResponse(
+    errorEnvelopeResponse(
+      'One or more outfit items are invalid, unavailable, duplicated, mismatched, out of stock, or have an invalid quantity.',
+      'OUTFIT_CART_INSUFFICIENT_STOCK',
+      'Requested quantity is not available for one or more outfit items.',
+    ),
+  )
+  @ApiForbiddenResponse(
+    errorEnvelopeResponse(
+      'Only customers can add outfit items to cart.',
+      'FORBIDDEN',
+      'You do not have permission to access this resource.',
+    ),
+  )
+  @Post('outfit-items')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  addOutfitItems(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AddOutfitCartItemsDto,
+  ) {
+    return this.cartService.addOutfitItems(user, dto);
   }
 
   @ApiOperation({ summary: 'Set a cart item quantity directly' })
