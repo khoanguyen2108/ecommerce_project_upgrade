@@ -136,7 +136,35 @@ const MAX_CANDIDATE_PRODUCTS = 200;
 const MAX_OUTFITS = 2;
 const MAX_CORE_ROLE_CANDIDATES = 32;
 const MAX_PRIMARY_CORE_CANDIDATES = 16;
-const COMPLETE_OUTFIT_ROLES: OutfitRole[] = ['top', 'bottom', 'shoes'];
+const CORE_OUTFIT_ROLES: OutfitRole[] = ['top', 'bottom'];
+const OUTFIT_ROLE_ORDER: OutfitRole[] = [
+  'top',
+  'bottom',
+  'shoes',
+  'jacket',
+  'handbag',
+  'accessory',
+];
+const PREFERRED_TOP_TAGS = [
+  'tee',
+  't_shirt',
+  'tshirt',
+  'ao_thun',
+  'ao_phong',
+  'long_sleeves',
+  'long_sleeve',
+  'ao_tay_dai',
+];
+const PREFERRED_TOP_ALIASES = [
+  'tee',
+  't shirt',
+  'tshirt',
+  'ao thun',
+  'ao phong',
+  'long sleeves',
+  'long sleeve',
+  'ao tay dai',
+];
 const DISALLOWED_CONTROL_CHARACTERS =
   /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
@@ -1058,7 +1086,7 @@ export class OutfitRecommendationService {
       }
     }
 
-    for (const role of COMPLETE_OUTFIT_ROLES) {
+    for (const role of CORE_OUTFIT_ROLES) {
       if (
         selectedByRole.has(role) ||
         parsed.removeRoles.includes(role) ||
@@ -1381,9 +1409,7 @@ export class OutfitRecommendationService {
   private orderRefinedProducts(
     selectedByRole: Map<OutfitRole, ScoredProduct>,
   ): ScoredProduct[] {
-    return (
-      ['top', 'bottom', 'shoes', 'jacket', 'handbag', 'accessory'] as OutfitRole[]
-    )
+    return OUTFIT_ROLE_ORDER
       .map((role) => selectedByRole.get(role))
       .filter((product): product is ScoredProduct => Boolean(product));
   }
@@ -1519,9 +1545,11 @@ export class OutfitRecommendationService {
   ): StyleAdviceOutfitDto[] {
     const scoredByRole = new Map<OutfitRole, ScoredProduct[]>();
 
-    for (const role of COMPLETE_OUTFIT_ROLES) {
+    for (const role of CORE_OUTFIT_ROLES) {
       scoredByRole.set(role, this.scoreProductsForRole(products, role, intent));
     }
+
+    scoredByRole.set('shoes', this.scoreProductsForRole(products, 'shoes', intent));
 
     if (this.shouldIncludeJacket(intent)) {
       scoredByRole.set('jacket', this.scoreProductsForRole(products, 'jacket', intent));
@@ -1576,11 +1604,11 @@ export class OutfitRecommendationService {
   private buildCoreOutfitCandidates(
     scoredByRole: Map<OutfitRole, ScoredProduct[]>,
   ): CoreOutfitCandidate[] {
-    const [tops, bottoms, shoes] = COMPLETE_OUTFIT_ROLES.map((role) =>
+    const [tops, bottoms] = CORE_OUTFIT_ROLES.map((role) =>
       this.limitCoreRoleCandidates(scoredByRole.get(role) ?? []),
     );
 
-    if (tops.length === 0 || bottoms.length === 0 || shoes.length === 0) {
+    if (tops.length === 0 || bottoms.length === 0) {
       return [];
     }
 
@@ -1592,24 +1620,7 @@ export class OutfitRecommendationService {
           continue;
         }
 
-        for (const shoe of shoes) {
-          const products = [top, bottom, shoe];
-          const productIds = products.map((product) => product.product.record.id);
-
-          if (new Set(productIds).size !== products.length) {
-            continue;
-          }
-
-          candidates.push({
-            key: [...productIds].sort().join(':'),
-            products,
-            scoreTotal: products.reduce((total, product) => total + product.score, 0),
-            totalPrice: products.reduce(
-              (total, product) => total + product.product.price,
-              0,
-            ),
-          });
-        }
+        candidates.push(this.createCoreOutfitCandidate([top, bottom]));
       }
     }
 
@@ -1649,7 +1660,7 @@ export class OutfitRecommendationService {
     scoredByRole: Map<OutfitRole, ScoredProduct[]>,
     budgetMax: number,
   ): BudgetCoreCandidateSelection {
-    const [tops, bottoms, shoes] = COMPLETE_OUTFIT_ROLES.map(
+    const [tops, bottoms] = CORE_OUTFIT_ROLES.map(
       (role) => scoredByRole.get(role) ?? [],
     );
     const affordable: CoreOutfitCandidate[] = [];
@@ -1660,31 +1671,14 @@ export class OutfitRecommendationService {
           continue;
         }
 
-        const remainingBudget = budgetMax - top.product.price - bottom.product.price;
-        if (remainingBudget < 0) {
+        if (top.product.price + bottom.product.price > budgetMax) {
           continue;
         }
 
-        let retainedShoes = 0;
-        for (const shoe of shoes) {
-          if (
-            shoe.product.record.id === top.product.record.id ||
-            shoe.product.record.id === bottom.product.record.id ||
-            shoe.product.price > remainingBudget
-          ) {
-            continue;
-          }
-
-          this.retainBestCoreCandidate(
-            affordable,
-            this.createCoreOutfitCandidate([top, bottom, shoe]),
-          );
-          retainedShoes += 1;
-
-          if (retainedShoes === MAX_OUTFITS) {
-            break;
-          }
-        }
+        this.retainBestCoreCandidate(
+          affordable,
+          this.createCoreOutfitCandidate([top, bottom]),
+        );
       }
     }
 
@@ -1692,7 +1686,7 @@ export class OutfitRecommendationService {
       return { affordable };
     }
 
-    const closestOverBudget = this.findLowestPricedCoreCandidate(tops, bottoms, shoes);
+    const closestOverBudget = this.findLowestPricedCoreCandidate(tops, bottoms);
 
     return { affordable, ...(closestOverBudget ? { closestOverBudget } : {}) };
   }
@@ -1700,13 +1694,7 @@ export class OutfitRecommendationService {
   private findLowestPricedCoreCandidate(
     tops: ScoredProduct[],
     bottoms: ScoredProduct[],
-    shoes: ScoredProduct[],
   ): CoreOutfitCandidate | undefined {
-    const shoesByPrice = [...shoes].sort(
-      (left, right) =>
-        left.product.price - right.product.price ||
-        this.compareScoredProducts(left, right),
-    );
     let closest: CoreOutfitCandidate | undefined;
 
     for (const top of tops) {
@@ -1715,17 +1703,7 @@ export class OutfitRecommendationService {
           continue;
         }
 
-        const shoe = shoesByPrice.find(
-          (candidate) =>
-            candidate.product.record.id !== top.product.record.id &&
-            candidate.product.record.id !== bottom.product.record.id,
-        );
-
-        if (!shoe) {
-          continue;
-        }
-
-        const candidate = this.createCoreOutfitCandidate([top, bottom, shoe]);
+        const candidate = this.createCoreOutfitCandidate([top, bottom]);
 
         if (
           !closest ||
@@ -1758,7 +1736,7 @@ export class OutfitRecommendationService {
   }
 
   private createCoreOutfitCandidate(
-    products: [ScoredProduct, ScoredProduct, ScoredProduct],
+    products: ScoredProduct[],
   ): CoreOutfitCandidate {
     const productIds = products.map((product) => product.product.record.id);
 
@@ -1794,6 +1772,21 @@ export class OutfitRecommendationService {
           this.buildWeakRoleWarning(product.role, locale),
       );
     let totalPrice = candidate.totalPrice;
+
+    const shoes = this.pickForRole(
+      scoredByRole.get('shoes') ?? [],
+      optionNumber - 1,
+      selectedIds,
+    );
+    totalPrice = this.addOptionalProduct(
+      shoes,
+      intent,
+      budgetMax,
+      selectedIds,
+      selectedRoles,
+      selectedProducts,
+      totalPrice,
+    );
 
     const jacket = this.pickForRole(
       scoredByRole.get('jacket') ?? [],
@@ -1866,7 +1859,7 @@ export class OutfitRecommendationService {
     const outfitWarnings: string[] = [];
     let totalPrice = 0;
 
-    for (const role of COMPLETE_OUTFIT_ROLES) {
+    for (const role of CORE_OUTFIT_ROLES) {
       const scoredProduct = this.pickForRole(
         scoredByRole.get(role) ?? [],
         0,
@@ -2018,7 +2011,10 @@ export class OutfitRecommendationService {
     }
 
     return products
-      .filter((product) => product.roles.has(role))
+      .filter(
+        (product) =>
+          product.roles.has(role) && this.productCanServeRole(product, role),
+      )
       .map((product, index) => this.scoreProduct(product, role, intent, index))
       .filter((product) => product.score > Number.NEGATIVE_INFINITY)
       .sort((left, right) => this.compareScoredProducts(left, right));
@@ -2045,6 +2041,14 @@ export class OutfitRecommendationService {
       matchedTags.add(this.roleToCategoryTag(role));
     } else if (product.roles.has(role)) {
       score += 18;
+    }
+
+    if (role === 'top') {
+      if (this.hasPreferredTopSignal(product)) {
+        score += 24;
+      } else {
+        score -= 18;
+      }
     }
 
     for (const category of intent.categories) {
@@ -2118,7 +2122,12 @@ export class OutfitRecommendationService {
     const variantColorTags = new Set(
       product.variants.map((variant) => this.normalizeTag(variant.color)),
     );
-    const roles = this.detectRoles(tagSet, categoryTags);
+    const roles = this.detectRoles(
+      tagSet,
+      categoryTags,
+      product.name,
+      product.slug,
+    );
     const prices = product.variants.map(
       (variant) => variant.priceOverride ?? product.basePrice,
     );
@@ -2138,6 +2147,8 @@ export class OutfitRecommendationService {
   private detectRoles(
     tagSet: Set<string>,
     categoryTags: Set<string>,
+    name: string,
+    slug: string,
   ): Set<OutfitRole> {
     const haystack = new Set([...tagSet, ...categoryTags]);
     const roles = new Set<OutfitRole>();
@@ -2150,7 +2161,111 @@ export class OutfitRecommendationService {
       }
     }
 
+    const dominantRole = this.getDominantRoleFromSignals(categoryTags, name, slug);
+    if (dominantRole) {
+      roles.add(dominantRole);
+    }
+
     return roles;
+  }
+
+  private productCanServeRole(product: PreparedProduct, role: OutfitRole): boolean {
+    const dominantRole = this.getDominantProductRole(product);
+
+    return dominantRole === undefined || dominantRole === role;
+  }
+
+  private getDominantProductRole(product: PreparedProduct): OutfitRole | undefined {
+    return this.getDominantRoleFromSignals(
+      product.categoryTags,
+      product.record.name,
+      product.record.slug,
+    );
+  }
+
+  private getDominantRoleFromSignals(
+    categoryTags: Set<string>,
+    name: string,
+    slug: string,
+  ): OutfitRole | undefined {
+    const text = this.normalizeComparable(`${name} ${slug}`);
+    const hasCategory = (tag: string) => categoryTags.has(tag);
+
+    if (
+      hasCategory('bottoms') ||
+      /\b(?:bottoms?|pants?|trousers?|jeans?|denim|shorts?|skirts?|quan)\b/.test(
+        text,
+      )
+    ) {
+      return 'bottom';
+    }
+
+    if (
+      hasCategory('jacket') ||
+      hasCategory('outerwear') ||
+      /\b(?:jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|biker)\b/.test(
+        text,
+      )
+    ) {
+      return 'jacket';
+    }
+
+    if (
+      hasCategory('shoes') ||
+      /\b(?:shoes?|sneakers?|boots?|loafers?|slippers?|giay)\b/.test(text)
+    ) {
+      return 'shoes';
+    }
+
+    if (/\b(?:handbags?|bags?|totes?|crossbody|tui|xach)\b/.test(text)) {
+      return 'handbag';
+    }
+
+    if (
+      hasCategory('accessories') ||
+      /\b(?:accessor(?:y|ies)|belts?|rings?|bracelets?|watches?|necklaces?|beanies?|sunglasses|phu kien)\b/.test(
+        text,
+      )
+    ) {
+      return 'accessory';
+    }
+
+    if (
+      hasCategory('top') ||
+      hasCategory('tops') ||
+      this.hasPreferredTopSignalFromSignals(categoryTags, name, slug)
+    ) {
+      return 'top';
+    }
+
+    return undefined;
+  }
+
+  private hasPreferredTopSignal(product: PreparedProduct): boolean {
+    return this.hasPreferredTopSignalFromSignals(
+      product.categoryTags,
+      product.record.name,
+      product.record.slug,
+      product.tagSet,
+    );
+  }
+
+  private hasPreferredTopSignalFromSignals(
+    categoryTags: Set<string>,
+    name: string,
+    slug: string,
+    tagSet = new Set<string>(),
+  ): boolean {
+    const text = this.normalizeComparable(`${name} ${slug}`);
+
+    return (
+      PREFERRED_TOP_TAGS.some(
+        (tag) => tagSet.has(tag) || categoryTags.has(tag),
+      ) ||
+      PREFERRED_TOP_ALIASES.some((alias) =>
+        this.hasAlias(text, this.normalizeComparable(alias)),
+      )
+    );
   }
 
   private pickForRole(
@@ -2205,7 +2320,7 @@ export class OutfitRecommendationService {
       );
     }
 
-    for (const role of COMPLETE_OUTFIT_ROLES) {
+    for (const role of CORE_OUTFIT_ROLES) {
       if (intent.negativeCategories.includes(role)) {
         continue;
       }

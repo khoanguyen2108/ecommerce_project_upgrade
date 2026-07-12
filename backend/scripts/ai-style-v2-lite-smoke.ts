@@ -16,6 +16,9 @@ const PRODUCT_FIXTURES = [
   buildProduct('top-2', 'Black Street Tee', 'black-street-tee', 120_000, [
     'top', 'tee', 'black', 'streetwear', 'gothic', 'darkwear', 'oversized',
   ]),
+  buildProduct('top-3', 'Black Rib Long Sleeves', 'black-rib-long-sleeves', 130_000, [
+    'top', 'long_sleeves', 'black', 'streetwear', 'gothic', 'darkwear',
+  ]),
   buildProduct('bottom-1', 'Cream Cafe Pants', 'cream-cafe-pants', 170_000, [
     'bottom', 'bottoms', 'pants', 'cream', 'minimal', 'clean_fit', 'coffee', 'school',
   ]),
@@ -33,6 +36,9 @@ const PRODUCT_FIXTURES = [
   ]),
   buildProduct('jacket-1', 'Black Gothic Jacket', 'black-gothic-jacket', 180_000, [
     'jacket', 'outerwear', 'black', 'gothic', 'darkwear',
+  ]),
+  buildProduct('jacket-2', 'Midnight Rider Pants', 'midnight-rider-pants', 110_000, [
+    'jacket', 'outerwear', 'bottom', 'pants', 'black', 'gothic', 'darkwear',
   ]),
   buildProduct('accessory-1', 'Silver Ring', 'silver-ring', 70_000, [
     'accessory', 'accessories', 'silver', 'silver_hardware', 'gothic', 'darkwear',
@@ -77,6 +83,12 @@ const OUTFIT_CASES = [
   { prompt: 'all black gothic \u0111i ch\u01a1i t\u1ed1i' },
   { prompt: 'streetwear \u00e1o thun \u0111en form r\u1ed9ng v\u1edbi boots' },
   { prompt: 'outfit \u0111\u01a1n gi\u1ea3n \u0111i h\u1ecdc d\u01b0\u1edbi 500k', locale: 'vi', maxBudget: 500_000 },
+  {
+    prompt: 'outfit \u0111\u01a1n gi\u1ea3n \u0111i h\u1ecdc d\u01b0\u1edbi 300k',
+    locale: 'vi',
+    maxBudget: 300_000,
+    forbiddenRoles: ['shoes', 'jacket', 'accessory', 'handbag'],
+  },
   { prompt: 'No jacket, just tee, pants and shoes.', noJacket: true },
   { prompt: 'Recommend darkwear with boots and silver accessories.' },
 ] as const;
@@ -132,6 +144,15 @@ async function run() {
         smokeCase.prompt,
         'jacket was returned',
       );
+    }
+    if ('forbiddenRoles' in smokeCase && smokeCase.forbiddenRoles) {
+      for (const role of smokeCase.forbiddenRoles) {
+        check(
+          response.outfit?.items.every((item) => item.role !== role) === true,
+          smokeCase.prompt,
+          `${role} was returned`,
+        );
+      }
     }
     report(smokeCase.prompt, response);
   }
@@ -234,6 +255,19 @@ function verifyOutfitResponse(prompt: string, response: StyleAdviceResponseDto) 
   check(response.outfits.length === 1, prompt, `legacy outfits length was ${response.outfits.length}`);
   check(new Set(productIds).size === productIds.length, prompt, 'duplicate canonical product IDs');
   check(new Set(roles).size === roles.length, prompt, 'duplicate canonical roles');
+  check(roles.filter((role) => role === 'top').length === 1, prompt, 'expected exactly one top');
+  check(roles.filter((role) => role === 'bottom').length === 1, prompt, 'expected exactly one bottom');
+  check(
+    items.every(
+      (item) =>
+        item.role === 'bottom' ||
+        !/\b(?:pants?|trousers?|jeans?|denim|shorts?|skirts?)\b/.test(
+          item.productSlug.replace(/-/g, ' '),
+        ),
+    ),
+    prompt,
+    'bottom-looking product was returned outside the bottom role',
+  );
   check(items.every((item) => item.variantRequired), prompt, 'variantRequired was not safe');
   check(
     response.outfits[0]?.products.map((product) => product.productId).join(',') === productIds.join(','),
