@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowUpRight, Loader2, MessageCircle, Save } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Loader2,
+  MessageCircle,
+  Save,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { FashionIllustration } from "@/components/ai/StyleAssistantEmpty";
@@ -16,6 +22,7 @@ import { formatPrice } from "@/features/catalog/format";
 
 interface StyleAssistantResultProps {
   isSavingOutfit?: boolean;
+  onPrepareOutfit?: () => void;
   onSaveOutfit?: () => void;
   result: StyleAdviceResponse;
   saveError?: string;
@@ -67,6 +74,7 @@ const RESULT_COPY = {
 
 export function StyleAssistantResult({
   isSavingOutfit = false,
+  onPrepareOutfit,
   onSaveOutfit,
   result,
   saveError,
@@ -86,6 +94,7 @@ export function StyleAssistantResult({
     <CurrentOutfitResult
       isSavingOutfit={isSavingOutfit}
       locale={locale}
+      onPrepareOutfit={onPrepareOutfit}
       onSaveOutfit={onSaveOutfit}
       result={result}
       saveError={saveError}
@@ -125,6 +134,7 @@ function ClarificationResult({
 function CurrentOutfitResult({
   isSavingOutfit,
   locale,
+  onPrepareOutfit,
   onSaveOutfit,
   result,
   saveError,
@@ -132,6 +142,7 @@ function CurrentOutfitResult({
 }: {
   isSavingOutfit: boolean;
   locale: ResultLocale;
+  onPrepareOutfit?: () => void;
   onSaveOutfit?: () => void;
   result: StyleAdviceResponse;
   saveError?: string;
@@ -155,6 +166,7 @@ function CurrentOutfitResult({
         <CurrentOutfit
           isSavingOutfit={isSavingOutfit}
           locale={locale}
+          onPrepareOutfit={onPrepareOutfit}
           onSaveOutfit={onSaveOutfit}
           outfit={outfit}
           saveError={saveError}
@@ -184,6 +196,7 @@ function CurrentOutfitResult({
 function CurrentOutfit({
   isSavingOutfit,
   locale,
+  onPrepareOutfit,
   onSaveOutfit,
   outfit,
   saveError,
@@ -191,6 +204,7 @@ function CurrentOutfit({
 }: {
   isSavingOutfit: boolean;
   locale: ResultLocale;
+  onPrepareOutfit?: () => void;
   onSaveOutfit?: () => void;
   outfit: StyleAdviceCanonicalOutfit;
   saveError?: string;
@@ -202,21 +216,35 @@ function CurrentOutfit({
     <div className={styles.outfitsSection}>
       <div className={styles.sectionHeading}>
         <h3>{copy.currentOutfit}</h3>
-        {isSavingOutfit ? (
-          <span className={styles.savingOutfitStatus} role="status">
-            <Loader2 aria-hidden="true" className={styles.spinner} size={16} />
-            {copy.savingOutfit}
-          </span>
-        ) : onSaveOutfit ? (
-          <button
-            className={styles.saveOutfitButton}
-            onClick={onSaveOutfit}
-            type="button"
-          >
-            <Save aria-hidden="true" size={16} />
-            {copy.saveOutfit}
-          </button>
-        ) : null}
+        <div className={styles.outfitHeadingActions}>
+          {isSavingOutfit ? (
+            <span className={styles.savingOutfitStatus} role="status">
+              <Loader2 aria-hidden="true" className={styles.spinner} size={16} />
+              {copy.savingOutfit}
+            </span>
+          ) : onSaveOutfit ? (
+            <button
+              className={styles.saveOutfitButton}
+              onClick={onSaveOutfit}
+              type="button"
+            >
+              <Save aria-hidden="true" size={16} />
+              {copy.saveOutfit}
+            </button>
+          ) : null}
+          {onPrepareOutfit && outfit.items.length > 0 ? (
+            <button
+              className={styles.prepareOutfitButton}
+              onClick={onPrepareOutfit}
+              type="button"
+            >
+              {locale === "vi"
+                ? "Tiếp tục với outfit này"
+                : "Continue with this outfit"}
+              <ArrowRight aria-hidden="true" size={16} />
+            </button>
+          ) : null}
+        </div>
       </div>
       {saveError ? (
         <p

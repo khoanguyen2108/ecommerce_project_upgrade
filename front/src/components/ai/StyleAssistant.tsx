@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { OutfitPreparationDrawer } from "@/components/ai/OutfitPreparationDrawer";
 import { SavedOutfitsSection } from "@/components/ai/SavedOutfitsSection";
 import { StyleAssistantEmpty } from "@/components/ai/StyleAssistantEmpty";
 import { StyleAssistantError } from "@/components/ai/StyleAssistantError";
@@ -9,12 +10,21 @@ import styles from "@/components/ai/StyleAssistant.module.css";
 import { StyleAssistantResult } from "@/components/ai/StyleAssistantResult";
 import { StyleAssistantSkeleton } from "@/components/ai/StyleAssistantSkeleton";
 import { useStyleAdvice } from "@/features/ai/hooks";
+import {
+  toCurrentPurchasableOutfit,
+  toSavedPurchasableOutfit,
+  type PurchasableOutfit,
+} from "@/features/ai/outfit-preparation";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { useSavedOutfits } from "@/features/saved-outfits/hooks";
 import type { SavedOutfit } from "@/features/saved-outfits/types";
 
 export function StyleAssistant() {
   const [prompt, setPrompt] = useState("");
+  const [preparation, setPreparation] = useState<{
+    locale: "vi" | "en";
+    outfit: PurchasableOutfit;
+  }>();
   const {
     currentOutfit,
     error,
@@ -103,10 +113,37 @@ export function StyleAssistant() {
     });
   }
 
+  const closePreparation = useCallback(() => {
+    setPreparation(undefined);
+  }, []);
+
+  function handlePrepareCurrentOutfit() {
+    if (!isAuthenticated || !currentOutfit?.items.length) {
+      return;
+    }
+
+    setPreparation({
+      locale,
+      outfit: toCurrentPurchasableOutfit(currentOutfit),
+    });
+  }
+
+  function handlePrepareSavedOutfit(savedOutfit: SavedOutfit) {
+    if (!isAuthenticated || savedOutfit.items.length === 0) {
+      return;
+    }
+
+    setPreparation({
+      locale: savedOutfit.locale,
+      outfit: toSavedPurchasableOutfit(savedOutfit),
+    });
+  }
+
   return (
-    <main className={styles.page}>
-      <div className={styles.shell}>
-        <section className={styles.intro}>
+    <>
+      <main className={styles.page}>
+        <div className={styles.shell}>
+          <section className={styles.intro}>
           <div className={styles.introCopy}>
             <h1>Your next look, thoughtfully edited.</h1>
             <p>
@@ -134,9 +171,9 @@ export function StyleAssistant() {
             Recommendations use current catalog availability. Confirm live color,
             size, and price on the product page.
           </p>
-        </section>
+          </section>
 
-        <aside aria-label="Style assistant result" className={styles.resultColumn}>
+          <aside aria-label="Style assistant result" className={styles.resultColumn}>
           {status === "idle" ? <StyleAssistantEmpty /> : null}
           {status === "loading" ? <StyleAssistantSkeleton /> : null}
           {status === "error" ? (
@@ -148,6 +185,11 @@ export function StyleAssistant() {
           {status === "success" && result ? (
             <StyleAssistantResult
               isSavingOutfit={isSavingOutfit}
+              onPrepareOutfit={
+                isAuthenticated && currentOutfit?.items.length
+                  ? handlePrepareCurrentOutfit
+                  : undefined
+              }
               onSaveOutfit={
                 canSaveCurrentOutfit
                   ? () => void handleSaveCurrentOutfit()
@@ -174,12 +216,20 @@ export function StyleAssistant() {
               isLoading={isLoadingSavedOutfits}
               locale={locale}
               onDelete={removeSavedOutfit}
+              onPrepare={handlePrepareSavedOutfit}
               onView={handleViewSavedOutfit}
               savedOutfits={savedOutfits}
             />
           ) : null}
-        </aside>
-      </div>
-    </main>
+          </aside>
+        </div>
+      </main>
+      <OutfitPreparationDrawer
+        isOpen={Boolean(preparation && isAuthenticated)}
+        locale={preparation?.locale || locale}
+        onClose={closePreparation}
+        outfit={preparation?.outfit}
+      />
+    </>
   );
 }

@@ -577,8 +577,10 @@
 }
 
 .saveOutfitButton,
+.prepareOutfitButton,
 .savingOutfitStatus,
 .savedOutfitViewButton,
+.savedOutfitPrepareButton,
 .savedOutfitDeleteButton {
   align-items: center;
   display: inline-flex;
@@ -601,6 +603,29 @@
 
 .saveOutfitButton:hover,
 .savedOutfitViewButton:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+}
+
+.outfitHeadingActions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.prepareOutfitButton,
+.savedOutfitPrepareButton {
+  align-items: center;
+  background: var(--color-brand);
+  border: 1px solid var(--color-brand);
+  color: var(--color-surface);
+  display: inline-flex;
+  justify-content: center;
+}
+
+.prepareOutfitButton:hover,
+.savedOutfitPrepareButton:hover:not(:disabled) {
   background: var(--color-brand-hover);
 }
 
@@ -900,6 +925,7 @@
 }
 
 .savedOutfitViewButton:disabled,
+.savedOutfitPrepareButton:disabled,
 .savedOutfitDeleteButton:disabled {
   cursor: not-allowed;
   opacity: 0.45;
@@ -1220,9 +1246,17 @@
   }
 
   .savedOutfitActions,
+  .outfitHeadingActions,
+  .prepareOutfitButton,
+  .savedOutfitPrepareButton,
   .savedOutfitViewButton,
   .savedOutfitDeleteButton {
     width: 100%;
+  }
+
+  .sectionHeading {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .productLink {

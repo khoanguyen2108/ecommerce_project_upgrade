@@ -25,6 +25,13 @@ import {
   sortSizesByStandardOrder,
 } from "@/features/catalog/sizes";
 import type { Product, ProductVariant } from "@/features/catalog/types";
+import {
+  getOnlySelectableColor,
+  getVariantUnitPrice,
+  hasSelectableColor,
+  hasSelectableCombination,
+  isVariantSelectable,
+} from "@/features/catalog/variant-selection";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface ProductDetailPageProps {
@@ -558,52 +565,6 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     value,
   );
-}
-
-function isVariantSelectable(
-  variant: ProductVariant | undefined,
-): variant is ProductVariant {
-  return Boolean(variant?.isActive && variant.stock > 0);
-}
-
-function hasSelectableColor(variants: ProductVariant[], color: string): boolean {
-  return variants.some(
-    (variant) => variant.color === color && isVariantSelectable(variant),
-  );
-}
-
-function getOnlySelectableColor(
-  variants: ProductVariant[],
-): string | undefined {
-  const selectableColors = Array.from(
-    new Set(
-      variants
-        .filter(isVariantSelectable)
-        .map((variant) => variant.color),
-    ),
-  );
-
-  return selectableColors.length === 1 ? selectableColors[0] : undefined;
-}
-
-function hasSelectableCombination(
-  variants: ProductVariant[],
-  color: string,
-  size?: string,
-): boolean {
-  return Boolean(
-    color &&
-      variants.some(
-        (variant) =>
-          variant.color === color &&
-          variant.size === size &&
-          isVariantSelectable(variant),
-      ),
-  );
-}
-
-function getVariantUnitPrice(product: Product, variant: ProductVariant): number {
-  return variant.priceOverride ?? product.basePrice;
 }
 
 function getQuantityAvailabilityMessage({

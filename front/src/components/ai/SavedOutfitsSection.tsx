@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowRight, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import styles from "@/components/ai/StyleAssistant.module.css";
 import type {
@@ -15,6 +15,7 @@ interface SavedOutfitsSectionProps {
   isLoading: boolean;
   locale: "vi" | "en";
   onDelete: (id: string) => Promise<boolean>;
+  onPrepare: (savedOutfit: SavedOutfit) => void;
   onView: (savedOutfit: SavedOutfit) => void;
   savedOutfits: SavedOutfit[];
 }
@@ -56,6 +57,7 @@ export function SavedOutfitsSection({
   isLoading,
   locale,
   onDelete,
+  onPrepare,
   onView,
   savedOutfits,
 }: SavedOutfitsSectionProps) {
@@ -120,6 +122,22 @@ export function SavedOutfitsSection({
                     </time>
                   </div>
                   <div className={styles.savedOutfitActions}>
+                    <button
+                      aria-label={`${
+                        locale === "vi"
+                          ? "Tiếp tục với outfit đã lưu"
+                          : "Continue with saved outfit"
+                      }: ${savedOutfit.summary}`}
+                      className={styles.savedOutfitPrepareButton}
+                      disabled={isDeleting}
+                      onClick={() => onPrepare(savedOutfit)}
+                      type="button"
+                    >
+                      {locale === "vi"
+                        ? "Tiếp tục với outfit đã lưu"
+                        : "Continue with saved outfit"}
+                      <ArrowRight aria-hidden="true" size={15} />
+                    </button>
                     <button
                       aria-label={copy.viewAria(savedOutfit.summary)}
                       className={styles.savedOutfitViewButton}

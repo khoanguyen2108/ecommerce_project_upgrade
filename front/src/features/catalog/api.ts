@@ -49,9 +49,13 @@ export function getProducts(query: ProductQuery = {}): Promise<ProductListRespon
   );
 }
 
-export async function getProductById(id: string): Promise<Product> {
+export async function getProductById(
+  id: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<Product> {
   const response = await apiRequest<{ product: Product }>(`/products/${id}`, {
     method: "GET",
+    signal: options.signal,
   });
 
   return response.product;
@@ -68,11 +72,15 @@ export async function getProductBySlug(slug: string): Promise<Product> {
   return response.product;
 }
 
-export async function getProductVariants(id: string): Promise<ProductVariant[]> {
+export async function getProductVariants(
+  id: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<ProductVariant[]> {
   const response = await apiRequest<{ variants: ProductVariant[] }>(
     `/products/${id}/variants`,
     {
       method: "GET",
+      signal: options.signal,
     },
   );
 
