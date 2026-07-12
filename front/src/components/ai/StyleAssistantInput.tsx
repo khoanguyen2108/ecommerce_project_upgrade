@@ -6,15 +6,6 @@ import type { KeyboardEvent } from "react";
 import { useEffect, useRef } from "react";
 import styles from "@/components/ai/StyleAssistant.module.css";
 
-const SUGGESTED_PROMPTS = [
-  "All black gothic",
-  "Streetwear black tee",
-  "Cafe cream denim",
-  "Darkwear boots",
-  "No jacket fit",
-  "Chrome Hearts vibe",
-] as const;
-
 interface StyleAssistantInputProps {
   isDisabled: boolean;
   isLocked: boolean;
@@ -61,11 +52,6 @@ export function StyleAssistantInput({
     }
   }
 
-  function selectPrompt(prompt: string) {
-    onChange(prompt);
-    textareaRef.current?.focus();
-  }
-
   return (
     <form
       className={styles.inputCard}
@@ -79,7 +65,6 @@ export function StyleAssistantInput({
           <span className={styles.stepNumber}>01</span>
           <h2>Tell us what you need</h2>
         </div>
-        <span className={styles.inputHint}>Enter to send · Shift+Enter for a new line</span>
       </div>
 
       {isLocked ? (
@@ -111,20 +96,6 @@ export function StyleAssistantInput({
       <span className={styles.visuallyHidden} id="style-assistant-help">
         Maximum 500 characters. Press Enter to generate advice.
       </span>
-
-      <div aria-label="Suggested style prompts" className={styles.chips} role="group">
-        {SUGGESTED_PROMPTS.map((prompt) => (
-          <button
-            className={styles.chip}
-            disabled={isDisabled}
-            key={prompt}
-            onClick={() => selectPrompt(prompt)}
-            type="button"
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
 
       <div className={styles.inputFooter}>
         <span>{value.length}/500</span>

@@ -1,7 +1,5 @@
 .page {
-  background:
-    linear-gradient(90deg, transparent 49.94%, rgba(17, 17, 17, 0.07) 50%, transparent 50.06%),
-    var(--color-background);
+  background: var(--color-background);
   min-height: calc(100vh - var(--header-height));
 }
 
@@ -126,11 +124,6 @@
   width: 24px;
 }
 
-.inputHint {
-  color: var(--color-text-muted);
-  font-size: 0.7rem;
-}
-
 .signInPrompt {
   align-items: center;
   background: var(--color-surface-muted);
@@ -199,37 +192,6 @@
 
 .textarea:disabled {
   opacity: 0.72;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.chip {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-text-muted);
-  font-size: 0.66rem;
-  font-weight: 750;
-  min-height: 28px;
-  padding: 5px 10px;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
-}
-
-.chip:hover:not(:disabled),
-.chip:focus-visible {
-  background: var(--color-text);
-  border-color: var(--color-text);
-  color: var(--color-surface);
-}
-
-.chip:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
 }
 
 .inputFooter {
@@ -1157,10 +1119,6 @@
   .intro,
   .resultColumn {
     padding: 32px 16px 48px;
-  }
-
-  .inputHint {
-    display: none;
   }
 
   .introCopy {
