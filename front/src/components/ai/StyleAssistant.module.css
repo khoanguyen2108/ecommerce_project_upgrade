@@ -67,7 +67,7 @@
 .stateCard,
 .skeletonCard {
   background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   box-shadow: var(--shadow-subtle);
   overflow: hidden;
@@ -187,7 +187,7 @@
 
 .textarea:focus {
   background: var(--color-surface);
-  border-color: var(--color-border-strong);
+  border-color: #c8c8c8;
 }
 
 .textarea::placeholder {
@@ -779,7 +779,7 @@
 
 .savedOutfitsSection {
   background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   box-shadow: var(--shadow-subtle);
   overflow: hidden;
