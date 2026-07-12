@@ -42,7 +42,7 @@ export function StyleAssistantInput({
     }
 
     textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 220)}px`;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 156)}px`;
   }, [value]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -105,7 +105,7 @@ export function StyleAssistantInput({
         onKeyDown={handleKeyDown}
         placeholder="Describe your style, occasion, color, or budget..."
         ref={textareaRef}
-        rows={4}
+        rows={3}
         value={value}
       />
       <span className={styles.visuallyHidden} id="style-assistant-help">

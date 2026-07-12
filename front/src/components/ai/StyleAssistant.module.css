@@ -7,7 +7,7 @@
 
 .shell {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(480px, 1.1fr);
+  grid-template-columns: minmax(320px, 0.72fr) minmax(520px, 1.28fr);
   margin: 0 auto;
   max-width: var(--container);
   min-height: calc(100vh - var(--header-height));
@@ -16,12 +16,15 @@
 .intro,
 .resultColumn {
   min-width: 0;
-  padding: clamp(40px, 6vw, 88px) clamp(24px, 5vw, 72px) clamp(56px, 7vw, 96px);
+  padding: clamp(24px, 4vw, 52px) clamp(20px, 3.6vw, 48px) clamp(36px, 5vw, 64px);
 }
 
 .intro {
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: var(--header-height);
+  align-self: start;
 }
 
 .resultColumn {
@@ -31,8 +34,8 @@
 }
 
 .introCopy {
-  margin: 0 0 clamp(32px, 4vw, 56px);
-  max-width: 660px;
+  margin: 0 0 clamp(20px, 3vw, 32px);
+  max-width: 520px;
 }
 
 .resultLabel {
@@ -45,20 +48,20 @@
 
 .introCopy h1 {
   font-family: Montserrat, Inter, sans-serif;
-  font-size: clamp(3rem, 5.5vw, 5.75rem);
+  font-size: clamp(2.45rem, 4vw, 4.15rem);
   font-weight: 760;
-  letter-spacing: -0.055em;
-  line-height: 0.94;
-  margin: 0 0 28px;
-  max-width: 700px;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+  margin: 0 0 18px;
+  max-width: 500px;
 }
 
 .introCopy > p:last-child {
   color: var(--color-text-muted);
-  font-size: clamp(1rem, 1.3vw, 1.13rem);
-  line-height: 1.7;
+  font-size: clamp(0.9rem, 1vw, 1rem);
+  line-height: 1.55;
   margin: 0;
-  max-width: 600px;
+  max-width: 460px;
 }
 
 .inputCard,
@@ -72,7 +75,7 @@
 }
 
 .inputCard {
-  padding: clamp(20px, 2.5vw, 32px);
+  padding: clamp(16px, 2vw, 22px);
 }
 
 .inputHeading,
@@ -116,11 +119,11 @@
   color: var(--color-surface);
   display: inline-flex;
   flex: 0 0 auto;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 800;
-  height: 28px;
+  height: 24px;
   justify-content: center;
-  width: 28px;
+  width: 24px;
 }
 
 .inputHint {
@@ -172,14 +175,14 @@
   color: var(--color-text);
   display: block;
   font: inherit;
-  font-size: 1rem;
-  line-height: 1.6;
-  margin-top: 22px;
-  max-height: 220px;
-  min-height: 132px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin-top: 16px;
+  max-height: 156px;
+  min-height: 92px;
   outline: none;
   overflow-y: auto;
-  padding: 18px;
+  padding: 14px;
   resize: none;
   transition: border-color 160ms ease, background-color 160ms ease;
   width: 100%;
@@ -201,8 +204,8 @@
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .chip {
@@ -210,10 +213,10 @@
   border: 1px solid var(--color-border);
   border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 750;
-  min-height: 34px;
-  padding: 6px 12px;
+  min-height: 28px;
+  padding: 5px 10px;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
@@ -231,8 +234,8 @@
 
 .inputFooter {
   border-top: 1px solid var(--color-border);
-  margin-top: 22px;
-  padding-top: 20px;
+  margin-top: 16px;
+  padding-top: 14px;
 }
 
 .inputFooter > span,
@@ -252,8 +255,8 @@
   gap: 9px;
   justify-content: center;
   letter-spacing: 0.04em;
-  min-height: 44px;
-  padding: 11px 18px;
+  min-height: 38px;
+  padding: 9px 15px;
   text-transform: uppercase;
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
@@ -261,7 +264,7 @@
 .generateButton {
   background: var(--color-text);
   color: var(--color-surface);
-  min-width: 184px;
+  min-width: 168px;
 }
 
 .generateButton:hover:not(:disabled),
@@ -304,11 +307,11 @@
 .stateCard,
 .skeletonCard,
 .resultCard {
-  max-width: 760px;
+  max-width: 840px;
 }
 
 .stateCard {
-  --state-card-padding: clamp(28px, 4vw, 52px);
+  --state-card-padding: clamp(20px, 3vw, 34px);
   padding: var(--state-card-padding);
 }
 
@@ -320,7 +323,7 @@
 .illustration {
   background: #e7e5e0;
   color: #171717;
-  min-height: 330px;
+  min-height: 220px;
   overflow: hidden;
   position: relative;
 }
@@ -340,23 +343,23 @@
 }
 
 .illustrationCompact {
-  min-height: 210px;
+  min-height: 150px;
   width: 100%;
 }
 
 .emptyCopy {
   background: var(--color-surface);
   margin: 0 calc(var(--state-card-padding) * -1);
-  padding: 36px var(--state-card-padding) 44px;
+  padding: 24px var(--state-card-padding) 28px;
 }
 
 .emptyCopy h2,
 .stateCard h2 {
   font-family: Montserrat, Inter, sans-serif;
-  font-size: clamp(1.8rem, 3vw, 2.65rem);
-  letter-spacing: -0.035em;
-  line-height: 1.04;
-  margin: 14px 0;
+  font-size: clamp(1.45rem, 2.3vw, 2.1rem);
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  margin: 10px 0;
 }
 
 .emptyCopy p,
@@ -394,31 +397,32 @@
 }
 
 .resultCard {
-  padding: clamp(24px, 3.5vw, 42px);
+  padding: clamp(18px, 2.6vw, 28px);
 }
 
 .summary {
   align-items: flex-start;
   display: flex;
-  gap: 16px;
-  padding: 30px 0;
+  gap: 12px;
+  padding: 18px 0 22px;
 }
 
 .summary h2 {
-  font-size: 1.25rem;
+  font-size: 1.08rem;
 }
 
 .summary p {
   color: var(--color-text-muted);
-  line-height: 1.68;
-  margin: 9px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.52;
+  margin: 6px 0 0;
 }
 
 .outfitsSection,
 .tipsSection,
 .warningSection {
   border-top: 1px solid var(--color-border);
-  padding-top: 26px;
+  padding-top: 18px;
 }
 
 .sectionHeading h3,
@@ -551,8 +555,8 @@
 .outfitCard {
   border: 1px solid var(--color-border);
   display: grid;
-  gap: 18px;
-  padding: 18px;
+  gap: 12px;
+  padding: 12px;
 }
 
 .outfitMeta,
@@ -569,11 +573,11 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px 18px;
-  padding-top: 14px;
+  padding-top: 10px;
 }
 
 .currentOutfitCard {
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .saveOutfitButton,
@@ -651,8 +655,8 @@
 
 .outfitProductGrid {
   display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
 }
 
 .outfitProduct {
@@ -663,7 +667,7 @@
 }
 
 .outfitProductImageLink {
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 1 / 1;
   background: var(--color-surface-muted);
   color: inherit;
   display: block;
@@ -682,19 +686,19 @@
 
 .outfitProductBody {
   display: grid;
-  gap: 9px;
-  padding: 14px;
+  gap: 7px;
+  padding: 10px;
 }
 
 .outfitProductBody h5 {
   font-family: Montserrat, Inter, sans-serif;
-  font-size: 0.88rem;
-  line-height: 1.32;
+  font-size: 0.76rem;
+  line-height: 1.25;
   margin: 0;
 }
 
 .outfitProductBody strong {
-  font-size: 0.78rem;
+  font-size: 0.7rem;
 }
 
 .outfitProductBody p {
@@ -705,7 +709,10 @@
 }
 
 .outfitProduct .productLink {
-  margin-top: 2px;
+  font-size: 0.66rem;
+  margin-top: 0;
+  min-height: 34px;
+  padding: 7px 10px;
   width: 100%;
 }
 
@@ -794,9 +801,9 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   box-shadow: var(--shadow-subtle);
-  margin-top: 28px;
-  max-width: 760px;
-  padding: clamp(24px, 3.5vw, 36px);
+  margin-top: 18px;
+  max-width: 840px;
+  padding: clamp(18px, 2.6vw, 28px);
   width: 100%;
 }
 
@@ -969,7 +976,7 @@
 }
 
 .skeletonCard {
-  padding: clamp(28px, 4vw, 44px);
+  padding: clamp(20px, 3vw, 30px);
 }
 
 .skeletonTopline {
@@ -1020,20 +1027,20 @@
   border-top: 1px solid var(--color-border);
   display: grid;
   gap: 14px;
-  margin-top: 34px;
-  padding-top: 26px;
+  margin-top: 24px;
+  padding-top: 18px;
 }
 
 .skeletonProduct {
   border: 1px solid var(--color-border);
   display: grid;
-  gap: 18px;
-  grid-template-columns: 130px 1fr;
-  padding: 14px;
+  gap: 12px;
+  grid-template-columns: 104px 1fr;
+  padding: 10px;
 }
 
 .skeletonImage {
-  height: 160px;
+  height: 118px;
 }
 
 .skeletonProductName {
@@ -1095,17 +1102,17 @@
 
 @media (max-width: 1120px) {
   .shell {
-    grid-template-columns: minmax(0, 0.92fr) minmax(430px, 1.08fr);
+    grid-template-columns: minmax(300px, 0.76fr) minmax(460px, 1.24fr);
   }
 
   .intro,
   .resultColumn {
-    padding-left: 32px;
-    padding-right: 32px;
+    padding-left: 28px;
+    padding-right: 28px;
   }
 
   .introCopy h1 {
-    font-size: clamp(3rem, 6vw, 4.6rem);
+    font-size: clamp(2.35rem, 4.5vw, 3.7rem);
   }
 
   .productCard {
@@ -1122,13 +1129,17 @@
     display: block;
   }
 
+  .intro {
+    position: static;
+  }
+
   .intro,
   .resultColumn {
-    padding: 42px clamp(20px, 6vw, 48px);
+    padding: 28px clamp(18px, 5vw, 40px);
   }
 
   .introCopy {
-    margin: 0 0 40px;
+    margin: 0 0 24px;
   }
 
   .resultColumn {
@@ -1153,11 +1164,11 @@
   }
 
   .introCopy {
-    margin: 0 0 32px;
+    margin: 0 0 22px;
   }
 
   .introCopy h1 {
-    font-size: clamp(2.8rem, 15vw, 4rem);
+    font-size: clamp(2.15rem, 11vw, 3rem);
   }
 
   .inputCard,
@@ -1233,7 +1244,11 @@
   }
 
   .outfitProductGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .outfitProductBody h5 {
+    font-size: 0.72rem;
   }
 
   .savedOutfitCard {
