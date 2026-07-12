@@ -53,6 +53,28 @@ export interface AddCartItemRequest {
   quantity: number;
 }
 
+export interface AddOutfitCartItemRequest {
+  productId: string;
+  variantId: string;
+  quantity: 1;
+}
+
+export interface AddOutfitCartItemsRequest {
+  items: AddOutfitCartItemRequest[];
+}
+
+export interface AddedOutfitCartItem {
+  productId: string;
+  variantId: string;
+  quantity: number;
+  currentUnitPrice: number;
+}
+
+export interface AddOutfitCartItemsResponse {
+  cart: Cart;
+  addedItems: AddedOutfitCartItem[];
+}
+
 export interface UpdateCartItemRequest {
   quantity: number;
 }

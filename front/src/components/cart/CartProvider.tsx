@@ -30,6 +30,7 @@ interface CartToastState {
 }
 
 interface CartContextValue {
+  applyAuthoritativeCart: (nextCart: Cart) => void;
   cart?: Cart;
   cartCount: number;
   closeCart: () => void;
@@ -72,6 +73,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
   const closeCart = useCallback(() => setIsOpen(false), []);
   const openCart = useCallback(() => setIsOpen(true), []);
+  const applyAuthoritativeCart = useCallback((nextCart: Cart) => {
+    setCart(nextCart);
+    clearError();
+  }, [clearError]);
 
   const showToast = useCallback(
     (kind: CartToastState["kind"], message: string) => {
@@ -224,6 +229,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const value = useMemo<CartContextValue>(
     () => ({
       addItemAndOpenDrawer,
+      applyAuthoritativeCart,
       cart,
       cartCount: cart?.totalQuantity ?? 0,
       clearCart,
@@ -240,6 +246,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }),
     [
       addItemAndOpenDrawer,
+      applyAuthoritativeCart,
       cart,
       clearCart,
       closeCart,

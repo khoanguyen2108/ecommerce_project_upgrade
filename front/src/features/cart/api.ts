@@ -1,6 +1,8 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
   AddCartItemRequest,
+  AddOutfitCartItemsRequest,
+  AddOutfitCartItemsResponse,
   CartResponse,
   UpdateCartItemRequest,
 } from "@/features/cart/types";
@@ -19,6 +21,23 @@ export function addCartItem(
   return apiRequest<CartResponse>("/cart/items", {
     auth: true,
     body: { quantity: payload.quantity, variantId: payload.variantId },
+    credentials: "include",
+    method: "POST",
+  });
+}
+
+export function addOutfitItemsToCart(
+  payload: AddOutfitCartItemsRequest,
+): Promise<AddOutfitCartItemsResponse> {
+  return apiRequest<AddOutfitCartItemsResponse>("/cart/outfit-items", {
+    auth: true,
+    body: {
+      items: payload.items.map((item) => ({
+        productId: item.productId,
+        quantity: 1,
+        variantId: item.variantId,
+      })),
+    },
     credentials: "include",
     method: "POST",
   });

@@ -243,7 +243,9 @@
 .priceNotice,
 .selectionHint,
 .selectionStatus,
-.readyStatus {
+.readyStatus,
+.submitError,
+.submitStatus {
   font-size: 0.74rem;
   line-height: 1.5;
   margin: 0;
@@ -251,7 +253,9 @@
 
 .loadingStatus,
 .itemError,
-.readyStatus {
+.readyStatus,
+.submitError,
+.submitStatus {
   align-items: center;
   display: flex;
   gap: 8px;
@@ -265,6 +269,16 @@
 
 .itemError {
   color: var(--color-danger);
+}
+
+.submitError {
+  color: var(--color-danger);
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.submitStatus {
+  color: var(--color-text-muted);
 }
 
 .itemWarning,
@@ -313,7 +327,17 @@
   margin-right: auto;
 }
 
-.closeButton {
+.footerActions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.closeButton,
+.submitButton {
   background: var(--color-text);
   border: 1px solid var(--color-text);
   color: var(--color-surface);
@@ -325,9 +349,25 @@
   text-transform: uppercase;
 }
 
+.submitButton {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  justify-content: center;
+}
+
 .closeButton:hover,
-.closeButton:focus-visible {
+.closeButton:focus-visible,
+.submitButton:hover:not(:disabled),
+.submitButton:focus-visible:not(:disabled) {
   background: var(--color-brand-hover);
+}
+
+.submitButton:disabled {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }
 
 @keyframes spin {
@@ -380,7 +420,13 @@
     margin-right: 0;
   }
 
-  .closeButton {
+  .footerActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .closeButton,
+  .submitButton {
     width: 100%;
   }
 }
