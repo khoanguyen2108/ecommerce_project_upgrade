@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getLandingGallery } from "@/features/landing/api";
 import type { LandingGalleryImage } from "@/features/landing/types";
+import { useI18n } from "@/features/i18n/useI18n";
 
 interface LandingGalleryState {
   images: LandingGalleryImage[];
@@ -11,6 +12,7 @@ interface LandingGalleryState {
 }
 
 export function LandingInspirationGallery() {
+  const { t } = useI18n();
   const trackRef = useRef<HTMLDivElement>(null);
   const [gallery, setGallery] = useState<LandingGalleryState>({
     images: [],
@@ -116,10 +118,10 @@ export function LandingInspirationGallery() {
   if (gallery.isLoading) {
     return (
       <section
-        aria-label="Style inspiration loading"
+        aria-label={t("landing.inspirationLoading")}
         className="landing-gallery landing-gallery--loading"
       >
-        <GalleryHeading />
+        <GalleryHeading heading={t("landing.inspiration")} />
         <div className="landing-gallery__track" aria-hidden="true">
           {Array.from({ length: 4 }, (_, index) => (
             <div className="landing-gallery__skeleton" key={index} />
@@ -136,28 +138,28 @@ export function LandingInspirationGallery() {
   return (
     <section className="landing-gallery" aria-labelledby="landing-gallery-heading">
       <div className="landing-gallery__topline">
-        <GalleryHeading />
+        <GalleryHeading heading={t("landing.inspiration")} />
         {visibleImages.length > 1 ? (
           <div
             className="landing-gallery__controls"
-            aria-label="Style file carousel controls"
+            aria-label={t("landing.carouselControls")}
           >
             <button
-              aria-label="Previous inspiration images"
+              aria-label={t("landing.previousImages")}
               className="icon-button landing-gallery__control"
               disabled={!scrollState.canScrollLeft}
               onClick={() => scrollGallery("previous")}
-              title="Previous"
+              title={t("common.previous")}
               type="button"
             >
               <ChevronLeft aria-hidden="true" size={22} strokeWidth={1.9} />
             </button>
             <button
-              aria-label="Next inspiration images"
+              aria-label={t("landing.nextImages")}
               className="icon-button landing-gallery__control"
               disabled={!scrollState.canScrollRight}
               onClick={() => scrollGallery("next")}
-              title="Next"
+              title={t("common.next")}
               type="button"
             >
               <ChevronRight aria-hidden="true" size={22} strokeWidth={1.9} />
@@ -173,7 +175,7 @@ export function LandingInspirationGallery() {
         {visibleImages.slice(0, 10).map((image, index) => (
           <figure className="landing-gallery__item" key={image.id}>
             <img
-              alt={getImageAlt(image)}
+              alt={getImageAlt(image, t("landing.styleInspiration"))}
               className="landing-gallery__image"
               loading={index < 2 ? "eager" : "lazy"}
               onError={() =>
@@ -198,20 +200,20 @@ export function LandingInspirationGallery() {
   );
 }
 
-function GalleryHeading() {
+function GalleryHeading({ heading }: { heading: string }) {
   return (
     <div className="landing-gallery__heading">
-      <h2 id="landing-gallery-heading">Outfit Inspo</h2>
+      <h2 id="landing-gallery-heading">{heading}</h2>
     </div>
   );
 }
 
-function getImageAlt(image: LandingGalleryImage): string {
+function getImageAlt(image: LandingGalleryImage, fallback: string): string {
   const altText = image.altText?.trim();
 
   if (altText) {
     return altText;
   }
 
-  return image.title?.trim() || "Belikeme style inspiration";
+  return image.title?.trim() || fallback;
 }

@@ -253,6 +253,38 @@ img {
   justify-self: end;
 }
 
+.language-switcher {
+  align-items: stretch;
+  border: 1px solid var(--color-text);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 30px;
+}
+
+.language-switcher button {
+  background: var(--color-surface);
+  border: 0;
+  color: var(--color-text);
+  font-family: Inter, sans-serif;
+  font-size: 0.66rem;
+  font-weight: 800;
+  min-width: 29px;
+  padding: 0 6px;
+}
+
+.language-switcher button + button {
+  border-left: 1px solid var(--color-text);
+}
+
+.language-switcher button.is-active {
+  background: var(--color-text);
+  color: var(--color-surface);
+}
+
+.language-switcher--mobile {
+  display: none;
+}
+
 .icon-button {
   align-items: center;
   background: transparent;
@@ -9891,6 +9923,15 @@ img {
     gap: 4px;
     min-width: 0;
     z-index: 2;
+  }
+
+  .language-switcher--desktop {
+    display: none;
+  }
+
+  .language-switcher--mobile {
+    display: inline-flex;
+    margin-right: 2px;
   }
 
   .site-actions .icon-button {

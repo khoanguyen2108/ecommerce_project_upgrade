@@ -19,6 +19,9 @@ import type {
   StyleAdviceResponse,
 } from "@/features/ai/types";
 import { formatPrice } from "@/features/catalog/format";
+import type { Locale } from "@/features/i18n/locale";
+import { translate } from "@/features/i18n/translations";
+import { useI18n } from "@/features/i18n/useI18n";
 
 interface StyleAssistantResultProps {
   isSavingOutfit?: boolean;
@@ -29,49 +32,6 @@ interface StyleAssistantResultProps {
   saveSuccess?: string;
 }
 
-type ResultLocale = "vi" | "en";
-
-const RESULT_COPY = {
-  en: {
-    currentOutfit: "Current outfit",
-    handoffAction: "Open Customer Chat",
-    handoffBody: "Chat with our stylist.",
-    handoffTitle: "Need more personalized advice?",
-    matchingNotes: "Matching notes",
-    noProducts:
-      "No matching in-stock pieces were returned. Try broadening your style, color, or budget description.",
-    outOfScopeHeading: "I'm your Belikeme style specialist.",
-    outOfScopeLabel: "Let's keep it stylish",
-    pieceCount: (count: number) => `${count} piece${count === 1 ? "" : "s"}`,
-    saveOutfit: "Save outfit",
-    savingOutfit: "Saving outfit…",
-    summary: "Summary",
-    total: (value: string) => `${value} total`,
-    tryAsking: "Try asking",
-    viewProduct: "View Product",
-    viewProductAria: (name: string) => `View ${name}`,
-  },
-  vi: {
-    saveOutfit: "Lưu outfit",
-    savingOutfit: "Đang lưu outfit…",
-    currentOutfit: "Outfit hiện tại",
-    handoffAction: "Mở chat hỗ trợ",
-    handoffBody: "Trò chuyện với stylist của Belikeme.",
-    handoffTitle: "Bạn cần tư vấn riêng hơn?",
-    matchingNotes: "Lưu ý",
-    noProducts:
-      "Chưa có sản phẩm còn hàng phù hợp. Hãy thử mô tả rộng hơn về phong cách, màu sắc hoặc ngân sách.",
-    outOfScopeHeading: "Mình là trợ lý phối đồ của Belikeme.",
-    outOfScopeLabel: "Cùng tìm outfit phù hợp",
-    pieceCount: (count: number) => `${count} món`,
-    summary: "Tóm tắt",
-    total: (value: string) => `Tổng ${value}`,
-    tryAsking: "Bạn có thể hỏi",
-    viewProduct: "Xem sản phẩm",
-    viewProductAria: (name: string) => `Xem ${name}`,
-  },
-} as const;
-
 export function StyleAssistantResult({
   isSavingOutfit = false,
   onPrepareOutfit,
@@ -80,7 +40,7 @@ export function StyleAssistantResult({
   saveError,
   saveSuccess,
 }: StyleAssistantResultProps) {
-  const locale: ResultLocale = result.locale === "vi" ? "vi" : "en";
+  const { locale } = useI18n();
 
   if (result.type === "clarification") {
     return <ClarificationResult locale={locale} result={result} />;
@@ -103,26 +63,15 @@ export function StyleAssistantResult({
   );
 }
 
-function ClarificationResult({
-  locale,
-  result,
-}: {
-  locale: ResultLocale;
-  result: StyleAdviceResponse;
-}) {
+function ClarificationResult({ locale, result }: { locale: Locale; result: StyleAdviceResponse }) {
   const question =
     result.clarificationQuestion ||
     result.message ||
     result.summary ||
-    (locale === "vi"
-      ? "Bạn muốn outfit cho dịp nào, vibe gì và ngân sách khoảng bao nhiêu?"
-      : "What occasion, vibe, and budget should I style this outfit for?");
+    translate(locale, "ai.clarificationFallback");
 
   return (
-    <section
-      aria-live="polite"
-      className={`${styles.stateCard} ${styles.clarificationCard}`}
-    >
+    <section aria-live="polite" className={`${styles.stateCard} ${styles.clarificationCard}`}>
       <span aria-hidden="true" className={styles.assistantAvatar}>
         <MessageCircle size={20} />
       </span>
@@ -141,22 +90,25 @@ function CurrentOutfitResult({
   saveSuccess,
 }: {
   isSavingOutfit: boolean;
-  locale: ResultLocale;
+  locale: Locale;
   onPrepareOutfit?: () => void;
   onSaveOutfit?: () => void;
   result: StyleAdviceResponse;
   saveError?: string;
   saveSuccess?: string;
 }) {
-  const copy = RESULT_COPY[locale];
   const outfit = getCurrentStyleAdviceOutfit(result);
-  const summary = outfit?.summary || result.message || result.summary || copy.noProducts;
+  const summary =
+    outfit?.summary ||
+    result.message ||
+    result.summary ||
+    translate(locale, "ai.noMatchingProducts");
 
   return (
     <section aria-live="polite" className={styles.resultCard}>
       <div className={styles.summary}>
         <div>
-          <h2>{copy.summary}</h2>
+          <h2>{translate(locale, "ai.summary")}</h2>
           <p>{summary}</p>
         </div>
       </div>
@@ -174,15 +126,17 @@ function CurrentOutfitResult({
       ) : (
         <div className={styles.outfitsSection}>
           <div className={styles.sectionHeading}>
-            <h3>{copy.currentOutfit}</h3>
+            <h3>{translate(locale, "ai.currentOutfit")}</h3>
           </div>
-          <p className={styles.noProducts}>{copy.noProducts}</p>
+          <p className={styles.noProducts}>
+            {translate(locale, "ai.noMatchingProducts")}
+          </p>
         </div>
       )}
 
       {!outfit && result.warnings?.length ? (
         <div className={styles.warningSection}>
-          <h3>{copy.matchingNotes}</h3>
+          <h3>{translate(locale, "ai.matchingNotes")}</h3>
           <WarningList warnings={result.warnings} />
         </div>
       ) : null}
@@ -202,104 +156,78 @@ function CurrentOutfit({
   saveSuccess,
 }: {
   isSavingOutfit: boolean;
-  locale: ResultLocale;
+  locale: Locale;
   onPrepareOutfit?: () => void;
   onSaveOutfit?: () => void;
   outfit: StyleAdviceCanonicalOutfit;
   saveError?: string;
   saveSuccess?: string;
 }) {
-  const copy = RESULT_COPY[locale];
+  const countLabel = translate(
+    locale,
+    outfit.items.length === 1 ? "ai.piece" : "ai.pieces",
+  );
 
   return (
     <div className={styles.outfitsSection}>
       <div className={styles.sectionHeading}>
-        <h3>{copy.currentOutfit}</h3>
+        <h3>{translate(locale, "ai.currentOutfit")}</h3>
         <div className={styles.outfitHeadingActions}>
           {isSavingOutfit ? (
             <span className={styles.savingOutfitStatus} role="status">
               <Loader2 aria-hidden="true" className={styles.spinner} size={16} />
-              {copy.savingOutfit}
+              {translate(locale, "ai.savingOutfit")}
             </span>
           ) : onSaveOutfit ? (
-            <button
-              className={styles.saveOutfitButton}
-              onClick={onSaveOutfit}
-              type="button"
-            >
+            <button className={styles.saveOutfitButton} onClick={onSaveOutfit} type="button">
               <Save aria-hidden="true" size={16} />
-              {copy.saveOutfit}
+              {translate(locale, "ai.saveOutfit")}
             </button>
           ) : null}
           {onPrepareOutfit && outfit.items.length > 0 ? (
-            <button
-              className={styles.prepareOutfitButton}
-              onClick={onPrepareOutfit}
-              type="button"
-            >
-              {locale === "vi"
-                ? "Tiếp tục với outfit này"
-                : "Continue with this outfit"}
+            <button className={styles.prepareOutfitButton} onClick={onPrepareOutfit} type="button">
+              {translate(locale, "ai.continueCurrent")}
               <ArrowRight aria-hidden="true" size={16} />
             </button>
           ) : null}
         </div>
       </div>
       {saveError ? (
-        <p
-          className={`${styles.savedOutfitFeedback} ${styles.savedOutfitError}`}
-          role="alert"
-        >
+        <p className={`${styles.savedOutfitFeedback} ${styles.savedOutfitError}`} role="alert">
           {saveError}
         </p>
       ) : null}
       {saveSuccess ? (
-        <p
-          className={`${styles.savedOutfitFeedback} ${styles.savedOutfitSuccess}`}
-          role="status"
-        >
+        <p className={`${styles.savedOutfitFeedback} ${styles.savedOutfitSuccess}`} role="status">
           {saveSuccess}
         </p>
       ) : null}
       <article className={`${styles.outfitCard} ${styles.currentOutfitCard}`}>
         <div className={styles.outfitMeta}>
-          <span>{copy.pieceCount(outfit.items.length)}</span>
-          <span>{copy.total(formatPrice(outfit.totalPrice))}</span>
+          <span>{outfit.items.length} {countLabel}</span>
+          <span>{formatPrice(outfit.totalPrice)} {translate(locale, "ai.total")}</span>
         </div>
 
         <div className={styles.outfitProductGrid}>
           {outfit.items.map((item) => (
-            <OutfitProductCard
-              item={item}
-              key={`${item.role}-${item.productId}`}
-              locale={locale}
-            />
+            <OutfitProductCard item={item} key={`${item.role}-${item.productId}`} locale={locale} />
           ))}
         </div>
 
-        {outfit.warnings?.length ? (
-          <WarningList warnings={outfit.warnings} />
-        ) : null}
+        {outfit.warnings?.length ? <WarningList warnings={outfit.warnings} /> : null}
       </article>
     </div>
   );
 }
 
-function OutfitProductCard({
-  item,
-  locale,
-}: {
-  item: StyleAdviceCanonicalOutfitItem;
-  locale: ResultLocale;
-}) {
+function OutfitProductCard({ item, locale }: { item: StyleAdviceCanonicalOutfitItem; locale: Locale }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const copy = RESULT_COPY[locale];
   const productHref = `/products/${encodeURIComponent(item.productSlug)}`;
 
   return (
     <article className={styles.outfitProduct}>
       <Link
-        aria-label={copy.viewProductAria(item.productName)}
+        aria-label={`${translate(locale, "ai.viewProduct")}: ${item.productName}`}
         className={styles.outfitProductImageLink}
         href={productHref}
       >
@@ -320,7 +248,7 @@ function OutfitProductCard({
         <h5>{item.productName}</h5>
         <strong>{formatPrice(item.price)}</strong>
         <Link className={styles.productLink} href={productHref}>
-          {copy.viewProduct}
+          {translate(locale, "ai.viewProduct")}
           <ArrowUpRight aria-hidden="true" size={16} />
         </Link>
       </div>
@@ -338,28 +266,19 @@ function WarningList({ warnings }: { warnings: string[] }) {
   );
 }
 
-function OutOfScopeResult({
-  locale,
-  result,
-}: {
-  locale: ResultLocale;
-  result: StyleAdviceResponse;
-}) {
-  const copy = RESULT_COPY[locale];
-  const message = result.message || result.summary || copy.outOfScopeHeading;
+function OutOfScopeResult({ locale, result }: { locale: Locale; result: StyleAdviceResponse }) {
+  const message =
+    result.message || result.summary || translate(locale, "ai.outOfScopeHeading");
 
   return (
-    <section
-      aria-live="polite"
-      className={`${styles.stateCard} ${styles.outOfScopeCard}`}
-    >
+    <section aria-live="polite" className={`${styles.stateCard} ${styles.outOfScopeCard}`}>
       <FashionIllustration compact />
-      <span className={styles.resultLabel}>{copy.outOfScopeLabel}</span>
-      <h2>{copy.outOfScopeHeading}</h2>
+      <span className={styles.resultLabel}>{translate(locale, "ai.outOfScopeLabel")}</span>
+      <h2>{translate(locale, "ai.outOfScopeHeading")}</h2>
       <p>{message}</p>
       {result.extraTips?.length ? (
         <div className={styles.examples}>
-          <h3>{copy.tryAsking}</h3>
+          <h3>{translate(locale, "ai.tryAsking")}</h3>
           <ul>
             {result.extraTips.map((tip, index) => (
               <li key={`${index}-${tip}`}>{tip}</li>
@@ -371,57 +290,40 @@ function OutOfScopeResult({
   );
 }
 
-function HandoffCard({ locale }: { locale: ResultLocale }) {
-  const copy = RESULT_COPY[locale];
-
+function HandoffCard({ locale }: { locale: Locale }) {
   function openCustomerChat() {
     const launcher = document.querySelector<HTMLButtonElement>(
       ".customer-chat-widget__launcher",
     );
-
     if (launcher) {
       launcher.click();
       return;
     }
-
-    document
-      .querySelector<HTMLElement>(".customer-chat-panel")
-      ?.focus({ preventScroll: false });
+    document.querySelector<HTMLElement>(".customer-chat-panel")?.focus({ preventScroll: false });
   }
 
   return (
     <div className={styles.handoffCard}>
       <MessageCircle aria-hidden="true" size={22} />
       <div>
-        <h3>{copy.handoffTitle}</h3>
-        <p>{copy.handoffBody}</p>
+        <h3>{translate(locale, "ai.handoffTitle")}</h3>
+        <p>{translate(locale, "ai.handoffBody")}</p>
       </div>
-      <button
-        className={styles.secondaryButton}
-        onClick={openCustomerChat}
-        type="button"
-      >
-        {copy.handoffAction}
+      <button className={styles.secondaryButton} onClick={openCustomerChat} type="button">
+        {translate(locale, "ai.handoffAction")}
       </button>
     </div>
   );
 }
 
-function formatRole(
-  role: StyleAdviceOutfitProductRole,
-  locale: ResultLocale,
-): string {
-  const labels: Record<
-    StyleAdviceOutfitProductRole,
-    Record<ResultLocale, string>
-  > = {
-    top: { en: "Top", vi: "Áo" },
-    bottom: { en: "Bottom", vi: "Quần" },
-    shoes: { en: "Shoes", vi: "Giày" },
-    jacket: { en: "Jacket", vi: "Áo khoác" },
-    accessory: { en: "Accessory", vi: "Phụ kiện" },
-    handbag: { en: "Bag", vi: "Túi" },
-  };
-
-  return labels[role][locale];
+function formatRole(role: StyleAdviceOutfitProductRole, locale: Locale): string {
+  const keys = {
+    top: "ai.roleTop",
+    bottom: "ai.roleBottom",
+    shoes: "ai.roleShoes",
+    jacket: "ai.roleJacket",
+    accessory: "ai.roleAccessory",
+    handbag: "ai.roleBag",
+  } as const;
+  return translate(locale, keys[role]);
 }

@@ -14,6 +14,9 @@ import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
+import { LanguageSwitcher } from "@/features/i18n/LanguageSwitcher";
+import type { TranslationKey } from "@/features/i18n/translations";
+import { useI18n } from "@/features/i18n/useI18n";
 
 type SiteHeaderActive =
   | "shop"
@@ -31,22 +34,27 @@ type PrimaryNavItem = {
   active?: SiteHeaderActive;
   hideForAdmin?: boolean;
   href: string;
-  label: string;
+  labelKey: TranslationKey;
 };
 
 const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
-  { active: "shop", href: "/products", label: "Shop" },
-  { active: "categories", href: "/categories", label: "Categories" },
+  { active: "shop", href: "/products", labelKey: "nav.shop" },
+  {
+    active: "categories",
+    href: "/categories",
+    labelKey: "nav.categories",
+  },
   {
     active: "ai",
     hideForAdmin: true,
     href: "/ai/style-assistant",
-    label: "Style Assistant",
+    labelKey: "nav.styleAssistant",
   },
-  { href: "/#about", label: "About" },
+  { href: "/#about", labelKey: "nav.about" },
 ];
 
 export function SiteHeader({ active }: SiteHeaderProps) {
+  const { t } = useI18n();
   const { currentUser, isAuthenticated, isLoading, logout } = useAuthSession();
   const { cartCount, openCart } = useCart();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -58,8 +66,10 @@ export function SiteHeader({ active }: SiteHeaderProps) {
   );
   const cartLabel =
     cartCount > 0
-      ? `Cart, ${cartCount} ${cartCount === 1 ? "item" : "items"}`
-      : "Cart";
+      ? `${t("nav.cart")}, ${cartCount} ${
+          cartCount === 1 ? t("cart.item") : t("cart.items")
+        }`
+      : t("nav.cart");
   const mobileMenuId = "site-mobile-navigation";
 
   useEffect(() => {
@@ -131,8 +141,8 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           aria-expanded={isMobileMenuOpen}
           aria-label={
             isMobileMenuOpen
-              ? "Close primary navigation"
-              : "Open primary navigation"
+              ? t("nav.close")
+              : t("nav.open")
           }
           className="icon-button site-menu-button"
           onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
@@ -141,7 +151,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           <Menu aria-hidden="true" size={28} strokeWidth={2} />
         </button>
 
-        <nav aria-label="Primary navigation" className="site-nav">
+        <nav aria-label={t("nav.primary")} className="site-nav">
           {primaryNavItems.map((item) => {
             const isActive = Boolean(item.active && active === item.active);
 
@@ -152,7 +162,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
                 href={item.href}
                 key={item.href}
               >
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             );
           })}
@@ -161,7 +171,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         <Link
           className="brand-mark brand-mark--image"
           href="/"
-          aria-label="Belikeme home"
+          aria-label={t("nav.home")}
         >
           <Image
             alt=""
@@ -175,12 +185,13 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         </Link>
 
         <div className="site-actions">
+          <LanguageSwitcher className="language-switcher--desktop" />
           {showCustomerActions && isAuthenticated ? (
             <button
               aria-label={cartLabel}
               className={`icon-button ${active === "cart" ? "is-active" : ""}`}
               onClick={openCart}
-              title="Cart"
+              title={t("nav.cart")}
               type="button"
             >
               <ShoppingBag size={20} strokeWidth={1.8} />
@@ -192,20 +203,20 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           {showCustomerActions && isAuthenticated ? (
             <>
               <Link
-                aria-label="Orders"
+                aria-label={t("nav.orders")}
                 className={`icon-button ${active === "orders" ? "is-active" : ""}`}
                 href="/orders"
-                title="Orders"
+                title={t("nav.orders")}
               >
                 <ReceiptText size={20} strokeWidth={1.8} />
               </Link>
               <Link
-                aria-label="Profile"
+                aria-label={t("nav.profile")}
                 className={`icon-button ${
                   active === "account" ? "is-active" : ""
                 }`}
                 href="/profile"
-                title="Profile"
+                title={t("nav.profile")}
               >
                 <User size={20} strokeWidth={1.8} />
               </Link>
@@ -213,21 +224,21 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           ) : null}
           {showCustomerActions && !isAuthenticated ? (
             <Link
-              aria-label="Account"
+              aria-label={t("nav.account")}
               className={`icon-button ${active === "account" ? "is-active" : ""}`}
               href="/login"
-              title="Account"
+              title={t("nav.account")}
             >
               <User size={20} strokeWidth={1.8} />
             </Link>
           ) : null}
           {isAuthenticated ? (
             <button
-              aria-label="Sign out"
+              aria-label={t("nav.signOut")}
               className="icon-button"
               disabled={isLoading}
               onClick={() => void logout()}
-              title="Sign out"
+              title={t("nav.signOut")}
               type="button"
             >
               <LogOut size={20} strokeWidth={1.8} />
@@ -248,10 +259,11 @@ export function SiteHeader({ active }: SiteHeaderProps) {
 
       {isMobileMenuOpen ? (
         <nav
-          aria-label="Mobile primary navigation"
+          aria-label={t("nav.mobilePrimary")}
           className="site-mobile-dropdown"
           id={mobileMenuId}
         >
+          <LanguageSwitcher className="language-switcher--mobile" />
           {primaryNavItems.map((item) => {
             const isActive = Boolean(item.active && active === item.active);
 
@@ -265,7 +277,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
                 key={item.href}
                 onClick={closeMobileMenu}
               >
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             );
           })}

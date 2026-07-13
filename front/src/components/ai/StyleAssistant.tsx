@@ -16,15 +16,14 @@ import {
   type PurchasableOutfit,
 } from "@/features/ai/outfit-preparation";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { useI18n } from "@/features/i18n/useI18n";
 import { useSavedOutfits } from "@/features/saved-outfits/hooks";
 import type { SavedOutfit } from "@/features/saved-outfits/types";
 
 export function StyleAssistant() {
+  const { locale: uiLocale, t } = useI18n();
   const [prompt, setPrompt] = useState("");
-  const [preparation, setPreparation] = useState<{
-    locale: "vi" | "en";
-    outfit: PurchasableOutfit;
-  }>();
+  const [preparation, setPreparation] = useState<PurchasableOutfit>();
   const {
     currentOutfit,
     error,
@@ -36,7 +35,7 @@ export function StyleAssistant() {
     status,
   } = useStyleAdvice();
   const { isAuthenticated, isLoading: isSessionLoading } = useAuthSession();
-  const locale = result?.locale === "vi" ? "vi" : "en";
+  const aiLocale = result?.locale === "vi" ? "vi" : "en";
   const {
     clearSavedOutfitFeedback,
     deletingSavedOutfitId,
@@ -49,7 +48,7 @@ export function StyleAssistant() {
     saveSuccessFeedback,
   } = useSavedOutfits({
     enabled: !isSessionLoading && isAuthenticated,
-    locale,
+    locale: uiLocale,
   });
   const isLoading = status === "loading";
   const isLocked = !isSessionLoading && !isAuthenticated;
@@ -65,13 +64,11 @@ export function StyleAssistant() {
   }
 
   async function handleSaveCurrentOutfit() {
-    if (!currentOutfit?.items.length || !sourcePrompt) {
-      return;
-    }
+    if (!currentOutfit?.items.length || !sourcePrompt) return;
 
     await saveOutfit({
       sourcePrompt,
-      locale,
+      locale: aiLocale,
       summary: currentOutfit.summary,
       items: currentOutfit.items.map((item) => ({
         role: item.role,
@@ -87,11 +84,6 @@ export function StyleAssistant() {
 
   function handleViewSavedOutfit(savedOutfit: SavedOutfit) {
     clearSavedOutfitFeedback();
-    const loadedWarning =
-      savedOutfit.locale === "vi"
-        ? "Outfit đã lưu được tải lên để chỉnh tiếp. Tồn kho và giá sẽ được kiểm tra lại khi bạn chỉnh outfit."
-        : "Saved outfit loaded for editing. Stock and prices will be rechecked when you make changes.";
-
     loadCurrentOutfit({
       locale: savedOutfit.locale,
       sourcePrompt: savedOutfit.sourcePrompt,
@@ -103,40 +95,26 @@ export function StyleAssistant() {
           productId: item.productId,
           productSlug: item.productSlugSnapshot,
           productName: item.productNameSnapshot,
-          ...(item.imageUrlSnapshot
-            ? { imageUrl: item.imageUrlSnapshot }
-            : {}),
+          ...(item.imageUrlSnapshot ? { imageUrl: item.imageUrlSnapshot } : {}),
           price: item.unitPriceSnapshot,
         })),
-        warnings: [loadedWarning],
+        warnings: [t("ai.loadedWarning")],
       },
     });
   }
 
-  const closePreparation = useCallback(() => {
-    setPreparation(undefined);
-  }, []);
+  const closePreparation = useCallback(() => setPreparation(undefined), []);
 
   function handlePrepareCurrentOutfit() {
-    if (!isAuthenticated || !currentOutfit?.items.length) {
-      return;
+    if (isAuthenticated && currentOutfit?.items.length) {
+      setPreparation(toCurrentPurchasableOutfit(currentOutfit));
     }
-
-    setPreparation({
-      locale,
-      outfit: toCurrentPurchasableOutfit(currentOutfit),
-    });
   }
 
   function handlePrepareSavedOutfit(savedOutfit: SavedOutfit) {
-    if (!isAuthenticated || savedOutfit.items.length === 0) {
-      return;
+    if (isAuthenticated && savedOutfit.items.length > 0) {
+      setPreparation(toSavedPurchasableOutfit(savedOutfit));
     }
-
-    setPreparation({
-      locale: savedOutfit.locale,
-      outfit: toSavedPurchasableOutfit(savedOutfit),
-    });
   }
 
   return (
@@ -144,91 +122,79 @@ export function StyleAssistant() {
       <main className={styles.page}>
         <div className={styles.shell}>
           <section className={styles.intro}>
-          <div className={styles.introCopy}>
-            <h1>Your next look, thoughtfully edited.</h1>
-            <p>
-              Tell us the mood, the moment, or your budget. Our assistant will
-              search Belikeme&apos;s live catalog and shape a considered edit around
-              you.
-            </p>
-          </div>
-          <StyleAssistantInput
-            isDisabled={isLoading || isSessionLoading || !isAuthenticated}
-            isLocked={isLocked}
-            isLoading={isLoading}
-            onChange={setPrompt}
-            onSubmit={handleGenerate}
-            value={prompt}
-          />
-          {status === "success" && hasCurrentOutfit ? (
-            <p className={styles.refinementHint}>
-              {result?.locale === "vi"
-                ? "B\u1ea1n c\u00f3 th\u1ec3 y\u00eau c\u1ea7u: \u201c\u0111\u1ed5i qu\u1ea7n\u201d, \u201c\u0111\u1ed5i gi\u00e0y sang boots\u201d, ho\u1eb7c \u201cb\u1ecf \u00e1o kho\u00e1c\u201d."
-                : "You can ask: \u201cchange the pants\u201d, \u201cswitch the shoes to boots\u201d, or \u201cremove the jacket\u201d."}
-            </p>
-          ) : null}
-          <p className={styles.disclaimer}>
-            Recommendations use current catalog availability. Confirm live color,
-            size, and price on the product page.
-          </p>
+            <div className={styles.introCopy}>
+              <h1>{t("ai.heroTitle")}</h1>
+              <p>{t("ai.heroBody")}</p>
+            </div>
+            <StyleAssistantInput
+              isDisabled={isLoading || isSessionLoading || !isAuthenticated}
+              isLocked={isLocked}
+              isLoading={isLoading}
+              onChange={setPrompt}
+              onSubmit={handleGenerate}
+              value={prompt}
+            />
+            {status === "success" && hasCurrentOutfit ? (
+              <p className={styles.refinementHint}>{t("ai.refinementHint")}</p>
+            ) : null}
+            <p className={styles.disclaimer}>{t("ai.disclaimer")}</p>
           </section>
 
-          <aside aria-label="Style assistant result" className={styles.resultColumn}>
-          {status === "idle" ? <StyleAssistantEmpty /> : null}
-          {status === "loading" ? <StyleAssistantSkeleton /> : null}
-          {status === "error" ? (
-            <StyleAssistantError
-              message={error || "The style assistant is unavailable right now."}
-              onRetry={retry}
-            />
-          ) : null}
-          {status === "success" && result ? (
-            <StyleAssistantResult
-              isSavingOutfit={isSavingOutfit}
-              onPrepareOutfit={
-                isAuthenticated && currentOutfit?.items.length
-                  ? handlePrepareCurrentOutfit
-                  : undefined
-              }
-              onSaveOutfit={
-                canSaveCurrentOutfit
-                  ? () => void handleSaveCurrentOutfit()
-                  : undefined
-              }
-              result={result}
-              saveError={
-                savedOutfitError?.action === "save"
-                  ? savedOutfitError.message
-                  : undefined
-              }
-              saveSuccess={saveSuccessFeedback}
-            />
-          ) : null}
+          <aside aria-label={t("ai.resultColumn")} className={styles.resultColumn}>
+            {status === "idle" ? <StyleAssistantEmpty /> : null}
+            {status === "loading" ? <StyleAssistantSkeleton /> : null}
+            {status === "error" ? (
+              <StyleAssistantError
+                message={error || t("ai.unavailable")}
+                onRetry={retry}
+              />
+            ) : null}
+            {status === "success" && result ? (
+              <StyleAssistantResult
+                isSavingOutfit={isSavingOutfit}
+                onPrepareOutfit={
+                  isAuthenticated && currentOutfit?.items.length
+                    ? handlePrepareCurrentOutfit
+                    : undefined
+                }
+                onSaveOutfit={
+                  canSaveCurrentOutfit
+                    ? () => void handleSaveCurrentOutfit()
+                    : undefined
+                }
+                result={result}
+                saveError={
+                  savedOutfitError?.action === "save"
+                    ? savedOutfitError.message
+                    : undefined
+                }
+                saveSuccess={saveSuccessFeedback}
+              />
+            ) : null}
 
-          {!isSessionLoading && isAuthenticated ? (
-            <SavedOutfitsSection
-              deletingSavedOutfitId={deletingSavedOutfitId}
-              error={
-                savedOutfitError?.action !== "save"
-                  ? savedOutfitError?.message
-                  : undefined
-              }
-              isLoading={isLoadingSavedOutfits}
-              locale={locale}
-              onDelete={removeSavedOutfit}
-              onPrepare={handlePrepareSavedOutfit}
-              onView={handleViewSavedOutfit}
-              savedOutfits={savedOutfits}
-            />
-          ) : null}
+            {!isSessionLoading && isAuthenticated ? (
+              <SavedOutfitsSection
+                deletingSavedOutfitId={deletingSavedOutfitId}
+                error={
+                  savedOutfitError?.action !== "save"
+                    ? savedOutfitError?.message
+                    : undefined
+                }
+                isLoading={isLoadingSavedOutfits}
+                onDelete={removeSavedOutfit}
+                onPrepare={handlePrepareSavedOutfit}
+                onView={handleViewSavedOutfit}
+                savedOutfits={savedOutfits}
+              />
+            ) : null}
           </aside>
         </div>
       </main>
       <OutfitPreparationDrawer
         isOpen={Boolean(preparation && isAuthenticated)}
-        locale={preparation?.locale || locale}
+        locale={uiLocale}
         onClose={closePreparation}
-        outfit={preparation?.outfit}
+        outfit={preparation}
       />
     </>
   );

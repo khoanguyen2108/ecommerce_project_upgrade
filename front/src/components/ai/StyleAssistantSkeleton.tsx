@@ -1,8 +1,12 @@
+"use client";
+
 import styles from "@/components/ai/StyleAssistant.module.css";
+import { useI18n } from "@/features/i18n/useI18n";
 
 export function StyleAssistantSkeleton() {
+  const { t } = useI18n();
   return (
-    <section aria-label="Generating your style edit" className={styles.skeletonCard} role="status">
+    <section aria-label={t("ai.generating")} className={styles.skeletonCard} role="status">
       <div className={styles.skeletonTopline}>
         <span className={`${styles.skeleton} ${styles.skeletonLabel}`} />
         <span className={`${styles.skeleton} ${styles.skeletonDot}`} />
@@ -22,7 +26,7 @@ export function StyleAssistantSkeleton() {
           </div>
         ))}
       </div>
-      <span className={styles.loadingCopy}>Building your Belikeme edit…</span>
+      <span className={styles.loadingCopy}>{t("ai.building")}</span>
     </section>
   );
 }

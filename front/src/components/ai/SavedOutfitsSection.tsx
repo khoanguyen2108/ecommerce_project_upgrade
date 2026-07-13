@@ -3,65 +3,35 @@
 import { ArrowRight, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import styles from "@/components/ai/StyleAssistant.module.css";
+import { formatPrice } from "@/features/catalog/format";
+import type { Locale } from "@/features/i18n/locale";
+import { translate } from "@/features/i18n/translations";
+import { useI18n } from "@/features/i18n/useI18n";
 import type {
   SavedOutfit,
   SavedOutfitItemSnapshot,
 } from "@/features/saved-outfits/types";
-import { formatPrice } from "@/features/catalog/format";
 
 interface SavedOutfitsSectionProps {
   deletingSavedOutfitId?: string;
   error?: string;
   isLoading: boolean;
-  locale: "vi" | "en";
   onDelete: (id: string) => Promise<boolean>;
   onPrepare: (savedOutfit: SavedOutfit) => void;
   onView: (savedOutfit: SavedOutfit) => void;
   savedOutfits: SavedOutfit[];
 }
 
-const SAVED_COPY = {
-  en: {
-    created: (value: string) => `Saved ${value}`,
-    delete: "Delete",
-    deleteAria: (summary: string) => `Delete saved outfit: ${summary}`,
-    deleteConfirm: "Delete this saved outfit?",
-    deleting: "Deleting",
-    empty: "You have not saved any outfits yet.",
-    heading: "Saved outfits",
-    itemCount: (count: number) => `${count} item${count === 1 ? "" : "s"}`,
-    loading: "Loading saved outfits…",
-    thumbnailAlt: (name: string) => `${name} in saved outfit`,
-    view: "View/Edit",
-    viewAria: (summary: string) => `View or edit saved outfit: ${summary}`,
-  },
-  vi: {
-    created: (value: string) => `Đã lưu ${value}`,
-    delete: "Xóa",
-    deleteAria: (summary: string) => `Xóa outfit đã lưu: ${summary}`,
-    deleteConfirm: "Xóa outfit đã lưu này?",
-    deleting: "Đang xóa",
-    empty: "Bạn chưa lưu outfit nào.",
-    heading: "Outfit đã lưu",
-    itemCount: (count: number) => `${count} món`,
-    loading: "Đang tải outfit đã lưu…",
-    thumbnailAlt: (name: string) => `${name} trong outfit đã lưu`,
-    view: "Xem/Chỉnh",
-    viewAria: (summary: string) => `Xem hoặc chỉnh outfit đã lưu: ${summary}`,
-  },
-} as const;
-
 export function SavedOutfitsSection({
   deletingSavedOutfitId,
   error,
   isLoading,
-  locale,
   onDelete,
   onPrepare,
   onView,
   savedOutfits,
 }: SavedOutfitsSectionProps) {
-  const copy = SAVED_COPY[locale];
+  const { locale, t } = useI18n();
 
   return (
     <section
@@ -71,7 +41,7 @@ export function SavedOutfitsSection({
     >
       <div className={styles.savedOutfitsHeading}>
         <div>
-          <h2 id="saved-outfits-heading">{copy.heading}</h2>
+          <h2 id="saved-outfits-heading">{t("ai.savedOutfits")}</h2>
         </div>
         {isLoading && savedOutfits.length > 0 ? (
           <Loader2 aria-hidden="true" className={styles.spinner} size={18} />
@@ -87,18 +57,21 @@ export function SavedOutfitsSection({
       {isLoading && savedOutfits.length === 0 ? (
         <p className={styles.savedOutfitsState} role="status">
           <Loader2 aria-hidden="true" className={styles.spinner} size={18} />
-          {copy.loading}
+          {t("ai.loadingSavedOutfits")}
         </p>
       ) : null}
 
       {!isLoading && !error && savedOutfits.length === 0 ? (
-        <p className={styles.savedOutfitsState}>{copy.empty}</p>
+        <p className={styles.savedOutfitsState}>{t("ai.noSavedOutfits")}</p>
       ) : null}
 
       {savedOutfits.length > 0 ? (
         <div className={styles.savedOutfitList}>
           {savedOutfits.map((savedOutfit) => {
             const isDeleting = deletingSavedOutfitId === savedOutfit.id;
+            const itemLabel = t(
+              savedOutfit.items.length === 1 ? "ai.item" : "ai.items",
+            );
 
             return (
               <article className={styles.savedOutfitCard} key={savedOutfit.id}>
@@ -115,59 +88,49 @@ export function SavedOutfitsSection({
                   <h3>{savedOutfit.summary}</h3>
                   <div className={styles.savedOutfitMeta}>
                     <strong>{formatPrice(savedOutfit.totalPriceSnapshot)}</strong>
-                    <span>{copy.itemCount(savedOutfit.items.length)}</span>
+                    <span>{savedOutfit.items.length} {itemLabel}</span>
                     <time dateTime={savedOutfit.createdAt}>
-                      {copy.created(formatSavedDate(savedOutfit.createdAt, locale))}
+                      {t("ai.saved")} {formatSavedDate(savedOutfit.createdAt, locale)}
                     </time>
                   </div>
                   <div className={styles.savedOutfitActions}>
                     <button
-                      aria-label={`${
-                        locale === "vi"
-                          ? "Tiếp tục với outfit đã lưu"
-                          : "Continue with saved outfit"
-                      }: ${savedOutfit.summary}`}
+                      aria-label={`${t("ai.continueSaved")}: ${savedOutfit.summary}`}
                       className={styles.savedOutfitPrepareButton}
                       disabled={isDeleting}
                       onClick={() => onPrepare(savedOutfit)}
                       type="button"
                     >
-                      {locale === "vi"
-                        ? "Tiếp tục với outfit đã lưu"
-                        : "Continue with saved outfit"}
+                      {t("ai.continueSaved")}
                       <ArrowRight aria-hidden="true" size={15} />
                     </button>
                     <button
-                      aria-label={copy.viewAria(savedOutfit.summary)}
+                      aria-label={`${t("ai.viewEdit")}: ${savedOutfit.summary}`}
                       className={styles.savedOutfitViewButton}
                       disabled={isDeleting}
                       onClick={() => onView(savedOutfit)}
                       type="button"
                     >
                       <Pencil aria-hidden="true" size={15} />
-                      {copy.view}
+                      {t("ai.viewEdit")}
                     </button>
                     <button
-                      aria-label={copy.deleteAria(savedOutfit.summary)}
+                      aria-label={`${t("ai.delete")}: ${savedOutfit.summary}`}
                       className={styles.savedOutfitDeleteButton}
                       disabled={Boolean(deletingSavedOutfitId)}
                       onClick={() => {
-                        if (window.confirm(copy.deleteConfirm)) {
+                        if (window.confirm(t("ai.deleteConfirm"))) {
                           void onDelete(savedOutfit.id);
                         }
                       }}
                       type="button"
                     >
                       {isDeleting ? (
-                        <Loader2
-                          aria-hidden="true"
-                          className={styles.spinner}
-                          size={15}
-                        />
+                        <Loader2 aria-hidden="true" className={styles.spinner} size={15} />
                       ) : (
                         <Trash2 aria-hidden="true" size={15} />
                       )}
-                      {isDeleting ? copy.deleting : copy.delete}
+                      {isDeleting ? t("ai.deleting") : t("ai.delete")}
                     </button>
                   </div>
                 </div>
@@ -180,23 +143,13 @@ export function SavedOutfitsSection({
   );
 }
 
-function SavedOutfitThumbnail({
-  item,
-  locale,
-}: {
-  item: SavedOutfitItemSnapshot;
-  locale: "vi" | "en";
-}) {
+function SavedOutfitThumbnail({ item, locale }: { item: SavedOutfitItemSnapshot; locale: Locale }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const copy = SAVED_COPY[locale];
+  const alt = `${item.productNameSnapshot} · ${translate(locale, "ai.savedOutfits")}`;
 
   if (!item.imageUrlSnapshot || imageFailed) {
     return (
-      <span
-        aria-label={copy.thumbnailAlt(item.productNameSnapshot)}
-        className={styles.savedOutfitThumbnailFallback}
-        role="img"
-      >
+      <span aria-label={alt} className={styles.savedOutfitThumbnailFallback} role="img">
         BELIKEME
       </span>
     );
@@ -204,7 +157,7 @@ function SavedOutfitThumbnail({
 
   return (
     <img
-      alt={copy.thumbnailAlt(item.productNameSnapshot)}
+      alt={alt}
       className={styles.savedOutfitThumbnail}
       loading="lazy"
       onError={() => setImageFailed(true)}
@@ -213,12 +166,9 @@ function SavedOutfitThumbnail({
   );
 }
 
-function formatSavedDate(value: string, locale: "vi" | "en") {
+function formatSavedDate(value: string, locale: Locale) {
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
+  if (Number.isNaN(date.getTime())) return value;
 
   return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
     dateStyle: "medium",

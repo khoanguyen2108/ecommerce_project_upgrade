@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatPrice } from "@/features/catalog/format";
 import { isImplicitAccessoryOption } from "@/features/catalog/sizes";
 import type { CartItem } from "@/features/cart/types";
+import { useI18n } from "@/features/i18n/useI18n";
 
 interface CartItemRowProps {
   isBusy: boolean;
@@ -20,6 +21,7 @@ export function CartItemRow({
   onRemove,
   onUpdate,
 }: CartItemRowProps) {
+  const { t } = useI18n();
   const [quantity, setQuantity] = useState(item.quantity);
   const maxQuantity = useMemo(
     () => Math.max(1, Math.min(99, item.availableStock)),
@@ -46,14 +48,14 @@ export function CartItemRow({
   return (
     <article className="cart-item-row">
       <Link
-        aria-label={`View ${item.product.name}`}
+        aria-label={`${t("product.view")}: ${item.product.name}`}
         className="cart-item-row__image"
         href={productHref}
       >
         {item.product.firstImageUrl ? (
           <img alt={item.product.name} loading="lazy" src={item.product.firstImageUrl} />
         ) : (
-          <span>No image available</span>
+          <span>{t("common.noImage")}</span>
         )}
       </Link>
 
@@ -70,16 +72,16 @@ export function CartItemRow({
         ) : null}
         <p className="cart-item-row__stock">
           {item.availableStock > 0
-            ? `${item.availableStock} in stock`
-            : "Out of stock"}
+            ? `${item.availableStock} ${t("product.inStock").toLocaleLowerCase()}`
+            : t("product.outOfStock")}
         </p>
       </div>
 
       <div className="cart-item-row__quantity">
-        <span>Quantity</span>
+        <span>{t("product.quantity")}</span>
         <div className="quantity-stepper">
           <button
-            aria-label={`Decrease ${item.product.name} quantity`}
+            aria-label={`${t("product.decreaseQuantity")}: ${item.product.name}`}
             disabled={isBusy || !canUpdate || quantity <= 1}
             onClick={() => handleQuantityChange(quantity - 1)}
             type="button"
@@ -87,7 +89,7 @@ export function CartItemRow({
             <Minus aria-hidden="true" size={16} />
           </button>
           <input
-            aria-label={`${item.product.name} quantity`}
+            aria-label={`${item.product.name}: ${t("product.quantity")}`}
             disabled={isBusy || !canUpdate}
             max={maxQuantity}
             min={1}
@@ -96,7 +98,7 @@ export function CartItemRow({
             value={quantity}
           />
           <button
-            aria-label={`Increase ${item.product.name} quantity`}
+            aria-label={`${t("product.increaseQuantity")}: ${item.product.name}`}
             disabled={isBusy || !canUpdate || quantity >= maxQuantity}
             onClick={() => handleQuantityChange(quantity + 1)}
             type="button"
@@ -110,26 +112,26 @@ export function CartItemRow({
           onClick={() => onUpdate(item.id, quantity)}
           type="button"
         >
-          Update
+          {t("cart.update")}
         </button>
       </div>
 
       <div className="cart-item-row__price">
-        <span>Unit price</span>
+        <span>{t("cart.unitPrice")}</span>
         <strong>{formatPrice(item.currentUnitPrice)}</strong>
       </div>
 
       <div className="cart-item-row__price">
-        <span>Line total</span>
+        <span>{t("cart.lineTotal")}</span>
         <strong>{formatPrice(item.currentLineTotal)}</strong>
       </div>
 
       <button
-        aria-label={`Remove ${item.product.name} from cart`}
+        aria-label={`${t("common.remove")}: ${item.product.name}`}
         className="icon-button cart-item-row__remove"
         disabled={isBusy}
         onClick={() => onRemove(item.id)}
-        title="Remove"
+        title={t("common.remove")}
         type="button"
       >
         <Trash2 aria-hidden="true" size={18} strokeWidth={1.9} />

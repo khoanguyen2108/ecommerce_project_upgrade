@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getCategories } from "@/features/catalog/api";
 import type { Category } from "@/features/catalog/types";
+import { useI18n } from "@/features/i18n/useI18n";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface CategoriesState {
@@ -14,6 +15,7 @@ interface CategoriesState {
 }
 
 export function CategoriesPage() {
+  const { t } = useI18n();
   const [requestKey, setRequestKey] = useState(0);
   const [state, setState] = useState<CategoriesState>({
     categories: [],
@@ -61,11 +63,11 @@ export function CategoriesPage() {
 
   return (
     <main className="categories-page">
-      <section aria-label="All categories">
+      <section aria-label={t("catalog.allCategories")}>
         {state.isLoading ? (
           <div
             aria-busy="true"
-            aria-label="Loading categories"
+            aria-label={t("catalog.loadingAllCategories")}
             className="categories-grid"
           >
             <CategoriesSkeleton count={8} />
@@ -76,8 +78,8 @@ export function CategoriesPage() {
           <div className="categories-state categories-state--error" role="alert">
             <AlertCircle aria-hidden="true" size={22} strokeWidth={1.7} />
             <div>
-              <p className="eyebrow">Unable to load categories</p>
-              <h2>Something interrupted the edit</h2>
+              <p className="eyebrow">{t("catalog.unableCategories")}</p>
+              <h2>{t("catalog.interrupted")}</h2>
               <p>{state.error}</p>
             </div>
             <button
@@ -85,16 +87,16 @@ export function CategoriesPage() {
               onClick={() => setRequestKey((current) => current + 1)}
               type="button"
             >
-              Retry
+              {t("common.retry")}
             </button>
           </div>
         ) : null}
 
         {!state.isLoading && !state.error && categories.length === 0 ? (
           <div className="categories-state" role="status">
-            <p className="eyebrow">Categories</p>
-            <h2>No categories found</h2>
-            <p>There are no active categories to browse right now.</p>
+            <p className="eyebrow">{t("nav.categories")}</p>
+            <h2>{t("catalog.noCategories")}</h2>
+            <p>{t("catalog.noCategoriesBody")}</p>
           </div>
         ) : null}
 
@@ -111,6 +113,7 @@ export function CategoriesPage() {
 }
 
 function CategoryCard({ category }: { category: Category }) {
+  const { t } = useI18n();
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = Boolean(category.imageUrl) && !imageFailed;
 
@@ -120,7 +123,7 @@ function CategoryCard({ category }: { category: Category }) {
         <div className="categories-card__media">
           {showImage ? (
             <img
-              alt={`${category.name} category`}
+              alt={`${category.name} · ${t("catalog.category")}`}
               className="categories-card__image"
               loading="lazy"
               onError={() => setImageFailed(true)}
@@ -132,7 +135,7 @@ function CategoryCard({ category }: { category: Category }) {
             </div>
           )}
           {category.isFeatured ? (
-            <span className="categories-card__badge">Featured</span>
+            <span className="categories-card__badge">{t("common.featured")}</span>
           ) : null}
         </div>
 

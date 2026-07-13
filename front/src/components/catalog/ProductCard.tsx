@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { formatPrice } from "@/features/catalog/format";
 import type { Product } from "@/features/catalog/types";
+import { useI18n } from "@/features/i18n/useI18n";
 
 interface ProductCardProps {
   product: Product;
@@ -11,6 +12,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, variant = "default" }: ProductCardProps) {
+  const { t } = useI18n();
   const imageUrl = product.imageUrls[0];
   const categories = product.categories?.length
     ? product.categories
@@ -23,16 +25,19 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
   );
   const availability =
     activeVariants.length === 0
-      ? "Availability pending"
+      ? t("product.availabilityPending")
       : availableStock > 0
-        ? "In stock"
-        : "Sold out";
+        ? t("product.inStock")
+        : t("product.soldOut");
 
   return (
     <article
       className={`product-card ${variant === "shop" ? "product-card--shop" : ""}`}
     >
-      <Link href={`/products/${product.slug}`} aria-label={`View ${product.name}`}>
+      <Link
+        href={`/products/${product.slug}`}
+        aria-label={`${t("product.view")}: ${product.name}`}
+      >
         <div className="product-card__image-wrap">
           {imageUrl && !imageFailed ? (
             <img
@@ -43,7 +48,7 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
               src={imageUrl}
             />
           ) : (
-            <div className="product-card__placeholder">No image available</div>
+            <div className="product-card__placeholder">{t("common.noImage")}</div>
           )}
         </div>
         <div className="product-card__body">

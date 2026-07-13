@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { KeyboardEvent } from "react";
 import { useEffect, useRef } from "react";
 import styles from "@/components/ai/StyleAssistant.module.css";
+import { useI18n } from "@/features/i18n/useI18n";
 
 interface StyleAssistantInputProps {
   isDisabled: boolean;
@@ -23,6 +24,7 @@ export function StyleAssistantInput({
   onSubmit,
   value,
 }: StyleAssistantInputProps) {
+  const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -62,22 +64,24 @@ export function StyleAssistantInput({
     >
       <div className={styles.inputHeading}>
         <div>
-          <h2>Tell us what you need</h2>
+          <h2>{t("ai.tellNeed")}</h2>
         </div>
       </div>
 
       {isLocked ? (
         <div className={styles.signInPrompt} role="note">
           <div>
-            <strong>Sign in to create your personal edit</strong>
-            <span>Your style request will be ready to use after you sign in.</span>
+            <strong>{t("ai.signInTitle")}</strong>
+            <span>{t("ai.signInBody")}</span>
           </div>
-          <Link href="/login?next=%2Fai%2Fstyle-assistant">Sign in to continue</Link>
+          <Link href="/login?next=%2Fai%2Fstyle-assistant">
+            {t("ai.signInContinue")}
+          </Link>
         </div>
       ) : null}
 
       <label className={styles.visuallyHidden} htmlFor="style-assistant-prompt">
-        Describe the outfit or style you want
+        {t("ai.describeLabel")}
       </label>
       <textarea
         aria-describedby="style-assistant-help"
@@ -87,13 +91,13 @@ export function StyleAssistantInput({
         maxLength={500}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Describe your style, occasion, color, or budget..."
+        placeholder={t("ai.placeholder")}
         ref={textareaRef}
         rows={3}
         value={value}
       />
       <span className={styles.visuallyHidden} id="style-assistant-help">
-        Maximum 500 characters. Press Enter to generate advice.
+        {t("ai.help")}
       </span>
 
       <div className={styles.inputFooter}>
@@ -106,11 +110,11 @@ export function StyleAssistantInput({
           {isLoading ? (
             <>
               <Loader2 aria-hidden="true" className={styles.spinner} size={18} />
-              Curating
+              {t("ai.curating")}
             </>
           ) : (
             <>
-              Generate Style
+              {t("ai.generate")}
               <ArrowUpRight aria-hidden="true" size={18} />
             </>
           )}

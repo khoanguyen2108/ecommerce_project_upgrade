@@ -10,6 +10,8 @@ import type {
   CreateSavedOutfitRequest,
   SavedOutfit,
 } from "@/features/saved-outfits/types";
+import type { Locale } from "@/features/i18n/locale";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 type SavedOutfitErrorAction = "list" | "save" | "delete";
@@ -21,25 +23,14 @@ interface SavedOutfitError {
 
 interface UseSavedOutfitsOptions {
   enabled: boolean;
-  locale: "vi" | "en";
+  locale: Locale;
 }
 
-const ERROR_COPY = {
-  en: {
-    auth: "Please sign in again to manage saved outfits.",
-    delete: "Could not delete this outfit.",
-    list: "Could not load saved outfits.",
-    save: "Could not save this outfit. Some products may be unavailable.",
-    saved: "Outfit saved.",
-  },
-  vi: {
-    auth: "Vui lòng đăng nhập lại để quản lý outfit đã lưu.",
-    delete: "Không thể xóa outfit này.",
-    list: "Không thể tải outfit đã lưu.",
-    save: "Không thể lưu outfit này. Một số sản phẩm có thể đã hết hàng.",
-    saved: "Đã lưu outfit.",
-  },
-} as const;
+const ERROR_KEYS: Record<SavedOutfitErrorAction, TranslationKey> = {
+  delete: "ai.saveDeleteError",
+  list: "ai.saveListError",
+  save: "ai.saveError",
+};
 
 export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
   const localeRef = useRef(locale);
@@ -48,10 +39,8 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
   const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
   const [isLoadingSavedOutfits, setIsLoadingSavedOutfits] = useState(false);
   const [isSavingOutfit, setIsSavingOutfit] = useState(false);
-  const [deletingSavedOutfitId, setDeletingSavedOutfitId] =
-    useState<string>();
-  const [savedOutfitError, setSavedOutfitError] =
-    useState<SavedOutfitError>();
+  const [deletingSavedOutfitId, setDeletingSavedOutfitId] = useState<string>();
+  const [savedOutfitError, setSavedOutfitError] = useState<SavedOutfitError>();
   const [saveSuccessFeedback, setSaveSuccessFeedback] = useState<string>();
 
   useEffect(() => {
@@ -73,32 +62,23 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
 
     let isActive = true;
     const controller = new AbortController();
-
     setIsLoadingSavedOutfits(true);
     setSavedOutfitError(undefined);
 
     void listSavedOutfits({ signal: controller.signal })
       .then(({ savedOutfits: nextSavedOutfits }) => {
-        if (isActive) {
-          setSavedOutfits(nextSavedOutfits);
-        }
+        if (isActive) setSavedOutfits(nextSavedOutfits);
       })
       .catch((error: unknown) => {
         if (isActive && !controller.signal.aborted) {
           setSavedOutfitError({
             action: "list",
-            message: getSavedOutfitErrorMessage(
-              error,
-              "list",
-              localeRef.current,
-            ),
+            message: getSavedOutfitErrorMessage(error, "list", localeRef.current),
           });
         }
       })
       .finally(() => {
-        if (isActive) {
-          setIsLoadingSavedOutfits(false);
-        }
+        if (isActive) setIsLoadingSavedOutfits(false);
       });
 
     return () => {
@@ -114,9 +94,7 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
 
   const saveOutfit = useCallback(
     async (request: CreateSavedOutfitRequest) => {
-      if (!enabled || isSavingRef.current) {
-        return undefined;
-      }
+      if (!enabled || isSavingRef.current) return undefined;
 
       isSavingRef.current = true;
       setIsSavingOutfit(true);
@@ -125,21 +103,21 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
 
       try {
         const { savedOutfit } = await createSavedOutfit(request);
-
         setSavedOutfits((current) => [
           savedOutfit,
           ...current.filter((item) => item.id !== savedOutfit.id),
         ]);
-        setSaveSuccessFeedback(ERROR_COPY[request.locale].saved);
+        setSaveSuccessFeedback(
+          translate(localeRef.current, "ai.saveSuccess"),
+        );
 
         try {
-          const { savedOutfits: refreshedSavedOutfits } =
-            await listSavedOutfits();
+          const { savedOutfits: refreshedSavedOutfits } = await listSavedOutfits();
           setSavedOutfits(refreshedSavedOutfits);
         } catch (error) {
           setSavedOutfitError({
             action: "list",
-            message: getSavedOutfitErrorMessage(error, "list", request.locale),
+            message: getSavedOutfitErrorMessage(error, "list", localeRef.current),
           });
         }
 
@@ -147,7 +125,7 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
       } catch (error) {
         setSavedOutfitError({
           action: "save",
-          message: getSavedOutfitErrorMessage(error, "save", request.locale),
+          message: getSavedOutfitErrorMessage(error, "save", localeRef.current),
         });
         return undefined;
       } finally {
@@ -160,9 +138,7 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
 
   const removeSavedOutfit = useCallback(
     async (id: string) => {
-      if (!enabled || deletingIdRef.current) {
-        return false;
-      }
+      if (!enabled || deletingIdRef.current) return false;
 
       deletingIdRef.current = id;
       setDeletingSavedOutfitId(id);
@@ -178,11 +154,7 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
       } catch (error) {
         setSavedOutfitError({
           action: "delete",
-          message: getSavedOutfitErrorMessage(
-            error,
-            "delete",
-            localeRef.current,
-          ),
+          message: getSavedOutfitErrorMessage(error, "delete", localeRef.current),
         });
         return false;
       } finally {
@@ -209,11 +181,10 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
 function getSavedOutfitErrorMessage(
   error: unknown,
   action: SavedOutfitErrorAction,
-  locale: "vi" | "en",
+  locale: Locale,
 ) {
   if (error instanceof ApiClientError && error.status === 401) {
-    return ERROR_COPY[locale].auth;
+    return translate(locale, "ai.saveAuthError");
   }
-
-  return ERROR_COPY[locale][action];
+  return translate(locale, ERROR_KEYS[action]);
 }
