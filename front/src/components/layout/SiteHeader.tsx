@@ -8,6 +8,7 @@ import {
   ShoppingBag,
   User,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
@@ -157,8 +158,20 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           })}
         </nav>
 
-        <Link className="brand-mark" href="/" aria-label="Belikeme home">
-          BELIKEME
+        <Link
+          className="brand-mark brand-mark--image"
+          href="/"
+          aria-label="Belikeme home"
+        >
+          <Image
+            alt=""
+            aria-hidden="true"
+            className="brand-mark__logo"
+            height={457}
+            priority
+            src="/images/brand/belikeme-logo.png"
+            width={1098}
+          />
         </Link>
 
         <div className="site-actions">
