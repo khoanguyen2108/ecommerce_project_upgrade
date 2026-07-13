@@ -68,10 +68,6 @@ export function BelikemeIntroPage() {
           >
             SHOP NOW
           </Link>
-          <p className={styles.helperText}>
-            <span className={styles.desktopOnly}>DRAG TO INTERACT</span>
-            <span className={styles.mobileOnly}>TOUCH AND DRAG</span>
-          </p>
         </div>
       </section>
     </main>

@@ -133,7 +133,7 @@ export function InteractiveLogoScene({
             </Html>
           }
         >
-          <Bounds fit clip observe margin={1.72}>
+          <Bounds fit clip observe margin={1.36}>
             <Center>
               <LogoModel
                 isInteracting={isInteracting}
