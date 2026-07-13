@@ -49,7 +49,7 @@
 .brandLogo {
   filter: invert(1) drop-shadow(0 16px 34px rgba(0, 0, 0, 0.7));
   height: auto;
-  width: clamp(118px, 10vw, 164px);
+  width: clamp(104px, 8vw, 140px);
 }
 
 .sceneShell {
@@ -61,20 +61,6 @@
   min-width: 0;
   position: relative;
   width: min(86vw, 840px);
-}
-
-.sceneShell::before {
-  background:
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
-  content: "";
-  height: 1px;
-  left: 10%;
-  opacity: 0.42;
-  pointer-events: none;
-  position: absolute;
-  right: 10%;
-  top: 4%;
 }
 
 .sceneShell::after {
@@ -218,17 +204,12 @@
   }
 
   .brandLogo {
-    width: 116px;
+    width: 104px;
   }
 
   .sceneShell {
     height: clamp(310px, 50svh, 430px);
     width: min(100%, 420px);
-  }
-
-  .sceneShell::before {
-    left: 4%;
-    right: 4%;
   }
 
   .sceneShell::after {
