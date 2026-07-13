@@ -117,6 +117,7 @@ interface ParsedRefinement {
   cheaper: boolean;
   legacyOptionReference: boolean;
   hasRefinementIntent: boolean;
+  addRoles: OutfitRole[];
   keepRoles: OutfitRole[];
   removeRoles: OutfitRole[];
   replaceRoles: OutfitRole[];
@@ -707,6 +708,7 @@ export class OutfitRecommendationService {
     const legacyOptionReference = Boolean(
       numberedOption || firstOptionReference || vagueOptionReference,
     );
+    const addRoles = new Set<OutfitRole>();
     const keepRoles = new Set<OutfitRole>();
     const replaceRoles = new Set<OutfitRole>();
     const removeRoles = new Set<OutfitRole>();
@@ -715,9 +717,10 @@ export class OutfitRecommendationService {
     const allMentionedRoles = this.findMentionedRoles(comparable);
     const actionMatches = [
       ...comparable.matchAll(
-        /\b(?:keep|giu(?: lai)?|change|replace|doi|thay(?: bang)?|remove|bo(?: bot)?|khong can|without|skip|no)\b/g,
+        /\b(?:add|include|them|keep|giu(?: lai)?|change|replace|doi|thay(?: bang)?|remove|bo(?: bot)?|khong can|without|skip|no)\b/g,
       ),
     ];
+    let hasAddKeyword = false;
     let hasKeepKeyword = false;
     let hasReplaceKeyword = false;
     let hasRemoveKeyword = false;
@@ -728,6 +731,13 @@ export class OutfitRecommendationService {
       const end = actionMatches[index + 1]?.index ?? comparable.length;
       const actionSegment = comparable.slice(start, end);
       const actionRoles = this.findMentionedRoles(actionSegment);
+
+      if (/^(?:add|include|them)$/.test(keyword)) {
+        hasAddKeyword = true;
+        for (const role of actionRoles) {
+          addRoles.add(role);
+        }
+      }
 
       if (/^(?:keep|giu(?: lai)?)$/.test(keyword)) {
         hasKeepKeyword = true;
@@ -751,6 +761,11 @@ export class OutfitRecommendationService {
       }
     }
 
+    if (hasAddKeyword && addRoles.size === 0) {
+      for (const role of allMentionedRoles) {
+        addRoles.add(role);
+      }
+    }
     if (hasKeepKeyword && keepRoles.size === 0) {
       for (const role of allMentionedRoles) {
         keepRoles.add(role);
@@ -791,24 +806,31 @@ export class OutfitRecommendationService {
       (requestBudget !== undefined &&
         (hasBudgetWording || legacyOptionReference));
     const hasRoleAction =
-      keepRoles.size > 0 || replaceRoles.size > 0 || removeRoles.size > 0;
+      addRoles.size > 0 ||
+      keepRoles.size > 0 ||
+      replaceRoles.size > 0 ||
+      removeRoles.size > 0;
     const hasRefinementIntent =
       hasRoleAction ||
       hasBudgetRefinement ||
       (legacyOptionReference &&
-        (hasKeepKeyword || hasReplaceKeyword || hasRemoveKeyword));
+        (hasAddKeyword || hasKeepKeyword || hasReplaceKeyword || hasRemoveKeyword));
     const requiresPreviousContext =
       legacyOptionReference ||
+      hasAddKeyword ||
       hasKeepKeyword ||
       hasReplaceKeyword;
     const targetRoles = [
+      ...addRoles,
       ...keepRoles,
       ...replaceRoles,
       ...removeRoles,
       ...replacementRoleBySource.values(),
     ].filter((role, index, roles) => roles.indexOf(role) === index);
     const action: StyleAdviceRefinementAction =
-      replaceRoles.size > 0
+      addRoles.size > 0
+        ? 'add'
+        : replaceRoles.size > 0
         ? 'replace'
         : removeRoles.size > 0
           ? 'remove'
@@ -823,6 +845,7 @@ export class OutfitRecommendationService {
       cheaper,
       legacyOptionReference,
       hasRefinementIntent,
+      addRoles: [...addRoles],
       keepRoles: [...keepRoles],
       removeRoles: [...removeRoles],
       replaceRoles: [...replaceRoles],
@@ -1049,6 +1072,27 @@ export class OutfitRecommendationService {
         excludedProductIds.add(removed.product.record.id);
       }
       selectedByRole.delete(role);
+    }
+
+    for (const role of parsed.addRoles) {
+      if (selectedByRole.has(role)) {
+        continue;
+      }
+
+      const added = this.selectReplacementProduct(
+        products,
+        role,
+        this.buildReplacementIntent(intent, currentIntent, [this.roleToCategoryTag(role)]),
+        selectedByRole,
+        excludedProductIds,
+      );
+
+      if (added) {
+        selectedByRole.set(role, added);
+        replacedProductIds.add(added.product.record.id);
+      } else {
+        warnings.push(this.buildReplacementUnavailableWarning(role, locale));
+      }
     }
 
     for (const sourceRole of parsed.replaceRoles) {
@@ -2190,42 +2234,68 @@ export class OutfitRecommendationService {
   ): OutfitRole | undefined {
     const text = this.normalizeComparable(`${name} ${slug}`);
     const hasCategory = (tag: string) => categoryTags.has(tag);
+    const hasBottomText =
+      /\b(?:bottoms?|pants?|trousers?|jeans?|denim|shorts?|skirts?|quan)\b/.test(
+        text,
+      );
+    const hasJacketText =
+      /\b(?:jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|biker)\b/.test(
+        text,
+      );
+    const hasShoesText = /\b(?:shoes?|sneakers?|boots?|loafers?|slippers?|giay)\b/.test(text);
+    const hasHandbagText = /\b(?:handbags?|bags?|totes?|crossbody|tui|xach)\b/.test(text);
+    const hasAccessoryText =
+      /\b(?:accessor(?:y|ies)|belts?|rings?|bracelets?|watches?|necklaces?|beanies?|sunglasses|phu kien)\b/.test(
+        text,
+      );
+
+    if (hasBottomText) {
+      return 'bottom';
+    }
+
+    if (hasJacketText) {
+      return 'jacket';
+    }
+
+    if (hasShoesText) {
+      return 'shoes';
+    }
+
+    if (hasHandbagText) {
+      return 'handbag';
+    }
+
+    if (hasAccessoryText) {
+      return 'accessory';
+    }
 
     if (
       hasCategory('bottoms') ||
-      /\b(?:bottoms?|pants?|trousers?|jeans?|denim|shorts?|skirts?|quan)\b/.test(
-        text,
-      )
+      hasCategory('bottom')
     ) {
       return 'bottom';
     }
 
     if (
       hasCategory('jacket') ||
-      hasCategory('outerwear') ||
-      /\b(?:jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|biker)\b/.test(
-        text,
-      )
+      hasCategory('outerwear')
     ) {
       return 'jacket';
     }
 
     if (
-      hasCategory('shoes') ||
-      /\b(?:shoes?|sneakers?|boots?|loafers?|slippers?|giay)\b/.test(text)
+      hasCategory('shoes')
     ) {
       return 'shoes';
     }
 
-    if (/\b(?:handbags?|bags?|totes?|crossbody|tui|xach)\b/.test(text)) {
+    if (hasCategory('handbag') || hasCategory('bags')) {
       return 'handbag';
     }
 
     if (
       hasCategory('accessories') ||
-      /\b(?:accessor(?:y|ies)|belts?|rings?|bracelets?|watches?|necklaces?|beanies?|sunglasses|phu kien)\b/.test(
-        text,
-      )
+      hasCategory('accessory')
     ) {
       return 'accessory';
     }

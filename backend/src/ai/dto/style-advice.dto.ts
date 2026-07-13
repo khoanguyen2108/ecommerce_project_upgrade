@@ -441,6 +441,7 @@ export class StyleAdviceCanonicalOutfitDto {
 }
 
 export const STYLE_ADVICE_REFINEMENT_ACTIONS = [
+  'add',
   'replace',
   'remove',
   'keep',

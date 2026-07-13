@@ -40,6 +40,14 @@ const PRODUCT_FIXTURES = [
   buildProduct('jacket-2', 'Midnight Rider Pants', 'midnight-rider-pants', 110_000, [
     'jacket', 'outerwear', 'bottom', 'pants', 'black', 'gothic', 'darkwear',
   ]),
+  buildProduct(
+    'jacket-3',
+    'Decayed Denim Jacket',
+    'decayed-denim-jacket',
+    90_000,
+    ['bottom', 'pants', 'jacket', 'outerwear', 'black', 'gothic', 'darkwear'],
+    { name: 'Bottoms', slug: 'bottoms' },
+  ),
   buildProduct('accessory-1', 'Silver Ring', 'silver-ring', 70_000, [
     'accessory', 'accessories', 'silver', 'silver_hardware', 'gothic', 'darkwear',
   ]),
@@ -212,6 +220,50 @@ async function run() {
   );
   report(bootsPrompt, bootsRefined);
 
+  const addJacketSource = await aiService.getStyleAdvice(
+    {
+      message: 'them ao khoac',
+      currentOutfit: {
+        items: [
+          { role: 'top', productId: 'top-2' },
+          { role: 'bottom', productId: 'bottom-2' },
+          { role: 'shoes', productId: 'shoes-2' },
+        ],
+        intent: previous.intent,
+        locale: 'vi',
+      },
+    },
+    { userId: 'v2-lite-add-jacket-refinement-smoke-user' },
+  );
+  const addJacketPrompt = 'them ao khoac';
+  verifyOutfitResponse(addJacketPrompt, addJacketSource);
+  check(addJacketSource.refinement?.action === 'add', addJacketPrompt, 'action was not add');
+  check(
+    addJacketSource.outfit?.items.length === 4,
+    addJacketPrompt,
+    `expected 4 items, got ${addJacketSource.outfit?.items.length}`,
+  );
+  for (const productId of ['top-2', 'bottom-2', 'shoes-2']) {
+    check(
+      addJacketSource.outfit?.items.some((item) => item.productId === productId) === true,
+      addJacketPrompt,
+      `${productId} was not kept while adding jacket`,
+    );
+  }
+  check(
+    addJacketSource.outfit?.items.filter((item) => item.role === 'jacket').length === 1,
+    addJacketPrompt,
+    'expected exactly one jacket role',
+  );
+  check(
+    addJacketSource.outfit?.items.some(
+      (item) => item.role === 'bottom' && item.productSlug.includes('jacket'),
+    ) === false,
+    addJacketPrompt,
+    'jacket-looking product was used as bottom',
+  );
+  report(addJacketPrompt, addJacketSource);
+
   const missingPrompt = '\u0111\u1ed5i qu\u1ea7n kh\u00e1c';
   const missing = await aiService.getStyleAdvice(
     { message: missingPrompt },
@@ -267,6 +319,17 @@ function verifyOutfitResponse(prompt: string, response: StyleAdviceResponseDto) 
     ),
     prompt,
     'bottom-looking product was returned outside the bottom role',
+  );
+  check(
+    items.every(
+      (item) =>
+        item.role === 'jacket' ||
+        !/\b(?:jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|biker)\b/.test(
+          item.productSlug.replace(/-/g, ' '),
+        ),
+    ),
+    prompt,
+    'jacket-looking product was returned outside the jacket role',
   );
   check(items.every((item) => item.variantRequired), prompt, 'variantRequired was not safe');
   check(
@@ -352,11 +415,12 @@ function buildProduct(
   slug: string,
   price: number,
   aiTags: string[],
+  category = { name: 'Catalog', slug: 'catalog' },
 ) {
   return {
     aiTags,
     basePrice: price,
-    category: { name: 'Catalog', slug: 'catalog' },
+    category,
     id,
     imageUrls: [`https://example.com/${slug}.jpg`],
     managedImages: [],

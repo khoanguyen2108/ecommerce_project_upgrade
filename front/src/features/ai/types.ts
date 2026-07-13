@@ -65,7 +65,7 @@ export interface StyleAdviceOutfit {
 
 export interface StyleAdviceRefinement {
   applied: boolean;
-  action?: "replace" | "remove" | "keep" | "budget" | "fresh";
+  action?: "add" | "replace" | "remove" | "keep" | "budget" | "fresh";
   targetRoles?: StyleAdviceOutfitProductRole[];
   keptProductIds?: string[];
   removedProductIds?: string[];
