@@ -11153,6 +11153,10 @@ img {
   z-index: 80;
 }
 
+body.outfit-preparation-drawer-active .customer-chat-widget {
+  z-index: 70;
+}
+
 .customer-chat-widget > * {
   pointer-events: auto;
 }

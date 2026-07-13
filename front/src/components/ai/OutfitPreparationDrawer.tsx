@@ -72,6 +72,8 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
+const PREPARATION_DRAWER_BODY_CLASS = "outfit-preparation-drawer-active";
+
 const DRAWER_COPY = {
   en: {
     basePrice: "Base price",
@@ -161,6 +163,18 @@ export function OutfitPreparationDrawer({
     setIsSubmitting(false);
     onCloseRef.current();
   }, []);
+
+  useEffect(() => {
+    if (!isOpen || !outfit) {
+      return;
+    }
+
+    document.body.classList.add(PREPARATION_DRAWER_BODY_CLASS);
+
+    return () => {
+      document.body.classList.remove(PREPARATION_DRAWER_BODY_CLASS);
+    };
+  }, [isOpen, outfit]);
 
   useEffect(() => {
     if (!isOpen || !outfit) {
