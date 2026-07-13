@@ -1,5 +1,5 @@
 .page {
-  background: #737373;
+  background: #6d6d6d;
   color: #f8f4ec;
   isolation: isolate;
   min-height: 100svh;
@@ -15,16 +15,16 @@
   background-image: url("/assets/landing/belikeme-landing-bg.png");
   background-position: center;
   background-size: cover;
-  filter: grayscale(1);
+  filter: grayscale(1) brightness(1.08) contrast(0.82);
   inset: 0;
   position: absolute;
-  opacity: 0;
+  opacity: 1;
   transform: scale(1.018);
   z-index: -3;
 }
 
 .overlay {
-  background: #737373;
+  background: rgba(109, 109, 109, 0.54);
   inset: 0;
   position: absolute;
   z-index: -2;
@@ -74,10 +74,10 @@
   align-items: center;
   color: #ffffff;
   display: inline-flex;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-family: Inter, Arial, Helvetica, sans-serif;
   font-size: clamp(0.62rem, 0.7vw, 0.72rem);
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
+  font-weight: 600;
   gap: 8px;
   line-height: 1;
   text-transform: uppercase;
@@ -143,9 +143,9 @@
   align-items: center;
   color: #ffffff;
   display: inline-flex;
-  font-family: Georgia, Cambria, "Times New Roman", serif;
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-family: Inter, Arial, Helvetica, sans-serif;
+  font-size: 0.76rem;
+  font-weight: 600;
   justify-content: center;
   line-height: 1;
   min-height: 44px;
