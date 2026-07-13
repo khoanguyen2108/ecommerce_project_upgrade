@@ -1,5 +1,5 @@
 .page {
-  background: #020202;
+  background: #737373;
   color: #f8f4ec;
   isolation: isolate;
   min-height: 100svh;
@@ -15,18 +15,16 @@
   background-image: url("/assets/landing/belikeme-landing-bg.png");
   background-position: center;
   background-size: cover;
-  filter: saturate(0.86) contrast(1.05);
+  filter: grayscale(1);
   inset: 0;
   position: absolute;
+  opacity: 0;
   transform: scale(1.018);
   z-index: -3;
 }
 
 .overlay {
-  background:
-    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.1), transparent 28%),
-    radial-gradient(circle at 50% 50%, transparent 0%, rgba(0, 0, 0, 0.36) 42%, rgba(0, 0, 0, 0.88) 100%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.48), rgba(0, 0, 0, 0.72));
+  background: #737373;
   inset: 0;
   position: absolute;
   z-index: -2;
@@ -74,11 +72,12 @@
 
 .vietnamTime {
   align-items: center;
-  color: rgba(248, 244, 236, 0.72);
+  color: #ffffff;
   display: inline-flex;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   font-size: clamp(0.62rem, 0.7vw, 0.72rem);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 650;
   gap: 8px;
   line-height: 1;
   text-transform: uppercase;
@@ -86,7 +85,7 @@
 }
 
 .timeSeparator {
-  color: rgba(248, 244, 236, 0.42);
+  color: rgba(255, 255, 255, 0.76);
 }
 
 .sceneShell {
@@ -142,10 +141,11 @@
 
 .shopButton {
   align-items: center;
-  color: rgba(248, 244, 236, 0.72);
+  color: #ffffff;
   display: inline-flex;
-  font-size: 0.72rem;
-  font-weight: 800;
+  font-family: Georgia, Cambria, "Times New Roman", serif;
+  font-size: 0.82rem;
+  font-weight: 700;
   justify-content: center;
   line-height: 1;
   min-height: 44px;

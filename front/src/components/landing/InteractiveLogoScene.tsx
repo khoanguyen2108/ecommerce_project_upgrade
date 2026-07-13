@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Group } from "three";
+import { MathUtils, type Group } from "three";
 import styles from "./BelikemeIntroPage.module.css";
 
 const FRONT_FACING_MODEL_ROTATION: [number, number, number] = [0, 0, 0];
@@ -133,7 +133,7 @@ export function InteractiveLogoScene({
             </Html>
           }
         >
-          <Bounds fit clip observe margin={1.36}>
+          <Bounds fit clip observe margin={1.16}>
             <Center>
               <LogoModel
                 isInteracting={isInteracting}
@@ -163,7 +163,7 @@ function LogoModel({
   const groupRef = useRef<Group>(null);
   const { scene } = useGLTF(modelSrc);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const group = groupRef.current;
 
     if (!group) {
@@ -179,8 +179,18 @@ function LogoModel({
         ? Math.sin(clock.elapsedTime * 0.32) * 0.1
         : 0;
 
-    group.rotation.x = manualRotationRef.current.x + idleRotationX;
-    group.rotation.y = manualRotationRef.current.y + idleRotationY;
+    group.rotation.x = MathUtils.damp(
+      group.rotation.x,
+      manualRotationRef.current.x + idleRotationX,
+      14,
+      delta,
+    );
+    group.rotation.y = MathUtils.damp(
+      group.rotation.y,
+      manualRotationRef.current.y + idleRotationY,
+      14,
+      delta,
+    );
   });
 
   return (
