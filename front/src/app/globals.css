@@ -202,10 +202,11 @@ img {
 }
 
 .site-nav a {
-  font-family: Montserrat, Inter, sans-serif;
+  font-family: Inter, sans-serif;
   font-size: clamp(0.88rem, 0.82vw, 0.96rem);
-  font-weight: 720;
+  font-weight: 650;
   line-height: 1;
+  text-transform: none;
 }
 
 .text-link::after {
@@ -315,13 +316,13 @@ img {
   color: var(--color-text);
   display: flex;
   flex: 0 0 auto;
-  font-family: Montserrat, Inter, sans-serif;
+  font-family: Inter, sans-serif;
   font-size: 0.92rem;
-  font-weight: 720;
+  font-weight: 650;
   min-height: 64px;
   position: relative;
   text-decoration: none;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 
