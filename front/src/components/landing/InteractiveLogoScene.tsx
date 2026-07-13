@@ -15,6 +15,7 @@ import { MathUtils, type Group } from "three";
 import styles from "./BelikemeIntroPage.module.css";
 
 const FRONT_FACING_MODEL_ROTATION: [number, number, number] = [0, 0, 0];
+const CONTINUOUS_ROTATION_SPEED = 0.58;
 const HORIZONTAL_DRAG_SPEED = 0.006;
 const MAX_VERTICAL_ROTATION = Math.PI / 9;
 const VERTICAL_DRAG_SPEED = 0.004;
@@ -133,10 +134,9 @@ export function InteractiveLogoScene({
             </Html>
           }
         >
-          <Bounds fit clip observe margin={1.16}>
+          <Bounds fit clip observe margin={1.05}>
             <Center>
               <LogoModel
-                isInteracting={isInteracting}
                 manualRotationRef={manualRotationRef}
                 modelSrc={modelSrc}
                 prefersReducedMotion={prefersReducedMotion}
@@ -150,12 +150,10 @@ export function InteractiveLogoScene({
 }
 
 function LogoModel({
-  isInteracting,
   manualRotationRef,
   modelSrc,
   prefersReducedMotion,
 }: {
-  isInteracting: boolean;
   manualRotationRef: MutableRefObject<ManualRotation>;
   modelSrc: string;
   prefersReducedMotion: boolean;
@@ -170,14 +168,12 @@ function LogoModel({
       return;
     }
 
-    const idleRotationX =
-      !isInteracting && !prefersReducedMotion
-        ? Math.sin(clock.elapsedTime * 0.24) * 0.018
-        : 0;
-    const idleRotationY =
-      !isInteracting && !prefersReducedMotion
-        ? Math.sin(clock.elapsedTime * 0.32) * 0.1
-        : 0;
+    const idleRotationX = prefersReducedMotion
+      ? 0
+      : Math.sin(clock.elapsedTime * 0.24) * 0.018;
+    const continuousRotationY = prefersReducedMotion
+      ? 0
+      : clock.elapsedTime * CONTINUOUS_ROTATION_SPEED;
 
     group.rotation.x = MathUtils.damp(
       group.rotation.x,
@@ -187,7 +183,7 @@ function LogoModel({
     );
     group.rotation.y = MathUtils.damp(
       group.rotation.y,
-      manualRotationRef.current.y + idleRotationY,
+      manualRotationRef.current.y + continuousRotationY,
       14,
       delta,
     );
