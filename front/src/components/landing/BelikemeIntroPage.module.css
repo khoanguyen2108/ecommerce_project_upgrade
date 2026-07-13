@@ -1,5 +1,5 @@
 .page {
-  background: #6d6d6d;
+  background: #5d5d5d;
   color: #f8f4ec;
   isolation: isolate;
   min-height: 100svh;
@@ -24,7 +24,7 @@
 }
 
 .overlay {
-  background: rgba(109, 109, 109, 0.54);
+  background: rgba(78, 78, 78, 0.62);
   inset: 0;
   position: absolute;
   z-index: -2;
