@@ -4,10 +4,11 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Component, type ReactNode, useEffect } from "react";
 import styles from "./BelikemeIntroPage.module.css";
+import { markBelikemeIntroSeen } from "./IntroGate";
 
 const LANDING_LOGO_SRC = "/assets/landing/belikeme-logo.png";
 const LANDING_MODEL_SRC = "/assets/landing/belikeme-logo-3d.glb";
-const SHOP_HREF = "/products";
+const SHOP_HREF = "/";
 
 const InteractiveLogoScene = dynamic(
   () =>
@@ -60,7 +61,11 @@ export function BelikemeIntroPage() {
           <h1 className={styles.srOnly} id="belikeme-intro-title">
             BELIKEME cinematic logo intro
           </h1>
-          <Link className={styles.shopButton} href={SHOP_HREF}>
+          <Link
+            className={styles.shopButton}
+            href={SHOP_HREF}
+            onClick={markBelikemeIntroSeen}
+          >
             SHOP NOW
           </Link>
           <p className={styles.helperText}>

@@ -1,10 +1,36 @@
 "use client";
 
-import { Bounds, Center, Html, OrbitControls, useGLTF } from "@react-three/drei";
+import { Bounds, Center, Html, useGLTF } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Suspense, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  type MutableRefObject,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { Group } from "three";
 import styles from "./BelikemeIntroPage.module.css";
+
+const FRONT_FACING_MODEL_ROTATION: [number, number, number] = [0, 0, 0];
+const HORIZONTAL_DRAG_SPEED = 0.006;
+const MAX_VERTICAL_ROTATION = Math.PI / 9;
+const VERTICAL_DRAG_SPEED = 0.004;
+
+interface ManualRotation {
+  x: number;
+  y: number;
+}
+
+interface PointerDragState {
+  pointerId: number;
+  startRotationX: number;
+  startRotationY: number;
+  startX: number;
+  startY: number;
+}
 
 interface InteractiveLogoSceneProps {
   fallback: ReactNode;
@@ -17,12 +43,70 @@ export function InteractiveLogoScene({
 }: InteractiveLogoSceneProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [isInteracting, setIsInteracting] = useState(false);
+  const dragStateRef = useRef<PointerDragState | null>(null);
+  const manualRotationRef = useRef<ManualRotation>({ x: 0, y: 0 });
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.isPrimary || event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startRotationX: manualRotationRef.current.x,
+      startRotationY: manualRotationRef.current.y,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    setIsInteracting(true);
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const dragState = dragStateRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    manualRotationRef.current.y =
+      dragState.startRotationY +
+      (event.clientX - dragState.startX) * HORIZONTAL_DRAG_SPEED;
+    manualRotationRef.current.x = clamp(
+      dragState.startRotationX +
+        (event.clientY - dragState.startY) * VERTICAL_DRAG_SPEED,
+      -MAX_VERTICAL_ROTATION,
+      MAX_VERTICAL_ROTATION,
+    );
+  }
+
+  function handlePointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    const dragState = dragStateRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    dragStateRef.current = null;
+    setIsInteracting(false);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
 
   return (
     <div
       className={`${styles.logoScene} ${
         isInteracting ? styles.logoSceneInteracting : ""
       }`}
+      onLostPointerCapture={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
     >
       <Canvas
         aria-label="Interactive 3D BELIKEME logo"
@@ -53,24 +137,13 @@ export function InteractiveLogoScene({
             <Center>
               <LogoModel
                 isInteracting={isInteracting}
+                manualRotationRef={manualRotationRef}
                 modelSrc={modelSrc}
                 prefersReducedMotion={prefersReducedMotion}
               />
             </Center>
           </Bounds>
         </Suspense>
-
-        <OrbitControls
-          dampingFactor={0.08}
-          enableDamping
-          enablePan={false}
-          enableZoom={false}
-          maxPolarAngle={Math.PI / 1.65}
-          minPolarAngle={Math.PI / 2.35}
-          onEnd={() => setIsInteracting(false)}
-          onStart={() => setIsInteracting(true)}
-          rotateSpeed={0.62}
-        />
       </Canvas>
     </div>
   );
@@ -78,33 +151,47 @@ export function InteractiveLogoScene({
 
 function LogoModel({
   isInteracting,
+  manualRotationRef,
   modelSrc,
   prefersReducedMotion,
 }: {
   isInteracting: boolean;
+  manualRotationRef: MutableRefObject<ManualRotation>;
   modelSrc: string;
   prefersReducedMotion: boolean;
 }) {
   const groupRef = useRef<Group>(null);
   const { scene } = useGLTF(modelSrc);
 
-  useFrame(({ clock }, delta) => {
+  useFrame(({ clock }) => {
     const group = groupRef.current;
 
-    if (!group || prefersReducedMotion) {
+    if (!group) {
       return;
     }
 
-    const idleSpeed = isInteracting ? 0.035 : 0.22;
-    group.rotation.y += delta * idleSpeed;
-    group.rotation.x = Math.sin(clock.elapsedTime * 0.35) * 0.025;
+    const idleRotationX =
+      !isInteracting && !prefersReducedMotion
+        ? Math.sin(clock.elapsedTime * 0.24) * 0.018
+        : 0;
+    const idleRotationY =
+      !isInteracting && !prefersReducedMotion
+        ? Math.sin(clock.elapsedTime * 0.32) * 0.1
+        : 0;
+
+    group.rotation.x = manualRotationRef.current.x + idleRotationX;
+    group.rotation.y = manualRotationRef.current.y + idleRotationY;
   });
 
   return (
-    <group ref={groupRef} rotation={[0, Math.PI, Math.PI]}>
+    <group ref={groupRef} rotation={FRONT_FACING_MODEL_ROTATION}>
       <primitive object={scene} />
     </group>
   );
+}
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(value, minimum), maximum);
 }
 
 function usePrefersReducedMotion() {
