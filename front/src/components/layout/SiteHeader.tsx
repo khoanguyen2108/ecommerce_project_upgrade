@@ -264,23 +264,25 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           id={mobileMenuId}
         >
           <LanguageSwitcher className="language-switcher--mobile" />
-          {primaryNavItems.map((item) => {
-            const isActive = Boolean(item.active && active === item.active);
+          <div className="site-mobile-dropdown__links">
+            {primaryNavItems.map((item) => {
+              const isActive = Boolean(item.active && active === item.active);
 
-            return (
-              <Link
-                aria-current={isActive ? "page" : undefined}
-                className={`site-mobile-dropdown__link${
-                  isActive ? " is-active" : ""
-                }`}
-                href={item.href}
-                key={item.href}
-                onClick={closeMobileMenu}
-              >
-                {t(item.labelKey)}
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  aria-current={isActive ? "page" : undefined}
+                  className={`site-mobile-dropdown__link${
+                    isActive ? " is-active" : ""
+                  }`}
+                  href={item.href}
+                  key={item.href}
+                  onClick={closeMobileMenu}
+                >
+                  {t(item.labelKey)}
+                </Link>
+              );
+            })}
+          </div>
         </nav>
       ) : null}
     </header>
