@@ -17,6 +17,21 @@ const LANDING_LOGO_SRC = "/assets/landing/belikeme-logo.png";
 const LANDING_MODEL_SRC = "/assets/landing/belikeme-logo-3d.glb";
 const SHOP_HREF = "/";
 const INTRO_EXIT_DURATION_MS = 520;
+const VIETNAM_TIME_ZONE = "Asia/Ho_Chi_Minh";
+const vietnamTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  hour12: false,
+  minute: "2-digit",
+  second: "2-digit",
+  timeZone: VIETNAM_TIME_ZONE,
+});
+const vietnamDateFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  month: "short",
+  timeZone: VIETNAM_TIME_ZONE,
+  weekday: "short",
+  year: "numeric",
+});
 
 const InteractiveLogoScene = dynamic(
   () =>
@@ -98,6 +113,7 @@ export function BelikemeIntroPage() {
             className={styles.brandLogo}
             src={LANDING_LOGO_SRC}
           />
+          <VietnamTime />
         </div>
 
         <div
@@ -129,6 +145,44 @@ export function BelikemeIntroPage() {
       </section>
     </main>
   );
+}
+
+function VietnamTime() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const updateTime = () => {
+      setNow(new Date());
+    };
+
+    updateTime();
+    const timeInterval = window.setInterval(updateTime, 1_000);
+
+    return () => {
+      window.clearInterval(timeInterval);
+    };
+  }, []);
+
+  const date = now ? formatVietnamDate(now) : "---";
+  const time = now ? vietnamTimeFormatter.format(now) : "--:--:--";
+
+  return (
+    <time className={styles.vietnamTime} dateTime={now?.toISOString()}>
+      <span>{date}</span>
+      <span aria-hidden="true" className={styles.timeSeparator}>
+        ·
+      </span>
+      <span>{time} ICT</span>
+    </time>
+  );
+}
+
+function formatVietnamDate(date: Date) {
+  const dateParts = vietnamDateFormatter.formatToParts(date);
+  const partValue = (type: Intl.DateTimeFormatPartTypes) =>
+    dateParts.find((part) => part.type === type)?.value ?? "";
+
+  return `${partValue("weekday")}, ${partValue("day")} ${partValue("month")} ${partValue("year")}`;
 }
 
 function LogoFallback({ label }: { label: string }) {

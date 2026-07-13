@@ -53,14 +53,16 @@
   justify-items: center;
   min-height: 100svh;
   padding: clamp(20px, 3vw, 34px) clamp(18px, 4vw, 52px)
-    clamp(28px, 5vw, 58px);
+    clamp(22px, 3.5vw, 44px);
 }
 
 .brandSlot {
   align-items: center;
   display: flex;
+  flex-direction: column;
+  gap: 28px;
   justify-content: center;
-  min-height: clamp(58px, 8svh, 84px);
+  min-height: clamp(112px, 14svh, 144px);
   width: 100%;
 }
 
@@ -68,6 +70,23 @@
   filter: invert(1) drop-shadow(0 16px 34px rgba(0, 0, 0, 0.7));
   height: auto;
   width: clamp(104px, 8vw, 140px);
+}
+
+.vietnamTime {
+  align-items: center;
+  color: rgba(248, 244, 236, 0.72);
+  display: inline-flex;
+  font-size: clamp(0.62rem, 0.7vw, 0.72rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  gap: 8px;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.timeSeparator {
+  color: rgba(248, 244, 236, 0.42);
 }
 
 .sceneShell {
@@ -227,15 +246,21 @@
 @media (max-width: 640px) {
   .stage {
     grid-template-rows: auto minmax(300px, 1fr) auto;
-    padding: 18px 16px 34px;
+    padding: 18px 16px 28px;
   }
 
   .brandSlot {
-    min-height: 62px;
+    gap: 20px;
+    min-height: 108px;
   }
 
   .brandLogo {
     width: 104px;
+  }
+
+  .vietnamTime {
+    font-size: 0.62rem;
+    gap: 6px;
   }
 
   .sceneShell {
