@@ -3,6 +3,7 @@ import { AiScopeService } from '../src/ai/ai-scope.service';
 import { AiService } from '../src/ai/ai.service';
 import {
   type StyleAdviceRequestDto,
+  type StyleAdviceOutfitProductRole,
   type StyleAdviceResponseDto,
 } from '../src/ai/dto/style-advice.dto';
 import { OutfitRecommendationService } from '../src/ai/outfit-recommendation.service';
@@ -43,6 +44,9 @@ const PRODUCT_FIXTURES = [
   buildProduct('jacket-1', 'Black Gothic Jacket', 'black-gothic-jacket', 180_000, [
     'jacket', 'outerwear', 'black', 'gothic', 'darkwear',
   ]),
+  buildProduct('jacket-4', 'Washed Cropped Jacket', 'washed-cropped-jacket', 175_000, [
+    'jacket', 'outerwear', 'washed_black', 'streetwear', 'gothic', 'darkwear',
+  ]),
   buildProduct('jacket-2', 'Midnight Rider Pants', 'midnight-rider-pants', 110_000, [
     'jacket', 'outerwear', 'bottom', 'pants', 'black', 'gothic', 'darkwear',
   ]),
@@ -56,6 +60,9 @@ const PRODUCT_FIXTURES = [
   ),
   buildProduct('accessory-1', 'Silver Ring', 'silver-ring', 70_000, [
     'accessory', 'accessories', 'silver', 'silver_hardware', 'gothic', 'darkwear',
+  ]),
+  buildProduct('accessory-2', 'Black Chain Necklace', 'black-chain-necklace', 85_000, [
+    'accessory', 'accessories', 'necklace', 'black', 'gothic', 'darkwear',
   ]),
 ] as const;
 
@@ -303,6 +310,47 @@ async function run() {
     targetRole: 'shoes',
   });
 
+  await verifyGenericReplacement({
+    prompt: 'doi ao khac',
+    targetRole: 'top',
+  });
+  await verifyGenericReplacement({
+    prompt: 'change the top to another one',
+    targetRole: 'top',
+  });
+  await verifyGenericReplacement({
+    prompt: 'doi quan khac',
+    targetRole: 'bottom',
+  });
+  await verifyGenericReplacement({
+    prompt: 'change the pants to another pair',
+    targetRole: 'bottom',
+  });
+  await verifyGenericReplacement({
+    prompt: 'doi ao khoac khac',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
+    prompt: 'switch the jacket to a different one',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
+    prompt: 'doi giay khac',
+    targetRole: 'shoes',
+  });
+  await verifyGenericReplacement({
+    prompt: 'swap the shoes for another pair',
+    targetRole: 'shoes',
+  });
+  await verifyGenericReplacement({
+    prompt: 'doi phu kien khac',
+    targetRole: 'accessory',
+  });
+  await verifyGenericReplacement({
+    prompt: 'change the accessory to a different one',
+    targetRole: 'accessory',
+  });
+
   const missingPrompt = '\u0111\u1ed5i qu\u1ea7n kh\u00e1c';
   const missing = await aiService.getStyleAdvice(
     { message: missingPrompt },
@@ -384,6 +432,66 @@ async function verifyTargetedReplacement({
     ) === true,
     prompt,
     `${expectedProductSlugIncludes} was not prioritized for ${targetRole}`,
+  );
+
+  for (const sourceItem of sourceItems) {
+    if (sourceItem.role === targetRole) continue;
+    check(
+      response.outfit?.items.some((item) => item.productId === sourceItem.productId) === true,
+      prompt,
+      `non-target ${sourceItem.role} was not kept`,
+    );
+  }
+
+  report(prompt, response);
+}
+
+async function verifyGenericReplacement({
+  prompt,
+  targetRole,
+}: {
+  prompt: string;
+  targetRole: Exclude<StyleAdviceOutfitProductRole, 'handbag'>;
+}) {
+  const sourceItems: NonNullable<StyleAdviceRequestDto['currentOutfit']>['items'] = [
+    { role: 'top', productId: 'top-2' },
+    { role: 'bottom', productId: 'bottom-2' },
+    { role: 'shoes', productId: 'shoes-1' },
+    { role: 'jacket', productId: 'jacket-1' },
+    { role: 'accessory', productId: 'accessory-1' },
+  ];
+  const oldProductId = sourceItems.find((item) => item.role === targetRole)?.productId;
+  const response = await aiService.getStyleAdvice(
+    {
+      message: prompt,
+      currentOutfit: {
+        items: sourceItems,
+        intent: {
+          categories: ['tee', 'bottoms', 'shoes', 'jacket', 'accessories'],
+          colors: ['black'],
+          styles: ['streetwear'],
+          occasions: [],
+          fits: [],
+          negativeConstraints: [],
+        },
+        locale: prompt.includes('the ') ? 'en' : 'vi',
+      },
+    },
+    { userId: `v2-lite-${targetRole}-generic-replacement-smoke-user` },
+  );
+
+  verifyOutfitResponse(prompt, response);
+  check(response.refinement?.action === 'replace', prompt, 'action was not replace');
+  check(
+    response.refinement?.targetRoles?.includes(targetRole) === true,
+    prompt,
+    `${targetRole} was not a target role`,
+  );
+  check(
+    oldProductId !== undefined &&
+      response.outfit?.items.every((item) => item.productId !== oldProductId) === true,
+    prompt,
+    `old ${targetRole} was not excluded`,
   );
 
   for (const sourceItem of sourceItems) {

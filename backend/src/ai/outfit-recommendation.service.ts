@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   NormalizedStyleAdviceRequest,
@@ -122,6 +123,7 @@ interface ParsedRefinement {
   removeRoles: OutfitRole[];
   replaceRoles: OutfitRole[];
   replacementRoleBySource: Map<OutfitRole, OutfitRole>;
+  replacementShuffleRoles: OutfitRole[];
   replacementTags: Map<OutfitRole, string[]>;
   requiresPreviousContext: boolean;
   targetRoles: OutfitRole[];
@@ -713,11 +715,12 @@ export class OutfitRecommendationService {
     const replaceRoles = new Set<OutfitRole>();
     const removeRoles = new Set<OutfitRole>();
     const replacementRoleBySource = new Map<OutfitRole, OutfitRole>();
+    const replacementShuffleRoles = new Set<OutfitRole>();
     const replacementTags = new Map<OutfitRole, string[]>();
     const allMentionedRoles = this.findMentionedRoles(comparable);
     const actionMatches = [
       ...comparable.matchAll(
-        /\b(?:add|include|them|keep|giu(?: lai)?|change|replace|doi|thay(?: bang)?|remove|bo(?: bot)?|khong can|without|skip|no)\b/g,
+        /\b(?:add|include|them|keep|giu(?: lai)?|change|replace|switch|swap|doi|thay(?: bang)?|remove|bo(?: bot)?|khong can|without|skip|no)\b/g,
       ),
     ];
     let hasAddKeyword = false;
@@ -746,7 +749,7 @@ export class OutfitRecommendationService {
         }
       }
 
-      if (/^(?:change|replace|doi|thay(?: bang)?)$/.test(keyword)) {
+      if (/^(?:change|replace|switch|swap|doi|thay(?: bang)?)$/.test(keyword)) {
         hasReplaceKeyword = true;
         for (const role of actionRoles) {
           replaceRoles.add(role);
@@ -828,6 +831,19 @@ export class OutfitRecommendationService {
       replaceRoles.add('shoes');
     }
 
+    if (
+      hasReplaceKeyword &&
+      /\b(?:khac|different|another|other|new(?: one)?|something else|else|random|shuffle)\b/.test(
+        comparable,
+      )
+    ) {
+      for (const role of replaceRoles) {
+        if ((replacementTags.get(role) ?? []).length === 0) {
+          replacementShuffleRoles.add(role);
+        }
+      }
+    }
+
     const cheaper = /\b(?:cheaper|less expensive|re hon)\b/.test(comparable);
     const hasBudgetWording =
       /\b(?:under|below|duoi|tam|budget|ngan sach)\b/.test(comparable);
@@ -880,6 +896,7 @@ export class OutfitRecommendationService {
       removeRoles: [...removeRoles],
       replaceRoles: [...replaceRoles],
       replacementRoleBySource,
+      replacementShuffleRoles: [...replacementShuffleRoles],
       replacementTags,
       requiresPreviousContext,
       targetRoles,
@@ -1158,6 +1175,7 @@ export class OutfitRecommendationService {
         selectedByRole,
         excludedProductIds,
         preferredTags,
+        parsed.replacementShuffleRoles.includes(targetRole),
       );
 
       if (replacement) {
@@ -1301,6 +1319,7 @@ export class OutfitRecommendationService {
     selectedByRole: Map<OutfitRole, ScoredProduct>,
     excludedProductIds: Set<string>,
     preferredTags: string[] = [],
+    shuffle = false,
   ): ScoredProduct | undefined {
     const selectedIds = new Set(
       [...selectedByRole.values()].map((product) => product.product.record.id),
@@ -1319,7 +1338,14 @@ export class OutfitRecommendationService {
             ),
           );
 
-    return (preferredCandidates.length > 0 ? preferredCandidates : candidates)[0];
+    const eligibleCandidates =
+      preferredCandidates.length > 0 ? preferredCandidates : candidates;
+
+    if (!shuffle || eligibleCandidates.length <= 1) {
+      return eligibleCandidates[0];
+    }
+
+    return eligibleCandidates[randomInt(eligibleCandidates.length)];
   }
 
   private applyRefinementBudget(
