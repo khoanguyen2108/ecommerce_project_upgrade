@@ -793,6 +793,36 @@ export class OutfitRecommendationService {
       replacementRoleBySource.set('accessory', 'handbag');
     }
 
+    if (
+      hasReplaceKeyword &&
+      allMentionedRoles.includes('top') &&
+      /\b(?:tank(?: top)?|sleeveless|ao ba lo|ao tank|ba lo)\b/.test(comparable)
+    ) {
+      replacementTags.set('top', ['tank_top', 'tank']);
+      replaceRoles.add('top');
+    }
+
+    if (
+      hasReplaceKeyword &&
+      allMentionedRoles.includes('bottom') &&
+      /\b(?:flared|loe|ong loe)\b/.test(comparable)
+    ) {
+      replacementTags.set('bottom', ['flared']);
+      replaceRoles.add('bottom');
+    }
+
+    if (
+      hasReplaceKeyword &&
+      allMentionedRoles.includes('bottom') &&
+      /\b(?:wide leg|wide-leg|ong rong)\b/.test(comparable)
+    ) {
+      replacementTags.set('bottom', [
+        ...(replacementTags.get('bottom') ?? []),
+        'wide_leg',
+      ]);
+      replaceRoles.add('bottom');
+    }
+
     if (hasReplaceKeyword && /\bboots?\b/.test(comparable)) {
       replacementTags.set('shoes', ['boots']);
       replaceRoles.add('shoes');
@@ -887,6 +917,12 @@ export class OutfitRecommendationService {
       !/\bao khoac\b/.test(comparable)
     ) {
       roles.add('top');
+    }
+    if (/\b(?:tank(?: top)?|sleeveless|ba lo)\b/.test(comparable)) {
+      roles.add('top');
+    }
+    if (/\b(?:flared|wide leg|wide-leg|ong loe|ong rong)\b/.test(comparable)) {
+      roles.add('bottom');
     }
 
     return [...roles];
@@ -1114,12 +1150,14 @@ export class OutfitRecommendationService {
         currentIntent,
         parsed.replacementTags.get(targetRole) ?? [],
       );
+      const preferredTags = parsed.replacementTags.get(targetRole) ?? [];
       const replacement = this.selectReplacementProduct(
         products,
         targetRole,
         replacementIntent,
         selectedByRole,
         excludedProductIds,
+        preferredTags,
       );
 
       if (replacement) {
@@ -1262,16 +1300,26 @@ export class OutfitRecommendationService {
     intent: ExtractedIntent,
     selectedByRole: Map<OutfitRole, ScoredProduct>,
     excludedProductIds: Set<string>,
+    preferredTags: string[] = [],
   ): ScoredProduct | undefined {
     const selectedIds = new Set(
       [...selectedByRole.values()].map((product) => product.product.record.id),
     );
-
-    return this.scoreProductsForRole(products, role, intent).find(
+    const candidates = this.scoreProductsForRole(products, role, intent).filter(
       (candidate) =>
         !selectedIds.has(candidate.product.record.id) &&
         !excludedProductIds.has(candidate.product.record.id),
     );
+    const preferredCandidates =
+      preferredTags.length === 0
+        ? []
+        : candidates.filter((candidate) =>
+            preferredTags.some((tag) =>
+              this.hasCompatibleTag(candidate.product.tagSet, tag),
+            ),
+          );
+
+    return (preferredCandidates.length > 0 ? preferredCandidates : candidates)[0];
   }
 
   private applyRefinementBudget(
@@ -2100,6 +2148,11 @@ export class OutfitRecommendationService {
         score += 30;
         intentScore += 30;
         matchedTags.add(category);
+
+        if (this.hasCompatibleTag(product.tagSet, category)) {
+          score += 25;
+          intentScore += 25;
+        }
       } else if (this.hasCompatibleTag(product.tagSet, category)) {
         score += 16;
         intentScore += 16;

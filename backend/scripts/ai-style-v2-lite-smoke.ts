@@ -19,6 +19,9 @@ const PRODUCT_FIXTURES = [
   buildProduct('top-3', 'Black Rib Long Sleeves', 'black-rib-long-sleeves', 130_000, [
     'top', 'long_sleeves', 'black', 'streetwear', 'gothic', 'darkwear',
   ]),
+  buildProduct('top-4', 'Black Rib Tank Top', 'black-rib-tank-top', 125_000, [
+    'top', 'tank', 'tank_top', 'black', 'streetwear', 'gothic', 'darkwear',
+  ]),
   buildProduct('bottom-1', 'Cream Cafe Pants', 'cream-cafe-pants', 170_000, [
     'bottom', 'bottoms', 'pants', 'cream', 'minimal', 'clean_fit', 'coffee', 'school',
   ]),
@@ -27,6 +30,9 @@ const PRODUCT_FIXTURES = [
   ]),
   buildProduct('bottom-3', 'Black Denim Jeans', 'black-denim-jeans', 130_000, [
     'bottom', 'bottoms', 'pants', 'jeans', 'black', 'streetwear', 'gothic', 'darkwear',
+  ]),
+  buildProduct('bottom-4', 'Black Flared Pants', 'black-flared-pants', 135_000, [
+    'bottom', 'bottoms', 'pants', 'flared', 'black', 'streetwear', 'gothic', 'darkwear',
   ]),
   buildProduct('shoes-1', 'Cream Cafe Sneakers', 'cream-cafe-sneakers', 160_000, [
     'shoes', 'sneakers', 'cream', 'minimal', 'clean_fit', 'coffee', 'school',
@@ -264,6 +270,39 @@ async function run() {
   );
   report(addJacketPrompt, addJacketSource);
 
+  await verifyTargetedReplacement({
+    expectedProductSlugIncludes: 'tank',
+    prompt: 'doi thanh ao ba lo',
+    sourceItems: [
+      { role: 'top', productId: 'top-2' },
+      { role: 'bottom', productId: 'bottom-2' },
+      { role: 'shoes', productId: 'shoes-1' },
+    ],
+    targetRole: 'top',
+  });
+
+  await verifyTargetedReplacement({
+    expectedProductSlugIncludes: 'flared',
+    prompt: 'doi thanh quan ong loe',
+    sourceItems: [
+      { role: 'top', productId: 'top-2' },
+      { role: 'bottom', productId: 'bottom-2' },
+      { role: 'shoes', productId: 'shoes-1' },
+    ],
+    targetRole: 'bottom',
+  });
+
+  await verifyTargetedReplacement({
+    expectedProductSlugIncludes: 'boots',
+    prompt: 'doi thanh boots',
+    sourceItems: [
+      { role: 'top', productId: 'top-2' },
+      { role: 'bottom', productId: 'bottom-2' },
+      { role: 'shoes', productId: 'shoes-1' },
+    ],
+    targetRole: 'shoes',
+  });
+
   const missingPrompt = '\u0111\u1ed5i qu\u1ea7n kh\u00e1c';
   const missing = await aiService.getStyleAdvice(
     { message: missingPrompt },
@@ -296,6 +335,67 @@ async function run() {
   if (failures.length > 0) {
     throw new Error(failures.join('\n'));
   }
+}
+
+async function verifyTargetedReplacement({
+  expectedProductSlugIncludes,
+  prompt,
+  sourceItems,
+  targetRole,
+}: {
+  expectedProductSlugIncludes: string;
+  prompt: string;
+  sourceItems: NonNullable<StyleAdviceRequestDto['currentOutfit']>['items'];
+  targetRole: 'top' | 'bottom' | 'shoes';
+}) {
+  const oldProductId = sourceItems.find((item) => item.role === targetRole)?.productId;
+  const response = await aiService.getStyleAdvice(
+    {
+      message: prompt,
+      currentOutfit: {
+        items: sourceItems,
+        intent: {
+          categories: ['tee', 'bottoms', 'shoes'],
+          colors: ['black'],
+          styles: ['streetwear'],
+          occasions: [],
+          fits: [],
+          negativeConstraints: [],
+        },
+        locale: 'vi',
+      },
+    },
+    { userId: `v2-lite-${targetRole}-targeted-replacement-smoke-user` },
+  );
+
+  verifyOutfitResponse(prompt, response);
+  check(response.refinement?.action === 'replace', prompt, 'action was not replace');
+  check(
+    oldProductId !== undefined &&
+      response.outfit?.items.every((item) => item.productId !== oldProductId) === true,
+    prompt,
+    `old ${targetRole} was not excluded`,
+  );
+  check(
+    response.outfit?.items.some(
+      (item) =>
+        item.role === targetRole &&
+        item.productSlug.includes(expectedProductSlugIncludes),
+    ) === true,
+    prompt,
+    `${expectedProductSlugIncludes} was not prioritized for ${targetRole}`,
+  );
+
+  for (const sourceItem of sourceItems) {
+    if (sourceItem.role === targetRole) continue;
+    check(
+      response.outfit?.items.some((item) => item.productId === sourceItem.productId) === true,
+      prompt,
+      `non-target ${sourceItem.role} was not kept`,
+    );
+  }
+
+  report(prompt, response);
 }
 
 function verifyOutfitResponse(prompt: string, response: StyleAdviceResponseDto) {
