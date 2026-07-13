@@ -7,6 +7,10 @@
   position: relative;
 }
 
+.pageLeaving .stage {
+  animation: intro-content-exit 520ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
 .background {
   background-image: url("/assets/landing/belikeme-landing-bg.png");
   background-position: center;
@@ -26,6 +30,20 @@
   inset: 0;
   position: absolute;
   z-index: -2;
+}
+
+.transitionVeil {
+  background: #020202;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: fixed;
+  transition: opacity 520ms cubic-bezier(0.65, 0, 0.35, 1);
+  z-index: 5;
+}
+
+.pageLeaving .transitionVeil {
+  opacity: 1;
 }
 
 .stage {
@@ -134,6 +152,10 @@
   text-decoration-color: currentColor;
 }
 
+.pageLeaving .shopButton {
+  pointer-events: none;
+}
+
 .logoFallback {
   align-items: center;
   color: rgba(248, 244, 236, 0.72);
@@ -188,8 +210,17 @@
 
 @media (prefers-reduced-motion: reduce) {
   .background,
-  .shopButton {
+  .shopButton,
+  .transitionVeil {
+    animation: none;
     transition: none;
+  }
+}
+
+@keyframes intro-content-exit {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
   }
 }
 

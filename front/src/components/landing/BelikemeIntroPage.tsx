@@ -2,13 +2,21 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Component, type ReactNode, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Component,
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useState,
+} from "react";
 import styles from "./BelikemeIntroPage.module.css";
 import { markBelikemeIntroSeen } from "./IntroGate";
 
 const LANDING_LOGO_SRC = "/assets/landing/belikeme-logo.png";
 const LANDING_MODEL_SRC = "/assets/landing/belikeme-logo-3d.glb";
 const SHOP_HREF = "/";
+const INTRO_EXIT_DURATION_MS = 520;
 
 const InteractiveLogoScene = dynamic(
   () =>
@@ -22,6 +30,9 @@ const InteractiveLogoScene = dynamic(
 );
 
 export function BelikemeIntroPage() {
+  const router = useRouter();
+  const [isLeaving, setIsLeaving] = useState(false);
+
   useEffect(() => {
     document.body.classList.add("belikeme-intro-active");
 
@@ -30,10 +41,55 @@ export function BelikemeIntroPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isLeaving) {
+      return;
+    }
+
+    const transitionTimer = window.setTimeout(() => {
+      router.push(SHOP_HREF);
+    }, INTRO_EXIT_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(transitionTimer);
+    };
+  }, [isLeaving, router]);
+
+  function handleShopNow(event: MouseEvent<HTMLAnchorElement>) {
+    markBelikemeIntroSeen();
+
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.shiftKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (isLeaving) {
+      return;
+    }
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      router.push(SHOP_HREF);
+      return;
+    }
+
+    setIsLeaving(true);
+  }
+
   return (
-    <main className={styles.page}>
+    <main
+      aria-busy={isLeaving}
+      className={`${styles.page}${isLeaving ? ` ${styles.pageLeaving}` : ""}`}
+    >
       <div className={styles.background} aria-hidden="true" />
       <div className={styles.overlay} aria-hidden="true" />
+      <div className={styles.transitionVeil} aria-hidden="true" />
 
       <section className={styles.stage} aria-labelledby="belikeme-intro-title">
         <div className={styles.brandSlot}>
@@ -64,7 +120,8 @@ export function BelikemeIntroPage() {
           <Link
             className={styles.shopButton}
             href={SHOP_HREF}
-            onClick={markBelikemeIntroSeen}
+            onClick={handleShopNow}
+            tabIndex={isLeaving ? -1 : undefined}
           >
             SHOP NOW
           </Link>
