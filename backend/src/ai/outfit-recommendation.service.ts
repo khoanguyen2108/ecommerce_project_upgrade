@@ -831,12 +831,14 @@ export class OutfitRecommendationService {
       replaceRoles.add('shoes');
     }
 
-    if (
+    const shouldShuffleReplacement =
       hasReplaceKeyword &&
-      /\b(?:khac|different|another|other|new(?: one)?|something else|else|random|shuffle)\b/.test(
+      (/\b(?:khac|different|another|other|new(?: one)?|something else|else|random|shuffle)\b/.test(
         comparable,
-      )
-    ) {
+      ) ||
+        this.isBareRoleReplacement(comparable, replaceRoles));
+
+    if (shouldShuffleReplacement) {
       for (const role of replaceRoles) {
         if ((replacementTags.get(role) ?? []).length === 0) {
           replacementShuffleRoles.add(role);
@@ -943,6 +945,33 @@ export class OutfitRecommendationService {
     }
 
     return [...roles];
+  }
+
+  private isBareRoleReplacement(
+    comparable: string,
+    replaceRoles: Set<OutfitRole>,
+  ): boolean {
+    if (replaceRoles.size !== 1) {
+      return false;
+    }
+
+    const role = [...replaceRoles][0];
+    const rolePatterns: Record<OutfitRole, string> = {
+      accessory: '(?:accessor(?:y|ies)|phu kien|trang suc)',
+      bottom: '(?:bottoms?|pants|trousers|jeans|quan)',
+      handbag: '(?:handbags?|bags?|tui xach)',
+      jacket: '(?:jacket|coat|outerwear|ao khoac)',
+      shoes: '(?:shoes?|sneakers?|boots?|giay|doi giay)',
+      top: '(?:top|tee|t shirt|tshirt|shirt|ao thun|ao phong|ao)',
+    };
+    const actionPattern =
+      '(?:change|replace|switch|swap|doi|thay(?: bang)?)';
+    const politeSuffix =
+      '(?:please|pls|nhe|nha|di|cho minh|cho tui|cho toi)?';
+
+    return new RegExp(
+      `^${actionPattern}\\s+(?:the\\s+)?${rolePatterns[role]}\\s*${politeSuffix}$`,
+    ).test(comparable);
   }
 
   private mergeCurrentIntent(

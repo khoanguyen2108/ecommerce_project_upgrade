@@ -315,7 +315,15 @@ async function run() {
     targetRole: 'top',
   });
   await verifyGenericReplacement({
+    prompt: 'doi ao',
+    targetRole: 'top',
+  });
+  await verifyGenericReplacement({
     prompt: 'change the top to another one',
+    targetRole: 'top',
+  });
+  await verifyGenericReplacement({
+    prompt: 'change the top',
     targetRole: 'top',
   });
   await verifyGenericReplacement({
@@ -323,7 +331,15 @@ async function run() {
     targetRole: 'bottom',
   });
   await verifyGenericReplacement({
+    prompt: 'doi quan',
+    targetRole: 'bottom',
+  });
+  await verifyGenericReplacement({
     prompt: 'change the pants to another pair',
+    targetRole: 'bottom',
+  });
+  await verifyGenericReplacement({
+    prompt: 'replace pants',
     targetRole: 'bottom',
   });
   await verifyGenericReplacement({
@@ -331,7 +347,15 @@ async function run() {
     targetRole: 'jacket',
   });
   await verifyGenericReplacement({
+    prompt: 'doi ao khoac',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
     prompt: 'switch the jacket to a different one',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
+    prompt: 'switch the jacket',
     targetRole: 'jacket',
   });
   await verifyGenericReplacement({
@@ -339,7 +363,15 @@ async function run() {
     targetRole: 'shoes',
   });
   await verifyGenericReplacement({
+    prompt: 'doi giay',
+    targetRole: 'shoes',
+  });
+  await verifyGenericReplacement({
     prompt: 'swap the shoes for another pair',
+    targetRole: 'shoes',
+  });
+  await verifyGenericReplacement({
+    prompt: 'swap shoes',
     targetRole: 'shoes',
   });
   await verifyGenericReplacement({
@@ -347,7 +379,15 @@ async function run() {
     targetRole: 'accessory',
   });
   await verifyGenericReplacement({
+    prompt: 'doi phu kien',
+    targetRole: 'accessory',
+  });
+  await verifyGenericReplacement({
     prompt: 'change the accessory to a different one',
+    targetRole: 'accessory',
+  });
+  await verifyGenericReplacement({
+    prompt: 'change the accessory',
     targetRole: 'accessory',
   });
 
