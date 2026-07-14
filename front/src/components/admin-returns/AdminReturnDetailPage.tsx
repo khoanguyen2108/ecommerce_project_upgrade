@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { AdminFeedback } from '@/components/admin/AdminCommerceUi';
 import { ReturnRequestStatusBadge } from '@/components/returns/ReturnRequestStatusBadge';
 import { formatCurrency, formatDateTime } from '@/components/orders/order-format';
+import { requestAdminNavNotificationsRefresh } from '@/features/admin-notifications/events';
 import { getAdminReturn, reviewAdminReturn } from '@/features/returns/api';
 import { RETURN_REASON_LABELS } from '@/features/returns/format';
 import type { AdminReturnRequest } from '@/features/returns/types';
@@ -60,6 +61,7 @@ export function AdminReturnDetailPage({ returnId }: { returnId: string }) {
     try {
       const response = await reviewAdminReturn(request.id, status);
       setRequest(response.returnRequest);
+      requestAdminNavNotificationsRefresh();
     } catch (reviewError) {
       setError(reviewError instanceof ApiClientError ? reviewError.message : 'Return request could not be reviewed.');
       setRequestId(reviewError instanceof ApiClientError ? reviewError.requestId : undefined);

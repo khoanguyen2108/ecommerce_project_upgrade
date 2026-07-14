@@ -3247,6 +3247,30 @@ img {
   width: 17px;
 }
 
+.admin-nav__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-nav__notification {
+  align-items: center;
+  background: #d92d20;
+  color: #ffffff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 900;
+  height: 18px;
+  justify-content: center;
+  letter-spacing: 0;
+  line-height: 1;
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 5px;
+}
+
 .admin-nav__link:hover {
   background: var(--color-surface-muted);
   border-color: var(--color-border);

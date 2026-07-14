@@ -15,6 +15,7 @@ import {
   getAdminOrder,
   updateAdminOrderFulfillmentStatus,
 } from "@/features/admin-orders/api";
+import { requestAdminNavNotificationsRefresh } from "@/features/admin-notifications/events";
 import {
   getAdminOrderErrorMessage,
   getAdminOrderRequestId,
@@ -115,6 +116,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
           : await expireAdminOrder(order.id);
       setOrder(response.order);
       setSuccess(`Order was ${action === "cancel" ? "cancelled" : "expired"}.`);
+      requestAdminNavNotificationsRefresh();
     } catch (actionError) {
       setError(
         getAdminOrderErrorMessage(
@@ -140,6 +142,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
       const response = await updateAdminOrderFulfillmentStatus(order.id, status);
       setOrder(response.order);
       setSuccess(`Fulfillment status updated to ${FULFILLMENT_LABELS[status]}.`);
+      requestAdminNavNotificationsRefresh();
     } catch (actionError) {
       setError(
         getAdminOrderErrorMessage(

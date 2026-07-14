@@ -12,6 +12,7 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { AdminFeedback } from "@/components/admin/AdminCommerceUi";
 import { formatAdminDate } from "@/components/admin/admin-format";
+import { requestAdminNavNotificationsRefresh } from "@/features/admin-notifications/events";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
 import {
@@ -135,6 +136,7 @@ export function AdminChatsPage() {
         setSelectedConversation(conversation);
         setMessages(response.messages);
         setConversations((current) => upsertConversation(current, conversation));
+        requestAdminNavNotificationsRefresh();
       } catch (loadError) {
         if (!isMounted) {
           return;
