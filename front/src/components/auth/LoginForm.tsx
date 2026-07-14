@@ -7,6 +7,7 @@ import { FormEvent, useState } from "react";
 import { startGoogleLogin, loginUser } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { getPostLoginRedirectPath } from "@/features/auth/roles";
+import { useI18n } from "@/features/i18n/useI18n";
 import { ApiClientError } from "@/lib/errors/api-error";
 import { FieldError } from "@/components/ui/FieldError";
 import { GoogleMark } from "@/components/ui/GoogleMark";
@@ -24,6 +25,7 @@ interface LoginFieldErrors {
 export function LoginForm({ nextPath, registered }: LoginFormProps) {
   const router = useRouter();
   const { setAuthenticatedSession } = useAuthSession();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -34,7 +36,7 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const nextErrors = validateLogin({ email, password });
+    const nextErrors = validateLogin({ email, password }, t);
     setFieldErrors(nextErrors);
     setFormError(undefined);
 
@@ -52,7 +54,7 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
       setAuthenticatedSession(response);
       router.push(getPostLoginRedirectPath(response.user, nextPath || "/"));
     } catch (error) {
-      setFormError(getSafeErrorMessage(error));
+      setFormError(getSafeErrorMessage(error, t));
     } finally {
       setIsSubmitting(false);
     }
@@ -62,20 +64,20 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
     try {
       startGoogleLogin();
     } catch (error) {
-      setFormError(getSafeErrorMessage(error));
+      setFormError(getSafeErrorMessage(error, t));
     }
   }
 
   return (
     <div className="auth-card" aria-labelledby="login-heading">
       <div className="auth-card__heading">
-        <h1 id="login-heading">Welcome back</h1>
-        <p>Enter your details to continue shopping your saved edit.</p>
+        <h1 id="login-heading">{t("auth.loginTitle")}</h1>
+        <p>{t("auth.loginSubtitle")}</p>
       </div>
 
       {registered ? (
         <div className="form-success" role="status">
-          Your account was created. Sign in to continue.
+          {t("auth.registerSuccess")}
         </div>
       ) : null}
 
@@ -88,7 +90,7 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
 
       <form className="auth-form" noValidate onSubmit={handleSubmit}>
         <div className="form-field">
-          <label htmlFor="email">Email address</label>
+          <label htmlFor="email">{t("auth.email")}</label>
           <input
             aria-describedby={fieldErrors.email ? "email-error" : undefined}
             aria-invalid={Boolean(fieldErrors.email)}
@@ -96,7 +98,7 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
             id="email"
             name="email"
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="name@example.com"
+            placeholder={t("auth.emailPlaceholder")}
             type="email"
             value={email}
           />
@@ -107,7 +109,7 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
           <div className="form-field__label-row">
             <label htmlFor="password">Password</label>
             <Link className="text-link" href="/forgot-password">
-              Forgot?
+              {t("auth.forgot")}
             </Link>
           </div>
           <div className="password-field">
@@ -118,12 +120,14 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
               id="password"
               name="password"
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter your password"
+              placeholder={t("auth.passwordPlaceholder")}
               type={showPassword ? "text" : "password"}
               value={password}
             />
             <button
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={
+                showPassword ? t("auth.hidePassword") : t("auth.showPassword")
+              }
               className="password-toggle"
               onClick={() => setShowPassword((value) => !value)}
               type="button"
@@ -139,12 +143,12 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
           disabled={isSubmitting}
           type="submit"
         >
-          {isSubmitting ? "Signing in..." : "Sign in"}
+          {isSubmitting ? t("auth.signingIn") : t("auth.signIn")}
         </button>
       </form>
 
       <div className="auth-divider">
-        <span>Or continue with</span>
+        <span>{t("auth.orContinueWith")}</span>
       </div>
 
       <button className="button button--google" onClick={handleGoogleLogin} type="button">
@@ -153,31 +157,37 @@ export function LoginForm({ nextPath, registered }: LoginFormProps) {
       </button>
 
       <p className="auth-switch">
-        Do not have an account? <Link href="/register">Create account</Link>
+        {t("auth.noAccount")} <Link href="/register">{t("auth.createAccount")}</Link>
       </p>
     </div>
   );
 }
 
-function validateLogin(values: { email: string; password: string }): LoginFieldErrors {
+function validateLogin(
+  values: { email: string; password: string },
+  t: ReturnType<typeof useI18n>["t"],
+): LoginFieldErrors {
   const errors: LoginFieldErrors = {};
 
   if (!values.email.trim()) {
-    errors.email = "Email is required.";
+    errors.email = t("auth.emailRequired");
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
-    errors.email = "Enter a valid email address.";
+    errors.email = t("auth.emailInvalid");
   }
 
   if (!values.password) {
-    errors.password = "Password is required.";
+    errors.password = t("auth.passwordRequired");
   } else if (values.password.length < 8) {
-    errors.password = "Password must be at least 8 characters.";
+    errors.password = t("auth.passwordMin");
   }
 
   return errors;
 }
 
-function getSafeErrorMessage(error: unknown): string {
+function getSafeErrorMessage(
+  error: unknown,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
   if (error instanceof ApiClientError) {
     if (process.env.NODE_ENV === "development" && error.requestId) {
       return `${error.message} Request ID: ${error.requestId}`;
@@ -186,5 +196,5 @@ function getSafeErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Sign in could not be completed. Please try again.";
+  return t("auth.loginError");
 }
