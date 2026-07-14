@@ -10,12 +10,13 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { LandingPage } from "@/components/marketing/LandingPage";
 import { useI18n } from "@/features/i18n/useI18n";
 import styles from "./HomeLandingExperience.module.css";
-import { hasBelikemeIntroBeenSeen, markBelikemeIntroSeen } from "./IntroGate";
+import { markBelikemeIntroSeen } from "./IntroGate";
 
 const LANDING_LOGO_SRC = "/assets/landing/belikeme-logo.png";
 const LANDING_MODEL_SRC = "/assets/landing/belikeme-logo-3d.glb";
@@ -58,12 +59,19 @@ const InteractiveLogoScene = dynamic(
   },
 );
 
-export function HomeLandingExperience() {
+interface HomeLandingExperienceProps {
+  mode?: "intro" | "landing";
+}
+
+export function HomeLandingExperience({
+  mode = "landing",
+}: HomeLandingExperienceProps) {
   const { t } = useI18n();
+  const router = useRouter();
   const brandTargetRef = useRef<HTMLAnchorElement | null>(null);
   const sceneTargetRef = useRef<HTMLDivElement | null>(null);
-  const [hasEnteredLanding, setHasEnteredLanding] = useState(() =>
-    typeof window === "undefined" ? false : hasBelikemeIntroBeenSeen(),
+  const [hasEnteredLanding, setHasEnteredLanding] = useState(
+    mode === "landing",
   );
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -72,11 +80,7 @@ export function HomeLandingExperience() {
     setHasEnteredLanding(true);
     setIsTransitioning(false);
     window.scrollTo(0, 0);
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}${window.location.search}`,
-    );
+    router.replace("/");
   }
 
   const { isHeaderHidden, isSceneHidden, transitionRef } =
@@ -87,15 +91,6 @@ export function HomeLandingExperience() {
       onComplete: completeLandingEntry,
       sceneTargetRef,
     });
-
-  useEffect(() => {
-    if (hasEnteredLanding || !hasBelikemeIntroBeenSeen()) {
-      return;
-    }
-
-    setHasEnteredLanding(true);
-    setIsTransitioning(false);
-  }, [hasEnteredLanding]);
 
   function handleShopNow(event: MouseEvent<HTMLAnchorElement>) {
     markBelikemeIntroSeen();
@@ -125,6 +120,7 @@ export function HomeLandingExperience() {
       ? styles.homeTransitioning
       : styles.homeIntro;
   const shouldHideHeader = hasEnteredLanding ? false : isHeaderHidden;
+  const shouldRenderIntro = mode === "intro" && !hasEnteredLanding;
 
   return (
     <>
@@ -135,7 +131,7 @@ export function HomeLandingExperience() {
         variant={hasEnteredLanding ? "default" : "intro-transition"}
       />
       <main className={`${styles.home} ${homeStateClass}`}>
-        {!hasEnteredLanding ? (
+        {shouldRenderIntro ? (
           <section
             aria-labelledby="belikeme-home-intro-title"
             className={styles.intro}

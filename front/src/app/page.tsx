@@ -1,5 +1,5 @@
 import { HomeLandingExperience } from "@/components/landing/HomeLandingExperience";
 
 export default function HomePage() {
-  return <HomeLandingExperience />;
+  return <HomeLandingExperience mode="landing" />;
 }
