@@ -20,17 +20,29 @@ import { markBelikemeIntroSeen } from "./IntroGate";
 const LANDING_LOGO_SRC = "/assets/landing/belikeme-logo.png";
 const LANDING_MODEL_SRC = "/assets/landing/belikeme-logo-3d.glb";
 const LANDING_TARGET_ID = "landing";
-const FLOATING_UI_RELEASE_PROGRESS = 0.86;
+const CLICK_TRANSITION_DURATION_MS = 920;
 const HEADER_BRAND_FADE_END = 0.96;
-const HEADER_BRAND_FADE_START = 0.8;
+const HEADER_BRAND_FADE_START = 0.56;
 const HEADER_BRAND_INTERACTIVE_OPACITY = 0.18;
-const INTRO_HANDOFF_END = 0.94;
-const INTRO_HANDOFF_START = 0.08;
-const INTRO_PROGRESS_EPSILON = 0.0005;
 const ROOT_INTRO_BODY_CLASS = "belikeme-scroll-intro-active";
-const SCENE_FADE_END = 0.96;
-const SCENE_FADE_START = 0.74;
-const SCENE_HIDDEN_PROGRESS = 0.985;
+const SCENE_FADE_END = 0.98;
+const SCENE_FADE_START = 0.72;
+const SCENE_HIDDEN_PROGRESS = 0.995;
+const VIETNAM_TIME_ZONE = "Asia/Ho_Chi_Minh";
+const vietnamTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  hour12: false,
+  minute: "2-digit",
+  second: "2-digit",
+  timeZone: VIETNAM_TIME_ZONE,
+});
+const vietnamDateFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  month: "short",
+  timeZone: VIETNAM_TIME_ZONE,
+  weekday: "short",
+  year: "numeric",
+});
 
 const useIsomorphicLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -50,15 +62,28 @@ export function HomeLandingExperience() {
   const { t } = useI18n();
   const brandTargetRef = useRef<HTMLAnchorElement | null>(null);
   const sceneTargetRef = useRef<HTMLDivElement | null>(null);
-  const {
-    isHeaderBrandHidden,
-    isSceneHidden,
-    progressRef,
-    transitionRef,
-  } = useIntroScrollProgress({
-    brandTargetRef,
-    sceneTargetRef,
-  });
+  const [hasEnteredLanding, setHasEnteredLanding] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  function completeLandingEntry() {
+    setHasEnteredLanding(true);
+    setIsTransitioning(false);
+    window.scrollTo(0, 0);
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${window.location.search}`,
+    );
+  }
+
+  const { isHeaderHidden, isSceneHidden, transitionRef } =
+    useIntroClickTransition({
+      brandTargetRef,
+      hasEnteredLanding,
+      isTransitioning,
+      onComplete: completeLandingEntry,
+      sceneTargetRef,
+    });
 
   function handleShopNow(event: MouseEvent<HTMLAnchorElement>) {
     markBelikemeIntroSeen();
@@ -73,80 +98,82 @@ export function HomeLandingExperience() {
       return;
     }
 
-    const landingTarget = document.getElementById(LANDING_TARGET_ID);
+    event.preventDefault();
 
-    if (
-      !landingTarget ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (hasEnteredLanding || isTransitioning) {
       return;
     }
 
-    event.preventDefault();
-    landingTarget.scrollIntoView({ behavior: "smooth", block: "start" });
-    window.history.pushState(null, "", `#${LANDING_TARGET_ID}`);
+    setIsTransitioning(true);
   }
+
+  const homeStateClass = hasEnteredLanding
+    ? styles.homeEntered
+    : isTransitioning
+      ? styles.homeTransitioning
+      : styles.homeIntro;
 
   return (
     <>
       <SiteHeader
-        brandHidden={isHeaderBrandHidden}
+        brandHidden={isHeaderHidden}
         brandRef={brandTargetRef}
-        headerHidden={isHeaderBrandHidden}
+        headerHidden={isHeaderHidden}
         variant="intro-transition"
       />
-      <main className={styles.home}>
-        <section
-          className={styles.intro}
-          aria-labelledby="belikeme-home-intro-title"
-          ref={transitionRef}
-        >
-          <div className={styles.background} aria-hidden="true" />
-          <div className={styles.overlay} aria-hidden="true" />
+      <main className={`${styles.home} ${homeStateClass}`}>
+        {!hasEnteredLanding ? (
+          <section
+            aria-labelledby="belikeme-home-intro-title"
+            className={styles.intro}
+            ref={transitionRef}
+          >
+            <div className={styles.background} aria-hidden="true" />
+            <div className={styles.overlay} aria-hidden="true" />
 
-          <div className={styles.stage}>
-            <h1 className={styles.srOnly} id="belikeme-home-intro-title">
-              {t("intro.title")}
-            </h1>
+            <div className={styles.stage}>
+              <div className={styles.brandSlot}>
+                <img
+                  alt="BELIKEME"
+                  className={styles.brandLogo}
+                  src={LANDING_LOGO_SRC}
+                />
+                <VietnamTime />
+              </div>
 
-            <div
-              aria-label={t("intro.logoAria")}
-              aria-hidden={isSceneHidden ? true : undefined}
-              className={styles.sceneShell}
-              ref={sceneTargetRef}
-              role="img"
-            >
-              <div className={styles.sceneTransform}>
-                <SceneErrorBoundary fallback={<LogoFallback label="BELIKEME" />}>
-                  <InteractiveLogoScene
-                    fallback={<LogoFallback label="BELIKEME" />}
-                    mode="scroll"
-                    modelSrc={LANDING_MODEL_SRC}
-                    scrollProgressRef={progressRef}
-                  />
-                </SceneErrorBoundary>
+              <div
+                aria-hidden={isSceneHidden ? true : undefined}
+                aria-label={t("intro.logoAria")}
+                className={styles.sceneShell}
+                ref={sceneTargetRef}
+                role="img"
+              >
+                <div className={styles.sceneTransform}>
+                  <SceneErrorBoundary fallback={<LogoFallback label="BELIKEME" />}>
+                    <InteractiveLogoScene
+                      fallback={<LogoFallback label="BELIKEME" />}
+                      modelSrc={LANDING_MODEL_SRC}
+                    />
+                  </SceneErrorBoundary>
+                </div>
+              </div>
+
+              <div className={styles.actionStack}>
+                <h1 className={styles.srOnly} id="belikeme-home-intro-title">
+                  {t("intro.title")}
+                </h1>
+                <a
+                  className={styles.shopButton}
+                  href={`#${LANDING_TARGET_ID}`}
+                  onClick={handleShopNow}
+                  tabIndex={isTransitioning ? -1 : undefined}
+                >
+                  {t("intro.shopNow")}
+                </a>
               </div>
             </div>
-
-            <div className={styles.actionStack}>
-              <a
-                className={styles.shopButton}
-                href={`#${LANDING_TARGET_ID}`}
-                onClick={handleShopNow}
-              >
-                {t("intro.shopNow")}
-              </a>
-              <p className={styles.helperText}>
-                <span className={styles.helperDesktop}>
-                  {t("intro.dragToInteract")}
-                </span>
-                <span className={styles.helperTouch}>
-                  {t("intro.touchAndDrag")}
-                </span>
-              </p>
-            </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
 
         <section
           aria-label={t("intro.landingLabel")}
@@ -157,13 +184,16 @@ export function HomeLandingExperience() {
           <LandingPage />
         </section>
       </main>
-      <SiteFooter />
+      {hasEnteredLanding ? <SiteFooter /> : null}
     </>
   );
 }
 
-interface IntroScrollProgressOptions {
+interface IntroClickTransitionOptions {
   brandTargetRef: { current: HTMLAnchorElement | null };
+  hasEnteredLanding: boolean;
+  isTransitioning: boolean;
+  onComplete: () => void;
   sceneTargetRef: { current: HTMLDivElement | null };
 }
 
@@ -174,14 +204,24 @@ interface LogoTarget {
   width: number;
 }
 
-function useIntroScrollProgress({
+function useIntroClickTransition({
   brandTargetRef,
+  hasEnteredLanding,
+  isTransitioning,
+  onComplete,
   sceneTargetRef,
-}: IntroScrollProgressOptions) {
+}: IntroClickTransitionOptions) {
   const transitionRef = useRef<HTMLElement>(null);
+  const onCompleteRef = useRef(onComplete);
   const progressRef = useRef(0);
-  const [isHeaderBrandHidden, setIsHeaderBrandHidden] = useState(true);
+  const headerHiddenRef = useRef(true);
+  const sceneHiddenRef = useRef(false);
+  const [isHeaderHidden, setIsHeaderHidden] = useState(true);
   const [isSceneHidden, setIsSceneHidden] = useState(false);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useIsomorphicLayoutEffect(() => {
     const transitionElement = transitionRef.current;
@@ -197,37 +237,22 @@ function useIntroScrollProgress({
     );
     let animationFrameId: number | null = null;
     let isDisposed = false;
-    let floatingUiSuppressed = false;
-    let headerBrandHidden = true;
-    let sceneHidden = false;
 
-    function setFloatingUiSuppressed(nextIsSuppressed: boolean) {
-      if (floatingUiSuppressed === nextIsSuppressed) {
+    function setHeaderHiddenState(nextIsHidden: boolean) {
+      if (headerHiddenRef.current === nextIsHidden) {
         return;
       }
 
-      floatingUiSuppressed = nextIsSuppressed;
-      document.body.classList.toggle(
-        ROOT_INTRO_BODY_CLASS,
-        nextIsSuppressed,
-      );
-    }
-
-    function setHeaderBrandHiddenState(nextIsHidden: boolean) {
-      if (headerBrandHidden === nextIsHidden) {
-        return;
-      }
-
-      headerBrandHidden = nextIsHidden;
-      setIsHeaderBrandHidden(nextIsHidden);
+      headerHiddenRef.current = nextIsHidden;
+      setIsHeaderHidden(nextIsHidden);
     }
 
     function setSceneHiddenState(nextIsHidden: boolean) {
-      if (sceneHidden === nextIsHidden) {
+      if (sceneHiddenRef.current === nextIsHidden) {
         return;
       }
 
-      sceneHidden = nextIsHidden;
+      sceneHiddenRef.current = nextIsHidden;
       setIsSceneHidden(nextIsHidden);
     }
 
@@ -248,6 +273,7 @@ function useIntroScrollProgress({
         "--site-header-brand-pointer-events",
         isHidden ? "none" : "auto",
       );
+
       if (headerElement instanceof HTMLElement) {
         headerElement.style.setProperty(
           "--site-header-shell-opacity",
@@ -260,13 +286,15 @@ function useIntroScrollProgress({
       }
     }
 
-    function writeStableReducedMotionState() {
+    function writeIdleState() {
       progressRef.current = 0;
-      setFloatingUiSuppressed(false);
-      setHeaderBrandHiddenState(false);
+      document.body.classList.add(ROOT_INTRO_BODY_CLASS);
+      setHeaderHiddenState(true);
       setSceneHiddenState(false);
-      writeHeaderBrandState(1, false);
-      variableElement.style.setProperty("--intro-progress", "0");
+      writeHeaderBrandState(0, true);
+      variableElement.style.setProperty("--intro-backdrop-opacity", "1");
+      variableElement.style.setProperty("--intro-brand-opacity", "1");
+      variableElement.style.setProperty("--intro-brand-y", "0px");
       variableElement.style.setProperty("--intro-scene-x", "0px");
       variableElement.style.setProperty("--intro-scene-scale", "1");
       variableElement.style.setProperty("--intro-scene-y", "0px");
@@ -277,12 +305,12 @@ function useIntroScrollProgress({
         "--intro-action-pointer-events",
         "auto",
       );
-      variableElement.style.setProperty("--intro-landing-opacity", "1");
+      variableElement.style.setProperty("--intro-landing-opacity", "0");
       variableElement.style.setProperty(
         "--intro-landing-pointer-events",
-        "auto",
+        "none",
       );
-      variableElement.style.setProperty("--intro-landing-y", "0px");
+      variableElement.style.setProperty("--intro-landing-y", "24px");
       variableElement.style.setProperty(
         "--intro-scene-pointer-events",
         "auto",
@@ -290,34 +318,38 @@ function useIntroScrollProgress({
       variableElement.style.setProperty("--intro-scene-visibility", "visible");
     }
 
-    function updateProgress() {
-      if (isDisposed) {
-        return;
-      }
+    function writeEnteredState() {
+      progressRef.current = 1;
+      document.body.classList.remove(ROOT_INTRO_BODY_CLASS);
+      setHeaderHiddenState(false);
+      setSceneHiddenState(true);
+      writeHeaderBrandState(1, false);
+      variableElement.style.setProperty("--intro-backdrop-opacity", "0");
+      variableElement.style.setProperty("--intro-brand-opacity", "0");
+      variableElement.style.setProperty("--intro-brand-y", "-10px");
+      variableElement.style.setProperty("--intro-scene-opacity", "0");
+      variableElement.style.setProperty(
+        "--intro-scene-pointer-events",
+        "none",
+      );
+      variableElement.style.setProperty("--intro-scene-visibility", "hidden");
+      variableElement.style.setProperty("--intro-action-opacity", "0");
+      variableElement.style.setProperty(
+        "--intro-action-pointer-events",
+        "none",
+      );
+      variableElement.style.setProperty("--intro-landing-opacity", "1");
+      variableElement.style.setProperty(
+        "--intro-landing-pointer-events",
+        "auto",
+      );
+      variableElement.style.setProperty("--intro-landing-y", "0px");
+    }
 
-      animationFrameId = null;
-
-      if (reducedMotionQuery.matches) {
-        writeStableReducedMotionState();
-        return;
-      }
-
+    function writeTransitionProgress(progress: number) {
       const headerHeight = getHeaderHeight();
       const viewportHeight = Math.max(1, window.innerHeight);
       const viewportWidth = Math.max(1, window.innerWidth);
-      const stickyHeight = Math.max(1, viewportHeight - headerHeight);
-      const rect = transitionNode.getBoundingClientRect();
-      const scrollableDistance = Math.max(1, rect.height - stickyHeight);
-      const progress = clamp(
-        (headerHeight - rect.top) / scrollableDistance,
-        0,
-        1,
-      );
-
-      if (Math.abs(progressRef.current - progress) > INTRO_PROGRESS_EPSILON) {
-        progressRef.current = progress;
-      }
-
       const isMobile = viewportWidth <= 640;
       const headerLogoTarget = getHeaderLogoTarget(
         brandTargetRef.current,
@@ -330,19 +362,16 @@ function useIntroScrollProgress({
         viewportHeight,
         viewportWidth,
       );
-      const travelProgress = normalize(
-        progress,
-        INTRO_HANDOFF_START,
-        INTRO_HANDOFF_END,
-      );
-      const fadeProgress = smoothstep(
+      const travelProgress = smoothstep(progress);
+      const sceneFadeProgress = smoothstep(
         normalize(progress, SCENE_FADE_START, SCENE_FADE_END),
       );
-      const brandOpacity = smoothstep(
+      const headerOpacity = smoothstep(
         normalize(progress, HEADER_BRAND_FADE_START, HEADER_BRAND_FADE_END),
       );
-      const actionProgress = smoothstep(normalize(progress, 0.2, 0.62));
-      const landingProgress = smoothstep(normalize(progress, 0.68, 0.96));
+      const introBrandProgress = smoothstep(normalize(progress, 0.02, 0.34));
+      const actionProgress = smoothstep(normalize(progress, 0, 0.28));
+      const landingProgress = smoothstep(normalize(progress, 0.28, 0.98));
       const finalScale = getFinalSceneScale(
         headerLogoTarget.width,
         sceneOrigin.width,
@@ -353,23 +382,33 @@ function useIntroScrollProgress({
       const scale = lerp(1, finalScale, travelProgress);
       const translateX = lerp(0, finalTranslateX, travelProgress);
       const translateY = lerp(0, finalTranslateY, travelProgress);
-      const sceneOpacity = lerp(1, 0, fadeProgress);
+      const sceneOpacity = lerp(1, 0, sceneFadeProgress);
+      const introBrandOpacity = lerp(1, 0, introBrandProgress);
+      const introBrandY = lerp(0, -10, introBrandProgress);
       const actionOpacity = lerp(1, 0, actionProgress);
-      const actionTranslateY = lerp(0, -18, actionProgress);
+      const actionTranslateY = lerp(0, 16, actionProgress);
       const landingOpacity = lerp(0, 1, landingProgress);
       const landingTranslateY = lerp(24, 0, landingProgress);
+      const backdropOpacity = lerp(1, 0, landingProgress);
       const isHeaderBrandCurrentlyHidden =
-        brandOpacity < HEADER_BRAND_INTERACTIVE_OPACITY;
+        headerOpacity < HEADER_BRAND_INTERACTIVE_OPACITY;
       const isSceneCurrentlyHidden = progress >= SCENE_HIDDEN_PROGRESS;
 
-      setFloatingUiSuppressed(progress < FLOATING_UI_RELEASE_PROGRESS);
-      setHeaderBrandHiddenState(isHeaderBrandCurrentlyHidden);
+      progressRef.current = progress;
+      setHeaderHiddenState(isHeaderBrandCurrentlyHidden);
       setSceneHiddenState(isSceneCurrentlyHidden);
-      writeHeaderBrandState(brandOpacity, isHeaderBrandCurrentlyHidden);
-
+      writeHeaderBrandState(headerOpacity, isHeaderBrandCurrentlyHidden);
       variableElement.style.setProperty(
-        "--intro-progress",
-        progress.toFixed(4),
+        "--intro-backdrop-opacity",
+        backdropOpacity.toFixed(4),
+      );
+      variableElement.style.setProperty(
+        "--intro-brand-opacity",
+        introBrandOpacity.toFixed(4),
+      );
+      variableElement.style.setProperty(
+        "--intro-brand-y",
+        `${introBrandY.toFixed(2)}px`,
       );
       variableElement.style.setProperty(
         "--intro-scene-x",
@@ -397,7 +436,7 @@ function useIntroScrollProgress({
       );
       variableElement.style.setProperty(
         "--intro-action-pointer-events",
-        progress > 0.62 ? "none" : "auto",
+        progress > 0.1 ? "none" : "auto",
       );
       variableElement.style.setProperty(
         "--intro-landing-opacity",
@@ -405,7 +444,7 @@ function useIntroScrollProgress({
       );
       variableElement.style.setProperty(
         "--intro-landing-pointer-events",
-        progress > FLOATING_UI_RELEASE_PROGRESS ? "auto" : "none",
+        progress > 0.72 ? "auto" : "none",
       );
       variableElement.style.setProperty(
         "--intro-landing-y",
@@ -413,7 +452,7 @@ function useIntroScrollProgress({
       );
       variableElement.style.setProperty(
         "--intro-scene-pointer-events",
-        progress > 0.68 ? "none" : "auto",
+        progress > 0.18 ? "none" : "auto",
       );
       variableElement.style.setProperty(
         "--intro-scene-visibility",
@@ -421,62 +460,125 @@ function useIntroScrollProgress({
       );
     }
 
-    function requestProgressUpdate() {
+    function requestCurrentStateWrite() {
       if (isDisposed) {
         return;
       }
 
-      if (animationFrameId !== null) {
+      if (hasEnteredLanding) {
+        writeEnteredState();
         return;
       }
 
-      animationFrameId = window.requestAnimationFrame(updateProgress);
+      if (isTransitioning) {
+        writeTransitionProgress(progressRef.current);
+        return;
+      }
+
+      writeIdleState();
     }
 
-    updateProgress();
-    window.addEventListener("scroll", requestProgressUpdate, {
-      passive: true,
-    });
-    window.addEventListener("resize", requestProgressUpdate);
-    window.addEventListener("load", requestProgressUpdate);
-    window.visualViewport?.addEventListener("resize", requestProgressUpdate);
-    reducedMotionQuery.addEventListener("change", requestProgressUpdate);
-    document.fonts?.ready.then(requestProgressUpdate).catch(() => undefined);
+    if (hasEnteredLanding) {
+      writeEnteredState();
+    } else if (!isTransitioning) {
+      writeIdleState();
+    } else if (reducedMotionQuery.matches) {
+      writeEnteredState();
+      onCompleteRef.current();
+    } else {
+      const startTime = performance.now();
+      document.body.classList.add(ROOT_INTRO_BODY_CLASS);
+
+      function tick(timestamp: number) {
+        if (isDisposed) {
+          return;
+        }
+
+        const rawProgress = clamp(
+          (timestamp - startTime) / CLICK_TRANSITION_DURATION_MS,
+          0,
+          1,
+        );
+
+        writeTransitionProgress(rawProgress);
+
+        if (rawProgress >= 1) {
+          writeEnteredState();
+          onCompleteRef.current();
+          return;
+        }
+
+        animationFrameId = window.requestAnimationFrame(tick);
+      }
+
+      animationFrameId = window.requestAnimationFrame(tick);
+    }
+
+    window.addEventListener("resize", requestCurrentStateWrite);
+    window.addEventListener("load", requestCurrentStateWrite);
+    window.visualViewport?.addEventListener("resize", requestCurrentStateWrite);
 
     return () => {
       isDisposed = true;
-      window.removeEventListener("scroll", requestProgressUpdate);
-      window.removeEventListener("resize", requestProgressUpdate);
-      window.removeEventListener("load", requestProgressUpdate);
+      window.removeEventListener("resize", requestCurrentStateWrite);
+      window.removeEventListener("load", requestCurrentStateWrite);
       window.visualViewport?.removeEventListener(
         "resize",
-        requestProgressUpdate,
+        requestCurrentStateWrite,
       );
-      reducedMotionQuery.removeEventListener("change", requestProgressUpdate);
-      document.body.classList.remove(ROOT_INTRO_BODY_CLASS);
-      brandTargetRef.current?.style.removeProperty(
-        "--site-header-brand-opacity",
-      );
-      brandTargetRef.current?.style.removeProperty(
-        "--site-header-brand-pointer-events",
-      );
-      const headerElement = brandTargetRef.current?.closest(
-        ".site-header--intro-transition",
-      );
-      if (headerElement instanceof HTMLElement) {
-        headerElement.style.removeProperty("--site-header-shell-opacity");
-        headerElement.style.removeProperty(
-          "--site-header-shell-pointer-events",
-        );
-      }
 
       if (animationFrameId !== null) {
         window.cancelAnimationFrame(animationFrameId);
       }
-    };
-  }, [brandTargetRef, sceneTargetRef]);
 
-  return { isHeaderBrandHidden, isSceneHidden, progressRef, transitionRef };
+      document.body.classList.remove(ROOT_INTRO_BODY_CLASS);
+    };
+  }, [
+    brandTargetRef,
+    hasEnteredLanding,
+    isTransitioning,
+    sceneTargetRef,
+  ]);
+
+  return { isHeaderHidden, isSceneHidden, transitionRef };
+}
+
+function VietnamTime() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const updateTime = () => {
+      setNow(new Date());
+    };
+
+    updateTime();
+    const timeInterval = window.setInterval(updateTime, 1_000);
+
+    return () => {
+      window.clearInterval(timeInterval);
+    };
+  }, []);
+
+  const date = now ? formatVietnamDate(now) : "---";
+  const time = now ? vietnamTimeFormatter.format(now) : "--:--:--";
+
+  return (
+    <time className={styles.vietnamTime} dateTime={now?.toISOString()}>
+      <span>{date}</span>
+      <span aria-hidden="true" className={styles.timeSeparator}>
+        {"\u00b7"}
+      </span>
+      <span>{time} ICT</span>
+    </time>
+  );
+}
+
+function formatVietnamDate(date: Date) {
+  const dateParts = vietnamDateFormatter.formatToParts(date);
+  const partValue = (type: Intl.DateTimeFormatPartTypes) =>
+    dateParts.find((part) => part.type === type)?.value ?? "";
+
+  return `${partValue("weekday")}, ${partValue("day")} ${partValue("month")} ${partValue("year")}`;
 }
 
 function LogoFallback({ label }: { label: string }) {
@@ -554,7 +656,6 @@ function getSceneOrigin(
     };
   }
 
-  const stageHeight = Math.max(1, viewportHeight - headerHeight);
   const isMobile = viewportWidth <= 640;
   const fallbackWidth = isMobile
     ? Math.min(viewportWidth, 420)
@@ -565,7 +666,7 @@ function getSceneOrigin(
 
   return {
     centerX: viewportWidth / 2,
-    centerY: headerHeight + stageHeight * 0.46,
+    centerY: headerHeight + (viewportHeight - headerHeight) * 0.48,
     height: fallbackHeight,
     width: fallbackWidth,
   };
