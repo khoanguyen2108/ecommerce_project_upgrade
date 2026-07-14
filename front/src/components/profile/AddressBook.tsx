@@ -26,8 +26,11 @@ import {
 } from "@/features/addresses/api";
 import type { Address, AddressInput } from "@/features/addresses/types";
 import { ApiClientError } from "@/lib/errors/api-error";
+import { useI18n } from "@/features/i18n/useI18n";
+import type { Locale } from "@/features/i18n/locale";
 
 export function AddressBook() {
+  const { locale, t } = useI18n();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [editingId, setEditingId] = useState<string | null>();
   const [form, setForm] = useState<AddressInput>(emptyAddressInput);
@@ -39,7 +42,7 @@ export function AddressBook() {
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -61,8 +64,9 @@ export function AddressBook() {
   async function refresh() {
     try {
       setAddresses((await listAddresses()).addresses);
+      setError(undefined);
     } catch (caught) {
-      setError(message(caught, "Saved addresses could not be loaded."));
+      setError(message(caught, t("profile.addressesLoadError"), locale));
     }
   }
 
@@ -103,7 +107,7 @@ export function AddressBook() {
     event.preventDefault();
     if (isBusy) return;
 
-    const validation = validateAddress(form);
+    const validation = validateAddress(form, locale);
     if (validation) {
       setError(validation);
       return;
@@ -123,21 +127,21 @@ export function AddressBook() {
       setMakeDefault(false);
       await refresh();
     } catch (caught) {
-      setError(message(caught, "Address could not be saved."));
+      setError(message(caught, t("profile.addressSaveError"), locale));
     } finally {
       setIsBusy(false);
     }
   }
 
   async function remove(address: Address) {
-    if (!window.confirm(`Delete the address for ${address.recipientName}?`)) return;
+    if (!window.confirm(`${t("profile.deleteConfirm")} ${address.recipientName}?`)) return;
     setIsBusy(true);
     setError(undefined);
     try {
       await deleteAddress(address.id);
       await refresh();
     } catch (caught) {
-      setError(message(caught, "Address could not be deleted."));
+      setError(message(caught, t("profile.addressDeleteError"), locale));
     } finally {
       setIsBusy(false);
     }
@@ -150,7 +154,7 @@ export function AddressBook() {
       await setDefaultAddress(id);
       await refresh();
     } catch (caught) {
-      setError(message(caught, "Default address could not be changed."));
+      setError(message(caught, t("profile.defaultError"), locale));
     } finally {
       setIsBusy(false);
     }
@@ -163,8 +167,8 @@ export function AddressBook() {
     >
       <div className="profile-subsection__header">
         <div>
-          <h2 id="address-book-heading">Delivery Addresses</h2>
-          <p>Choose where you would like your orders delivered.</p>
+          <h2 id="address-book-heading">{t("profile.addresses")}</h2>
+          <p>{t("profile.addressesIntro")}</p>
         </div>
         {addresses.length > 0 ? (
           <button
@@ -174,7 +178,7 @@ export function AddressBook() {
             type="button"
           >
             <Plus size={16} />
-            Add Address
+            {t("profile.addAddress")}
           </button>
         ) : null}
       </div>
@@ -191,8 +195,8 @@ export function AddressBook() {
           <div className="address-book__empty">
             <span className="address-book__empty-icon"><MapPin size={21} /></span>
             <div>
-              <strong>No saved addresses yet</strong>
-              <p>Add an address for a faster checkout.</p>
+              <strong>{t("profile.noAddresses")}</strong>
+              <p>{t("profile.noAddressesBody")}</p>
             </div>
             <button
               className="button button--primary"
@@ -201,7 +205,7 @@ export function AddressBook() {
               type="button"
             >
               <Plus size={15} />
-              Add Address
+              {t("profile.addAddress")}
             </button>
           </div>
         ) : (
@@ -211,7 +215,7 @@ export function AddressBook() {
                 <div>
                   <strong>{address.recipientName}</strong>
                   {address.isDefault ? (
-                    <span className="address-default-badge">Default</span>
+                    <span className="address-default-badge">{t("profile.default")}</span>
                   ) : null}
                 </div>
                 <p>{address.phone}</p>
@@ -227,26 +231,26 @@ export function AddressBook() {
                     onClick={() => void makeAddressDefault(address.id)}
                     type="button"
                   >
-                    Set default
+                    {t("profile.setDefault")}
                   </button>
                 ) : null}
                 <button
-                  aria-label={`Edit address for ${address.recipientName}`}
+                  aria-label={`${t("profile.editAddressFor")} ${address.recipientName}`}
                   disabled={isBusy}
                   onClick={() => openEdit(address)}
                   type="button"
                 >
                   <Pencil size={15} />
-                  Edit
+                  {t("profile.edit")}
                 </button>
                 <button
-                  aria-label={`Delete address for ${address.recipientName}`}
+                  aria-label={`${t("profile.deleteAddressFor")} ${address.recipientName}`}
                   disabled={isBusy}
                   onClick={() => void remove(address)}
                   type="button"
                 >
                   <Trash2 size={15} />
-                  Delete
+                  {t("profile.delete")}
                 </button>
               </div>
             </article>
@@ -268,13 +272,13 @@ export function AddressBook() {
           >
             <header className="address-modal__header">
               <div>
-                <p className="eyebrow">Delivery details</p>
+                <p className="eyebrow">{t("profile.deliveryDetails")}</p>
                 <h2 id="address-modal-title">
-                  {editingId === "new" ? "Add Address" : "Edit Address"}
+                  {editingId === "new" ? t("profile.addAddress") : t("profile.editAddress")}
                 </h2>
               </div>
               <button
-                aria-label="Close address form"
+                aria-label={t("profile.closeAddress")}
                 className="address-modal__close"
                 disabled={isBusy}
                 onClick={closeModal}
@@ -304,7 +308,7 @@ export function AddressBook() {
               {editingAddress?.isDefault ? (
                 <p className="address-modal__default-note">
                   <Check size={16} />
-                  This is your default delivery address.
+                  {t("profile.defaultNote")}
                 </p>
               ) : (
                 <label className="address-checkbox">
@@ -314,7 +318,7 @@ export function AddressBook() {
                     onChange={(event) => setMakeDefault(event.target.checked)}
                     type="checkbox"
                   />
-                  Set as default address
+                  {t("profile.setAsDefault")}
                 </label>
               )}
 
@@ -325,11 +329,11 @@ export function AddressBook() {
                   onClick={closeModal}
                   type="button"
                 >
-                  Cancel
+                  {t("profile.cancel")}
                 </button>
                 <button className="button button--primary" disabled={isBusy} type="submit">
                   {isBusy ? <Loader2 className="spin" size={16} /> : <Check size={16} />}
-                  {isBusy ? "Saving..." : "Save Address"}
+                  {isBusy ? t("profile.saving") : t("profile.saveAddress")}
                 </button>
               </footer>
             </form>
@@ -340,6 +344,8 @@ export function AddressBook() {
   );
 }
 
-function message(error: unknown, fallback: string) {
-  return error instanceof ApiClientError ? error.message : fallback;
+function message(error: unknown, fallback: string, locale: Locale) {
+  return error instanceof ApiClientError && locale === "en"
+    ? error.message
+    : fallback;
 }

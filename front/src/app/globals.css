@@ -262,7 +262,7 @@ img {
 
 .language-switcher__trigger {
   align-items: center;
-  background: #df2d24;
+  background: #111111;
   border: 0;
   border-radius: 50%;
   color: #ffffff;
@@ -282,14 +282,14 @@ img {
 
 .language-switcher__trigger:hover,
 .language-switcher__trigger[aria-expanded="true"] {
-  background: #c9231b;
+  background: #000000;
   transform: translateY(-1px);
 }
 
 .language-switcher__menu {
   animation: site-mobile-dropdown-in 160ms ease both;
   background: #ffffff;
-  border: 1px solid #d8e0e8;
+  border: 1px solid #111111;
   border-radius: 18px;
   box-shadow: 0 16px 38px rgba(17, 17, 17, 0.16);
   display: grid;
@@ -307,7 +307,7 @@ img {
   background: transparent;
   border: 0;
   border-radius: 11px;
-  color: #285486;
+  color: #111111;
   display: grid;
   font-family: Inter, sans-serif;
   font-size: 0.96rem;
@@ -322,12 +322,13 @@ img {
 
 .language-switcher__option:hover,
 .language-switcher__option.is-active {
-  background: #f3f5f7;
+  background: #111111;
+  color: #ffffff;
 }
 
 .language-switcher__badge {
   align-items: center;
-  background: #df2d24;
+  background: #111111;
   border-radius: 50%;
   color: #ffffff;
   display: inline-flex;
@@ -337,6 +338,12 @@ img {
   justify-content: center;
   line-height: 1;
   width: 32px;
+}
+
+.language-switcher__option:hover .language-switcher__badge,
+.language-switcher__option.is-active .language-switcher__badge {
+  background: #ffffff;
+  color: #111111;
 }
 
 .language-switcher--mobile {

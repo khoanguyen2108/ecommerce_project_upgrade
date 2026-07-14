@@ -42,22 +42,23 @@ import type {
   PaymentSummary,
 } from "@/features/orders/types";
 import type { CustomerReturnRequest } from "@/features/returns/types";
+import { useI18n } from "@/features/i18n/useI18n";
 
 interface OrderDetailPageProps {
   orderId: string;
 }
 const FULFILLMENT_STEPS: Array<{
-  label: string;
   status: OrderFulfillmentStatus;
 }> = [
-  { label: "Preparing", status: "PENDING" },
-  { label: "Picked up", status: "PICKED_UP" },
-  { label: "In transit", status: "IN_TRANSIT" },
-  { label: "Out for delivery", status: "OUT_FOR_DELIVERY" },
-  { label: "Delivered", status: "DELIVERED" },
+  { status: "PENDING" },
+  { status: "PICKED_UP" },
+  { status: "IN_TRANSIT" },
+  { status: "OUT_FOR_DELIVERY" },
+  { status: "DELIVERED" },
 ];
 
 export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
+  const { locale, t } = useI18n();
   const [order, setOrder] = useState<Order>();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>();
@@ -96,7 +97,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         } catch {
           if (isMounted) {
             setReturnRequest(undefined);
-            setReturnError('Return status could not be loaded. Refresh to try again.');
+            setReturnError(t("orders.returnLoadError"));
           }
         }
       } catch (loadError) {
@@ -108,7 +109,8 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
         setError(
           getOrderErrorMessage(
             loadError,
-            "This order could not be loaded right now.",
+            t("orders.detailLoadError"),
+            locale,
           ),
         );
         setRequestId(getOrderRequestId(loadError));
@@ -124,7 +126,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [orderId, refreshKey]);
+  }, [locale, orderId, refreshKey, t]);
 
   if (isLoading && !order) {
     return <OrderDetailLoading />;
@@ -140,19 +142,19 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
     <main className="customer-page order-detail-page">
       <Link className="order-detail-back" href="/orders">
         <ArrowLeft aria-hidden="true" size={17} />
-        Back to orders
+        {t("orders.back")}
       </Link>
 
       <header className="order-detail-heading" aria-labelledby="order-heading">
         <div className="order-detail-heading__copy">
-          <p className="eyebrow">Order detail</p>
+          <p className="eyebrow">{t("orders.detail")}</p>
           <h1 id="order-heading">
-            Order {formatOrderDisplayId(order.orderCode || order.id)}
+            {t("return.order")} {formatOrderDisplayId(order.orderCode || order.id)}
           </h1>
-          <p>Placed on {formatDate(order.createdAt)}</p>
+          <p>{t("orders.placedOn")} {formatDate(order.createdAt, locale)}</p>
         </div>
         <div className="order-detail-heading__aside">
-          <div className="order-detail-badges" aria-label="Order statuses">
+          <div className="order-detail-badges" aria-label={t("orders.statuses")}>
             <OrderStatusBadge status={order.status} />
             <FulfillmentStatusBadge status={order.fulfillmentStatus} />
           </div>
@@ -167,7 +169,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
               className={isLoading ? "spin" : undefined}
               size={16}
             />
-            {isLoading ? "Refreshing" : "Refresh"}
+            {isLoading ? t("orders.refreshing") : t("orders.refresh")}
           </button>
         </div>
       </header>
@@ -184,7 +186,7 @@ export function OrderDetailPage({ orderId }: OrderDetailPageProps) {
           <OrderItems order={order} />
         </div>
 
-        <aside className="order-detail-sidebar" aria-label="Order information">
+        <aside className="order-detail-sidebar" aria-label={t("orders.information")}>
           <OrderTotals order={order} />
           <ShippingAddress order={order} />
           <PaymentDetails currency={order.currency} payment={latestPayment} />
@@ -212,6 +214,7 @@ function ReturnRequestPanel({
   order: Order;
   returnRequest?: CustomerReturnRequest;
 }) {
+  const { locale, t } = useI18n();
   if (
     order.fulfillmentStatus !== "DELIVERED" &&
     order.fulfillmentStatus !== "RETURNED"
@@ -223,8 +226,8 @@ function ReturnRequestPanel({
     <section className="order-detail-card order-return-card" aria-labelledby="return-request-heading">
       <div className="order-detail-card__heading">
         <div>
-          <p className="eyebrow">After delivery</p>
-          <h2 id="return-request-heading">Return request</h2>
+          <p className="eyebrow">{t("orders.afterDelivery")}</p>
+          <h2 id="return-request-heading">{t("orders.returnRequest")}</h2>
         </div>
         <RotateCcw aria-hidden="true" size={22} />
       </div>
@@ -233,21 +236,21 @@ function ReturnRequestPanel({
         <div className="order-return-card__status">
           <ReturnRequestStatusBadge status={returnRequest.status} />
           <p>
-            Submitted {formatDate(returnRequest.createdAt)} for order #{order.orderCode}.
+            {t("orders.submitted")} {formatDate(returnRequest.createdAt, locale)} {t("orders.forOrder")} #{order.orderCode}.
           </p>
         </div>
       ) : order.fulfillmentStatus === "RETURNED" ? (
         <div className="order-return-card__status">
           <ReturnRequestStatusBadge status="APPROVED" />
-          <p>This order has an approved return.</p>
+          <p>{t("orders.approvedReturn")}</p>
         </div>
       ) : (
         <div className="order-return-card__action">
           <p>
-            If something is not right, send a short request for our team to review.
+            {t("orders.returnPrompt")}
           </p>
           <button className="button button--primary" onClick={onRequestReturn} type="button">
-            Request Return
+            {t("orders.requestReturn")}
           </button>
         </div>
       )}
@@ -258,6 +261,7 @@ function ReturnRequestPanel({
 }
 
 function FulfillmentProgress({ order }: { order: Order }) {
+  const { locale, t } = useI18n();
   const isReturned = order.fulfillmentStatus === "RETURNED";
   const activeIndex = isReturned
     ? FULFILLMENT_STEPS.length
@@ -270,21 +274,21 @@ function FulfillmentProgress({ order }: { order: Order }) {
     <section className="order-detail-card" aria-labelledby="shipping-progress-heading">
       <div className="order-detail-card__heading">
         <div>
-          <p className="eyebrow">Shipping progress</p>
+          <p className="eyebrow">{t("orders.shippingProgress")}</p>
           <h2 id="shipping-progress-heading">
             {isInactive
-              ? "Fulfillment stopped"
-              : getFulfillmentStatusLabel(order.fulfillmentStatus)}
+              ? t("orders.fulfillmentStopped")
+              : getFulfillmentStatusLabel(order.fulfillmentStatus, locale)}
           </h2>
         </div>
         <Truck aria-hidden="true" size={22} />
       </div>
       <p className="order-detail-card__intro">
         {isInactive
-          ? "This timeline is retained for reference. The order is no longer active."
+          ? t("orders.timelineInactive")
           : isReturned
-            ? "This order was delivered and its return request has been approved."
-          : "Fulfillment updates are read-only and come directly from our shipping team."}
+            ? t("orders.returnedIntro")
+          : t("orders.fulfillmentIntro")}
       </p>
       <ol className={`fulfillment-progress${isInactive ? " is-inactive" : ""}`}>
         {FULFILLMENT_STEPS.map((step, index) => {
@@ -307,15 +311,15 @@ function FulfillmentProgress({ order }: { order: Order }) {
                   <span aria-hidden="true" />
                 )}
               </span>
-              <span className="fulfillment-progress__label">{step.label}</span>
+              <span className="fulfillment-progress__label">{getFulfillmentStatusLabel(step.status, locale)}</span>
               <small>
                 {isComplete
-                  ? "Complete"
+                  ? t("orders.complete")
                   : isCurrent
                     ? step.status === "DELIVERED" && order.fulfilledAt
-                      ? formatDate(order.fulfilledAt)
-                      : "Current"
-                    : "Pending"}
+                      ? formatDate(order.fulfilledAt, locale)
+                      : t("orders.current")
+                    : t("orders.pending")}
               </small>
             </li>
           );
@@ -326,23 +330,24 @@ function FulfillmentProgress({ order }: { order: Order }) {
 }
 
 function OrderItems({ order }: { order: Order }) {
+  const { locale, t } = useI18n();
   return (
     <section className="order-detail-card" aria-labelledby="order-items-heading">
       <div className="order-detail-card__heading">
         <div>
-          <p className="eyebrow">Your pieces</p>
-          <h2 id="order-items-heading">Items in this order</h2>
+          <p className="eyebrow">{t("orders.yourPieces")}</p>
+          <h2 id="order-items-heading">{t("orders.itemsInOrder")}</h2>
         </div>
         <span className="order-detail-count">
-          {formatNumber(order.items.length)} {order.items.length === 1 ? "item" : "items"}
+          {formatNumber(order.items.length, locale)} {order.items.length === 1 ? t("orders.item") : t("orders.items")}
         </span>
       </div>
 
       {order.items.length === 0 ? (
         <div className="order-detail-empty" role="status">
           <Package aria-hidden="true" size={24} />
-          <strong>No items to show</strong>
-          <span>No item snapshots were returned for this order.</span>
+          <strong>{t("orders.noItems")}</strong>
+          <span>{t("orders.noItemSnapshots")}</span>
         </div>
       ) : (
         <div className="order-detail-items">
@@ -356,18 +361,18 @@ function OrderItems({ order }: { order: Order }) {
                   <h3>{item.productName}</h3>
                   {showVariantOption ? (
                     <p>
-                      <span>{item.color || "Color not set"}</span>
-                      <span>{item.size || "Size not set"}</span>
+                      <span>{item.color || t("orders.colorNotSet")}</span>
+                      <span>{item.size || t("orders.sizeNotSet")}</span>
                     </p>
                   ) : null}
                   {item.sku ? <small>SKU {item.sku}</small> : null}
                 </div>
                 <div className="order-detail-item__quantity">
-                  <span>Quantity</span>
-                  <strong>{formatNumber(item.quantity)}</strong>
+                  <span>{t("orders.quantity")}</span>
+                  <strong>{formatNumber(item.quantity, locale)}</strong>
                 </div>
                 <div className="order-detail-item__price">
-                  <span>{formatCurrency(item.unitPrice, order.currency)} each</span>
+                  <span>{formatCurrency(item.unitPrice, order.currency)} {t("orders.each")}</span>
                   <strong>{formatCurrency(item.lineTotal, order.currency)}</strong>
                 </div>
               </article>
@@ -380,18 +385,19 @@ function OrderItems({ order }: { order: Order }) {
 }
 
 function OrderTotals({ order }: { order: Order }) {
+  const { t } = useI18n();
   return (
     <section className="order-detail-card order-detail-totals" aria-labelledby="totals-heading">
       <div className="order-detail-card__heading">
-        <h2 id="totals-heading">Order summary</h2>
+        <h2 id="totals-heading">{t("orders.summary")}</h2>
       </div>
       <dl>
         <div>
-          <dt>Subtotal</dt>
+          <dt>{t("orders.subtotal")}</dt>
           <dd>{formatCurrency(order.subtotalAmount, order.currency)}</dd>
         </div>
         <div>
-          <dt>Discount</dt>
+          <dt>{t("orders.discount")}</dt>
           <dd className={order.discountAmount > 0 ? "is-discount" : undefined}>
             {order.discountAmount > 0 ? "-" : ""}
             {formatCurrency(order.discountAmount, order.currency)}
@@ -399,12 +405,12 @@ function OrderTotals({ order }: { order: Order }) {
         </div>
         {order.voucherCodeSnapshot ? (
           <div className="order-detail-voucher">
-            <dt>Voucher</dt>
+            <dt>{t("orders.voucher")}</dt>
             <dd>{order.voucherCodeSnapshot}</dd>
           </div>
         ) : null}
         <div className="order-detail-total">
-          <dt>Total</dt>
+          <dt>{t("orders.total")}</dt>
           <dd>{formatCurrency(order.totalAmount, order.currency)}</dd>
         </div>
       </dl>
@@ -413,6 +419,7 @@ function OrderTotals({ order }: { order: Order }) {
 }
 
 function ShippingAddress({ order }: { order: Order }) {
+  const { t } = useI18n();
   const address = [
     order.shippingAddressLine,
     order.shippingWard,
@@ -426,7 +433,7 @@ function ShippingAddress({ order }: { order: Order }) {
         <span>
           <MapPin aria-hidden="true" size={18} />
         </span>
-        <h2 id="shipping-address-heading">Shipping address</h2>
+        <h2 id="shipping-address-heading">{t("orders.shippingAddress")}</h2>
       </div>
       {order.shippingRecipientName ? (
         <address className="order-detail-address">
@@ -437,13 +444,13 @@ function ShippingAddress({ order }: { order: Order }) {
           {order.shippingPhone ? <span>{order.shippingPhone}</span> : null}
           {order.shippingNote ? (
             <span className="order-detail-address__note">
-              Note: {order.shippingNote}
+              {t("orders.note")}: {order.shippingNote}
             </span>
           ) : null}
         </address>
       ) : (
         <div className="order-detail-empty order-detail-empty--compact">
-          Delivery information is unavailable for this historical order.
+          {t("orders.addressUnavailable")}
         </div>
       )}
     </section>
@@ -457,42 +464,43 @@ function PaymentDetails({
   currency: string;
   payment?: PaymentSummary;
 }) {
+  const { locale, t } = useI18n();
   return (
     <section className="order-detail-card" aria-labelledby="payment-details-heading">
       <div className="order-detail-card__heading order-detail-card__heading--icon">
         <span>
           <CreditCard aria-hidden="true" size={18} />
         </span>
-        <h2 id="payment-details-heading">Payment</h2>
+        <h2 id="payment-details-heading">{t("orders.payment")}</h2>
       </div>
       {!payment ? (
         <div className="order-detail-empty order-detail-empty--compact">
-          No payment record is available yet.
+          {t("orders.noPayment")}
         </div>
       ) : (
         <dl className="order-detail-payment-list">
           <div>
-            <dt>Provider</dt>
+            <dt>{t("orders.provider")}</dt>
             <dd>{payment.provider}</dd>
           </div>
           <div>
-            <dt>Status</dt>
+            <dt>{t("orders.status")}</dt>
             <dd>
               <PaymentStatusBadge status={payment.status} />
             </dd>
           </div>
           <div>
-            <dt>Amount</dt>
+            <dt>{t("orders.amount")}</dt>
             <dd>{formatCurrency(payment.amount, payment.currency || currency)}</dd>
           </div>
           <div>
-            <dt>Order code</dt>
-            <dd>{formatOrderCode(payment.providerOrderCode)}</dd>
+            <dt>{t("orders.orderCode")}</dt>
+            <dd>{formatOrderCode(payment.providerOrderCode, locale)}</dd>
           </div>
           {payment.paidAt ? (
             <div>
-              <dt>Paid at</dt>
-              <dd>{formatDateTime(payment.paidAt)}</dd>
+              <dt>{t("orders.paidAt")}</dt>
+              <dd>{formatDateTime(payment.paidAt, locale)}</dd>
             </div>
           ) : null}
         </dl>
@@ -502,11 +510,12 @@ function PaymentDetails({
 }
 
 function OrderDetailLoading() {
+  const { t } = useI18n();
   return (
     <main className="customer-page order-detail-page" aria-busy="true">
       <div className="order-detail-loading-back" />
       <section className="order-detail-loading-shell" role="status">
-        <span className="sr-only">Loading order details</span>
+        <span className="sr-only">{t("orders.loadingDetail")}</span>
         <div className="order-detail-loading-title">
           <span />
           <span />
@@ -533,26 +542,27 @@ function OrderDetailError({
   error?: string;
   requestId?: string;
 }) {
+  const { t } = useI18n();
   return (
     <main className="customer-page order-detail-page">
       <Link className="order-detail-back" href="/orders">
         <ArrowLeft aria-hidden="true" size={17} />
-        Back to orders
+        {t("orders.back")}
       </Link>
       <section className="order-detail-error" role="alert">
         <span className="order-detail-error__icon">
           <AlertCircle aria-hidden="true" size={28} />
         </span>
-        <p className="eyebrow">Order detail</p>
-        <h1>Order unavailable</h1>
-        <p>{error || "This order was not found for the current account."}</p>
-        {requestId ? <small>Request {requestId}</small> : null}
+        <p className="eyebrow">{t("orders.detail")}</p>
+        <h1>{t("orders.unavailable")}</h1>
+        <p>{error || t("orders.notFound")}</p>
+        {requestId ? <small>{t("orders.request")} {requestId}</small> : null}
         <div className="order-detail-error__actions">
           <Link className="button button--primary" href="/orders">
-            View my orders
+            {t("orders.viewMyOrders")}
           </Link>
           <Link className="button button--secondary" href="/products">
-            Continue shopping
+            {t("orders.continueShopping")}
           </Link>
         </div>
       </section>

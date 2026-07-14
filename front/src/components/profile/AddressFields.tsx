@@ -1,4 +1,7 @@
 import type { AddressInput } from '@/features/addresses/types';
+import type { Locale } from '@/features/i18n/locale';
+import { translate } from '@/features/i18n/translations';
+import { useI18n } from '@/features/i18n/useI18n';
 
 export const emptyAddressInput: AddressInput = {
   recipientName: '', phone: '', province: '', district: '', ward: '', addressLine: '', note: '',
@@ -12,9 +15,10 @@ export function AddressFields({ autoFocus = false, compact = false, disabled = f
   onChange: (value: AddressInput) => void;
   value: AddressInput;
 }) {
+  const { t } = useI18n();
   const field = (key: keyof AddressInput, label: string, autoComplete: string, maxLength: number, placeholder: string) => (
     <div className={`form-field address-form__field--${key} ${(compact ? key === 'note' : key === 'addressLine' || key === 'note') ? 'address-form__wide' : ''}`}>
-      <label htmlFor={`${idPrefix}-${key}`}>{label}{key === 'note' ? ' (optional)' : ''}</label>
+      <label htmlFor={`${idPrefix}-${key}`}>{label}{key === 'note' ? ` (${t('profile.optional')})` : ''}</label>
       <input
         autoComplete={autoComplete}
         autoFocus={autoFocus && key === 'recipientName'}
@@ -32,23 +36,26 @@ export function AddressFields({ autoFocus = false, compact = false, disabled = f
 
   return (
     <div className={`address-form__fields ${compact ? 'address-form__fields--compact' : ''}`}>
-      {field('recipientName', 'Recipient name', 'name', 120, 'Nguyen Van An')}
-      {field('phone', 'Phone number', 'tel', 20, '0901234567')}
-      {field('province', 'Province / City', 'address-level1', 120, 'Ho Chi Minh City')}
-      {field('district', 'District', 'address-level2', 120, 'District 1')}
-      {field('ward', 'Ward', 'address-level3', 120, 'Ben Nghe Ward')}
-      {field('addressLine', compact ? 'Street address / Address line' : 'Address line', 'street-address', 255, '12 Nguyen Hue Street')}
-      {field('note', 'Delivery note', 'off', 500, 'Call before delivery')}
+      {field('recipientName', t('profile.recipientName'), 'name', 120, 'Nguyễn Văn An')}
+      {field('phone', t('profile.phone'), 'tel', 20, '0901234567')}
+      {field('province', t('profile.province'), 'address-level1', 120, t('profile.provincePlaceholder'))}
+      {field('district', t('profile.district'), 'address-level2', 120, t('profile.districtPlaceholder'))}
+      {field('ward', t('profile.ward'), 'address-level3', 120, t('profile.wardPlaceholder'))}
+      {field('addressLine', compact ? t('profile.streetAddress') : t('profile.addressLine'), 'street-address', 255, t('profile.addressPlaceholder'))}
+      {field('note', t('profile.deliveryNote'), 'off', 500, t('profile.notePlaceholder'))}
     </div>
   );
 }
 
-export function validateAddress(value: AddressInput): string | undefined {
+export function validateAddress(
+  value: AddressInput,
+  locale: Locale = 'en',
+): string | undefined {
   if (!value.recipientName.trim() || !value.phone.trim() || !value.province.trim() || !value.district.trim() || !value.ward.trim() || !value.addressLine.trim()) {
-    return 'Complete all required delivery fields.';
+    return translate(locale, 'profile.requiredFields');
   }
   if (!/^(?:\+84|0)\d{9}$/.test(value.phone.trim())) {
-    return 'Enter a valid Vietnamese phone number, such as 0901234567.';
+    return translate(locale, 'profile.invalidPhone');
   }
   return undefined;
 }
