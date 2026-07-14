@@ -347,6 +347,10 @@ async function run() {
     targetRole: 'jacket',
   });
   await verifyGenericReplacement({
+    prompt: 'ao khoac khac',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
     prompt: 'doi ao khoac',
     targetRole: 'jacket',
   });

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
   NormalizedStyleAdviceRequest,
@@ -892,12 +891,21 @@ export class OutfitRecommendationService {
       replaceRoles.add('shoes');
     }
 
+    const hasDifferentWording =
+      /\b(?:khac|different|another|other|new(?: one)?|something else|else|random|shuffle)\b/.test(
+        comparable,
+      );
+
+    if (!hasReplaceKeyword && hasDifferentWording && allMentionedRoles.length > 0) {
+      hasReplaceKeyword = true;
+      for (const role of allMentionedRoles) {
+        replaceRoles.add(role);
+      }
+    }
+
     const shouldShuffleReplacement =
       hasReplaceKeyword &&
-      (/\b(?:khac|different|another|other|new(?: one)?|something else|else|random|shuffle)\b/.test(
-        comparable,
-      ) ||
-        this.isBareRoleReplacement(comparable, replaceRoles));
+      (hasDifferentWording || this.isBareRoleReplacement(comparable, replaceRoles));
 
     if (shouldShuffleReplacement) {
       for (const role of replaceRoles) {
@@ -1237,6 +1245,7 @@ export class OutfitRecommendationService {
         excludedProductIds,
         preferredTags,
         rejectedTags,
+        undefined,
       );
 
       if (added) {
@@ -1276,6 +1285,9 @@ export class OutfitRecommendationService {
         excludedProductIds,
         preferredTags,
         rejectedTags,
+        parsed.replacementShuffleRoles.includes(targetRole)
+          ? removed?.product.record.id
+          : undefined,
         parsed.replacementShuffleRoles.includes(targetRole),
       );
 
@@ -1302,6 +1314,9 @@ export class OutfitRecommendationService {
         this.buildReplacementIntent(intent, currentIntent, []),
         selectedByRole,
         excludedProductIds,
+        [],
+        [],
+        undefined,
       );
 
       if (replacement) {
@@ -1421,6 +1436,7 @@ export class OutfitRecommendationService {
     excludedProductIds: Set<string>,
     preferredTags: string[] = [],
     rejectedTags: string[] = [],
+    rotateAfterProductId?: string,
     shuffle = false,
   ): ScoredProduct | undefined {
     const selectedIds = new Set(
@@ -1429,7 +1445,8 @@ export class OutfitRecommendationService {
     const candidates = this.scoreProductsForRole(products, role, intent).filter(
       (candidate) =>
         !selectedIds.has(candidate.product.record.id) &&
-        !excludedProductIds.has(candidate.product.record.id) &&
+        (!excludedProductIds.has(candidate.product.record.id) ||
+          candidate.product.record.id === rotateAfterProductId) &&
         !rejectedTags.some((tag) =>
           this.hasCompatibleProductTag(candidate.product, tag),
         ),
@@ -1450,7 +1467,17 @@ export class OutfitRecommendationService {
       return eligibleCandidates[0];
     }
 
-    return eligibleCandidates[randomInt(eligibleCandidates.length)];
+    if (rotateAfterProductId) {
+      const currentIndex = eligibleCandidates.findIndex(
+        (candidate) => candidate.product.record.id === rotateAfterProductId,
+      );
+
+      if (currentIndex >= 0) {
+        return eligibleCandidates[(currentIndex + 1) % eligibleCandidates.length];
+      }
+    }
+
+    return eligibleCandidates[0];
   }
 
   private applyRefinementBudget(
