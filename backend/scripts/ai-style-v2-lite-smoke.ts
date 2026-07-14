@@ -315,6 +315,14 @@ async function run() {
     targetRole: 'top',
   });
   await verifyGenericReplacement({
+    prompt: 'thay cai ao khac',
+    targetRole: 'top',
+  });
+  await verifyGenericReplacement({
+    prompt: 'ao khac',
+    targetRole: 'top',
+  });
+  await verifyGenericReplacement({
     prompt: 'doi ao',
     targetRole: 'top',
   });
@@ -331,6 +339,14 @@ async function run() {
     targetRole: 'bottom',
   });
   await verifyGenericReplacement({
+    prompt: 'thay cai quan khac',
+    targetRole: 'bottom',
+  });
+  await verifyGenericReplacement({
+    prompt: 'quan khac',
+    targetRole: 'bottom',
+  });
+  await verifyGenericReplacement({
     prompt: 'doi quan',
     targetRole: 'bottom',
   });
@@ -344,6 +360,26 @@ async function run() {
   });
   await verifyGenericReplacement({
     prompt: 'doi ao khoac khac',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
+    prompt: 'doi cai ao khoac khac',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
+    prompt: 'cho ao khoac khac',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
+    prompt: 'jacket khac',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
+    prompt: 'another jacket',
+    targetRole: 'jacket',
+  });
+  await verifyGenericReplacement({
+    prompt: 'đổi áo khoác khác',
     targetRole: 'jacket',
   });
   await verifyGenericReplacement({
@@ -367,6 +403,10 @@ async function run() {
     targetRole: 'shoes',
   });
   await verifyGenericReplacement({
+    prompt: 'giay khac',
+    targetRole: 'shoes',
+  });
+  await verifyGenericReplacement({
     prompt: 'doi giay',
     targetRole: 'shoes',
   });
@@ -380,6 +420,10 @@ async function run() {
   });
   await verifyGenericReplacement({
     prompt: 'doi phu kien khac',
+    targetRole: 'accessory',
+  });
+  await verifyGenericReplacement({
+    prompt: 'phu kien khac',
     targetRole: 'accessory',
   });
   await verifyGenericReplacement({
