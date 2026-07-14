@@ -5,8 +5,9 @@
   --intro-action-opacity: 1;
   --intro-action-pointer-events: auto;
   --intro-action-y: 0px;
-  --intro-landing-opacity: 0.92;
-  --intro-landing-y: 28px;
+  --intro-landing-opacity: 0;
+  --intro-landing-pointer-events: none;
+  --intro-landing-y: 18px;
   --intro-progress: 0;
   --intro-scene-opacity: 1;
   --intro-scene-pointer-events: auto;
@@ -157,10 +158,14 @@
 
 .landingSection {
   background: var(--color-background);
+  margin-top: calc(-100svh + var(--header-height));
   opacity: var(--intro-landing-opacity);
+  pointer-events: var(--intro-landing-pointer-events);
+  position: relative;
   scroll-margin-top: var(--header-height);
   transform: translate3d(0, var(--intro-landing-y), 0);
   will-change: transform, opacity;
+  z-index: 4;
 }
 
 .landingSection:focus {
@@ -210,6 +215,17 @@
   will-change: opacity;
 }
 
+:global(.site-header--intro-transition) {
+  left: 0;
+  opacity: var(--site-header-shell-opacity, 0);
+  pointer-events: var(--site-header-shell-pointer-events, none);
+  position: fixed;
+  right: 0;
+  top: 0;
+  transform: translateZ(0);
+  will-change: opacity;
+}
+
 :global(body.belikeme-scroll-intro-active .cart-toast),
 :global(body.belikeme-scroll-intro-active .mini-cart-backdrop),
 :global(body.belikeme-scroll-intro-active .mini-cart-drawer),
@@ -234,6 +250,17 @@
     opacity: 1;
     transform: none;
     visibility: visible;
+    will-change: auto;
+  }
+
+  .landingSection {
+    margin-top: 0;
+    pointer-events: auto;
+  }
+
+  :global(.site-header--intro-transition) {
+    opacity: 1;
+    pointer-events: auto;
     will-change: auto;
   }
 

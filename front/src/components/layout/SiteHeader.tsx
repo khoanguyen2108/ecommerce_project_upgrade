@@ -30,6 +30,7 @@ interface SiteHeaderProps {
   active?: SiteHeaderActive;
   brandHidden?: boolean;
   brandRef?: Ref<HTMLAnchorElement>;
+  headerHidden?: boolean;
   variant?: "default" | "intro-transition";
 }
 
@@ -60,6 +61,7 @@ export function SiteHeader({
   active,
   brandHidden = false,
   brandRef,
+  headerHidden = false,
   variant = "default",
 }: SiteHeaderProps) {
   const { t } = useI18n();
@@ -115,6 +117,12 @@ export function SiteHeader({
   }, [isMobileMenuOpen]);
 
   useEffect(() => {
+    if (headerHidden) {
+      setIsMobileMenuOpen(false);
+    }
+  }, [headerHidden]);
+
+  useEffect(() => {
     if (!isMobileMenuOpen) {
       return;
     }
@@ -144,7 +152,14 @@ export function SiteHeader({
   }
 
   return (
-    <header className="site-header" ref={headerRef}>
+    <header
+      aria-hidden={headerHidden ? true : undefined}
+      className={`site-header${
+        variant === "intro-transition" ? " site-header--intro-transition" : ""
+      }`}
+      inert={headerHidden ? true : undefined}
+      ref={headerRef}
+    >
       <div className="site-header__inner">
         <div className="site-header__left-actions">
           <button

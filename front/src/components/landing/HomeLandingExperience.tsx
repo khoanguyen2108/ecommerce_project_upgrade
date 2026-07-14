@@ -21,8 +21,8 @@ const LANDING_LOGO_SRC = "/assets/landing/belikeme-logo.png";
 const LANDING_MODEL_SRC = "/assets/landing/belikeme-logo-3d.glb";
 const LANDING_TARGET_ID = "landing";
 const FLOATING_UI_RELEASE_PROGRESS = 0.88;
-const HEADER_BRAND_FADE_END = 0.9;
-const HEADER_BRAND_FADE_START = 0.72;
+const HEADER_BRAND_FADE_END = 0.94;
+const HEADER_BRAND_FADE_START = 0.82;
 const HEADER_BRAND_INTERACTIVE_OPACITY = 0.18;
 const INTRO_HANDOFF_END = 0.9;
 const INTRO_HANDOFF_START = 0.12;
@@ -92,6 +92,7 @@ export function HomeLandingExperience() {
       <SiteHeader
         brandHidden={isHeaderBrandHidden}
         brandRef={brandTargetRef}
+        headerHidden={isHeaderBrandHidden}
         variant="intro-transition"
       />
       <main className={styles.home}>
@@ -237,6 +238,8 @@ function useIntroScrollProgress({
         return;
       }
 
+      const headerElement = brandElement.closest(".site-header--intro-transition");
+
       brandElement.style.setProperty(
         "--site-header-brand-opacity",
         opacity.toFixed(4),
@@ -245,6 +248,16 @@ function useIntroScrollProgress({
         "--site-header-brand-pointer-events",
         isHidden ? "none" : "auto",
       );
+      if (headerElement instanceof HTMLElement) {
+        headerElement.style.setProperty(
+          "--site-header-shell-opacity",
+          opacity.toFixed(4),
+        );
+        headerElement.style.setProperty(
+          "--site-header-shell-pointer-events",
+          isHidden ? "none" : "auto",
+        );
+      }
     }
 
     function writeStableReducedMotionState() {
@@ -265,6 +278,10 @@ function useIntroScrollProgress({
         "auto",
       );
       variableElement.style.setProperty("--intro-landing-opacity", "1");
+      variableElement.style.setProperty(
+        "--intro-landing-pointer-events",
+        "auto",
+      );
       variableElement.style.setProperty("--intro-landing-y", "0px");
       variableElement.style.setProperty(
         "--intro-scene-pointer-events",
@@ -323,7 +340,7 @@ function useIntroScrollProgress({
         normalize(progress, HEADER_BRAND_FADE_START, HEADER_BRAND_FADE_END),
       );
       const actionProgress = smoothstep(normalize(progress, 0.2, 0.62));
-      const landingProgress = smoothstep(normalize(progress, 0.56, 0.96));
+      const landingProgress = smoothstep(normalize(progress, 0.78, 0.94));
       const finalScale = getFinalSceneScale(
         headerLogoTarget.width,
         sceneOrigin.width,
@@ -337,8 +354,8 @@ function useIntroScrollProgress({
       const sceneOpacity = lerp(1, 0, fadeProgress);
       const actionOpacity = lerp(1, 0, actionProgress);
       const actionTranslateY = lerp(0, -18, actionProgress);
-      const landingOpacity = lerp(0.92, 1, landingProgress);
-      const landingTranslateY = lerp(28, 0, landingProgress);
+      const landingOpacity = lerp(0, 1, landingProgress);
+      const landingTranslateY = lerp(18, 0, landingProgress);
       const isHeaderBrandCurrentlyHidden =
         brandOpacity < HEADER_BRAND_INTERACTIVE_OPACITY;
       const isSceneCurrentlyHidden = progress >= SCENE_HIDDEN_PROGRESS;
@@ -383,6 +400,10 @@ function useIntroScrollProgress({
       variableElement.style.setProperty(
         "--intro-landing-opacity",
         landingOpacity.toFixed(4),
+      );
+      variableElement.style.setProperty(
+        "--intro-landing-pointer-events",
+        progress > FLOATING_UI_RELEASE_PROGRESS ? "auto" : "none",
       );
       variableElement.style.setProperty(
         "--intro-landing-y",
@@ -437,6 +458,15 @@ function useIntroScrollProgress({
       brandTargetRef.current?.style.removeProperty(
         "--site-header-brand-pointer-events",
       );
+      const headerElement = brandTargetRef.current?.closest(
+        ".site-header--intro-transition",
+      );
+      if (headerElement instanceof HTMLElement) {
+        headerElement.style.removeProperty("--site-header-shell-opacity");
+        headerElement.style.removeProperty(
+          "--site-header-shell-pointer-events",
+        );
+      }
 
       if (animationFrameId !== null) {
         window.cancelAnimationFrame(animationFrameId);
