@@ -20,16 +20,16 @@ import { markBelikemeIntroSeen } from "./IntroGate";
 const LANDING_LOGO_SRC = "/assets/landing/belikeme-logo.png";
 const LANDING_MODEL_SRC = "/assets/landing/belikeme-logo-3d.glb";
 const LANDING_TARGET_ID = "landing";
-const FLOATING_UI_RELEASE_PROGRESS = 0.88;
-const HEADER_BRAND_FADE_END = 0.94;
-const HEADER_BRAND_FADE_START = 0.82;
+const FLOATING_UI_RELEASE_PROGRESS = 0.86;
+const HEADER_BRAND_FADE_END = 0.96;
+const HEADER_BRAND_FADE_START = 0.8;
 const HEADER_BRAND_INTERACTIVE_OPACITY = 0.18;
-const INTRO_HANDOFF_END = 0.9;
-const INTRO_HANDOFF_START = 0.12;
+const INTRO_HANDOFF_END = 0.94;
+const INTRO_HANDOFF_START = 0.08;
 const INTRO_PROGRESS_EPSILON = 0.0005;
 const ROOT_INTRO_BODY_CLASS = "belikeme-scroll-intro-active";
-const SCENE_FADE_END = 0.94;
-const SCENE_FADE_START = 0.76;
+const SCENE_FADE_END = 0.96;
+const SCENE_FADE_START = 0.74;
 const SCENE_HIDDEN_PROGRESS = 0.985;
 
 const useIsomorphicLayoutEffect =
@@ -330,8 +330,10 @@ function useIntroScrollProgress({
         viewportHeight,
         viewportWidth,
       );
-      const scaleProgress = easeInOutCubic(
-        normalize(progress, INTRO_HANDOFF_START, INTRO_HANDOFF_END),
+      const travelProgress = normalize(
+        progress,
+        INTRO_HANDOFF_START,
+        INTRO_HANDOFF_END,
       );
       const fadeProgress = smoothstep(
         normalize(progress, SCENE_FADE_START, SCENE_FADE_END),
@@ -340,7 +342,7 @@ function useIntroScrollProgress({
         normalize(progress, HEADER_BRAND_FADE_START, HEADER_BRAND_FADE_END),
       );
       const actionProgress = smoothstep(normalize(progress, 0.2, 0.62));
-      const landingProgress = smoothstep(normalize(progress, 0.78, 0.94));
+      const landingProgress = smoothstep(normalize(progress, 0.68, 0.96));
       const finalScale = getFinalSceneScale(
         headerLogoTarget.width,
         sceneOrigin.width,
@@ -348,14 +350,14 @@ function useIntroScrollProgress({
       );
       const finalTranslateX = headerLogoTarget.centerX - sceneOrigin.centerX;
       const finalTranslateY = headerLogoTarget.centerY - sceneOrigin.centerY;
-      const scale = lerp(1, finalScale, scaleProgress);
-      const translateX = lerp(0, finalTranslateX, scaleProgress);
-      const translateY = lerp(0, finalTranslateY, scaleProgress);
+      const scale = lerp(1, finalScale, travelProgress);
+      const translateX = lerp(0, finalTranslateX, travelProgress);
+      const translateY = lerp(0, finalTranslateY, travelProgress);
       const sceneOpacity = lerp(1, 0, fadeProgress);
       const actionOpacity = lerp(1, 0, actionProgress);
       const actionTranslateY = lerp(0, -18, actionProgress);
       const landingOpacity = lerp(0, 1, landingProgress);
-      const landingTranslateY = lerp(18, 0, landingProgress);
+      const landingTranslateY = lerp(24, 0, landingProgress);
       const isHeaderBrandCurrentlyHidden =
         brandOpacity < HEADER_BRAND_INTERACTIVE_OPACITY;
       const isSceneCurrentlyHidden = progress >= SCENE_HIDDEN_PROGRESS;
@@ -619,14 +621,6 @@ function smoothstep(value: number) {
   const normalizedValue = clamp(value, 0, 1);
 
   return normalizedValue * normalizedValue * (3 - 2 * normalizedValue);
-}
-
-function easeInOutCubic(value: number) {
-  const normalizedValue = clamp(value, 0, 1);
-
-  return normalizedValue < 0.5
-    ? 4 * normalizedValue * normalizedValue * normalizedValue
-    : 1 - Math.pow(-2 * normalizedValue + 2, 3) / 2;
 }
 
 function lerp(start: number, end: number, progress: number) {
