@@ -12,6 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { type Ref, useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
+import { markBelikemeIntroSeen } from "@/components/landing/IntroGate";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
 import { LanguageSwitcher } from "@/features/i18n/LanguageSwitcher";
@@ -216,6 +217,7 @@ export function SiteHeader({
             variant === "intro-transition" ? "true" : undefined
           }
           href="/"
+          onClick={markBelikemeIntroSeen}
           ref={brandRef}
           tabIndex={brandHidden ? -1 : undefined}
         >

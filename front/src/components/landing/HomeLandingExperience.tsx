@@ -15,7 +15,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { LandingPage } from "@/components/marketing/LandingPage";
 import { useI18n } from "@/features/i18n/useI18n";
 import styles from "./HomeLandingExperience.module.css";
-import { markBelikemeIntroSeen } from "./IntroGate";
+import { hasBelikemeIntroBeenSeen, markBelikemeIntroSeen } from "./IntroGate";
 
 const LANDING_LOGO_SRC = "/assets/landing/belikeme-logo.png";
 const LANDING_MODEL_SRC = "/assets/landing/belikeme-logo-3d.glb";
@@ -62,10 +62,13 @@ export function HomeLandingExperience() {
   const { t } = useI18n();
   const brandTargetRef = useRef<HTMLAnchorElement | null>(null);
   const sceneTargetRef = useRef<HTMLDivElement | null>(null);
-  const [hasEnteredLanding, setHasEnteredLanding] = useState(false);
+  const [hasEnteredLanding, setHasEnteredLanding] = useState(() =>
+    typeof window === "undefined" ? false : hasBelikemeIntroBeenSeen(),
+  );
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   function completeLandingEntry() {
+    markBelikemeIntroSeen();
     setHasEnteredLanding(true);
     setIsTransitioning(false);
     window.scrollTo(0, 0);
@@ -83,7 +86,16 @@ export function HomeLandingExperience() {
       isTransitioning,
       onComplete: completeLandingEntry,
       sceneTargetRef,
-    });
+  });
+
+  useEffect(() => {
+    if (hasEnteredLanding || !hasBelikemeIntroBeenSeen()) {
+      return;
+    }
+
+    setHasEnteredLanding(true);
+    setIsTransitioning(false);
+  }, [hasEnteredLanding]);
 
   function handleShopNow(event: MouseEvent<HTMLAnchorElement>) {
     markBelikemeIntroSeen();

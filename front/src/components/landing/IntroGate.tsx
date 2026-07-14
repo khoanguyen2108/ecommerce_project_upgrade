@@ -19,3 +19,14 @@ export function markBelikemeIntroSeen() {
     // Storage can be unavailable in hardened browsers. The link still works.
   }
 }
+
+export function hasBelikemeIntroBeenSeen() {
+  try {
+    return (
+      window.localStorage.getItem(INTRO_SEEN_STORAGE_KEY) ===
+      INTRO_SEEN_STORAGE_VALUE
+    );
+  } catch {
+    return false;
+  }
+}
