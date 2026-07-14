@@ -1,5 +1,6 @@
 import { Send } from "lucide-react";
 import type { FormEvent, KeyboardEvent, RefObject } from "react";
+import { useI18n } from "@/features/i18n/useI18n";
 
 interface ChatComposerProps {
   draft: string;
@@ -18,6 +19,7 @@ export function ChatComposer({
   onSend,
   textareaRef,
 }: ChatComposerProps) {
+  const { t } = useI18n();
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSend();
@@ -38,25 +40,25 @@ export function ChatComposer({
 
   return (
     <form className="customer-chat-composer" onSubmit={handleSubmit}>
-      <label htmlFor="customer-chat-message">Message</label>
+      <label htmlFor="customer-chat-message">{t("chat.message")}</label>
       <div className="customer-chat-composer__field">
         <textarea
-          aria-label="Type your message"
+          aria-label={t("chat.typeMessage")}
           disabled={isSending}
           id="customer-chat-message"
           maxLength={maxLength}
           onChange={(event) => onDraftChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your message..."
+          placeholder={t("chat.typeMessagePlaceholder")}
           ref={textareaRef}
           rows={1}
           value={draft}
         />
         <button
-          aria-label="Send message"
+          aria-label={t("chat.sendMessage")}
           className="customer-chat-composer__send"
           disabled={!draft.trim() || isSending}
-          title="Send message"
+          title={t("chat.sendMessage")}
           type="submit"
         >
           <Send aria-hidden="true" size={17} />

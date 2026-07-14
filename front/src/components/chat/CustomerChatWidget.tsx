@@ -32,6 +32,9 @@ import type {
   ChatSocketError,
 } from "@/features/chat/types";
 import { ApiClientError } from "@/lib/errors/api-error";
+import { useI18n } from "@/features/i18n/useI18n";
+import type { Locale } from "@/features/i18n/locale";
+import type { TranslationKey } from "@/features/i18n/translations";
 
 type ConnectionState = "connected" | "connecting" | "offline";
 
@@ -90,55 +93,28 @@ const LEGACY_UNSUPPORTED_AI_MESSAGE_TYPES = new Set([
   "size_recommendation",
   "comparison_card",
 ]);
-const LEGACY_UNSUPPORTED_AI_MESSAGE =
-  "Belikeme AI Support: This older AI message used a feature that is no longer available. You can keep chatting here for product questions, order tracking, returns, or human support.";
-
-const CUSTOMER_CHAT_WELCOME_MESSAGE = `Hi
-
-I'm Belikeme AI.
-
-I can help you with:
-
-- outfit suggestions
-- products
-- order status
-- shipping
-
-If I can't solve it,
-
-I'll connect you with our team.`;
-
-const AI_UNAVAILABLE_MESSAGE = `AI is temporarily unavailable.
-
-You can continue chatting with our support team.`;
-
-const OUT_OF_SCOPE_MESSAGE = `Sorry,
-
-I can only help with Belikeme shopping,
-
-orders,
-
-products,
-
-and shipping.`;
-
 const CUSTOMER_CHAT_QUICK_ACTIONS = [
   {
-    label: "Track Order",
-    message: "I need help tracking my order.",
+    labelKey: "chat.trackOrder",
+    messageKey: "chat.trackOrderMessage",
     action: "TRACK_ORDER",
   },
   {
-    label: "Request Return",
-    message: "I want to return my order.",
+    labelKey: "chat.requestReturn",
+    messageKey: "chat.requestReturnMessage",
     action: "RETURN_REQUEST",
   },
-] as const;
+] as const satisfies ReadonlyArray<{
+  action: SupportRequest["action"];
+  labelKey: TranslationKey;
+  messageKey: TranslationKey;
+}>;
 
 let localMessageSequence = 0;
 
 export function CustomerChatWidget() {
   const pathname = usePathname() || "/";
+  const { locale, t } = useI18n();
   const {
     accessToken,
     currentUser,
@@ -205,18 +181,22 @@ export function CustomerChatWidget() {
 
     setLocalMessages((current) => {
       if (current.some((message) => message.welcome)) {
-        return current;
+        return current.map((message) =>
+          message.welcome
+            ? { ...message, body: t("chat.welcome") }
+            : message,
+        );
       }
 
       return [
         ...current,
-        createLocalMessage("ai", CUSTOMER_CHAT_WELCOME_MESSAGE, {
+        createLocalMessage("ai", t("chat.welcome"), {
           showDayLabel: true,
           welcome: true,
         }),
       ];
     });
-  }, [isAdmin, isAuthenticated, isOpen]);
+  }, [isAdmin, isAuthenticated, isOpen, t]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
@@ -264,7 +244,7 @@ export function CustomerChatWidget() {
           return;
         }
 
-        setError(getChatErrorMessage(loadError));
+        setError(getChatErrorMessage(loadError, locale, t("chat.unavailable")));
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -277,7 +257,7 @@ export function CustomerChatWidget() {
     return () => {
       isMounted = false;
     };
-  }, [isAdmin, isAuthenticated, isOpen]);
+  }, [isAdmin, isAuthenticated, isOpen, locale, t]);
 
   useEffect(() => {
     if (!isAuthenticated || isAdmin) {
@@ -297,7 +277,7 @@ export function CustomerChatWidget() {
         socketRef.current = socket;
         setConnectionState("connecting");
       } catch (socketError) {
-        setError(getChatErrorMessage(socketError));
+        setError(getChatErrorMessage(socketError, locale, t("chat.unavailable")));
         setConnectionState("offline");
         return;
       }
@@ -316,7 +296,7 @@ export function CustomerChatWidget() {
       socket.on("connect_error", (connectError) => {
         if (isMounted) {
           setConnectionState("offline");
-          setError(getChatErrorMessage(connectError));
+          setError(getChatErrorMessage(connectError, locale, t("chat.unavailable")));
         }
       });
       socket.io.on("reconnect_attempt", () => {
@@ -327,7 +307,7 @@ export function CustomerChatWidget() {
       socket.io.on("reconnect_error", (connectError) => {
         if (isMounted) {
           setConnectionState("offline");
-          setError(getChatErrorMessage(connectError));
+          setError(getChatErrorMessage(connectError, locale, t("chat.unavailable")));
         }
       });
       socket.io.on("reconnect", () => {
@@ -370,7 +350,9 @@ export function CustomerChatWidget() {
       });
       socket.on("chat:error", (socketError) => {
         if (isMounted) {
-          setError(socketError.message);
+          setError(
+            getChatErrorMessage(socketError, locale, t("chat.unavailable")),
+          );
         }
       });
     }
@@ -382,19 +364,19 @@ export function CustomerChatWidget() {
       socket?.disconnect();
       socketRef.current = undefined;
     };
-  }, [accessToken, isAdmin, isAuthenticated]);
+  }, [accessToken, isAdmin, isAuthenticated, locale, t]);
 
   const connectionLabel = useMemo(() => {
     if (connectionState === "connected") {
-      return "Online • Usually responds in minutes";
+      return t("chat.online");
     }
 
     if (connectionState === "connecting") {
-      return "Reconnecting • Usually responds in minutes";
+      return t("chat.reconnecting");
     }
 
-    return "Offline • We will reconnect shortly";
-  }, [connectionState]);
+    return t("chat.offline");
+  }, [connectionState, t]);
 
   const timeline = useMemo(
     () => buildTimeline(messages, localMessages, forwardedPersistedIds),
@@ -453,7 +435,7 @@ export function CustomerChatWidget() {
 
         if (isOutOfScope) {
           if (!hasPersistedHistory) {
-            addAiMessage(OUT_OF_SCOPE_MESSAGE, "out-of-scope");
+            addAiMessage(t("chat.outOfScope"), "out-of-scope");
           }
           return;
         }
@@ -471,8 +453,8 @@ export function CustomerChatWidget() {
                 ? {}
                 : {
                     status:
-                      "This conversation has been forwarded to Belikeme Support.",
-                    statusDetail: "Waiting for an available specialist...",
+                      t("chat.forwarded"),
+                    statusDetail: t("chat.waitingSpecialist"),
                   },
             );
           }
@@ -500,7 +482,7 @@ export function CustomerChatWidget() {
           return;
         }
 
-        addAiMessage(AI_UNAVAILABLE_MESSAGE, "error");
+        addAiMessage(t("chat.aiUnavailable"), "error");
         await forwardToHumanSupport(body, customerMessage.id);
       }
     } finally {
@@ -564,7 +546,7 @@ export function CustomerChatWidget() {
             setIsSendingRealtime(false);
 
             if (!response) {
-              setError("Message could not be sent.");
+              setError(t("chat.messageFailed"));
 
               if (options.restoreDraftOnFailure) {
                 setDraft(body);
@@ -575,7 +557,11 @@ export function CustomerChatWidget() {
             }
 
             if (!response.ok) {
-              setError(response.error?.message || "Message could not be sent.");
+              setError(
+                locale === "en" && response.error?.message
+                  ? response.error.message
+                  : t("chat.messageFailed"),
+              );
 
               if (options.restoreDraftOnFailure) {
                 setDraft(body);
@@ -616,7 +602,7 @@ export function CustomerChatWidget() {
         markMessageAsForwarded(response.message.id, setForwardedPersistedIds);
       }
     } catch (sendError) {
-      setError(getChatErrorMessage(sendError));
+      setError(getChatErrorMessage(sendError, locale, t("chat.unavailable")));
 
       if (options.restoreDraftOnFailure) {
         setDraft(body);
@@ -649,7 +635,7 @@ export function CustomerChatWidget() {
   function handleQuickAction(
     action: (typeof CUSTOMER_CHAT_QUICK_ACTIONS)[number],
   ) {
-    setDraft(action.message);
+    setDraft(t(action.messageKey));
     setDraftAction("action" in action ? action.action : undefined);
     textareaRef.current?.focus();
   }
@@ -658,7 +644,7 @@ export function CustomerChatWidget() {
     <div className="customer-chat-widget">
       {isOpen ? (
         <section
-          aria-label="Belikeme Support"
+          aria-label={t("chat.support")}
           className="customer-chat-panel"
           role="dialog"
         >
@@ -669,7 +655,7 @@ export function CustomerChatWidget() {
                 <span />
               </div>
               <div>
-                <h2>Belikeme Support</h2>
+                <h2>{t("chat.support")}</h2>
                 <span
                   className={`customer-chat-panel__status customer-chat-panel__status--${connectionState}`}
                 >
@@ -678,16 +664,16 @@ export function CustomerChatWidget() {
                   ) : null}
                   {isAuthenticated
                     ? connectionLabel
-                    : "Sign in to start a conversation"}
+                    : t("chat.signInStart")}
                 </span>
               </div>
             </div>
             <div className="customer-chat-panel__controls">
               <button
-                aria-label="Close support chat"
+                aria-label={t("chat.close")}
                 className="customer-chat-panel__control"
                 onClick={() => setIsOpen(false)}
-                title="Close support chat"
+                title={t("chat.close")}
                 type="button"
               >
                 <X aria-hidden="true" size={18} />
@@ -701,12 +687,10 @@ export function CustomerChatWidget() {
                 <div aria-hidden="true" className="customer-chat-panel__sign-in-icon">
                   <MessageCircle size={25} />
                 </div>
-                <h3>We&apos;re here to help</h3>
-                <p>
-                  Sign in to chat with Belikeme AI and our customer support team.
-                </p>
+                <h3>{t("chat.helpTitle")}</h3>
+                <p>{t("chat.helpBody")}</p>
                 <Link href={`/login?next=${encodeURIComponent(pathname)}`}>
-                  Sign in to chat
+                  {t("chat.signIn")}
                 </Link>
               </div>
             ) : isLoading ? (
@@ -719,7 +703,10 @@ export function CustomerChatWidget() {
               >
                 {timeline.map((item) => {
                   if (item.kind === "persisted") {
-                    const aiResponse = getPersistedAiResponse(item.message);
+                    const aiResponse = getPersistedAiResponse(
+                      item.message,
+                      t("chat.legacyUnsupported"),
+                    );
 
                     if (aiResponse) {
                       const requiresHuman = isHandoffResponse(aiResponse);
@@ -740,12 +727,12 @@ export function CustomerChatWidget() {
                           returnRequests={aiResponse.returnRequests}
                           status={
                             requiresHuman && !requiresOrderContext
-                              ? "This conversation has been forwarded to Belikeme Support."
+                              ? t("chat.forwarded")
                               : undefined
                           }
                           statusDetail={
                             requiresHuman && !requiresOrderContext
-                              ? "Waiting for an available specialist..."
+                              ? t("chat.waitingSpecialist")
                               : undefined
                           }
                           tone={
@@ -808,7 +795,7 @@ export function CustomerChatWidget() {
           {isAuthenticated ? (
             <>
               <div
-                aria-label="Quick messages"
+                aria-label={t("chat.quickMessages")}
                 className="customer-chat-quick-actions"
                 role="group"
               >
@@ -816,11 +803,11 @@ export function CustomerChatWidget() {
                   <button
                     className="customer-chat-quick-actions__chip"
                     disabled={isSending}
-                    key={action.label}
+                    key={action.action}
                     onClick={() => handleQuickAction(action)}
                     type="button"
                   >
-                    {action.label}
+                    {t(action.labelKey)}
                   </button>
                 ))}
               </div>
@@ -843,10 +830,10 @@ export function CustomerChatWidget() {
       {!isOpen ? (
         <button
           aria-expanded="false"
-          aria-label="Open Belikeme support chat"
+          aria-label={t("chat.open")}
           className="customer-chat-widget__launcher"
           onClick={() => setIsOpen(true)}
-          title="Belikeme Support"
+          title={t("chat.support")}
           type="button"
         >
           <MessageCircle aria-hidden="true" size={24} />
@@ -894,8 +881,13 @@ export function CustomerChatWidget() {
 }
 
 function ChatMessageSkeleton() {
+  const { t } = useI18n();
   return (
-    <div className="customer-chat-messages" role="status">
+    <div
+      aria-label={t("chat.loading")}
+      className="customer-chat-messages"
+      role="status"
+    >
       {Array.from({ length: 3 }, (_, index) => (
         <div
           aria-hidden="true"
@@ -1079,6 +1071,7 @@ function isOutOfScopeResponse(response: SupportResponse): boolean {
 
 function getPersistedAiResponse(
   message: ChatMessage,
+  legacyMessage: string,
 ): SupportResponse | undefined {
   if (message.senderRole !== "AI") {
     return undefined;
@@ -1094,7 +1087,7 @@ function getPersistedAiResponse(
     return {
       mode: "ai",
       type: "text",
-      answer: LEGACY_UNSUPPORTED_AI_MESSAGE,
+      answer: legacyMessage,
       sources: [],
       handoff: { required: false },
     };
@@ -1167,16 +1160,20 @@ function shouldCountCustomerUnread(
   return typeof document !== "undefined" && document.visibilityState !== "visible";
 }
 
-function getChatErrorMessage(error: unknown): string {
+function getChatErrorMessage(
+  error: unknown,
+  locale: Locale,
+  fallback: string,
+): string {
   if (error instanceof ApiClientError) {
-    return error.message;
+    return locale === "en" ? error.message : fallback;
   }
 
   const socketError = error as Partial<ChatSocketError>;
 
   if (typeof socketError?.message === "string") {
-    return socketError.message;
+    return locale === "en" ? socketError.message : fallback;
   }
 
-  return "Belikeme support chat is unavailable right now.";
+  return fallback;
 }

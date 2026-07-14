@@ -1,9 +1,11 @@
 import { Sparkles } from "lucide-react";
+import { useI18n } from "@/features/i18n/useI18n";
 
 export function AiTypingIndicator() {
+  const { t } = useI18n();
   return (
     <div
-      aria-label="Belikeme AI is typing"
+      aria-label={t("chat.aiTyping")}
       aria-live="polite"
       className="customer-chat-ai-typing"
       role="status"

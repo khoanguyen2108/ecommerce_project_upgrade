@@ -1,4 +1,6 @@
 import type { ChatMessage as PersistedChatMessage } from "@/features/chat/types";
+import { useI18n } from "@/features/i18n/useI18n";
+import type { Locale } from "@/features/i18n/locale";
 
 interface ChatMessageProps {
   body?: string;
@@ -13,6 +15,7 @@ export function ChatMessage({
   isOwn,
   message,
 }: ChatMessageProps) {
+  const { locale, t } = useI18n();
   const resolvedBody = message?.body ?? body ?? "";
   const resolvedCreatedAt = message?.createdAt ?? createdAt ?? "";
   const resolvedIsOwn = message
@@ -29,20 +32,20 @@ export function ChatMessage({
     >
       <p>{resolvedBody}</p>
       <time dateTime={resolvedCreatedAt || undefined}>
-        {formatChatTime(resolvedCreatedAt)}
+        {formatChatTime(resolvedCreatedAt, locale, t("chat.now"))}
       </time>
     </article>
   );
 }
 
-function formatChatTime(value: string): string {
+function formatChatTime(value: string, locale: Locale, fallback: string): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Now";
+    return fallback;
   }
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
