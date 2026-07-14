@@ -1,6 +1,12 @@
 import type { Locale } from "@/features/i18n/locale";
 
 const english = {
+  "intro.title": "BELIKEME cinematic intro",
+  "intro.logoAria": "Interactive 3D BELIKEME logo. Drag to rotate the logo.",
+  "intro.shopNow": "SHOP NOW",
+  "intro.dragToInteract": "DRAG TO INTERACT",
+  "intro.touchAndDrag": "TOUCH AND DRAG",
+  "intro.landingLabel": "Belikeme landing page",
   "language.change": "Change language",
   "nav.shop": "Shop",
   "nav.categories": "Categories",
@@ -460,6 +466,12 @@ export type TranslationKey = keyof typeof english;
 export type TranslationDictionary = Record<TranslationKey, string>;
 
 const vietnamese = {
+  "intro.title": "Gi\u1edbi thi\u1ec7u \u0111i\u1ec7n \u1ea3nh BELIKEME",
+  "intro.logoAria": "Logo BELIKEME 3D t\u01b0\u01a1ng t\u00e1c. K\u00e9o \u0111\u1ec3 xoay logo.",
+  "intro.shopNow": "MUA NGAY",
+  "intro.dragToInteract": "K\u00c9O \u0110\u1ec2 T\u01af\u01a0NG T\u00c1C",
+  "intro.touchAndDrag": "CH\u1ea0M V\u00c0 K\u00c9O",
+  "intro.landingLabel": "Trang gi\u1edbi thi\u1ec7u Belikeme",
   "language.change": "Thay đổi ngôn ngữ",
   "nav.shop": "Cửa hàng",
   "nav.categories": "Danh mục",

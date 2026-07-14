@@ -70,7 +70,7 @@ export function LandingPage() {
   }, []);
 
   return (
-    <main>
+    <div className="landing-page">
       <section className="hero-section" aria-labelledby="hero-heading">
         <video
           aria-hidden="true"
@@ -88,7 +88,7 @@ export function LandingPage() {
           <h1 id="hero-heading">{t("landing.heroTitle")}</h1>
           <p>{t("landing.heroSubtitle")}</p>
           <div className="hero-section__actions">
-            <Link className="button button--primary" href="#new-arrivals">
+            <Link className="button button--primary" href="/products">
               {t("landing.exploreProducts")} <ArrowRight size={18} />
             </Link>
             <Link className="button button--secondary button--on-image" href="#categories">
@@ -187,7 +187,7 @@ export function LandingPage() {
           </Link>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 
