@@ -16,7 +16,7 @@ export type AiQuotaEndpoint =
   | 'support';
 
 const DAILY_LIMITS: Record<AiQuotaEndpoint, number> = {
-  'style-advice': 20,
+  'style-advice': 100,
   'recommend-products': 20,
   support: 50,
 };
