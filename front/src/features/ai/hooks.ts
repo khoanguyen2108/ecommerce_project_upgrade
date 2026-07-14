@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getStyleAdvice } from "@/features/ai/api";
 import { getCurrentStyleAdviceOutfit } from "@/features/ai/normalize";
 import type {
@@ -12,14 +12,37 @@ import type {
 } from "@/features/ai/types";
 import { ApiClientError } from "@/lib/errors/api-error";
 
+const STYLE_ADVICE_SESSION_KEY = "belikeme:style-advice:last-outfit:v1";
+
 export function useStyleAdvice() {
-  const [status, setStatus] = useState<StyleAdviceStatus>("idle");
-  const [result, setResult] = useState<StyleAdviceResponse>();
-  const [currentOutfitContext, setCurrentOutfitContext] =
-    useState<CurrentOutfitContext>();
+  const [storedAdvice] = useState(readStoredStyleAdvice);
+  const [status, setStatus] = useState<StyleAdviceStatus>(
+    storedAdvice ? "success" : "idle",
+  );
+  const [result, setResult] = useState<StyleAdviceResponse | undefined>(
+    storedAdvice?.result,
+  );
+  const [currentOutfitContext, setCurrentOutfitContext] = useState<
+    CurrentOutfitContext | undefined
+  >(storedAdvice?.currentOutfitContext);
   const [error, setError] = useState<string>();
-  const [lastPrompt, setLastPrompt] = useState("");
-  const [lastSuccessfulPrompt, setLastSuccessfulPrompt] = useState("");
+  const [lastPrompt, setLastPrompt] = useState(storedAdvice?.lastPrompt ?? "");
+  const [lastSuccessfulPrompt, setLastSuccessfulPrompt] = useState(
+    storedAdvice?.lastSuccessfulPrompt ?? "",
+  );
+
+  useEffect(() => {
+    if (status !== "success" || !result || !currentOutfitContext) {
+      return;
+    }
+
+    writeStoredStyleAdvice({
+      currentOutfitContext,
+      lastPrompt,
+      lastSuccessfulPrompt,
+      result,
+    });
+  }, [currentOutfitContext, lastPrompt, lastSuccessfulPrompt, result, status]);
 
   const generate = useCallback(
     async (prompt: string) => {
@@ -109,6 +132,13 @@ interface CurrentOutfitContext {
   locale?: "vi" | "en";
 }
 
+interface StoredStyleAdvice {
+  currentOutfitContext: CurrentOutfitContext;
+  lastPrompt: string;
+  lastSuccessfulPrompt: string;
+  result: StyleAdviceResponse;
+}
+
 function buildStyleAdviceRequest(
   message: string,
   currentContext: CurrentOutfitContext | undefined,
@@ -152,4 +182,57 @@ function getStyleAdviceErrorMessage(error: unknown): string {
   }
 
   return "The style assistant is unavailable right now. Please try again.";
+}
+
+function readStoredStyleAdvice(): StoredStyleAdvice | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(STYLE_ADVICE_SESSION_KEY);
+    if (!rawValue) {
+      return undefined;
+    }
+
+    const parsed = JSON.parse(rawValue) as Partial<StoredStyleAdvice>;
+    const outfit = parsed.currentOutfitContext?.outfit;
+
+    if (
+      !parsed.result ||
+      !outfit ||
+      !Array.isArray(outfit.items) ||
+      outfit.items.length === 0
+    ) {
+      return undefined;
+    }
+
+    return {
+      currentOutfitContext: parsed.currentOutfitContext,
+      lastPrompt: typeof parsed.lastPrompt === "string" ? parsed.lastPrompt : "",
+      lastSuccessfulPrompt:
+        typeof parsed.lastSuccessfulPrompt === "string"
+          ? parsed.lastSuccessfulPrompt
+          : "",
+      result: parsed.result,
+    } as StoredStyleAdvice;
+  } catch {
+    window.sessionStorage.removeItem(STYLE_ADVICE_SESSION_KEY);
+    return undefined;
+  }
+}
+
+function writeStoredStyleAdvice(value: StoredStyleAdvice) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      STYLE_ADVICE_SESSION_KEY,
+      JSON.stringify(value),
+    );
+  } catch {
+    // Best-effort only; in-memory state remains the source of truth.
+  }
 }

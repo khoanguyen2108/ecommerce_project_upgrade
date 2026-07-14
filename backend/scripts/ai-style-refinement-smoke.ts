@@ -188,6 +188,18 @@ async function run() {
       replacementSlugIncludes: 'hoodie',
     },
   );
+  const hoodieRefinement = await generate('th\u00eam hoodie', initialStreetwear);
+  await verifyRefinement(
+    '\u0111\u1ed5i th\u00e0nh jacket',
+    hoodieRefinement,
+    {
+      locale: 'vi',
+      action: 'replace',
+      targetRoles: ['jacket'],
+      replacedRole: 'jacket',
+      replacementSlugIncludes: 'jacket',
+    },
+  );
 
   await verifyMissingContext(
     'Tui th\u00edch option 1 nh\u01b0ng \u0111\u1ed5i qu\u1ea7n.',

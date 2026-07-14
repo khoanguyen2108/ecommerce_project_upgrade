@@ -124,6 +124,7 @@ interface ParsedRefinement {
   replaceRoles: OutfitRole[];
   replacementRoleBySource: Map<OutfitRole, OutfitRole>;
   replacementShuffleRoles: OutfitRole[];
+  replacementRejectedTags: Map<OutfitRole, string[]>;
   replacementTags: Map<OutfitRole, string[]>;
   requiresPreviousContext: boolean;
   targetRoles: OutfitRole[];
@@ -723,6 +724,7 @@ export class OutfitRecommendationService {
     const removeRoles = new Set<OutfitRole>();
     const replacementRoleBySource = new Map<OutfitRole, OutfitRole>();
     const replacementShuffleRoles = new Set<OutfitRole>();
+    const replacementRejectedTags = new Map<OutfitRole, string[]>();
     const replacementTags = new Map<OutfitRole, string[]>();
     const allMentionedRoles = this.findMentionedRoles(comparable);
     const actionMatches = [
@@ -832,6 +834,40 @@ export class OutfitRecommendationService {
 
     if (
       hasReplaceKeyword &&
+      allMentionedRoles.includes('jacket') &&
+      /\b(?:hoodies?|ao hoodie)\b/.test(comparable) &&
+      !/\b(?:sang|thanh|to|with|bang)\s+(?:jacket|coat|outerwear|ao khoac)\b/.test(
+        comparable,
+      )
+    ) {
+      replacementTags.set('jacket', ['hoodie']);
+      replaceRoles.add('jacket');
+    }
+
+    if (
+      hasReplaceKeyword &&
+      allMentionedRoles.includes('jacket') &&
+      /\b(?:jacket|coat|outerwear|ao khoac)\b/.test(comparable) &&
+      !/\b(?:sang|thanh|to|with|bang)\s+(?:hoodies?|ao hoodie)\b/.test(
+        comparable,
+      )
+    ) {
+      replacementTags.set('jacket', [
+        'jacket',
+        'outerwear',
+        'coat',
+        'blazer',
+        'overshirt',
+        'leather_jacket',
+        'biker',
+        'ao_khoac',
+      ]);
+      replacementRejectedTags.set('jacket', ['hoodie']);
+      replaceRoles.add('jacket');
+    }
+
+    if (
+      hasReplaceKeyword &&
       allMentionedRoles.includes('bottom') &&
       /\b(?:flared|loe|ong loe)\b/.test(comparable)
     ) {
@@ -923,6 +959,7 @@ export class OutfitRecommendationService {
       removeRoles: [...removeRoles],
       replaceRoles: [...replaceRoles],
       replacementRoleBySource,
+      replacementRejectedTags,
       replacementShuffleRoles: [...replacementShuffleRoles],
       replacementTags,
       requiresPreviousContext,
@@ -1187,6 +1224,7 @@ export class OutfitRecommendationService {
       }
 
       const preferredTags = parsed.replacementTags.get(role) ?? [];
+      const rejectedTags = parsed.replacementRejectedTags.get(role) ?? [];
       const added = this.selectReplacementProduct(
         products,
         role,
@@ -1198,6 +1236,7 @@ export class OutfitRecommendationService {
         selectedByRole,
         excludedProductIds,
         preferredTags,
+        rejectedTags,
       );
 
       if (added) {
@@ -1228,6 +1267,7 @@ export class OutfitRecommendationService {
         parsed.replacementTags.get(targetRole) ?? [],
       );
       const preferredTags = parsed.replacementTags.get(targetRole) ?? [];
+      const rejectedTags = parsed.replacementRejectedTags.get(targetRole) ?? [];
       const replacement = this.selectReplacementProduct(
         products,
         targetRole,
@@ -1235,6 +1275,7 @@ export class OutfitRecommendationService {
         selectedByRole,
         excludedProductIds,
         preferredTags,
+        rejectedTags,
         parsed.replacementShuffleRoles.includes(targetRole),
       );
 
@@ -1379,6 +1420,7 @@ export class OutfitRecommendationService {
     selectedByRole: Map<OutfitRole, ScoredProduct>,
     excludedProductIds: Set<string>,
     preferredTags: string[] = [],
+    rejectedTags: string[] = [],
     shuffle = false,
   ): ScoredProduct | undefined {
     const selectedIds = new Set(
@@ -1387,7 +1429,10 @@ export class OutfitRecommendationService {
     const candidates = this.scoreProductsForRole(products, role, intent).filter(
       (candidate) =>
         !selectedIds.has(candidate.product.record.id) &&
-        !excludedProductIds.has(candidate.product.record.id),
+        !excludedProductIds.has(candidate.product.record.id) &&
+        !rejectedTags.some((tag) =>
+          this.hasCompatibleProductTag(candidate.product, tag),
+        ),
     );
     const preferredCandidates =
       preferredTags.length === 0
