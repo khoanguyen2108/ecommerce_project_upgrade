@@ -12,7 +12,7 @@ import {
   useState,
 } from "react";
 import { MathUtils, type Group } from "three";
-import styles from "./BelikemeIntroPage.module.css";
+import styles from "./InteractiveLogoScene.module.css";
 
 const FRONT_FACING_MODEL_ROTATION: [number, number, number] = [0, 0, 0];
 const CONTINUOUS_ROTATION_SPEED = 0.58;

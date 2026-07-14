@@ -8,7 +8,6 @@ import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 
 const PUBLIC_ROUTES = new Set([
   "/",
-  "/intro",
   "/login",
   "/register",
   "/forgot-password",
