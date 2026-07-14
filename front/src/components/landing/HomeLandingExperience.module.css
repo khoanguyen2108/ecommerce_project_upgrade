@@ -219,7 +219,7 @@
 .homeEntered .landingSection {
   min-height: 100svh;
   opacity: 1;
-  padding-top: var(--header-height);
+  padding-top: 0;
   pointer-events: auto;
   position: relative;
   transform: none;
