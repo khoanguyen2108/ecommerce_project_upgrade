@@ -193,6 +193,14 @@ img {
   justify-self: start;
 }
 
+.site-header__left-actions {
+  display: contents;
+}
+
+.icon-button.site-account-action--mobile {
+  display: none;
+}
+
 .site-nav {
   align-items: center;
   display: flex;
@@ -9994,13 +10002,22 @@ img {
 @media (max-width: 980px) {
   .site-header__inner {
     gap: var(--space-2);
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     position: relative;
+  }
+
+  .site-header__left-actions {
+    align-items: center;
+    display: flex;
+    gap: 2px;
+    grid-column: 1;
+    justify-self: start;
+    min-width: 0;
+    z-index: 2;
   }
 
   .icon-button.site-menu-button {
     display: inline-flex;
-    z-index: 2;
   }
 
   .site-nav {
@@ -10008,9 +10025,9 @@ img {
   }
 
   .brand-mark {
-    left: 50%;
-    position: absolute;
-    transform: translateX(-50%);
+    grid-column: 2;
+    position: static;
+    transform: none;
     z-index: 1;
   }
 
@@ -10020,9 +10037,18 @@ img {
   }
 
   .site-actions {
+    grid-column: 3;
     gap: 4px;
     min-width: 0;
     z-index: 2;
+  }
+
+  .icon-button.site-account-action--desktop {
+    display: none;
+  }
+
+  .icon-button.site-account-action--mobile {
+    display: inline-flex;
   }
 
   .language-switcher--desktop {
@@ -10040,12 +10066,14 @@ img {
     top: calc(100% + 10px);
   }
 
-  .site-actions .icon-button {
+  .site-actions .icon-button,
+  .site-header__left-actions .icon-button {
     height: 34px;
     width: 32px;
   }
 
-  .site-actions .icon-button svg {
+  .site-actions .icon-button svg,
+  .site-header__left-actions .icon-button svg {
     height: 18px;
     width: 18px;
   }
@@ -10292,12 +10320,14 @@ img {
     gap: 2px;
   }
 
-  .site-actions .icon-button {
+  .site-actions .icon-button,
+  .site-header__left-actions .icon-button {
     height: 30px;
     width: 28px;
   }
 
-  .site-actions .icon-button svg {
+  .site-actions .icon-button svg,
+  .site-header__left-actions .icon-button svg {
     height: 17px;
     width: 17px;
   }
@@ -11241,26 +11271,18 @@ img {
     max-width: 140px;
   }
 
-  .icon-button.site-menu-button {
-    height: 32px;
-    width: 30px;
-  }
-
-  .icon-button.site-menu-button svg {
-    height: 22px;
-    width: 22px;
-  }
-
   .site-actions {
     gap: 1px;
   }
 
-  .site-actions .icon-button {
+  .site-actions .icon-button,
+  .site-header__left-actions .icon-button {
     height: 28px;
     width: 25px;
   }
 
-  .site-actions .icon-button svg {
+  .site-actions .icon-button svg,
+  .site-header__left-actions .icon-button svg {
     height: 15px;
     width: 15px;
   }

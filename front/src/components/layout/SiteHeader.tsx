@@ -70,6 +70,8 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           cartCount === 1 ? t("cart.item") : t("cart.items")
         }`
       : t("nav.cart");
+  const accountHref = isAuthenticated ? "/profile" : "/login";
+  const accountLabel = isAuthenticated ? t("nav.profile") : t("nav.account");
   const mobileMenuId = "site-mobile-navigation";
 
   useEffect(() => {
@@ -136,20 +138,31 @@ export function SiteHeader({ active }: SiteHeaderProps) {
   return (
     <header className="site-header" ref={headerRef}>
       <div className="site-header__inner">
-        <button
-          aria-controls={mobileMenuId}
-          aria-expanded={isMobileMenuOpen}
-          aria-label={
-            isMobileMenuOpen
-              ? t("nav.close")
-              : t("nav.open")
-          }
-          className="icon-button site-menu-button"
-          onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
-          type="button"
-        >
-          <Menu aria-hidden="true" size={28} strokeWidth={2} />
-        </button>
+        <div className="site-header__left-actions">
+          <button
+            aria-controls={mobileMenuId}
+            aria-expanded={isMobileMenuOpen}
+            aria-label={isMobileMenuOpen ? t("nav.close") : t("nav.open")}
+            className="icon-button site-menu-button"
+            onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
+            type="button"
+          >
+            <Menu aria-hidden="true" size={20} strokeWidth={1.8} />
+          </button>
+
+          {showCustomerActions ? (
+            <Link
+              aria-label={accountLabel}
+              className={`icon-button site-account-action site-account-action--mobile ${
+                active === "account" ? "is-active" : ""
+              }`}
+              href={accountHref}
+              title={accountLabel}
+            >
+              <User size={20} strokeWidth={1.8} />
+            </Link>
+          ) : null}
+        </div>
 
         <nav aria-label={t("nav.primary")} className="site-nav">
           {primaryNavItems.map((item) => {
@@ -212,7 +225,7 @@ export function SiteHeader({ active }: SiteHeaderProps) {
               </Link>
               <Link
                 aria-label={t("nav.profile")}
-                className={`icon-button ${
+                className={`icon-button site-account-action site-account-action--desktop ${
                   active === "account" ? "is-active" : ""
                 }`}
                 href="/profile"
@@ -225,7 +238,9 @@ export function SiteHeader({ active }: SiteHeaderProps) {
           {showCustomerActions && !isAuthenticated ? (
             <Link
               aria-label={t("nav.account")}
-              className={`icon-button ${active === "account" ? "is-active" : ""}`}
+              className={`icon-button site-account-action site-account-action--desktop ${
+                active === "account" ? "is-active" : ""
+              }`}
               href="/login"
               title={t("nav.account")}
             >
