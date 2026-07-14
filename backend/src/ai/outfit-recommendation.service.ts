@@ -218,6 +218,7 @@ const ROLE_TAGS: Record<OutfitRole, string[]> = {
     'coat',
     'blazer',
     'overshirt',
+    'hoodie',
     'leather_jacket',
     'biker',
     'ao_khoac',
@@ -268,6 +269,12 @@ const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
     role: 'jacket',
     aliases: ['jacket', 'outerwear', 'coat', 'blazer', 'ao khoac', 'leather jacket'],
     impliedTags: ['jacket', 'outerwear'],
+  },
+  {
+    tag: 'hoodie',
+    role: 'jacket',
+    aliases: ['hoodie', 'hoodies', 'ao hoodie'],
+    impliedTags: ['jacket', 'outerwear', 'hoodie'],
   },
   {
     tag: 'bottoms',
@@ -807,6 +814,24 @@ export class OutfitRecommendationService {
 
     if (
       hasReplaceKeyword &&
+      allMentionedRoles.includes('top') &&
+      /\b(?:long sleeves?|ao tay dai|sweater)\b/.test(comparable)
+    ) {
+      replacementTags.set('top', ['long_sleeves', 'long_sleeve', 'ao_tay_dai']);
+      replaceRoles.add('top');
+    }
+
+    if (
+      hasAddKeyword &&
+      /\b(?:hoodies?|ao hoodie)\b/.test(comparable)
+    ) {
+      addRoles.delete('top');
+      addRoles.add('jacket');
+      replacementTags.set('jacket', ['hoodie']);
+    }
+
+    if (
+      hasReplaceKeyword &&
       allMentionedRoles.includes('bottom') &&
       /\b(?:flared|loe|ong loe)\b/.test(comparable)
     ) {
@@ -908,7 +933,7 @@ export class OutfitRecommendationService {
   private findMentionedRoles(comparable: string): OutfitRole[] {
     const roles = new Set<OutfitRole>();
 
-    if (/\b(?:jacket|coat|outerwear|ao khoac)\b/.test(comparable)) {
+    if (/\b(?:jacket|coat|outerwear|ao khoac|hoodies?|ao hoodie)\b/.test(comparable)) {
       roles.add('jacket');
     }
     if (/\b(?:bottom|bottoms|pants|trousers|jeans|quan)\b/.test(comparable)) {
@@ -930,10 +955,10 @@ export class OutfitRecommendationService {
       roles.add('handbag');
     }
     if (
-      /\b(?:top|tee|t shirt|tshirt|shirt|ao thun|ao phong|ao)\b/.test(
+      /\b(?:top|tee|t shirt|tshirt|shirt|ao thun|ao phong|ao|long sleeves?)\b/.test(
         comparable,
       ) &&
-      !/\bao khoac\b/.test(comparable)
+      !/\bao (?:khoac|hoodie)\b/.test(comparable)
     ) {
       roles.add('top');
     }
@@ -1161,12 +1186,18 @@ export class OutfitRecommendationService {
         continue;
       }
 
+      const preferredTags = parsed.replacementTags.get(role) ?? [];
       const added = this.selectReplacementProduct(
         products,
         role,
-        this.buildReplacementIntent(intent, currentIntent, [this.roleToCategoryTag(role)]),
+        this.buildReplacementIntent(
+          intent,
+          currentIntent,
+          preferredTags.length > 0 ? preferredTags : [this.roleToCategoryTag(role)],
+        ),
         selectedByRole,
         excludedProductIds,
+        preferredTags,
       );
 
       if (added) {
@@ -1363,7 +1394,7 @@ export class OutfitRecommendationService {
         ? []
         : candidates.filter((candidate) =>
             preferredTags.some((tag) =>
-              this.hasCompatibleTag(candidate.product.tagSet, tag),
+              this.hasCompatibleProductTag(candidate.product, tag),
             ),
           );
 
@@ -2347,7 +2378,7 @@ export class OutfitRecommendationService {
         text,
       );
     const hasJacketText =
-      /\b(?:jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|biker)\b/.test(
+      /\b(?:jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|hoodies?|biker)\b/.test(
         text,
       );
     const hasShoesText = /\b(?:shoes?|sneakers?|boots?|loafers?|slippers?|giay)\b/.test(text);
@@ -2849,6 +2880,26 @@ export class OutfitRecommendationService {
 
     return (COMPATIBLE_TAGS[normalizedTag] ?? []).some((compatibleTag) =>
       tagSet.has(this.normalizeTag(compatibleTag)),
+    );
+  }
+
+  private hasCompatibleProductTag(product: PreparedProduct, tag: string): boolean {
+    if (
+      this.hasCompatibleTag(product.tagSet, tag) ||
+      this.hasCompatibleTag(product.categoryTags, tag)
+    ) {
+      return true;
+    }
+
+    const text = this.normalizeComparable(
+      `${product.record.name} ${product.record.slug}`,
+    );
+    const aliases = CATEGORY_ENTRIES.find((entry) => entry.tag === tag)?.aliases ?? [
+      tag,
+    ];
+
+    return aliases.some((alias) =>
+      this.hasAlias(text, this.normalizeComparable(alias)),
     );
   }
 

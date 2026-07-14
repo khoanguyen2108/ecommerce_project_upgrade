@@ -23,6 +23,9 @@ const PRODUCT_FIXTURES = [
   buildProduct('top-3', 'Budget Black Tee', 'budget-black-tee', 100_000, [
     'top', 'tee', 'black', 'gothic', 'darkwear', 'streetwear',
   ]),
+  buildProduct('top-4', 'Black Long Sleeve Top', 'black-long-sleeve-top', 160_000, [
+    'top', 'long_sleeves', 'long_sleeve', 'black', 'streetwear', 'gothic', 'darkwear',
+  ]),
   buildProduct('bottom-1', 'Black Gothic Jeans', 'black-gothic-jeans', 210_000, [
     'bottom', 'bottoms', 'pants', 'jeans', 'black', 'denim', 'gothic', 'darkwear',
   ]),
@@ -46,6 +49,9 @@ const PRODUCT_FIXTURES = [
   ]),
   buildProduct('jacket-1', 'Black Gothic Jacket', 'black-gothic-jacket', 160_000, [
     'jacket', 'outerwear', 'black', 'gothic', 'darkwear',
+  ]),
+  buildProduct('jacket-2', 'Black Oversized Hoodie', 'black-oversized-hoodie', 190_000, [
+    'hoodie', 'outerwear', 'black', 'streetwear', 'gothic', 'darkwear', 'oversized',
   ]),
   buildProduct('accessory-1', 'Silver Gothic Ring', 'silver-gothic-ring', 80_000, [
     'accessory', 'accessories', 'silver', 'silver_hardware', 'gothic', 'darkwear',
@@ -158,6 +164,28 @@ async function run() {
       action: 'replace',
       targetRoles: ['shoes'],
       replacedRole: 'shoes',
+    },
+  );
+  await verifyRefinement(
+    '\u0111\u1ed5i \u00e1o tay d\u00e0i',
+    initialStreetwear,
+    {
+      locale: 'vi',
+      action: 'replace',
+      targetRoles: ['top'],
+      replacedRole: 'top',
+      replacementSlugIncludes: 'long-sleeve',
+    },
+  );
+  await verifyRefinement(
+    'th\u00eam hoodie',
+    initialStreetwear,
+    {
+      locale: 'vi',
+      action: 'add',
+      targetRoles: ['jacket'],
+      expectedRole: 'jacket',
+      replacementSlugIncludes: 'hoodie',
     },
   );
 
@@ -332,7 +360,7 @@ async function verifyRequestValidation() {
 }
 
 interface RefinementExpectation {
-  action: 'replace' | 'remove' | 'keep' | 'budget' | 'fresh';
+  action: 'add' | 'replace' | 'remove' | 'keep' | 'budget' | 'fresh';
   cheaperThanSource?: boolean;
   expectedRole?: OutfitRole;
   expectedStyle?: string;
@@ -403,10 +431,11 @@ async function verifyRefinement(
     );
   }
   if (expected.replacementSlugIncludes) {
+    const slugRole = expected.replacedRole ?? expected.expectedRole;
     check(
       outfit?.products.some(
         (product) =>
-          product.role === expected.replacedRole &&
+          product.role === slugRole &&
           product.productSlug.includes(expected.replacementSlugIncludes!),
       ) === true,
       `${JSON.stringify(prompt)} did not prioritize ${expected.replacementSlugIncludes}`,
