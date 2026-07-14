@@ -86,7 +86,7 @@ export function HomeLandingExperience() {
       isTransitioning,
       onComplete: completeLandingEntry,
       sceneTargetRef,
-  });
+    });
 
   useEffect(() => {
     if (hasEnteredLanding || !hasBelikemeIntroBeenSeen()) {
@@ -124,14 +124,15 @@ export function HomeLandingExperience() {
     : isTransitioning
       ? styles.homeTransitioning
       : styles.homeIntro;
+  const shouldHideHeader = hasEnteredLanding ? false : isHeaderHidden;
 
   return (
     <>
       <SiteHeader
-        brandHidden={isHeaderHidden}
+        brandHidden={shouldHideHeader}
         brandRef={brandTargetRef}
-        headerHidden={isHeaderHidden}
-        variant="intro-transition"
+        headerHidden={shouldHideHeader}
+        variant={hasEnteredLanding ? "default" : "intro-transition"}
       />
       <main className={`${styles.home} ${homeStateClass}`}>
         {!hasEnteredLanding ? (

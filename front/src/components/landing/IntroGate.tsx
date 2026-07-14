@@ -2,7 +2,7 @@
 
 import { type ReactNode } from "react";
 
-const INTRO_SEEN_STORAGE_KEY = "belikemeIntroSeen";
+const INTRO_SEEN_STORAGE_KEY = "belikemeIntroSeenThisSession";
 const INTRO_SEEN_STORAGE_VALUE = "true";
 
 export function IntroGate({ children }: { children: ReactNode }) {
@@ -11,7 +11,7 @@ export function IntroGate({ children }: { children: ReactNode }) {
 
 export function markBelikemeIntroSeen() {
   try {
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       INTRO_SEEN_STORAGE_KEY,
       INTRO_SEEN_STORAGE_VALUE,
     );
@@ -23,7 +23,7 @@ export function markBelikemeIntroSeen() {
 export function hasBelikemeIntroBeenSeen() {
   try {
     return (
-      window.localStorage.getItem(INTRO_SEEN_STORAGE_KEY) ===
+      window.sessionStorage.getItem(INTRO_SEEN_STORAGE_KEY) ===
       INTRO_SEEN_STORAGE_VALUE
     );
   } catch {
