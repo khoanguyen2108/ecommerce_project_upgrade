@@ -126,6 +126,11 @@
   touch-action: none;
 }
 
+.logoSceneScroll,
+.logoCanvasScroll {
+  touch-action: pan-y;
+}
+
 .logoSceneInteracting {
   cursor: grabbing;
 }
