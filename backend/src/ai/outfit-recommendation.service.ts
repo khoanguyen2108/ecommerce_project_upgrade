@@ -619,6 +619,7 @@ export class OutfitRecommendationService {
             refined.refinement,
             outfits.length,
             locale,
+            outfits[0],
           ),
           warnings: refined.warnings,
           extraTips: this.buildExtraTips(refined.warnings, outfits.length, locale),
@@ -1710,6 +1711,7 @@ export class OutfitRecommendationService {
     refinement: StyleAdviceRefinementDto,
     outfitCount: number,
     locale: StyleAdviceLocale,
+    outfit?: StyleAdviceOutfitDto,
   ): string {
     if (!refinement.applied || outfitCount === 0) {
       return locale === 'vi'
@@ -1717,9 +1719,111 @@ export class OutfitRecommendationService {
         : 'I could not apply this outfit refinement.';
     }
 
+    const targetRoles = this.getRefinementSummaryRoles(refinement, outfit);
+    const roleList = this.joinLocalizedList(
+      targetRoles.map((role) => this.localizedLabel(role, locale)),
+      locale,
+    );
+    const stylingNote = this.buildRefinementStylingNote(targetRoles, locale);
+
+    if (locale === 'vi') {
+      switch (refinement.action) {
+        case 'add':
+          return `M\u00ecnh \u0111\u00e3 th\u00eam ${roleList || 'm\u00f3n m\u1edbi'} v\u00e0o outfit \u0111\u1ec3 set \u0111\u1ea7y \u0111\u1ee7 h\u01a1n. ${stylingNote}`;
+        case 'replace':
+          return `M\u00ecnh \u0111\u00e3 \u0111\u1ed5i ${roleList || 'm\u00f3n b\u1ea1n ch\u1ecdn'} sang l\u1ef1a ch\u1ecdn kh\u00e1c c\u00f2n h\u00e0ng. ${stylingNote}`;
+        case 'remove':
+          return `M\u00ecnh \u0111\u00e3 b\u1ecf ${roleList || 'm\u00f3n b\u1ea1n kh\u00f4ng c\u1ea7n'} kh\u1ecfi outfit \u0111\u1ec3 t\u1ed5ng th\u1ec3 g\u1ecdn h\u01a1n. ${stylingNote}`;
+        case 'keep':
+          return `M\u00ecnh \u0111\u00e3 gi\u1eef ${roleList || 'm\u00f3n b\u1ea1n mu\u1ed1n gi\u1eef'} v\u00e0 c\u00e2n l\u1ea1i c\u00e1c m\u00f3n c\u00f2n l\u1ea1i cho h\u1ee3p set h\u01a1n. ${stylingNote}`;
+        case 'budget':
+          return `M\u00ecnh \u0111\u00e3 ch\u1ec9nh outfit theo ng\u00e2n s\u00e1ch m\u1edbi v\u00e0 \u01b0u ti\u00ean gi\u1eef tinh th\u1ea7n ph\u1ed1i \u0111\u1ed3 ban \u0111\u1ea7u. ${stylingNote}`;
+        default:
+          return `M\u00ecnh \u0111\u00e3 c\u1eadp nh\u1eadt outfit theo y\u00eau c\u1ea7u m\u1edbi v\u00e0 ki\u1ec3m tra l\u1ea1i c\u00e1c m\u00f3n c\u00f2n h\u00e0ng. ${stylingNote}`;
+      }
+    }
+
+    switch (refinement.action) {
+      case 'add':
+        return `I added ${roleList || 'a new piece'} to make the outfit feel more complete. ${stylingNote}`;
+      case 'replace':
+        return `I swapped ${roleList || 'the requested piece'} for another in-stock option. ${stylingNote}`;
+      case 'remove':
+        return `I removed ${roleList || 'the piece you did not need'} to keep the outfit cleaner. ${stylingNote}`;
+      case 'keep':
+        return `I kept ${roleList || 'the piece you wanted'} and adjusted the rest of the outfit around it. ${stylingNote}`;
+      case 'budget':
+        return `I adjusted the outfit around your updated budget while keeping the original styling direction. ${stylingNote}`;
+      default:
+        return `I updated the current outfit with your latest request and rechecked in-stock options. ${stylingNote}`;
+    }
+  }
+
+  private getRefinementSummaryRoles(
+    refinement: StyleAdviceRefinementDto,
+    outfit?: StyleAdviceOutfitDto,
+  ): OutfitRole[] {
+    if (refinement.targetRoles?.length) {
+      return refinement.targetRoles.slice(0, 3);
+    }
+
+    if (refinement.action === 'add' && outfit?.products.length) {
+      const changedIds = new Set(refinement.replacedProductIds ?? []);
+      return outfit.products
+        .filter((product) => changedIds.has(product.productId))
+        .map((product) => product.role)
+        .filter((role, index, roles) => roles.indexOf(role) === index)
+        .slice(0, 3);
+    }
+
+    return [];
+  }
+
+  private buildRefinementStylingNote(
+    roles: OutfitRole[],
+    locale: StyleAdviceLocale,
+  ): string {
+    const roleSet = new Set(roles);
+
+    if (roleSet.has('jacket')) {
+      return locale === 'vi'
+        ? 'L\u1edbp \u00e1o kho\u00e1c gi\u00fap outfit c\u00f3 chi\u1ec1u s\u00e2u h\u01a1n v\u00e0 d\u1ec5 t\u1ea1o \u0111i\u1ec3m nh\u1ea5n khi ra ngo\u00e0i.'
+        : 'The outer layer gives the outfit more depth and makes it feel more intentional.';
+    }
+
+    if (roleSet.has('top')) {
+      return locale === 'vi'
+        ? 'Ph\u1ea7n \u00e1o tr\u00ean k\u00e9o mood ch\u00ednh c\u1ee7a outfit, n\u00ean m\u00ecnh gi\u1eef c\u00e1c m\u00f3n c\u00f2n l\u1ea1i c\u00e2n v\u1edbi n\u00f3.'
+        : 'The top sets the main mood, so I balanced the other pieces around it.';
+    }
+
+    if (roleSet.has('bottom')) {
+      return locale === 'vi'
+        ? 'Ph\u1ea7n qu\u1ea7n thay \u0111\u1ed5i d\u00e1ng t\u1ed5ng th\u1ec3, n\u00ean set s\u1ebd nh\u00ecn kh\u00e1c ngay nh\u01b0ng v\u1eabn d\u1ec5 m\u1eb7c.'
+        : 'Changing the bottom shifts the silhouette while keeping the outfit wearable.';
+    }
+
+    if (roleSet.has('shoes')) {
+      return locale === 'vi'
+        ? '\u0110\u00f4i gi\u00e0y m\u1edbi neo l\u1ea1i vibe c\u1ee7a set v\u00e0 l\u00e0m t\u1ed5ng th\u1ec3 r\u00f5 phong c\u00e1ch h\u01a1n.'
+        : 'The shoes anchor the outfit and make the styling direction clearer.';
+    }
+
+    if (roleSet.has('handbag')) {
+      return locale === 'vi'
+        ? 'Chi\u1ebfc t\u00fai th\u00eam t\u00ednh ho\u00e0n thi\u1ec7n m\u00e0 kh\u00f4ng l\u00e0m outfit b\u1ecb qu\u00e1 n\u1eb7ng.'
+        : 'The bag finishes the look without making it feel too heavy.';
+    }
+
+    if (roleSet.has('accessory')) {
+      return locale === 'vi'
+        ? 'Ph\u1ee5 ki\u1ec7n t\u1ea1o \u0111i\u1ec3m s\u00e1ng nh\u1ecf \u0111\u1ec3 outfit b\u1edbt ph\u1eb3ng nh\u01b0ng v\u1eabn g\u1ecdn.'
+        : 'The accessory adds a small focal point while keeping the outfit clean.';
+    }
+
     return locale === 'vi'
-      ? 'M\u00ecnh \u0111\u00e3 ch\u1ec9nh outfit hi\u1ec7n t\u1ea1i theo y\u00eau c\u1ea7u m\u1edbi v\u00e0 ki\u1ec3m tra l\u1ea1i t\u1ed3n kho.'
-      : 'I refined the current outfit with your new request and rechecked current availability.';
+      ? 'M\u00ecnh gi\u1eef t\u1ed5ng th\u1ec3 d\u1ec5 m\u1eb7c v\u00e0 ch\u1ec9 thay ph\u1ea7n c\u1ea7n thi\u1ebft theo y\u00eau c\u1ea7u c\u1ee7a b\u1ea1n.'
+      : 'I kept the outfit wearable and changed only what your request called for.';
   }
 
   private extractIntent(query: string): ExtractedIntent {
