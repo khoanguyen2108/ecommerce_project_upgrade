@@ -11,6 +11,8 @@
   --intro-scene-opacity: 1;
   --intro-scene-pointer-events: auto;
   --intro-scene-scale: 1;
+  --intro-scene-visibility: visible;
+  --intro-scene-x: 0px;
   --intro-scene-y: 0px;
 }
 
@@ -62,17 +64,24 @@
   justify-items: center;
   max-width: 840px;
   min-width: 0;
-  opacity: var(--intro-scene-opacity);
-  pointer-events: var(--intro-scene-pointer-events);
   position: relative;
-  transform: translate3d(0, var(--intro-scene-y), 0)
-    scale(var(--intro-scene-scale));
-  transform-origin: center 44%;
-  will-change: transform, opacity;
   width: min(86vw, 840px);
 }
 
-.sceneShell::after {
+.sceneTransform {
+  height: 100%;
+  opacity: var(--intro-scene-opacity);
+  pointer-events: var(--intro-scene-pointer-events);
+  position: relative;
+  transform: translate3d(var(--intro-scene-x), var(--intro-scene-y), 0)
+    scale(var(--intro-scene-scale));
+  transform-origin: center 44%;
+  visibility: var(--intro-scene-visibility);
+  will-change: transform, opacity;
+  width: 100%;
+}
+
+.sceneTransform::after {
   background: rgba(255, 255, 255, 0.14);
   bottom: 8%;
   box-shadow: 0 0 54px rgba(245, 245, 245, 0.14);
@@ -195,6 +204,19 @@
   width: 1px;
 }
 
+:global(.brand-mark--intro-transition) {
+  opacity: var(--site-header-brand-opacity, 0);
+  pointer-events: var(--site-header-brand-pointer-events, none);
+  will-change: opacity;
+}
+
+:global(body.belikeme-scroll-intro-active .cart-toast),
+:global(body.belikeme-scroll-intro-active .mini-cart-backdrop),
+:global(body.belikeme-scroll-intro-active .mini-cart-drawer),
+:global(body.belikeme-scroll-intro-active .customer-chat-widget) {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .intro {
     min-height: calc(100svh - var(--header-height));
@@ -206,10 +228,18 @@
   }
 
   .sceneShell,
+  .sceneTransform,
   .actionStack,
   .landingSection {
     opacity: 1;
     transform: none;
+    visibility: visible;
+    will-change: auto;
+  }
+
+  :global(.brand-mark--intro-transition) {
+    opacity: 1;
+    pointer-events: auto;
     will-change: auto;
   }
 
@@ -233,7 +263,7 @@
     width: min(100%, 420px);
   }
 
-  .sceneShell::after {
+  .sceneTransform::after {
     left: 15%;
     right: 15%;
   }

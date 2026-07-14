@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { type Ref, useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/cart/CartProvider";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
@@ -28,6 +28,9 @@ type SiteHeaderActive =
 
 interface SiteHeaderProps {
   active?: SiteHeaderActive;
+  brandHidden?: boolean;
+  brandRef?: Ref<HTMLAnchorElement>;
+  variant?: "default" | "intro-transition";
 }
 
 type PrimaryNavItem = {
@@ -53,7 +56,12 @@ const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
   { href: "/#about", labelKey: "nav.about" },
 ];
 
-export function SiteHeader({ active }: SiteHeaderProps) {
+export function SiteHeader({
+  active,
+  brandHidden = false,
+  brandRef,
+  variant = "default",
+}: SiteHeaderProps) {
   const { t } = useI18n();
   const { currentUser, isAuthenticated, isLoading, logout } = useAuthSession();
   const { cartCount, openCart } = useCart();
@@ -182,9 +190,19 @@ export function SiteHeader({ active }: SiteHeaderProps) {
         </nav>
 
         <Link
-          className="brand-mark brand-mark--image"
-          href="/"
+          aria-hidden={brandHidden ? true : undefined}
           aria-label={t("nav.home")}
+          className={`brand-mark brand-mark--image${
+            variant === "intro-transition"
+              ? " brand-mark--intro-transition"
+              : ""
+          }`}
+          data-belikeme-brand-target={
+            variant === "intro-transition" ? "true" : undefined
+          }
+          href="/"
+          ref={brandRef}
+          tabIndex={brandHidden ? -1 : undefined}
         >
           <Image
             alt=""
