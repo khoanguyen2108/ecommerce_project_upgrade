@@ -294,3 +294,28 @@
     min-height: calc(100svh - var(--header-height));
   }
 }
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .stage {
+    grid-template-rows: minmax(4px, 0.08fr) minmax(170px, 1fr) auto;
+    padding: 10px 16px 12px;
+  }
+
+  .sceneShell {
+    height: clamp(170px, 43svh, 230px);
+    width: min(74vw, 520px);
+  }
+
+  .actionStack {
+    gap: 0;
+    min-height: 54px;
+  }
+
+  .shopButton {
+    min-height: 40px;
+  }
+
+  .helperText {
+    display: none;
+  }
+}
