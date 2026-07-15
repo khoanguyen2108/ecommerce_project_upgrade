@@ -21,14 +21,18 @@ import { markBelikemeIntroSeen } from "./IntroGate";
 const LANDING_LOGO_SRC = "/assets/landing/belikeme-logo.png";
 const LANDING_MODEL_SRC = "/assets/landing/belikeme-logo-3d.glb";
 const LANDING_TARGET_ID = "landing";
-const CLICK_TRANSITION_DURATION_MS = 920;
-const HEADER_BRAND_FADE_END = 0.96;
-const HEADER_BRAND_FADE_START = 0.56;
-const HEADER_BRAND_INTERACTIVE_OPACITY = 0.18;
+const CLICK_TRANSITION_DURATION_MS = 1_700;
+const HEADER_BRAND_FADE_END = 0.66;
+const HEADER_BRAND_FADE_START = 0.54;
+const HEADER_CONTENT_REVEAL_MIN_DURATION_MS = 680;
+const HEADER_CONTENT_REVEAL_START = 0.6;
+const HEADER_SHELL_FADE_END = 0.76;
+const HEADER_SHELL_FADE_START = 0.58;
+const LOGO_TRAVEL_END = 0.54;
 const ROOT_INTRO_BODY_CLASS = "belikeme-scroll-intro-active";
-const SCENE_FADE_END = 0.98;
-const SCENE_FADE_START = 0.72;
-const SCENE_HIDDEN_PROGRESS = 0.995;
+const SCENE_FADE_END = 0.68;
+const SCENE_FADE_START = LOGO_TRAVEL_END;
+const SCENE_HIDDEN_PROGRESS = 0.7;
 const VIETNAM_TIME_ZONE = "Asia/Ho_Chi_Minh";
 const vietnamTimeFormatter = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
@@ -83,7 +87,12 @@ export function HomeLandingExperience({
     router.replace("/");
   }
 
-  const { isHeaderHidden, isSceneHidden, transitionRef } =
+  const {
+    isHeaderContentVisible,
+    isHeaderHidden,
+    isSceneHidden,
+    transitionRef,
+  } =
     useIntroClickTransition({
       brandTargetRef,
       hasEnteredLanding,
@@ -128,6 +137,7 @@ export function HomeLandingExperience({
         brandHidden={shouldHideHeader}
         brandRef={brandTargetRef}
         headerHidden={shouldHideHeader}
+        introContentVisible={isHeaderContentVisible}
         variant={hasEnteredLanding ? "default" : "intro-transition"}
       />
       <main className={`${styles.home} ${homeStateClass}`}>
@@ -223,8 +233,10 @@ function useIntroClickTransition({
   const transitionRef = useRef<HTMLElement>(null);
   const onCompleteRef = useRef(onComplete);
   const progressRef = useRef(0);
+  const headerContentVisibleRef = useRef(false);
   const headerHiddenRef = useRef(true);
   const sceneHiddenRef = useRef(false);
+  const [isHeaderContentVisible, setIsHeaderContentVisible] = useState(false);
   const [isHeaderHidden, setIsHeaderHidden] = useState(true);
   const [isSceneHidden, setIsSceneHidden] = useState(false);
 
@@ -247,6 +259,15 @@ function useIntroClickTransition({
     let animationFrameId: number | null = null;
     let isDisposed = false;
 
+    function setHeaderContentVisibleState(nextIsVisible: boolean) {
+      if (headerContentVisibleRef.current === nextIsVisible) {
+        return;
+      }
+
+      headerContentVisibleRef.current = nextIsVisible;
+      setIsHeaderContentVisible(nextIsVisible);
+    }
+
     function setHeaderHiddenState(nextIsHidden: boolean) {
       if (headerHiddenRef.current === nextIsHidden) {
         return;
@@ -265,7 +286,11 @@ function useIntroClickTransition({
       setIsSceneHidden(nextIsHidden);
     }
 
-    function writeHeaderBrandState(opacity: number, isHidden: boolean) {
+    function writeHeaderState(
+      brandOpacity: number,
+      shellOpacity: number,
+      isHidden: boolean,
+    ) {
       const brandElement = brandTargetRef.current;
 
       if (!brandElement) {
@@ -276,7 +301,7 @@ function useIntroClickTransition({
 
       brandElement.style.setProperty(
         "--site-header-brand-opacity",
-        opacity.toFixed(4),
+        brandOpacity.toFixed(4),
       );
       brandElement.style.setProperty(
         "--site-header-brand-pointer-events",
@@ -286,7 +311,7 @@ function useIntroClickTransition({
       if (headerElement instanceof HTMLElement) {
         headerElement.style.setProperty(
           "--site-header-shell-opacity",
-          opacity.toFixed(4),
+          shellOpacity.toFixed(4),
         );
         headerElement.style.setProperty(
           "--site-header-shell-pointer-events",
@@ -298,9 +323,10 @@ function useIntroClickTransition({
     function writeIdleState() {
       progressRef.current = 0;
       document.body.classList.add(ROOT_INTRO_BODY_CLASS);
+      setHeaderContentVisibleState(false);
       setHeaderHiddenState(true);
       setSceneHiddenState(false);
-      writeHeaderBrandState(0, true);
+      writeHeaderState(0, 0, true);
       variableElement.style.setProperty("--intro-backdrop-opacity", "1");
       variableElement.style.setProperty("--intro-brand-opacity", "1");
       variableElement.style.setProperty("--intro-brand-y", "0px");
@@ -330,9 +356,10 @@ function useIntroClickTransition({
     function writeEnteredState() {
       progressRef.current = 1;
       document.body.classList.remove(ROOT_INTRO_BODY_CLASS);
+      setHeaderContentVisibleState(true);
       setHeaderHiddenState(false);
       setSceneHiddenState(true);
-      writeHeaderBrandState(1, false);
+      writeHeaderState(1, 1, false);
       variableElement.style.setProperty("--intro-backdrop-opacity", "0");
       variableElement.style.setProperty("--intro-brand-opacity", "0");
       variableElement.style.setProperty("--intro-brand-y", "-10px");
@@ -371,12 +398,15 @@ function useIntroClickTransition({
         viewportHeight,
         viewportWidth,
       );
-      const travelProgress = smoothstep(progress);
+      const travelProgress = smoothstep(normalize(progress, 0, LOGO_TRAVEL_END));
       const sceneFadeProgress = smoothstep(
         normalize(progress, SCENE_FADE_START, SCENE_FADE_END),
       );
-      const headerOpacity = smoothstep(
+      const headerBrandOpacity = smoothstep(
         normalize(progress, HEADER_BRAND_FADE_START, HEADER_BRAND_FADE_END),
+      );
+      const headerShellOpacity = smoothstep(
+        normalize(progress, HEADER_SHELL_FADE_START, HEADER_SHELL_FADE_END),
       );
       const introBrandProgress = smoothstep(normalize(progress, 0.02, 0.34));
       const actionProgress = smoothstep(normalize(progress, 0, 0.28));
@@ -399,14 +429,15 @@ function useIntroClickTransition({
       const landingOpacity = lerp(0, 1, landingProgress);
       const landingTranslateY = lerp(24, 0, landingProgress);
       const backdropOpacity = lerp(1, 0, landingProgress);
-      const isHeaderBrandCurrentlyHidden =
-        headerOpacity < HEADER_BRAND_INTERACTIVE_OPACITY;
+      const isHeaderContentCurrentlyVisible =
+        progress >= HEADER_CONTENT_REVEAL_START;
       const isSceneCurrentlyHidden = progress >= SCENE_HIDDEN_PROGRESS;
 
       progressRef.current = progress;
-      setHeaderHiddenState(isHeaderBrandCurrentlyHidden);
+      setHeaderContentVisibleState(isHeaderContentCurrentlyVisible);
+      setHeaderHiddenState(true);
       setSceneHiddenState(isSceneCurrentlyHidden);
-      writeHeaderBrandState(headerOpacity, isHeaderBrandCurrentlyHidden);
+      writeHeaderState(headerBrandOpacity, headerShellOpacity, true);
       variableElement.style.setProperty(
         "--intro-backdrop-opacity",
         backdropOpacity.toFixed(4),
@@ -496,6 +527,7 @@ function useIntroClickTransition({
       onCompleteRef.current();
     } else {
       const startTime = performance.now();
+      let headerRevealStartedAt: number | null = null;
       document.body.classList.add(ROOT_INTRO_BODY_CLASS);
 
       function tick(timestamp: number) {
@@ -509,9 +541,22 @@ function useIntroClickTransition({
           1,
         );
 
+        if (
+          rawProgress >= HEADER_CONTENT_REVEAL_START &&
+          headerRevealStartedAt === null
+        ) {
+          headerRevealStartedAt = timestamp;
+        }
+
         writeTransitionProgress(rawProgress);
 
-        if (rawProgress >= 1) {
+        const headerRevealElapsed =
+          headerRevealStartedAt === null ? 0 : timestamp - headerRevealStartedAt;
+
+        if (
+          rawProgress >= 1 &&
+          headerRevealElapsed >= HEADER_CONTENT_REVEAL_MIN_DURATION_MS
+        ) {
           writeEnteredState();
           onCompleteRef.current();
           return;
@@ -549,7 +594,12 @@ function useIntroClickTransition({
     sceneTargetRef,
   ]);
 
-  return { isHeaderHidden, isSceneHidden, transitionRef };
+  return {
+    isHeaderContentVisible,
+    isHeaderHidden,
+    isSceneHidden,
+    transitionRef,
+  };
 }
 
 function VietnamTime() {

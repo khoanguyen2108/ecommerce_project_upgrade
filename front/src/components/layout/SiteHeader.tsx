@@ -31,6 +31,7 @@ interface SiteHeaderProps {
   brandHidden?: boolean;
   brandRef?: Ref<HTMLAnchorElement>;
   headerHidden?: boolean;
+  introContentVisible?: boolean;
   variant?: "default" | "intro-transition";
 }
 
@@ -62,6 +63,7 @@ export function SiteHeader({
   brandHidden = false,
   brandRef,
   headerHidden = false,
+  introContentVisible = false,
   variant = "default",
 }: SiteHeaderProps) {
   const { t } = useI18n();
@@ -156,6 +158,10 @@ export function SiteHeader({
       aria-hidden={headerHidden ? true : undefined}
       className={`site-header${
         variant === "intro-transition" ? " site-header--intro-transition" : ""
+      }${
+        variant === "intro-transition" && introContentVisible
+          ? " site-header--intro-content-visible"
+          : ""
       }`}
       inert={headerHidden ? true : undefined}
       ref={headerRef}
