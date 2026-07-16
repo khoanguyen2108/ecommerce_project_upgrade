@@ -137,7 +137,6 @@ export function StyleAssistant() {
             {status === "success" && hasCurrentOutfit ? (
               <p className={styles.refinementHint}>{t("ai.refinementHint")}</p>
             ) : null}
-            <p className={styles.disclaimer}>{t("ai.disclaimer")}</p>
           </section>
 
           <aside aria-label={t("ai.resultColumn")} className={styles.resultColumn}>

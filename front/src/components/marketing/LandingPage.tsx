@@ -91,7 +91,7 @@ export function LandingPage() {
             <Link className="button button--primary" href="/products">
               {t("landing.exploreProducts")} <ArrowRight size={18} />
             </Link>
-            <Link className="button button--secondary button--on-image" href="#categories">
+            <Link className="button button--secondary button--on-image" href="/categories">
               {t("landing.browseCategories")}
             </Link>
           </div>
