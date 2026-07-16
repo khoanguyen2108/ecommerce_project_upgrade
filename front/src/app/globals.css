@@ -3343,16 +3343,22 @@ img {
   padding: 12px 8px 0;
 }
 
-.admin-sidebar__language {
-  align-items: center;
+.admin-sidebar__store-row {
+  align-items: stretch;
   display: grid;
   gap: 8px;
-  grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
 }
 
+.admin-sidebar__language {
+  align-items: center;
+  display: flex;
+  min-width: 0;
+}
+
 .admin-sidebar__language > span {
+  display: none;
   color: var(--color-text-muted);
   font-size: 0.68rem;
   font-weight: 800;
@@ -3362,7 +3368,7 @@ img {
 .admin-language-switcher {
   border: 1px solid var(--color-border);
   display: grid;
-  grid-template-columns: repeat(2, minmax(44px, 1fr));
+  grid-template-columns: repeat(2, 42px);
 }
 
 .admin-language-switcher button {
@@ -3371,8 +3377,8 @@ img {
   color: var(--color-text-muted);
   font-size: 0.7rem;
   font-weight: 850;
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 38px;
+  min-width: 42px;
   padding: 0 10px;
 }
 
@@ -3472,9 +3478,9 @@ img {
   display: inline-flex;
   font-size: 0.72rem;
   font-weight: 800;
-  gap: 8px;
   min-height: 38px;
-  padding: 0 var(--space-3);
+  min-width: 0;
+  padding: 0 10px;
   text-transform: uppercase;
   transition:
     background-color 160ms ease,
@@ -3483,7 +3489,7 @@ img {
 
 .admin-sidebar__footer .admin-store-link {
   justify-content: center;
-  width: 100%;
+  width: auto;
 }
 
 .admin-signout-button {

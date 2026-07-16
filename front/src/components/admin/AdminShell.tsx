@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Store, UserRound } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -39,15 +39,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <AdminNav />
 
         <div className="admin-sidebar__footer">
-          <div className="admin-sidebar__language">
-            <span>{messages.shell.language}</span>
-            <AdminLanguageSwitcher />
+          <div className="admin-sidebar__store-row">
+            <Link className="admin-store-link" href="/">
+              {messages.shell.storefront}
+            </Link>
+            <div className="admin-sidebar__language">
+              <AdminLanguageSwitcher />
+            </div>
           </div>
-
-          <Link className="admin-store-link" href="/">
-            <Store aria-hidden="true" size={17} strokeWidth={1.8} />
-            {messages.shell.storefront}
-          </Link>
 
           <div className="admin-sidebar__account">
             <span className="admin-sidebar__avatar" aria-hidden="true">
