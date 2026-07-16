@@ -3307,18 +3307,20 @@ img {
 .admin-nav__notification {
   align-items: center;
   background: #d92d20;
+  border-radius: 50%;
   color: #ffffff;
   display: inline-flex;
   flex: 0 0 auto;
   font-size: 0.62rem;
   font-weight: 900;
-  height: 18px;
+  height: 22px;
   justify-content: center;
   letter-spacing: 0;
   line-height: 1;
   margin-left: auto;
-  min-width: 18px;
-  padding: 0 5px;
+  min-width: 22px;
+  padding: 0;
+  width: 22px;
 }
 
 .admin-nav__link:hover {
@@ -3625,11 +3627,9 @@ img {
 
 .admin-resource__header {
   align-items: flex-end;
-  border-bottom: 1px solid var(--color-border);
   display: flex;
   gap: var(--space-4);
   justify-content: space-between;
-  padding-bottom: var(--space-6);
 }
 
 .admin-resource__header h1,
@@ -3648,7 +3648,7 @@ img {
 
 .admin-page-intro {
   display: grid;
-  gap: 5px;
+  gap: 0;
   min-width: 0;
 }
 
@@ -3659,6 +3659,11 @@ img {
   letter-spacing: 0.1em;
   margin: 0;
   text-transform: uppercase;
+}
+
+.admin-page-intro__eyebrow,
+.admin-page-intro > p:last-child {
+  display: none;
 }
 
 .admin-page-intro > p:last-child {
@@ -5088,11 +5093,9 @@ img {
 
 .admin-orders-hero {
   align-items: flex-end;
-  border-bottom: 1px solid var(--color-border);
   display: flex;
   gap: var(--space-6);
   justify-content: space-between;
-  padding-bottom: var(--space-6);
 }
 
 .admin-orders-hero h1 {
@@ -6354,11 +6357,9 @@ img {
 
 .admin-dashboard-modern__heading {
   align-items: flex-end;
-  border-bottom: 1px solid var(--dashboard-line);
   display: flex;
   gap: var(--space-6);
   justify-content: space-between;
-  padding-bottom: var(--space-6);
 }
 
 .admin-dashboard-card__kicker {
