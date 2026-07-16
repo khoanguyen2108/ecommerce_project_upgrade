@@ -5141,8 +5141,9 @@ img {
 }
 
 .admin-orders-kpi {
-  background: #eef4f8;
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
+  border-radius: 8px;
   display: grid;
   gap: 5px;
   min-width: 0;
