@@ -1380,16 +1380,6 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                             <Edit3 aria-hidden="true" size={17} />
                           </button>
                           <button
-                            className="admin-link-button"
-                            disabled={
-                              busyAction === `${product.id}:product`
-                            }
-                            onClick={() => void handleProductStatusChange(product)}
-                            type="button"
-                          >
-                            {product.isActive ? copy.common.deactivate : copy.common.activate}
-                          </button>
-                          <button
                             aria-label={`${copy.common.delete}: ${localizeProductName(
                               product.name,
                               locale,
@@ -1405,6 +1395,16 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                             type="button"
                           >
                             <Trash2 aria-hidden="true" size={17} />
+                          </button>
+                          <button
+                            className="admin-link-button"
+                            disabled={
+                              busyAction === `${product.id}:product`
+                            }
+                            onClick={() => void handleProductStatusChange(product)}
+                            type="button"
+                          >
+                            {product.isActive ? copy.common.deactivate : copy.common.activate}
                           </button>
                         </div>
                       </td>

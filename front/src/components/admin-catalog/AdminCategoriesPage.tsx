@@ -678,14 +678,6 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                             <Edit3 aria-hidden="true" size={17} />
                           </button>
                           <button
-                            className="admin-link-button"
-                            disabled={busyAction === category.id}
-                            onClick={() => void handleCategoryStatusChange(category)}
-                            type="button"
-                          >
-                            {category.isActive ? copy.common.deactivate : copy.common.activate}
-                          </button>
-                          <button
                             aria-label={`${copy.common.delete}: ${localizeCategoryName(
                               category.name,
                               locale,
@@ -701,6 +693,14 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                             type="button"
                           >
                             <Trash2 aria-hidden="true" size={17} />
+                          </button>
+                          <button
+                            className="admin-link-button"
+                            disabled={busyAction === category.id}
+                            onClick={() => void handleCategoryStatusChange(category)}
+                            type="button"
+                          >
+                            {category.isActive ? copy.common.deactivate : copy.common.activate}
                           </button>
                         </div>
                       </td>

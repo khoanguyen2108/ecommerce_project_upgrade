@@ -560,6 +560,16 @@ export function AdminLandingGalleryPage() {
                     <Edit3 aria-hidden="true" size={17} />
                   </button>
                   <button
+                    aria-label={copy.common.delete}
+                    className="icon-button admin-icon-button admin-icon-button--delete"
+                    disabled={Boolean(busyAction)}
+                    onClick={() => void handleDelete(image)}
+                    title={copy.common.delete}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" size={17} />
+                  </button>
+                  <button
                     className="admin-link-button"
                     disabled={Boolean(busyAction)}
                     onClick={() => void handleStatusChange(image)}
@@ -576,16 +586,6 @@ export function AdminLandingGalleryPage() {
                         {copy.common.activate}
                       </>
                     )}
-                  </button>
-                  <button
-                    aria-label={copy.common.delete}
-                    className="icon-button admin-icon-button admin-icon-button--delete"
-                    disabled={Boolean(busyAction)}
-                    onClick={() => void handleDelete(image)}
-                    title={copy.common.delete}
-                    type="button"
-                  >
-                    <Trash2 aria-hidden="true" size={17} />
                   </button>
                 </footer>
               </article>

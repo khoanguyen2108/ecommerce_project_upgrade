@@ -567,14 +567,6 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                             <Edit3 aria-hidden="true" size={17} />
                           </button>
                           <button
-                            className="admin-link-button"
-                            disabled={busyAction === `${user.id}:status`}
-                            onClick={() => void handleStatusChange(user)}
-                            type="button"
-                          >
-                            {user.isActive ? copy.users.deactivate : copy.users.activate}
-                          </button>
-                          <button
                             aria-label={`${copy.users.deleteTitle}: ${user.email}`}
                             className="icon-button admin-icon-button admin-icon-button--delete"
                             disabled={
@@ -590,6 +582,14 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                             type="button"
                           >
                             <Trash2 aria-hidden="true" size={17} />
+                          </button>
+                          <button
+                            className="admin-link-button"
+                            disabled={busyAction === `${user.id}:status`}
+                            onClick={() => void handleStatusChange(user)}
+                            type="button"
+                          >
+                            {user.isActive ? copy.users.deactivate : copy.users.activate}
                           </button>
                         </div>
                       </td>
