@@ -19,10 +19,16 @@ import { AdminFeedback } from "@/components/admin/AdminCommerceUi";
 import { AdminModal } from "@/components/admin/AdminModal";
 import {
   formatAdminDate,
-  getApiErrorMessage,
   getApiRequestId,
   normalizeNullableText,
 } from "@/components/admin/admin-format";
+import {
+  formatAdminCatalogNumber,
+  getAdminCatalogErrorMessage,
+  getAdminCatalogTranslations,
+  type AdminCatalogTranslations,
+} from "@/features/i18n/admin-catalog-translations";
+import { useI18n } from "@/features/i18n/useI18n";
 import {
   createAdminLandingGalleryImage,
   deleteAdminLandingGalleryImage,
@@ -36,30 +42,6 @@ import type {
   AdminLandingGalleryImage,
   CreateAdminLandingGalleryImageRequest,
 } from "@/features/landing/types";
-
-const LANDING_GALLERY_ERRORS: Record<string, string> = {
-  AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
-  BAD_REQUEST: "Some gallery fields are invalid. Review the form and try again.",
-  FORBIDDEN: "This account is not allowed to manage the landing gallery.",
-  LANDING_GALLERY_FIELD_INVALID: "Some gallery fields are invalid.",
-  LANDING_GALLERY_IMAGE_LIMIT_EXCEEDED:
-    "The landing gallery already has 10 images. Delete one before adding another.",
-  LANDING_GALLERY_IMAGE_NOT_FOUND: "That gallery image no longer exists.",
-  LANDING_GALLERY_IMAGE_URL_INVALID:
-    "Enter a valid public HTTP or HTTPS image URL.",
-  LANDING_GALLERY_IMAGE_URL_INPUT_DISABLED:
-    "Choose a JPEG, PNG, or WebP file instead of entering an image URL.",
-  LANDING_GALLERY_REORDER_DUPLICATE:
-    "Each gallery image can appear only once in a reorder request.",
-  LANDING_GALLERY_REORDER_EMPTY:
-    "Choose at least one image before saving a new order.",
-  LANDING_GALLERY_UPDATE_EMPTY: "Change at least one image field before saving.",
-  NETWORK_ERROR: "The gallery API could not be reached. Check the backend and retry.",
-  PRODUCT_IMAGE_EMPTY: "Choose a non-empty JPEG, PNG, or WebP image.",
-  PRODUCT_IMAGE_TOO_LARGE: "Gallery images must be 5 MB or smaller.",
-  PRODUCT_IMAGE_TYPE_INVALID: "Only genuine JPEG, PNG, and WebP images are allowed.",
-  VALIDATION_ERROR: "Some gallery fields are invalid. Review the form and try again.",
-};
 
 interface GalleryFormState {
   altText: string;
@@ -80,6 +62,10 @@ type GalleryModalMode = "create" | "edit";
 type MoveDirection = "up" | "down";
 
 export function AdminLandingGalleryPage() {
+  const { locale } = useI18n();
+  const copy = getAdminCatalogTranslations(locale);
+  const copyRef = useRef(copy);
+  copyRef.current = copy;
   const [images, setImages] = useState<AdminLandingGalleryImage[]>([]);
   const [count, setCount] = useState(0);
   const [maxImages, setMaxImages] = useState(10);
@@ -127,10 +113,10 @@ export function AdminLandingGalleryPage() {
         setImages([]);
         setCount(0);
         setListError(
-          getApiErrorMessage(
+          getAdminCatalogErrorMessage(
             error,
-            LANDING_GALLERY_ERRORS,
-            "Landing gallery images could not be loaded right now.",
+            copyRef.current.gallery.errors,
+            copyRef.current.gallery.feedback.listLoadError,
           ),
         );
         setRequestId(getApiRequestId(error));
@@ -156,7 +142,7 @@ export function AdminLandingGalleryPage() {
 
   function openCreateModal() {
     if (count >= maxImages) {
-      setActionError(LANDING_GALLERY_ERRORS.LANDING_GALLERY_IMAGE_LIMIT_EXCEEDED);
+      setActionError(copy.gallery.errors.LANDING_GALLERY_IMAGE_LIMIT_EXCEEDED);
       return;
     }
 
@@ -183,11 +169,11 @@ export function AdminLandingGalleryPage() {
     if (!file) return;
 
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-      setActionError("Only JPEG, PNG, and WebP images are allowed.");
+      setActionError(copy.gallery.feedback.imageType);
       return;
     }
     if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
-      setActionError("Gallery images must be non-empty and 5 MB or smaller.");
+      setActionError(copy.gallery.feedback.imageSize);
       return;
     }
 
@@ -224,7 +210,7 @@ export function AdminLandingGalleryPage() {
 
     resetActionFeedback();
 
-    const validationError = validateGalleryForm(form, modalMode);
+    const validationError = validateGalleryForm(form, modalMode, copy);
 
     if (validationError) {
       setActionError(validationError);
@@ -285,7 +271,7 @@ export function AdminLandingGalleryPage() {
 
       setRefreshKey((current) => current + 1);
       if (warning) {
-        setSuccessMessage("Landing gallery image changes were saved.");
+        setSuccessMessage(copy.gallery.feedback.changesSaved);
         setActionError(warning);
       } else {
         setIsModalOpen(false);
@@ -296,10 +282,10 @@ export function AdminLandingGalleryPage() {
         setSelectedImage(latestImage);
       }
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          LANDING_GALLERY_ERRORS,
-          "Landing gallery image could not be saved.",
+          copy.gallery.errors,
+          copy.gallery.feedback.saveError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -317,9 +303,7 @@ export function AdminLandingGalleryPage() {
     const nextIsActive = !image.isActive;
 
     if (
-      !window.confirm(
-        `${nextIsActive ? "Activate" : "Deactivate"} this gallery image?`,
-      )
+      !window.confirm(copy.gallery.confirm.status(nextIsActive))
     ) {
       return;
     }
@@ -333,16 +317,16 @@ export function AdminLandingGalleryPage() {
       });
       setSuccessMessage(
         nextIsActive
-          ? "Landing gallery image activated."
-          : "Landing gallery image deactivated.",
+          ? copy.gallery.feedback.activated
+          : copy.gallery.feedback.deactivated,
       );
       setRefreshKey((current) => current + 1);
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          LANDING_GALLERY_ERRORS,
-          "Landing gallery image status could not be changed.",
+          copy.gallery.errors,
+          copy.gallery.feedback.statusError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -356,7 +340,7 @@ export function AdminLandingGalleryPage() {
       return;
     }
 
-    if (!window.confirm("Delete this landing gallery image? This cannot be undone.")) {
+    if (!window.confirm(copy.gallery.confirm.delete)) {
       return;
     }
 
@@ -365,17 +349,17 @@ export function AdminLandingGalleryPage() {
 
     try {
       const response = await deleteAdminLandingGalleryImage(image.id);
-      setSuccessMessage("Landing gallery image deleted.");
+      setSuccessMessage(copy.gallery.feedback.deleted);
       if (response.warning) {
         setActionError(response.warning);
       }
       setRefreshKey((current) => current + 1);
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          LANDING_GALLERY_ERRORS,
-          "Landing gallery image could not be deleted.",
+          copy.gallery.errors,
+          copy.gallery.feedback.deleteError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -418,13 +402,13 @@ export function AdminLandingGalleryPage() {
       setImages(response.images);
       setCount(response.count);
       setMaxImages(response.maxImages);
-      setSuccessMessage("Landing gallery order updated.");
+      setSuccessMessage(copy.gallery.feedback.orderUpdated);
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          LANDING_GALLERY_ERRORS,
-          "Landing gallery order could not be updated.",
+          copy.gallery.errors,
+          copy.gallery.feedback.orderError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -449,12 +433,17 @@ export function AdminLandingGalleryPage() {
         aria-labelledby="admin-landing-gallery-heading"
       >
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">Storefront moodboard</p>
-          <h1 id="admin-landing-gallery-heading">Landing Gallery</h1>
-          <p>Manage the inspiration images shown on the storefront.</p>
+          <p className="admin-page-intro__eyebrow">{copy.gallery.header.eyebrow}</p>
+          <h1 id="admin-landing-gallery-heading">{copy.gallery.header.title}</h1>
+          <p>{copy.gallery.header.subtitle}</p>
         </div>
         <div className="admin-header-actions">
-          <span className="admin-gallery-count">{count}/{maxImages} images</span>
+          <span className="admin-gallery-count">
+            {copy.gallery.header.count(
+              formatAdminCatalogNumber(count, locale),
+              formatAdminCatalogNumber(maxImages, locale),
+            )}
+          </span>
           <button
             className="button button--secondary"
             disabled={isLoading}
@@ -462,7 +451,7 @@ export function AdminLandingGalleryPage() {
             type="button"
           >
             <RefreshCw aria-hidden="true" size={17} />
-            Refresh
+            {copy.common.refresh}
           </button>
           <button
             className="button button--primary"
@@ -471,7 +460,7 @@ export function AdminLandingGalleryPage() {
             type="button"
           >
             <Plus aria-hidden="true" size={17} />
-            New image
+            {copy.gallery.header.newImage}
           </button>
         </div>
       </section>
@@ -484,16 +473,16 @@ export function AdminLandingGalleryPage() {
         <AdminFeedback message={listError} requestId={requestId} tone="error" />
       ) : null}
 
-      <section className="admin-landing-gallery-board" aria-label="Landing gallery images">
+      <section className="admin-landing-gallery-board" aria-label={copy.gallery.board.aria}>
         {isLoading ? <AdminGallerySkeleton /> : null}
         {!isLoading && !listError && orderedImages.length === 0 ? (
           <div className="admin-landing-gallery-empty">
             <ImageIcon aria-hidden="true" size={28} strokeWidth={1.7} />
-            <h2>No inspiration images yet</h2>
-            <p>Add up to 10 standalone lookbook images for the homepage.</p>
+            <h2>{copy.gallery.board.emptyTitle}</h2>
+            <p>{copy.gallery.board.emptyBody}</p>
             <button className="button button--primary" onClick={openCreateModal} type="button">
               <Plus aria-hidden="true" size={17} />
-              New image
+              {copy.gallery.header.newImage}
             </button>
           </div>
         ) : null}
@@ -502,65 +491,70 @@ export function AdminLandingGalleryPage() {
               <article className="admin-landing-gallery-card" key={image.id}>
                 <GalleryPreview
                   altText={image.altText}
+                  copy={copy}
                   imageUrl={image.imageUrl}
                   title={image.title}
                 />
                 <div className="admin-landing-gallery-card__body">
                   <div className="admin-landing-gallery-card__heading">
                     <div>
-                      <h2>{image.title || "Untitled look"}</h2>
-                      <span>Order {image.sortOrder}</span>
+                      <h2>{image.title || copy.gallery.board.untitled}</h2>
+                      <span>
+                        {copy.gallery.board.order(
+                          formatAdminCatalogNumber(image.sortOrder, locale),
+                        )}
+                      </span>
                     </div>
                     <span
                       className={`admin-badge ${
                         image.isActive ? "admin-badge--neutral" : "admin-badge--muted"
                       }`}
                     >
-                      {image.isActive ? "Active" : "Inactive"}
+                      {image.isActive ? copy.common.active : copy.common.inactive}
                     </span>
                   </div>
-                  <p>{image.caption || "No caption set."}</p>
+                  <p>{image.caption || copy.gallery.board.noCaption}</p>
                   <dl>
                     <div>
-                      <dt>Alt text</dt>
-                      <dd>{image.altText || "Not set"}</dd>
+                      <dt>{copy.gallery.board.altText}</dt>
+                      <dd>{image.altText || copy.common.notSet}</dd>
                     </div>
                     <div>
-                      <dt>Updated</dt>
-                      <dd>{formatAdminDate(image.updatedAt)}</dd>
+                      <dt>{copy.gallery.board.updated}</dt>
+                      <dd>{formatAdminDate(image.updatedAt, locale)}</dd>
                     </div>
                   </dl>
                   <code title={image.imageUrl || undefined}>
-                    {image.imageUrl || "No image uploaded"}
+                    {image.imageUrl || copy.gallery.board.noImageUploaded}
                   </code>
                 </div>
                 <footer className="admin-landing-gallery-card__actions">
                   <button
-                    aria-label="Move image up"
+                    aria-label={copy.gallery.board.moveUpAria}
                     className="icon-button admin-icon-button"
                     disabled={Boolean(busyAction) || index === 0}
                     onClick={() => void handleMove(image, "up")}
-                    title="Move up"
+                    title={copy.gallery.board.moveUpTitle}
                     type="button"
                   >
                     <ArrowUp aria-hidden="true" size={17} />
                   </button>
                   <button
-                    aria-label="Move image down"
+                    aria-label={copy.gallery.board.moveDownAria}
                     className="icon-button admin-icon-button"
                     disabled={Boolean(busyAction) || index === orderedImages.length - 1}
                     onClick={() => void handleMove(image, "down")}
-                    title="Move down"
+                    title={copy.gallery.board.moveDownTitle}
                     type="button"
                   >
                     <ArrowDown aria-hidden="true" size={17} />
                   </button>
                   <button
-                    aria-label="Edit gallery image"
+                    aria-label={copy.gallery.board.editAria}
                     className="icon-button admin-icon-button"
                     disabled={Boolean(busyAction)}
                     onClick={() => openEditModal(image)}
-                    title="Edit image"
+                    title={copy.gallery.board.editTitle}
                     type="button"
                   >
                     <Edit3 aria-hidden="true" size={17} />
@@ -574,12 +568,12 @@ export function AdminLandingGalleryPage() {
                     {image.isActive ? (
                       <>
                         <EyeOff aria-hidden="true" size={15} />
-                        Deactivate
+                        {copy.common.deactivate}
                       </>
                     ) : (
                       <>
                         <Eye aria-hidden="true" size={15} />
-                        Activate
+                        {copy.common.activate}
                       </>
                     )}
                   </button>
@@ -590,7 +584,7 @@ export function AdminLandingGalleryPage() {
                     type="button"
                   >
                     <Trash2 aria-hidden="true" size={15} />
-                    Delete
+                    {copy.common.delete}
                   </button>
                 </footer>
               </article>
@@ -609,7 +603,7 @@ export function AdminLandingGalleryPage() {
               onClick={requestClose}
               type="button"
             >
-              Cancel
+              {copy.common.cancel}
             </button>
             <button
               className="button button--primary"
@@ -620,11 +614,11 @@ export function AdminLandingGalleryPage() {
               <Save aria-hidden="true" size={17} />
               {isSaving
                 ? form.imageFile
-                  ? "Uploading"
-                  : "Saving"
+                  ? copy.common.uploading
+                  : copy.common.saving
                 : modalMode === "create"
-                  ? "Create"
-                  : "Save"}
+                  ? copy.common.create
+                  : copy.common.save}
             </button>
           </>
         )}
@@ -634,13 +628,18 @@ export function AdminLandingGalleryPage() {
           releaseGalleryPreview(localPreviewUrlRef);
           setIsModalOpen(false);
         }}
-        title={modalMode === "create" ? "New gallery image" : "Edit gallery image"}
+        title={
+          modalMode === "create"
+            ? copy.gallery.form.newTitle
+            : copy.gallery.form.editTitle
+        }
       >
         {actionError ? (
           <AdminFeedback message={actionError} requestId={requestId} tone="error" />
         ) : null}
         <GalleryForm
           form={form}
+          copy={copy}
           isDisabled={isSaving}
           onChange={setForm}
           onFileChange={handleGalleryImageSelection}
@@ -653,6 +652,7 @@ export function AdminLandingGalleryPage() {
 }
 
 function GalleryForm({
+  copy,
   form,
   isDisabled,
   onChange,
@@ -660,6 +660,7 @@ function GalleryForm({
   onRemoveImage,
   onSubmit,
 }: {
+  copy: AdminCatalogTranslations;
   form: GalleryFormState;
   isDisabled: boolean;
   onChange: (form: GalleryFormState) => void;
@@ -684,13 +685,16 @@ function GalleryForm({
         aria-labelledby="landing-gallery-image-heading"
       >
         <div className="admin-form-section__heading">
-          <p className="eyebrow">Image source</p>
-          <h3 id="landing-gallery-image-heading">Lookbook image</h3>
-          <p>Upload one JPEG, PNG, or WebP image, up to 5 MB.</p>
+          <p className="eyebrow">{copy.gallery.form.sourceEyebrow}</p>
+          <h3 id="landing-gallery-image-heading">
+            {copy.gallery.form.imageTitle}
+          </h3>
+          <p>{copy.gallery.form.imageHelper}</p>
         </div>
         <div className="admin-landing-gallery-form__media">
           <GalleryPreview
             altText={form.altText}
+            copy={copy}
             imageUrl={form.imageUrl}
             title={form.title}
           />
@@ -710,11 +714,17 @@ function GalleryForm({
               type="button"
             >
               <Upload aria-hidden="true" size={17} />
-              Choose file
+              {copy.gallery.form.chooseFile}
             </button>
             <div className="admin-gallery-image-meta">
-              <strong>{form.imageFilename || "No gallery image"}</strong>
-              <small>{getGalleryImageStatus(form)}</small>
+              <strong>
+                {form.imageFilename ||
+                  (form.imageSource === "managed" ||
+                  form.imageSource === "legacy"
+                    ? copy.gallery.form.existingImage
+                    : copy.gallery.form.noImage)}
+              </strong>
+              <small>{getGalleryImageStatus(form, copy)}</small>
             </div>
             {form.imageSource !== "none" ? (
               <button
@@ -724,7 +734,7 @@ function GalleryForm({
                 type="button"
               >
                 <Trash2 aria-hidden="true" size={15} />
-                Remove image
+                {copy.gallery.form.removeImage}
               </button>
             ) : null}
           </div>
@@ -732,47 +742,49 @@ function GalleryForm({
       </section>
 
       <section className="admin-compact-group" aria-labelledby="landing-gallery-copy-heading">
-        <h3 id="landing-gallery-copy-heading">Copy and status</h3>
+        <h3 id="landing-gallery-copy-heading">
+          {copy.gallery.form.copyTitle}
+        </h3>
         <div className="admin-compact-fields">
           <label>
-            <span>Title</span>
+            <span>{copy.gallery.form.title}</span>
             <input
               disabled={isDisabled}
               maxLength={80}
               onChange={(event) => update("title", event.target.value)}
-              placeholder="Looks in motion"
+              placeholder={copy.gallery.form.titlePlaceholder}
               value={form.title}
             />
           </label>
           <label>
-            <span>Sort order</span>
+            <span>{copy.gallery.form.sortOrder}</span>
             <input
               disabled={isDisabled}
               onChange={(event) => update("sortOrder", event.target.value)}
-              placeholder="Auto"
+              placeholder={copy.gallery.form.sortOrderPlaceholder}
               step="1"
               type="number"
               value={form.sortOrder}
             />
           </label>
           <label className="admin-compact-field--wide">
-            <span>Caption</span>
+            <span>{copy.gallery.form.caption}</span>
             <textarea
               disabled={isDisabled}
               maxLength={160}
               onChange={(event) => update("caption", event.target.value)}
-              placeholder="A short line for the storefront moodboard."
+              placeholder={copy.gallery.form.captionPlaceholder}
               rows={3}
               value={form.caption}
             />
           </label>
           <label className="admin-compact-field--wide">
-            <span>Alt text</span>
+            <span>{copy.gallery.form.altText}</span>
             <input
               disabled={isDisabled}
               maxLength={160}
               onChange={(event) => update("altText", event.target.value)}
-              placeholder="Describe the image for accessibility"
+              placeholder={copy.gallery.form.altTextPlaceholder}
               value={form.altText}
             />
           </label>
@@ -783,7 +795,7 @@ function GalleryForm({
               onChange={(event) => update("isActive", event.target.checked)}
               type="checkbox"
             />
-            <span>Active on storefront</span>
+            <span>{copy.gallery.form.active}</span>
           </label>
         </div>
       </section>
@@ -793,10 +805,12 @@ function GalleryForm({
 
 function GalleryPreview({
   altText,
+  copy,
   imageUrl,
   title,
 }: {
   altText: string | null;
+  copy: AdminCatalogTranslations;
   imageUrl: string | null;
   title: string | null;
 }) {
@@ -810,14 +824,16 @@ function GalleryPreview({
     <div className="admin-landing-gallery-preview">
       {imageUrl && !hasFailed ? (
         <img
-          alt={altText || title || "Landing gallery preview"}
+          alt={altText || title || copy.gallery.form.previewAlt}
           onError={() => setHasFailed(true)}
           src={imageUrl}
         />
       ) : (
         <span>
           <ImageIcon aria-hidden="true" size={22} />
-          {imageUrl ? "Image unavailable" : "No image"}
+          {imageUrl
+            ? copy.gallery.form.imageUnavailable
+            : copy.gallery.form.noPreviewImage}
         </span>
       )}
     </div>
@@ -851,9 +867,7 @@ function galleryForm(image: AdminLandingGalleryImage): GalleryFormState {
   return {
     altText: image.altText || "",
     caption: image.caption || "",
-    imageFilename:
-      image.managedImageAsset?.originalFilename ||
-      (image.imageUrl ? "Existing gallery image" : ""),
+    imageFilename: image.managedImageAsset?.originalFilename || "",
     imageSource: image.managedImageAsset
       ? "managed"
       : image.imageUrl
@@ -886,28 +900,29 @@ function galleryPayload(
 function validateGalleryForm(
   form: GalleryFormState,
   mode: GalleryModalMode,
+  copy: AdminCatalogTranslations,
 ): string | undefined {
   if (mode === "create" && form.imageSource === "none") {
-    return "Choose a JPEG, PNG, or WebP image.";
+    return copy.gallery.validation.imageRequired;
   }
 
   if (form.title.trim().length > 80) {
-    return "Title must be 80 characters or fewer.";
+    return copy.gallery.validation.titleLength;
   }
 
   if (form.caption.trim().length > 160) {
-    return "Caption must be 160 characters or fewer.";
+    return copy.gallery.validation.captionLength;
   }
 
   if (form.altText.trim().length > 160) {
-    return "Alt text must be 160 characters or fewer.";
+    return copy.gallery.validation.altTextLength;
   }
 
   if (
     form.sortOrder.trim() &&
     !Number.isInteger(Number(form.sortOrder.trim()))
   ) {
-    return "Sort order must be a whole number.";
+    return copy.gallery.validation.sortOrder;
   }
 
   return undefined;
@@ -926,16 +941,19 @@ function areGalleryDetailsEqual(
   );
 }
 
-function getGalleryImageStatus(form: GalleryFormState): string {
+function getGalleryImageStatus(
+  form: GalleryFormState,
+  copy: AdminCatalogTranslations,
+): string {
   switch (form.imageSource) {
     case "local":
-      return "Ready to upload";
+      return copy.gallery.form.readyToUpload;
     case "managed":
-      return "Stored securely in Supabase";
+      return copy.gallery.form.managedImage;
     case "legacy":
-      return "Existing URL image; choose a file to migrate it";
+      return copy.gallery.form.legacyImage;
     default:
-      return "Choose one image for this gallery entry";
+      return copy.gallery.form.chooseImage;
   }
 }
 

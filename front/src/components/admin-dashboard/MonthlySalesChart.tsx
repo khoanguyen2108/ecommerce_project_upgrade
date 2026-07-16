@@ -1,4 +1,11 @@
+"use client";
+
 import type { AdminRevenueBucket } from "@/features/admin-stats/types";
+import {
+  getIntlLocale,
+  useAdminCommonI18n,
+} from "@/features/i18n/admin-common-translations";
+import type { Locale } from "@/features/i18n/locale";
 
 interface MonthlySalesChartProps {
   buckets?: AdminRevenueBucket[];
@@ -16,6 +23,7 @@ export function MonthlySalesChart({
   buckets = [],
   isLoading = false,
 }: MonthlySalesChartProps) {
+  const { locale, messages } = useAdminCommonI18n();
   const hasSales = buckets.some((bucket) => bucket.revenue > 0);
   const maxValue = Math.max(...buckets.map((bucket) => bucket.revenue), 0);
   const plotWidth = CHART_WIDTH - PLOT_LEFT - PLOT_RIGHT;
@@ -28,24 +36,23 @@ export function MonthlySalesChart({
     <article className="admin-dashboard-card admin-dashboard-card--sales">
       <header className="admin-dashboard-card__header">
         <div>
-          <p className="admin-dashboard-card__kicker">Performance</p>
-          <h2>Monthly sales</h2>
-          <span>Verified paid revenue in the selected range</span>
+          <p className="admin-dashboard-card__kicker">
+            {messages.dashboard.performance}
+          </p>
+          <h2>{messages.dashboard.monthlySales}</h2>
+          <span>{messages.dashboard.monthlySalesDescription}</span>
         </div>
         <span className="admin-dashboard-legend">
-          <i aria-hidden="true" /> Paid revenue
+          <i aria-hidden="true" /> {messages.dashboard.paidRevenue}
         </span>
       </header>
 
       {isLoading && buckets.length === 0 ? (
-        <ChartLoading label="Loading monthly sales" />
+        <ChartLoading label={messages.dashboard.loadingMonthlySales} />
       ) : !hasSales ? (
         <div className="admin-dashboard-chart-empty" role="status">
-          <strong>No sales data yet</strong>
-          <span>
-            Verified paid revenue will appear here when it is available for this
-            date range.
-          </span>
+          <strong>{messages.dashboard.noSales}</strong>
+          <span>{messages.dashboard.noSalesDescription}</span>
         </div>
       ) : (
         <div className="admin-dashboard-chart-wrap">
@@ -55,10 +62,9 @@ export function MonthlySalesChart({
             role="img"
             viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
           >
-            <title id="monthly-sales-title">Monthly verified paid revenue</title>
+            <title id="monthly-sales-title">{messages.dashboard.chartTitle}</title>
             <desc id="monthly-sales-description">
-              Bar chart of verified paid revenue for each API-provided monthly
-              bucket in the selected range.
+              {messages.dashboard.chartDescription}
             </desc>
             {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
               const y = PLOT_TOP + plotHeight * ratio;
@@ -79,7 +85,7 @@ export function MonthlySalesChart({
                     x={PLOT_LEFT - 10}
                     y={y + 4}
                   >
-                    {formatCompactCurrency(value)}
+                    {formatCompactCurrency(value, locale)}
                   </text>
                 </g>
               );
@@ -99,7 +105,7 @@ export function MonthlySalesChart({
                     y={PLOT_TOP + plotHeight - Math.max(height, 2)}
                   >
                     <title>
-                      {formatBucketLabel(bucket.periodStart, true)}: {formatCurrency(bucket.revenue)}
+                      {formatBucketLabel(bucket.periodStart, true, locale)}: {formatCurrency(bucket.revenue, locale)}
                     </title>
                   </rect>
                   {index % labelStep === 0 || index === buckets.length - 1 ? (
@@ -109,7 +115,11 @@ export function MonthlySalesChart({
                       x={x + barWidth / 2}
                       y={CHART_HEIGHT - 15}
                     >
-                      {formatBucketLabel(bucket.periodStart, buckets.length > 12)}
+                      {formatBucketLabel(
+                        bucket.periodStart,
+                        buckets.length > 12,
+                        locale,
+                      )}
                     </text>
                   ) : null}
                 </g>
@@ -130,29 +140,33 @@ function ChartLoading({ label }: { label: string }) {
   );
 }
 
-function formatBucketLabel(value: string, includeYear: boolean): string {
-  return new Intl.DateTimeFormat("en", {
+function formatBucketLabel(
+  value: string,
+  includeYear: boolean,
+  locale: Locale,
+): string {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     month: "short",
     timeZone: "UTC",
     ...(includeYear ? { year: "2-digit" } : {}),
   }).format(new Date(value));
 }
 
-function formatCompactCurrency(value: number): string {
+function formatCompactCurrency(value: number, locale: Locale): string {
   if (value === 0) {
     return "0";
   }
 
-  return new Intl.NumberFormat("en", {
+  return new Intl.NumberFormat(getIntlLocale(locale), {
     maximumFractionDigits: 1,
     notation: "compact",
   }).format(value);
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("vi-VN", {
-    currency: "VND",
+function formatCurrency(value: number, locale: Locale): string {
+  const amount = new Intl.NumberFormat(getIntlLocale(locale), {
     maximumFractionDigits: 0,
-    style: "currency",
   }).format(value);
+
+  return `${amount}\u00a0VND`;
 }

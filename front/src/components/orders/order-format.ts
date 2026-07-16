@@ -57,22 +57,35 @@ export function getOrderRequestId(error: unknown): string | undefined {
 export function formatCurrency(
   value: number,
   currency: string | null | undefined = "VND",
+  locale?: Locale,
 ): string {
   const amount = Number(value);
   const currencyCode = currency || "VND";
 
   if (!Number.isFinite(amount)) {
-    return "Not available";
+    return locale === "vi" ? "Không khả dụng" : "Not available";
   }
 
   try {
-    return new Intl.NumberFormat("vi-VN", {
-      currency: currencyCode,
-      maximumFractionDigits: currencyCode === "VND" ? 0 : 2,
-      style: "currency",
-    }).format(amount);
+    if (!locale) {
+      return new Intl.NumberFormat("vi-VN", {
+        currency: currencyCode,
+        maximumFractionDigits: currencyCode === "VND" ? 0 : 2,
+        style: "currency",
+      }).format(amount);
+    }
+
+    const formattedAmount = new Intl.NumberFormat(
+      locale === "vi" ? "vi-VN" : "en-US",
+      {
+        maximumFractionDigits: currencyCode === "VND" ? 0 : 2,
+        minimumFractionDigits: currencyCode === "VND" ? 0 : 2,
+      },
+    ).format(amount);
+
+    return `${formattedAmount}\u00a0${currencyCode}`;
   } catch {
-    return `${new Intl.NumberFormat("en-US").format(amount)} ${currencyCode}`;
+    return `${new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US").format(amount)}\u00a0${currencyCode}`;
   }
 }
 

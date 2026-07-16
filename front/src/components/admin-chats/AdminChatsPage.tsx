@@ -12,9 +12,15 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { AdminFeedback } from "@/components/admin/AdminCommerceUi";
 import { formatAdminDate } from "@/components/admin/admin-format";
+import { formatNumber } from "@/components/orders/order-format";
 import { requestAdminNavNotificationsRefresh } from "@/features/admin-notifications/events";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
+import {
+  getAdminOperationsTranslations,
+  type AdminOperationsTranslations,
+} from "@/features/i18n/admin-operations-translations";
+import { useI18n } from "@/features/i18n/useI18n";
 import {
   getAdminChatConversation,
   listAdminChatConversations,
@@ -34,9 +40,17 @@ import type {
 import { ApiClientError } from "@/lib/errors/api-error";
 
 type ConnectionState = "connected" | "connecting" | "offline";
+type ChatErrorFallback = "connection" | "load" | "reply";
+
+interface ChatUiError {
+  cause: unknown;
+  fallback: ChatErrorFallback;
+}
 
 export function AdminChatsPage() {
   const { accessToken, currentUser } = useAuthSession();
+  const { locale } = useI18n();
+  const copy = getAdminOperationsTranslations(locale);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
   const [selectedConversation, setSelectedConversation] =
@@ -46,8 +60,8 @@ export function AdminChatsPage() {
   const [isListLoading, setIsListLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [error, setError] = useState<string>();
-  const [socketError, setSocketError] = useState<string>();
+  const [error, setError] = useState<ChatUiError>();
+  const [socketError, setSocketError] = useState<ChatUiError>();
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("offline");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -92,7 +106,7 @@ export function AdminChatsPage() {
         }
 
         setConversations([]);
-        setError(getChatErrorMessage(loadError));
+        setError({ cause: loadError, fallback: "load" });
       } finally {
         if (isMounted) {
           setIsListLoading(false);
@@ -144,7 +158,7 @@ export function AdminChatsPage() {
 
         setSelectedConversation(undefined);
         setMessages([]);
-        setError(getChatErrorMessage(loadError));
+        setError({ cause: loadError, fallback: "load" });
       } finally {
         if (isMounted) {
           setIsDetailLoading(false);
@@ -176,7 +190,7 @@ export function AdminChatsPage() {
       socketRef.current = socket;
       setConnectionState("connecting");
     } catch (connectError) {
-      setSocketError(getChatErrorMessage(connectError));
+      setSocketError({ cause: connectError, fallback: "connection" });
       setConnectionState("offline");
       return;
     }
@@ -195,7 +209,7 @@ export function AdminChatsPage() {
     socket.on("connect_error", (connectError) => {
       if (isMounted) {
         setConnectionState("offline");
-        setSocketError(getChatErrorMessage(connectError));
+        setSocketError({ cause: connectError, fallback: "connection" });
       }
     });
     socket.io.on("reconnect_attempt", () => {
@@ -206,7 +220,7 @@ export function AdminChatsPage() {
     socket.io.on("reconnect_error", (connectError) => {
       if (isMounted) {
         setConnectionState("offline");
-        setSocketError(getChatErrorMessage(connectError));
+        setSocketError({ cause: connectError, fallback: "connection" });
       }
     });
     socket.io.on("reconnect", () => {
@@ -244,7 +258,7 @@ export function AdminChatsPage() {
     });
     socket.on("chat:error", (chatError) => {
       if (isMounted) {
-        setSocketError(chatError.message);
+        setSocketError({ cause: chatError, fallback: "connection" });
       }
     });
 
@@ -301,7 +315,10 @@ export function AdminChatsPage() {
           }
 
           if (!response.ok) {
-            setSocketError(response.error?.message || "Reply could not be sent.");
+            setSocketError({
+              cause: response.error,
+              fallback: "reply",
+            });
             setDraft(body);
             return;
           }
@@ -330,7 +347,7 @@ export function AdminChatsPage() {
       );
       setMessages((current) => appendMessage(current, response.message));
     } catch (sendError) {
-      setError(getChatErrorMessage(sendError));
+      setError({ cause: sendError, fallback: "reply" });
     } finally {
       setIsSending(false);
     }
@@ -370,21 +387,21 @@ export function AdminChatsPage() {
   const selectedCustomerLabel =
     selectedConversation?.customer.name ||
     selectedConversation?.customer.email ||
-    "Customer";
+    copy.chats.customerFallback;
   const connectionLabel =
     connectionState === "connected"
-      ? "ONLINE"
+      ? copy.chats.connection.connected
       : connectionState === "connecting"
-        ? "CONNECTING"
-        : "OFFLINE";
+        ? copy.chats.connection.connecting
+        : copy.chats.connection.offline;
 
   return (
     <div className="admin-resource admin-resource--full-width admin-chats-page">
       <section className="admin-resource__header" aria-labelledby="admin-chats-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">SUPPORT INBOX</p>
-          <h1 id="admin-chats-heading">Chats</h1>
-          <p>Reply to customer questions about orders, sizing, and delivery.</p>
+          <p className="admin-page-intro__eyebrow">{copy.chats.eyebrow}</p>
+          <h1 id="admin-chats-heading">{copy.chats.title}</h1>
+          <p>{copy.chats.subtitle}</p>
         </div>
         <button
           className="button button--secondary"
@@ -397,19 +414,28 @@ export function AdminChatsPage() {
             className={isListLoading ? "spin" : undefined}
             size={17}
           />
-          Refresh
+          {copy.common.refresh}
         </button>
       </section>
 
-      {error ? <AdminFeedback message={error} tone="error" /> : null}
-      {socketError ? <AdminFeedback message={socketError} tone="error" /> : null}
+      {error ? (
+        <AdminFeedback message={getChatErrorMessage(error, copy.chats)} tone="error" />
+      ) : null}
+      {socketError ? (
+        <AdminFeedback
+          message={getChatErrorMessage(socketError, copy.chats)}
+          tone="error"
+        />
+      ) : null}
 
-      <section className="admin-chats-layout" aria-label="Customer support chats">
-        <aside className="admin-chats-list" aria-label="Conversations">
+      <section className="admin-chats-layout" aria-label={copy.chats.layoutAria}>
+        <aside className="admin-chats-list" aria-label={copy.chats.listAria}>
           <div className="admin-chats-list__header">
             <div>
-              <strong>Conversations</strong>
-              <span>{conversations.length} total</span>
+              <strong>{copy.chats.conversations}</strong>
+              <span>
+                {copy.chats.conversationTotal(formatNumber(conversations.length, locale))}
+              </span>
             </div>
             <span
               className={`admin-chats-connection admin-chats-connection--${connectionState}`}
@@ -424,7 +450,7 @@ export function AdminChatsPage() {
           <div className="admin-chats-list__body">
             {isListLoading ? <AdminChatListSkeleton /> : null}
             {!isListLoading && conversations.length === 0 ? (
-              <AdminChatEmptyList />
+              <AdminChatEmptyList label={copy.chats.emptyList} />
             ) : null}
             {!isListLoading
               ? conversations.map((conversation) => (
@@ -454,6 +480,8 @@ export function AdminChatsPage() {
                         <small>
                           {formatNullableTime(
                             conversation.lastMessageAt || conversation.updatedAt,
+                            locale,
+                            copy.chats.noActivity,
                           )}
                         </small>
                       </span>
@@ -461,17 +489,17 @@ export function AdminChatsPage() {
                         {conversation.customer.email}
                       </span>
                       <span className="admin-chat-list-item__preview">
-                        {conversation.lastMessage?.body || "No messages yet."}
+                        {conversation.lastMessage?.body || copy.chats.emptyPreview}
                       </span>
                       <span className="admin-chat-list-item__meta">
                         <span
                           className={`admin-chat-status admin-chat-status--${conversation.status.toLowerCase()}`}
                         >
-                          {conversation.status}
+                          {copy.chats.status[conversation.status]}
                         </span>
                         {conversation.unreadCount > 0 ? (
                           <span className="admin-chat-list-item__unread">
-                            {conversation.unreadCount}
+                            {formatNumber(conversation.unreadCount, locale)}
                           </span>
                         ) : null}
                       </span>
@@ -482,7 +510,7 @@ export function AdminChatsPage() {
           </div>
         </aside>
 
-        <main className="admin-chat-thread" aria-label="Selected conversation">
+        <main className="admin-chat-thread" aria-label={copy.chats.selectedConversationAria}>
           {selectedConversation ? (
             <>
               <header className="admin-chat-thread__header">
@@ -500,26 +528,28 @@ export function AdminChatsPage() {
                 </div>
                 <dl>
                   <div>
-                    <dt>Status</dt>
+                    <dt>{copy.common.status}</dt>
                     <dd>
                       <span
                         className={`admin-chat-status admin-chat-status--${selectedConversation.status.toLowerCase()}`}
                       >
-                        {selectedConversation.status}
+                        {copy.chats.status[selectedConversation.status]}
                       </span>
                     </dd>
                   </div>
                   <div>
-                    <dt>Last activity</dt>
+                    <dt>{copy.chats.lastActivity}</dt>
                     <dd>
                       {formatNullableTime(
                         selectedConversation.lastMessageAt ||
                           selectedConversation.updatedAt,
+                          locale,
+                          copy.chats.noActivity,
                       )}
                     </dd>
                   </div>
                   <div>
-                    <dt>ID</dt>
+                    <dt>{copy.chats.conversationId}</dt>
                     <dd>{formatConversationId(selectedConversation.id)}</dd>
                   </div>
                 </dl>
@@ -535,7 +565,7 @@ export function AdminChatsPage() {
                 {!isDetailLoading && messages.length === 0 ? (
                   <div className="admin-chat-thread__empty" role="status">
                     <MessageCircle aria-hidden="true" size={28} />
-                    <span>No messages in this conversation yet.</span>
+                    <span>{copy.chats.emptyConversation}</span>
                   </div>
                 ) : null}
                 {!isDetailLoading
@@ -543,7 +573,9 @@ export function AdminChatsPage() {
                       <AdminChatBubble
                         isAdmin={message.senderRole === "ADMIN"}
                         key={message.id}
+                        locale={locale}
                         message={message}
+                        copy={copy.chats}
                       />
                     ))
                   : null}
@@ -551,7 +583,7 @@ export function AdminChatsPage() {
               </div>
 
               <form className="admin-chat-composer" onSubmit={handleSend}>
-                <label htmlFor="admin-chat-reply">Reply</label>
+                <label htmlFor="admin-chat-reply">{copy.chats.reply}</label>
                 <div className="admin-chat-composer__field">
                   <textarea
                     disabled={isSending || selectedConversation.status === "CLOSED"}
@@ -559,13 +591,13 @@ export function AdminChatsPage() {
                     maxLength={2000}
                     onChange={(event) => setDraft(event.target.value)}
                     onKeyDown={handleComposerKeyDown}
-                    placeholder="Type your reply..."
+                    placeholder={copy.chats.replyPlaceholder}
                     rows={2}
                     value={draft}
                   />
                 </div>
                 <button
-                  aria-label="Send reply"
+                  aria-label={copy.chats.sendAria}
                   className="admin-chat-composer__send"
                   disabled={
                     !draft.trim() ||
@@ -575,18 +607,18 @@ export function AdminChatsPage() {
                   type="submit"
                 >
                   <Send aria-hidden="true" size={17} />
-                  <span>{isSending ? "Sending" : "Send"}</span>
+                  <span>{isSending ? copy.chats.sending : copy.chats.send}</span>
                 </button>
               </form>
             </>
           ) : (
             <div className="admin-chat-thread__empty admin-chat-thread__empty--full">
               {isListLoading ? (
-                <span>Loading conversations.</span>
+                <span>{copy.chats.loadingConversations}</span>
               ) : (
                 <>
                   <Inbox aria-hidden="true" size={30} />
-                  <span>Select a conversation to start replying.</span>
+                  <span>{copy.chats.selectConversation}</span>
                 </>
               )}
             </div>
@@ -598,10 +630,14 @@ export function AdminChatsPage() {
 }
 
 function AdminChatBubble({
+  copy,
   isAdmin,
+  locale,
   message,
 }: {
+  copy: AdminOperationsTranslations["chats"];
   isAdmin: boolean;
+  locale: "en" | "vi";
   message: ChatMessage;
 }) {
   const isAi = message.senderRole === "AI";
@@ -619,23 +655,25 @@ function AdminChatBubble({
       <div>
         <strong>
           {isAdmin
-            ? "Admin"
+            ? copy.actorAdmin
             : isAi
               ? "Belikeme AI"
-              : message.sender?.name || "Customer"}
+              : message.sender?.name || copy.actorCustomer}
         </strong>
-        <time dateTime={message.createdAt}>{formatAdminDate(message.createdAt)}</time>
+        <time dateTime={message.createdAt}>
+          {formatAdminDate(message.createdAt, locale)}
+        </time>
       </div>
       <p>{message.body}</p>
     </article>
   );
 }
 
-function AdminChatEmptyList() {
+function AdminChatEmptyList({ label }: { label: string }) {
   return (
     <div className="admin-chats-list__empty" role="status">
       <AlertCircle aria-hidden="true" size={18} />
-      <span>No customer conversations yet.</span>
+      <span>{label}</span>
     </div>
   );
 }
@@ -698,26 +736,46 @@ function appendMessage(
   );
 }
 
-function getChatErrorMessage(error: unknown): string {
-  if (error instanceof ApiClientError) {
-    return error.message;
+function getChatErrorMessage(
+  error: ChatUiError,
+  copy: AdminOperationsTranslations["chats"],
+): string {
+  const socketError = error.cause as Partial<ChatSocketError> | undefined;
+  const code =
+    error.cause instanceof ApiClientError
+      ? error.cause.code
+      : typeof socketError?.code === "string"
+        ? socketError.code
+        : undefined;
+  const mapped = code
+    ? copy.errors[code as keyof typeof copy.errors]
+    : undefined;
+
+  if (mapped) {
+    return mapped;
   }
 
-  const socketError = error as Partial<ChatSocketError>;
-
-  if (typeof socketError?.message === "string") {
-    return socketError.message;
+  if (error.fallback === "reply") {
+    return copy.replyError;
   }
 
-  return "Chats could not be loaded right now.";
+  if (error.fallback === "connection") {
+    return copy.connectionError;
+  }
+
+  return copy.genericError;
 }
 
-function formatNullableTime(value: string | null | undefined): string {
+function formatNullableTime(
+  value: string | null | undefined,
+  locale: "en" | "vi",
+  fallback: string,
+): string {
   if (!value) {
-    return "No activity";
+    return fallback;
   }
 
-  return formatAdminDate(value);
+  return formatAdminDate(value, locale);
 }
 
 function getCustomerInitials(name: string | null | undefined, email: string): string {

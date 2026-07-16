@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useId, useRef } from "react";
+import { useAdminCommonI18n } from "@/features/i18n/admin-common-translations";
 
 interface AdminModalProps {
   children: ReactNode;
@@ -30,7 +31,7 @@ export function AdminModal({
   children,
   closeDisabled = false,
   compact = false,
-  confirmCloseMessage = "Discard your unsaved changes?",
+  confirmCloseMessage,
   description,
   footer,
   hasUnsavedChanges = false,
@@ -38,18 +39,21 @@ export function AdminModal({
   onClose,
   title,
 }: AdminModalProps) {
+  const { messages } = useAdminCommonI18n();
+  const effectiveConfirmCloseMessage =
+    confirmCloseMessage ?? messages.modal.discardChanges;
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeOptionsRef = useRef({
     closeDisabled,
-    confirmCloseMessage,
+    confirmCloseMessage: effectiveConfirmCloseMessage,
     hasUnsavedChanges,
     onClose,
   });
   closeOptionsRef.current = {
     closeDisabled,
-    confirmCloseMessage,
+    confirmCloseMessage: effectiveConfirmCloseMessage,
     hasUnsavedChanges,
     onClose,
   };
@@ -158,7 +162,7 @@ export function AdminModal({
             {description ? <p id={descriptionId}>{description}</p> : null}
           </div>
           <button
-            aria-label="Close modal"
+            aria-label={messages.modal.close}
             className="icon-button admin-icon-button"
             disabled={closeDisabled}
             onClick={requestClose}

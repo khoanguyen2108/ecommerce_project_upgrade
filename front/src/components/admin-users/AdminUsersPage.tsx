@@ -28,34 +28,27 @@ import type {
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import type { AuthProvider, UserRole } from "@/features/auth/types";
 import type { Pagination } from "@/lib/api/types";
+import { ApiClientError } from "@/lib/errors/api-error";
 import { AdminModal } from "@/components/admin/AdminModal";
+import { formatNumber } from "@/components/orders/order-format";
 import {
   formatAdminDate,
   formatOptional,
-  getApiErrorMessage,
   getApiRequestId,
   getBooleanFilterValue,
   normalizeNullableText,
   parseActiveFilter,
 } from "@/components/admin/admin-format";
+import {
+  getAdminOperationsTranslations,
+  type AdminOperationsTranslations,
+} from "@/features/i18n/admin-operations-translations";
+import type { Locale } from "@/features/i18n/locale";
+import { useI18n } from "@/features/i18n/useI18n";
 
 const USER_LIMIT = 8;
 const ROLE_OPTIONS: UserRole[] = ["CUSTOMER", "STAFF", "ADMIN"];
 const AUTH_PROVIDER_OPTIONS: AuthProvider[] = ["EMAIL", "GOOGLE"];
-
-const USER_ERROR_MESSAGES: Record<string, string> = {
-  ADMIN_USER_UPDATE_EMPTY: "Change at least one editable field before saving.",
-  AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
-  BAD_REQUEST: "Some user fields are invalid. Review the form and try again.",
-  FORBIDDEN: "This account is not allowed to manage admin users.",
-  LAST_ACTIVE_ADMIN: "At least one active admin account must remain available.",
-  NETWORK_ERROR: "The users API could not be reached. Check the backend and retry.",
-  USER_NOT_FOUND: "That user no longer exists.",
-  USER_DELETE_BLOCKED:
-    "This user has related records. Deactivate the account instead.",
-  USER_DELETE_SELF_BLOCKED: "You cannot delete the admin account you are using.",
-  VALIDATION_ERROR: "Some user fields are invalid. Review the form and try again.",
-};
 
 interface AdminUsersPageProps {
   initialQuery: AdminUserQuery;
@@ -68,8 +61,26 @@ interface UserFormState {
   role: UserRole;
 }
 
+type UserErrorFallback =
+  | "delete"
+  | "empty"
+  | "list"
+  | "open"
+  | "selfDelete"
+  | "status"
+  | "update";
+
+interface UserUiError {
+  cause?: unknown;
+  fallback: UserErrorFallback;
+}
+
+type UserSuccess = "activated" | "deactivated" | "deleted" | "updated";
+
 export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
   const { currentUser } = useAuthSession();
+  const { locale } = useI18n();
+  const copy = getAdminOperationsTranslations(locale);
   const [query, setQuery] = useState<AdminUserQuery>({
     ...initialQuery,
     limit: USER_LIMIT,
@@ -95,10 +106,10 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [busyAction, setBusyAction] = useState<string>();
-  const [listError, setListError] = useState<string>();
-  const [actionError, setActionError] = useState<string>();
+  const [listError, setListError] = useState<UserUiError>();
+  const [actionError, setActionError] = useState<UserUiError>();
   const [requestId, setRequestId] = useState<string>();
-  const [successMessage, setSuccessMessage] = useState<string>();
+  const [success, setSuccess] = useState<UserSuccess>();
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -133,13 +144,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
         }
 
         setUsers([]);
-        setListError(
-          getApiErrorMessage(
-            error,
-            USER_ERROR_MESSAGES,
-            "Admin users could not be loaded right now.",
-          ),
-        );
+        setListError({ cause: error, fallback: "list" });
         setRequestId(getApiRequestId(error));
       } finally {
         if (isMounted) {
@@ -183,7 +188,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     setSelectedUser(user);
     setForm(getUserFormState(user));
     setActionError(undefined);
-    setSuccessMessage(undefined);
+    setSuccess(undefined);
     setRequestId(undefined);
     setIsModalOpen(true);
     setIsDetailLoading(true);
@@ -194,13 +199,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
       setSelectedUser(response.user);
       setForm(getUserFormState(response.user));
     } catch (error) {
-      setActionError(
-        getApiErrorMessage(
-          error,
-          USER_ERROR_MESSAGES,
-          "This user could not be opened right now.",
-        ),
-      );
+      setActionError({ cause: error, fallback: "open" });
       setRequestId(getApiRequestId(error));
     } finally {
       setIsDetailLoading(false);
@@ -215,7 +214,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     }
 
     setActionError(undefined);
-    setSuccessMessage(undefined);
+    setSuccess(undefined);
     setRequestId(undefined);
 
     const name = normalizeNullableText(form.name);
@@ -225,14 +224,14 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     const statusChanged = form.isActive !== selectedUser.isActive;
 
     if (!profileChanged && !roleChanged && !statusChanged) {
-      setActionError("Change at least one editable field before saving.");
+      setActionError({ fallback: "empty" });
       return;
     }
 
     if (
       statusChanged &&
       !window.confirm(
-        `${form.isActive ? "Activate" : "Deactivate"} ${selectedUser.email}?`,
+        copy.users.confirmStatus(form.isActive, selectedUser.email),
       )
     ) {
       return;
@@ -267,16 +266,10 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
 
       setForm(getUserFormState(updatedUser));
       setRefreshKey((current) => current + 1);
-      setSuccessMessage("User updated.");
+      setSuccess("updated");
       setIsModalOpen(false);
     } catch (error) {
-      setActionError(
-        getApiErrorMessage(
-          error,
-          USER_ERROR_MESSAGES,
-          "User profile could not be updated.",
-        ),
-      );
+      setActionError({ cause: error, fallback: "update" });
       setRequestId(getApiRequestId(error));
     } finally {
       setIsSaving(false);
@@ -288,7 +281,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
 
     if (
       !window.confirm(
-        `${nextIsActive ? "Activate" : "Deactivate"} ${user.email}?`,
+        copy.users.confirmStatus(nextIsActive, user.email),
       )
     ) {
       return;
@@ -298,7 +291,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
 
     setBusyAction(actionKey);
     setActionError(undefined);
-    setSuccessMessage(undefined);
+    setSuccess(undefined);
     setRequestId(undefined);
 
     try {
@@ -308,19 +301,9 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
 
       syncUser(response.user);
       setRefreshKey((current) => current + 1);
-      setSuccessMessage(
-        response.user.isActive
-          ? "User account activated."
-          : "User account deactivated.",
-      );
+      setSuccess(response.user.isActive ? "activated" : "deactivated");
     } catch (error) {
-      setActionError(
-        getApiErrorMessage(
-          error,
-          USER_ERROR_MESSAGES,
-          "User active status could not be changed.",
-        ),
-      );
+      setActionError({ cause: error, fallback: "status" });
       setRequestId(getApiRequestId(error));
     } finally {
       setBusyAction(undefined);
@@ -329,14 +312,14 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
 
   async function handleDelete(user: AdminUser) {
     if (user.id === currentUser?.id) {
-      setActionError("You cannot delete the admin account you are using.");
+      setActionError({ fallback: "selfDelete" });
       return;
     }
-    if (!window.confirm(`Delete ${user.email}? This cannot be undone.`)) return;
+    if (!window.confirm(copy.users.deleteConfirm(user.email))) return;
 
     setBusyAction(`${user.id}:delete`);
     setActionError(undefined);
-    setSuccessMessage(undefined);
+    setSuccess(undefined);
     setRequestId(undefined);
     try {
       await deleteAdminUser(user.id);
@@ -345,11 +328,9 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
       } else {
         setRefreshKey((current) => current + 1);
       }
-      setSuccessMessage("User deleted.");
+      setSuccess("deleted");
     } catch (error) {
-      setActionError(
-        getApiErrorMessage(error, USER_ERROR_MESSAGES, "User could not be deleted."),
-      );
+      setActionError({ cause: error, fallback: "delete" });
       setRequestId(getApiRequestId(error));
     } finally {
       setBusyAction(undefined);
@@ -374,14 +355,29 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
   const hasUnsavedChanges = selectedUser
     ? !areUserFormsEqual(form, getUserFormState(selectedUser))
     : false;
+  const listErrorMessage = listError
+    ? getUserErrorMessage(listError, copy)
+    : undefined;
+  const actionErrorMessage = actionError
+    ? getUserErrorMessage(actionError, copy)
+    : undefined;
+  const successMessage = success
+    ? success === "activated"
+      ? copy.users.userStatusActivated
+      : success === "deactivated"
+        ? copy.users.userStatusDeactivated
+        : success === "deleted"
+          ? copy.users.userDeleted
+          : copy.users.userUpdated
+    : undefined;
 
   return (
     <div className="admin-resource admin-resource--full-width">
       <section className="admin-resource__header" aria-labelledby="admin-users-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">Access management</p>
-          <h1 id="admin-users-heading">Users Management</h1>
-          <p>Review customer and staff profiles, roles, and account access.</p>
+          <p className="admin-page-intro__eyebrow">{copy.users.eyebrow}</p>
+          <h1 id="admin-users-heading">{copy.users.title}</h1>
+          <p>{copy.users.subtitle}</p>
         </div>
         <button
           className="button button--secondary"
@@ -390,32 +386,35 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
           type="button"
         >
           <RefreshCw aria-hidden="true" size={17} />
-          Refresh
+          {copy.common.refresh}
         </button>
       </section>
 
-      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline admin-filter-surface" aria-label="User filters">
+      <section
+        className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline admin-filter-surface"
+        aria-label={copy.users.filtersAria}
+      >
         <form className="admin-search" onSubmit={handleSearchSubmit}>
-          <label htmlFor="admin-user-search">Search</label>
+          <label htmlFor="admin-user-search">{copy.users.search}</label>
           <div>
             <input
               id="admin-user-search"
               maxLength={120}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Email, name, or phone"
+              placeholder={copy.users.searchPlaceholder}
               type="search"
               value={searchInput}
             />
             <button className="button button--primary" type="submit">
               <Search aria-hidden="true" size={17} />
-              Search
+              {copy.users.search}
             </button>
           </div>
         </form>
 
         <div className="admin-filter-grid">
           <label>
-            <span>Role</span>
+            <span>{copy.common.role}</span>
             <select
               onChange={(event) =>
                 handleFilterChange({
@@ -424,17 +423,17 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               }
               value={query.role || ""}
             >
-              <option value="">All roles</option>
+              <option value="">{copy.users.allRoles}</option>
               {ROLE_OPTIONS.map((role) => (
                 <option key={role} value={role}>
-                  {role}
+                  {copy.users.roles[role]}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            <span>Auth provider</span>
+            <span>{copy.users.authProvider}</span>
             <select
               onChange={(event) =>
                 handleFilterChange({
@@ -445,17 +444,17 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               }
               value={query.authProvider || ""}
             >
-              <option value="">All providers</option>
+              <option value="">{copy.users.allProviders}</option>
               {AUTH_PROVIDER_OPTIONS.map((provider) => (
                 <option key={provider} value={provider}>
-                  {provider}
+                  {copy.users.providers[provider]}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            <span>Status</span>
+            <span>{copy.common.status}</span>
             <select
               onChange={(event) =>
                 handleFilterChange({
@@ -464,9 +463,9 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               }
               value={getBooleanFilterValue(query.isActive)}
             >
-              <option value="">All statuses</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
+              <option value="">{copy.users.allStatuses}</option>
+              <option value="true">{copy.users.active}</option>
+              <option value="false">{copy.users.inactive}</option>
             </select>
           </label>
 
@@ -480,7 +479,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
             type="button"
           >
             <RotateCcw aria-hidden="true" size={17} />
-            Reset
+            {copy.users.reset}
           </button>
         </div>
       </section>
@@ -488,11 +487,11 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
       {successMessage ? (
         <AdminFeedback message={successMessage} tone="success" />
       ) : null}
-      {!isModalOpen && actionError ? (
-        <AdminFeedback message={actionError} requestId={requestId} tone="error" />
+      {!isModalOpen && actionErrorMessage ? (
+        <AdminFeedback message={actionErrorMessage} requestId={requestId} tone="error" />
       ) : null}
-      {listError ? (
-        <AdminFeedback message={listError} requestId={requestId} tone="error" />
+      {listErrorMessage ? (
+        <AdminFeedback message={listErrorMessage} requestId={requestId} tone="error" />
       ) : null}
 
       <section className="admin-resource__body admin-resource__body--full-width">
@@ -500,13 +499,13 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Phone</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
+                <th>{copy.common.email}</th>
+                <th>{copy.common.name}</th>
+                <th>{copy.common.phone}</th>
+                <th>{copy.common.role}</th>
+                <th>{copy.common.status}</th>
+                <th>{copy.common.created}</th>
+                <th>{copy.common.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -514,14 +513,14 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               {!isLoading && !listError && users.length === 0 ? (
                 <tr>
                   <td className="admin-table__state" colSpan={7}>
-                    No users match the current filters.
+                    {copy.users.listEmpty}
                   </td>
                 </tr>
               ) : null}
               {!isLoading && !listError
                 ? users.map((user) => (
                     <tr
-                      aria-label={`Open ${user.email}`}
+                      aria-label={copy.users.openAria(user.email)}
                       className="admin-table__clickable-row"
                       key={user.id}
                       onClick={() => void openUserDetail(user)}
@@ -536,9 +535,9 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                       <td>
                         <strong>{user.email}</strong>
                       </td>
-                      <td>{formatOptional(user.name)}</td>
-                      <td>{formatOptional(user.phone)}</td>
-                      <td>{user.role}</td>
+                      <td>{formatOptional(user.name, locale)}</td>
+                      <td>{formatOptional(user.phone, locale)}</td>
+                      <td>{copy.users.roles[user.role]}</td>
                       <td>
                         <span
                           className={`admin-badge ${
@@ -547,10 +546,10 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                               : "admin-badge--muted"
                           }`}
                         >
-                          {user.isActive ? "Active" : "Inactive"}
+                          {user.isActive ? copy.users.active : copy.users.inactive}
                         </span>
                       </td>
-                      <td>{formatAdminDate(user.createdAt)}</td>
+                      <td>{formatAdminDate(user.createdAt, locale)}</td>
                       <td>
                         <div
                           className="admin-row-actions"
@@ -558,10 +557,10 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                           onKeyDown={(event) => event.stopPropagation()}
                         >
                           <button
-                            aria-label={`Edit ${user.email}`}
+                            aria-label={copy.users.editAria(user.email)}
                             className="icon-button admin-icon-button"
                             onClick={() => void openUserDetail(user)}
-                            title="Edit user"
+                            title={copy.users.editTitle}
                             type="button"
                           >
                             <Edit3 aria-hidden="true" size={17} />
@@ -572,7 +571,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                             onClick={() => void handleStatusChange(user)}
                             type="button"
                           >
-                            {user.isActive ? "Deactivate" : "Activate"}
+                            {user.isActive ? copy.users.deactivate : copy.users.activate}
                           </button>
                           <button
                             className="admin-link-button admin-link-button--delete"
@@ -583,12 +582,14 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                             onClick={() => void handleDelete(user)}
                             title={
                               user.id === currentUser?.id
-                                ? "You cannot delete your current account"
-                                : "Delete user"
+                                ? copy.users.deleteCurrentTitle
+                                : copy.users.deleteTitle
                             }
                             type="button"
                           >
-                            {busyAction === `${user.id}:delete` ? "Deleting" : "Delete"}
+                            {busyAction === `${user.id}:delete`
+                              ? copy.users.deleting
+                              : copy.users.delete}
                           </button>
                         </div>
                       </td>
@@ -602,7 +603,9 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
       </section>
 
       <AdminPagination
+        copy={copy}
         isLoading={isLoading}
+        locale={locale}
         onPageChange={goToPage}
         pagination={pagination}
       />
@@ -618,7 +621,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               onClick={requestClose}
               type="button"
             >
-              Cancel
+              {copy.common.cancel}
             </button>
             <button
               className="button button--primary"
@@ -627,43 +630,43 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               type="submit"
             >
               <Save aria-hidden="true" size={17} />
-              {isSaving ? "Saving" : "Save"}
+              {isSaving ? copy.common.saving : copy.common.save}
             </button>
           </>
         )}
         hasUnsavedChanges={hasUnsavedChanges}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Edit user"
+        title={copy.users.editTitle}
       >
-        {actionError ? (
-          <AdminFeedback message={actionError} requestId={requestId} tone="error" />
+        {actionErrorMessage ? (
+          <AdminFeedback message={actionErrorMessage} requestId={requestId} tone="error" />
         ) : null}
         {selectedUser ? (
             <form className="admin-form admin-compact-form" id="admin-user-edit-form" onSubmit={handleUserSave}>
               <section className="admin-compact-group" aria-labelledby="user-account-heading">
-                <h3 id="user-account-heading">Account</h3>
+                <h3 id="user-account-heading">{copy.users.account}</h3>
                 <div className="admin-compact-fields">
                   <label className="admin-compact-field--wide">
-                    <span>Name</span>
+                    <span>{copy.common.name}</span>
                     <input disabled={isDetailLoading} maxLength={120} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} value={form.name} />
                   </label>
                   <label className="admin-compact-field--wide">
-                    <span>Email</span>
+                    <span>{copy.common.email}</span>
                     <input disabled readOnly type="email" value={selectedUser.email} />
                   </label>
                   <label className="admin-compact-field--wide">
-                    <span>Phone</span>
+                    <span>{copy.common.phone}</span>
                     <input disabled={isDetailLoading} maxLength={32} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} value={form.phone} />
                   </label>
                 </div>
               </section>
 
               <section className="admin-compact-group" aria-labelledby="user-access-heading">
-                <h3 id="user-access-heading">Access</h3>
+                <h3 id="user-access-heading">{copy.users.access}</h3>
                 <div className="admin-compact-fields">
                 <label>
-                  <span>Role</span>
+                  <span>{copy.common.role}</span>
                   <select
                     disabled={isDetailLoading}
                     onChange={(event) =>
@@ -676,7 +679,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                   >
                     {ROLE_OPTIONS.map((role) => (
                       <option key={role} value={role}>
-                        {role}
+                        {copy.users.roles[role]}
                       </option>
                     ))}
                   </select>
@@ -694,25 +697,25 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                     }
                     type="checkbox"
                   />
-                  <span>Active</span>
+                  <span>{copy.users.active}</span>
                 </label>
               </div>
               </section>
 
               <section className="admin-compact-group" aria-labelledby="user-metadata-heading">
-                <h3 id="user-metadata-heading">Metadata</h3>
+                <h3 id="user-metadata-heading">{copy.users.metadata}</h3>
                 <div className="admin-meta-grid admin-meta-grid--compact">
                 <span>
-                  <small>Provider</small>
-                  <strong>{selectedUser.authProvider}</strong>
+                  <small>{copy.common.provider}</small>
+                  <strong>{copy.users.providers[selectedUser.authProvider]}</strong>
                 </span>
                 <span>
-                  <small>Created at</small>
-                  <strong>{formatAdminDate(selectedUser.createdAt)}</strong>
+                  <small>{copy.users.createdAt}</small>
+                  <strong>{formatAdminDate(selectedUser.createdAt, locale)}</strong>
                 </span>
                 <span>
-                  <small>Updated at</small>
-                  <strong>{formatAdminDate(selectedUser.updatedAt)}</strong>
+                  <small>{copy.users.updatedAt}</small>
+                  <strong>{formatAdminDate(selectedUser.updatedAt, locale)}</strong>
                 </span>
               </div>
               </section>
@@ -720,7 +723,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
             </form>
           ) : (
             <div className="admin-panel__empty" role="status">
-              Loading user detail.
+              {copy.users.loadingDetail}
             </div>
           )}
       </AdminModal>
@@ -756,12 +759,18 @@ function AdminFeedback({
   tone: "error" | "success";
 }) {
   const Icon = tone === "success" ? CheckCircle2 : AlertCircle;
+  const { locale } = useI18n();
+  const copy = getAdminOperationsTranslations(locale);
 
   return (
     <div className={`admin-feedback admin-feedback--${tone}`} role="status">
       <Icon aria-hidden="true" size={19} />
       <span>{message}</span>
-      {requestId ? <small>Request {requestId}</small> : null}
+      {requestId ? (
+        <small>
+          {copy.common.request} {requestId}
+        </small>
+      ) : null}
     </div>
   );
 }
@@ -785,28 +794,36 @@ function AdminTableSkeleton({
 }
 
 function AdminPagination({
+  copy,
   isLoading,
+  locale,
   onPageChange,
   pagination,
 }: {
+  copy: AdminOperationsTranslations;
   isLoading: boolean;
+  locale: Locale;
   onPageChange: (page: number) => void;
   pagination: Pagination;
 }) {
   const totalPages = Math.max(1, pagination.totalPages);
 
   return (
-    <nav className="admin-pagination" aria-label="Users pagination">
+    <nav className="admin-pagination" aria-label={copy.users.paginationAria}>
       <button
         className="button button--secondary"
         disabled={isLoading || pagination.page <= 1}
         onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
         type="button"
       >
-        Previous
+        {copy.common.previous}
       </button>
       <span>
-        Page {pagination.page} of {totalPages} ({pagination.total} users)
+        {copy.users.pageSummary(
+          formatNumber(pagination.page, locale),
+          formatNumber(totalPages, locale),
+          formatNumber(pagination.total, locale),
+        )}
       </span>
       <button
         className="button button--secondary"
@@ -814,8 +831,38 @@ function AdminPagination({
         onClick={() => onPageChange(pagination.page + 1)}
         type="button"
       >
-        Next
+        {copy.common.next}
       </button>
     </nav>
+  );
+}
+
+function getUserErrorMessage(
+  error: UserUiError,
+  copy: AdminOperationsTranslations,
+): string {
+  const fallback =
+    error.fallback === "list"
+      ? copy.users.loadError
+      : error.fallback === "open"
+        ? copy.users.userOpenError
+        : error.fallback === "empty"
+          ? copy.users.errors.ADMIN_USER_UPDATE_EMPTY
+          : error.fallback === "update"
+            ? copy.users.userUpdateError
+            : error.fallback === "status"
+              ? copy.users.userStatusError
+              : error.fallback === "selfDelete"
+                ? copy.users.selfDeleteError
+                : copy.users.userDeleteError;
+
+  if (!(error.cause instanceof ApiClientError)) {
+    return fallback;
+  }
+
+  return (
+    copy.users.errors[
+      error.cause.code as keyof typeof copy.users.errors
+    ] || fallback
   );
 }

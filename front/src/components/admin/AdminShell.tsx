@@ -7,10 +7,13 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
+import { AdminLanguageSwitcher } from "@/features/i18n/AdminLanguageSwitcher";
+import { useAdminCommonI18n } from "@/features/i18n/admin-common-translations";
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { currentUser, logout } = useAuthSession();
+  const { messages } = useAdminCommonI18n();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut() {
@@ -23,18 +26,27 @@ export function AdminShell({ children }: { children: ReactNode }) {
     <div className="admin-shell">
       <aside className="admin-sidebar">
         <div className="admin-sidebar__brand">
-          <Link className="brand-mark" href="/admin" aria-label="Belikeme admin home">
+          <Link
+            className="brand-mark"
+            href="/admin"
+            aria-label={messages.shell.adminHomeLabel}
+          >
             BELIKEME
           </Link>
-          <span>Management Console</span>
+          <span>{messages.shell.managementConsole}</span>
         </div>
 
         <AdminNav />
 
         <div className="admin-sidebar__footer">
+          <div className="admin-sidebar__language">
+            <span>{messages.shell.language}</span>
+            <AdminLanguageSwitcher />
+          </div>
+
           <Link className="admin-store-link" href="/">
             <Store aria-hidden="true" size={17} strokeWidth={1.8} />
-            Storefront
+            {messages.shell.storefront}
           </Link>
 
           <div className="admin-sidebar__account">
@@ -42,15 +54,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <UserRound size={18} strokeWidth={1.8} />
             </span>
             <div className="admin-topbar__identity">
-              <span>{currentUser?.name || "Admin"}</span>
+              <span>{currentUser?.name || messages.common.admin}</span>
               <small>{currentUser?.email}</small>
             </div>
             <button
-              aria-label="Sign out"
+              aria-label={messages.shell.signOut}
               className="admin-signout-button"
               disabled={isSigningOut}
               onClick={() => void handleSignOut()}
-              title="Sign out"
+              title={messages.shell.signOut}
               type="button"
             >
               <LogOut aria-hidden="true" size={17} strokeWidth={1.8} />

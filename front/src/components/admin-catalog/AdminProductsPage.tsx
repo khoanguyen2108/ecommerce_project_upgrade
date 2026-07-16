@@ -47,7 +47,6 @@ import type {
   AdminSortOrder,
   AdminProductSort,
 } from "@/features/admin-catalog/types";
-import { formatPrice } from "@/features/catalog/format";
 import {
   CLOTHING_SIZE_ORDER,
   DEFAULT_ACCESSORY_VARIANT_COLOR,
@@ -56,11 +55,18 @@ import {
   ONE_SIZE,
   SHOE_SIZE_ORDER,
 } from "@/features/catalog/sizes";
+import {
+  formatAdminCatalogMoney,
+  formatAdminCatalogNumber,
+  getAdminCatalogErrorMessage,
+  getAdminCatalogTranslations,
+  type AdminCatalogTranslations,
+} from "@/features/i18n/admin-catalog-translations";
+import { useI18n } from "@/features/i18n/useI18n";
 import type { Pagination } from "@/lib/api/types";
 import { AdminModal } from "@/components/admin/AdminModal";
 import {
   formatOptional,
-  getApiErrorMessage,
   getApiRequestId,
   getBooleanFilterValue,
   normalizeNullableText,
@@ -77,40 +83,8 @@ const ALLOWED_PRODUCT_IMAGE_TYPES = new Set([
   "image/webp",
 ]);
 const MAX_PRODUCT_VARIANTS = 50;
-const PRODUCT_VARIANT_LIMIT_MESSAGE = "Maximum 50 variants per product.";
 const MAX_PRODUCT_AI_TAGS = 30;
 const MAX_PRODUCT_AI_TAG_LENGTH = 60;
-
-const PRODUCT_ERROR_MESSAGES: Record<string, string> = {
-  AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
-  CATALOG_UPDATE_EMPTY: "Change at least one catalog field before saving.",
-  CATEGORY_INACTIVE: "Products cannot be assigned to an inactive category.",
-  CATEGORY_NOT_FOUND: "That category no longer exists.",
-  FORBIDDEN: "This account is not allowed to manage admin products.",
-  INVALID_CATALOG_FIELD: "One or more catalog fields are invalid.",
-  INVALID_PRICE_RANGE: "The price filter range is invalid.",
-  NETWORK_ERROR: "The product API could not be reached. Check the backend and retry.",
-  PRODUCT_IMAGE_EMPTY: "Choose a non-empty JPEG, PNG, or WebP image.",
-  PRODUCT_IMAGE_LIMIT_EXCEEDED: "A product can include at most 4 images.",
-  PRODUCT_IMAGE_NOT_FOUND: "That product image no longer exists.",
-  PRODUCT_IMAGE_ORDER_STALE: "Product images changed. Refresh and try again.",
-  PRODUCT_IMAGE_TOO_LARGE: "Each product image must be 5 MB or smaller.",
-  PRODUCT_IMAGE_TYPE_INVALID: "Only genuine JPEG, PNG, and WebP images are allowed.",
-  PRODUCT_IMAGE_URL_INPUT_DISABLED:
-    "New product images must be selected from your device.",
-  SUPABASE_IMAGE_STORAGE_NOT_CONFIGURED:
-    "Image storage is not configured. Ask an operator to configure Supabase Storage.",
-  PRODUCT_NOT_FOUND: "That product no longer exists.",
-  PRODUCT_DELETE_BLOCKED:
-    "This product has related orders or carts. Deactivate it instead.",
-  PRODUCT_SLUG_EXISTS: "Another product already uses this slug.",
-  PRODUCT_VARIANT_NOT_FOUND: "That variant no longer exists.",
-  PRODUCT_VARIANT_OPTION_EXISTS:
-    "A variant with this size and color already exists for this product.",
-  PRODUCT_VARIANT_LIMIT_EXCEEDED: PRODUCT_VARIANT_LIMIT_MESSAGE,
-  PRODUCT_VARIANT_SKU_EXISTS: "Another variant already uses this SKU.",
-  VALIDATION_ERROR: "Some catalog fields are invalid. Review the form and try again.",
-};
 
 interface AdminProductsPageProps {
   initialQuery: AdminProductQuery;
@@ -156,7 +130,7 @@ interface DraftVariant extends CreateAdminProductVariantRequest {
 type ProductPanelMode = "create" | "edit";
 
 interface ProductSortChoice {
-  label: string;
+  labelKey: keyof AdminCatalogTranslations["products"]["sort"];
   order: AdminSortOrder;
   sort: AdminProductSort;
   value: string;
@@ -164,37 +138,37 @@ interface ProductSortChoice {
 
 const PRODUCT_SORT_CHOICES: ProductSortChoice[] = [
   {
-    label: "Newest",
+    labelKey: "newest",
     order: "desc",
     sort: "createdAt",
     value: "createdAt_desc",
   },
   {
-    label: "Recently updated",
+    labelKey: "recentlyUpdated",
     order: "desc",
     sort: "updatedAt",
     value: "updatedAt_desc",
   },
   {
-    label: "Name A-Z",
+    labelKey: "nameAscending",
     order: "asc",
     sort: "name",
     value: "name_asc",
   },
   {
-    label: "Price low to high",
+    labelKey: "priceAscending",
     order: "asc",
     sort: "basePrice",
     value: "basePrice_asc",
   },
   {
-    label: "Price high to low",
+    labelKey: "priceDescending",
     order: "desc",
     sort: "basePrice",
     value: "basePrice_desc",
   },
   {
-    label: "Active first",
+    labelKey: "activeFirst",
     order: "desc",
     sort: "isActive",
     value: "isActive_desc",
@@ -202,6 +176,10 @@ const PRODUCT_SORT_CHOICES: ProductSortChoice[] = [
 ];
 
 export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
+  const { locale } = useI18n();
+  const copy = getAdminCatalogTranslations(locale);
+  const copyRef = useRef(copy);
+  copyRef.current = copy;
   const [query, setQuery] = useState<AdminProductQuery>({
     ...initialQuery,
     limit: PRODUCT_LIMIT,
@@ -284,10 +262,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
         setCategories([]);
         setCategoryError(
-          getApiErrorMessage(
+          getAdminCatalogErrorMessage(
             error,
-            PRODUCT_ERROR_MESSAGES,
-            "Category options could not be loaded.",
+            copyRef.current.products.errors,
+            copyRef.current.products.feedback.categoryOptionsLoadError,
           ),
         );
       } finally {
@@ -337,10 +315,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
         setProducts([]);
         setListError(
-          getApiErrorMessage(
+          getAdminCatalogErrorMessage(
             error,
-            PRODUCT_ERROR_MESSAGES,
-            "Admin products could not be loaded right now.",
+            copyRef.current.products.errors,
+            copyRef.current.products.feedback.listLoadError,
           ),
         );
         setRequestId(getApiRequestId(error));
@@ -366,7 +344,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     const maxPrice = parseOptionalInteger(maxPriceInput);
 
     if (minPrice.error || maxPrice.error) {
-      setActionError("Price filters must be whole numbers greater than or equal to 0.");
+      setActionError(copy.products.validation.priceFilters);
       return;
     }
 
@@ -375,7 +353,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       maxPrice.value !== undefined &&
       minPrice.value > maxPrice.value
     ) {
-      setActionError("Minimum price cannot be higher than maximum price.");
+      setActionError(copy.products.validation.priceRange);
       return;
     }
 
@@ -464,10 +442,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       syncProduct(loadedProduct);
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          PRODUCT_ERROR_MESSAGES,
-          "This product could not be opened right now.",
+          copy.products.errors,
+          copy.products.feedback.openError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -481,10 +459,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     setActionError(undefined);
     setSuccessMessage(undefined);
 
-    const productPayload = getProductPayload(productForm);
+    const productPayload = getProductPayload(productForm, copy);
 
     if (productPayload.error || !productPayload.payload) {
-      setActionError(productPayload.error || "Product fields are invalid.");
+      setActionError(productPayload.error || copy.products.feedback.fieldsInvalid);
       return;
     }
 
@@ -504,7 +482,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       accessoryStock === undefined
     ) {
       setActionError(
-        "Stock quantity must be a whole number greater than or equal to 0.",
+        copy.products.validation.stockQuantity,
       );
       return;
     }
@@ -515,7 +493,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       productDetailsChanged &&
       productPayload.payload.isActive !== selectedProduct.isActive &&
       !window.confirm(
-        `${productPayload.payload.isActive ? "Activate" : "Deactivate"} ${selectedProduct.name}?`,
+        copy.products.confirm.productStatus(
+          productPayload.payload.isActive,
+          selectedProduct.name,
+        ),
       )
     ) {
       return;
@@ -634,7 +615,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       setRefreshKey((current) => current + 1);
 
       if (cleanupWarnings.length > 0) {
-        setSuccessMessage("Product image changes were saved.");
+        setSuccessMessage(copy.products.feedback.imagesSaved);
         setActionError(cleanupWarnings.join(" "));
         return;
       }
@@ -654,12 +635,12 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       }
 
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          PRODUCT_ERROR_MESSAGES,
+          copy.products.errors,
           latestProduct
-            ? "Product details were saved, but image changes did not finish. Review the images and retry."
-            : "Product could not be saved.",
+            ? copy.products.feedback.partialImageSaveError
+            : copy.products.feedback.saveError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -671,11 +652,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   async function handleProductStatusChange(product: AdminProduct) {
     const nextIsActive = !product.isActive;
 
-    if (
-      !window.confirm(
-        `${nextIsActive ? "Activate" : "Deactivate"} ${product.name}?`,
-      )
-    ) {
+    if (!window.confirm(copy.products.confirm.productStatus(nextIsActive, product.name))) {
       return;
     }
 
@@ -699,14 +676,16 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       syncProduct(updatedProduct);
       setRefreshKey((current) => current + 1);
       setSuccessMessage(
-        response.product.isActive ? "Product activated." : "Product deactivated.",
+        response.product.isActive
+          ? copy.products.feedback.activated
+          : copy.products.feedback.deactivated,
       );
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          PRODUCT_ERROR_MESSAGES,
-          "Product status could not be changed.",
+          copy.products.errors,
+          copy.products.feedback.statusError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -727,10 +706,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       syncVariant(response.variant);
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          PRODUCT_ERROR_MESSAGES,
-          "This variant could not be opened right now.",
+          copy.products.errors,
+          copy.products.feedback.variantOpenError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -743,10 +722,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     setActionError(undefined);
     setSuccessMessage(undefined);
 
-    const variantPayload = getVariantPayload(variantForm, sizingType);
+    const variantPayload = getVariantPayload(variantForm, sizingType, copy);
 
     if (variantPayload.error || !variantPayload.payload) {
-      setActionError(variantPayload.error || "Variant fields are invalid.");
+      setActionError(variantPayload.error || copy.products.feedback.variantFieldsInvalid);
       return;
     }
 
@@ -755,7 +734,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         ? draftVariants.length
         : (selectedProduct?.variants.length ?? 0);
     if (!editingVariantId && currentVariantCount >= MAX_PRODUCT_VARIANTS) {
-      setActionError(PRODUCT_VARIANT_LIMIT_MESSAGE);
+      setActionError(copy.products.validation.variantLimit(MAX_PRODUCT_VARIANTS));
       return;
     }
 
@@ -767,6 +746,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       variantPayload.payload,
       panelMode === "create" ? draftVariants : selectedProduct?.variants ?? [],
       editingVariantId,
+      copy,
     );
     if (duplicateError) {
       setActionError(duplicateError);
@@ -777,7 +757,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       editingVariant &&
       variantPayload.payload.isActive !== editingVariant.isActive &&
       !window.confirm(
-        `${variantPayload.payload.isActive ? "Activate" : "Deactivate"} variant ${editingVariant.size} / ${editingVariant.color}?`,
+        copy.products.confirm.variantStatus(variantPayload.payload.isActive, editingVariant),
       )
     ) {
       return;
@@ -791,7 +771,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
           ...current,
           { ...variantPayload.payload, tempId: crypto.randomUUID() },
         ]);
-        setSuccessMessage("Draft variant added. It will be saved with the product.");
+        setSuccessMessage(copy.products.feedback.draftVariantAdded);
       } else if (editingVariantId) {
         const response = await updateAdminProductVariant(
           editingVariantId,
@@ -799,7 +779,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         );
 
         syncVariant(response.variant);
-        setSuccessMessage("Variant updated.");
+        setSuccessMessage(copy.products.feedback.variantUpdated);
       } else if (selectedProduct) {
         const response = await createAdminProductVariant(
           selectedProduct.id,
@@ -807,7 +787,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         );
 
         syncVariant(response.variant);
-        setSuccessMessage("Variant created.");
+        setSuccessMessage(copy.products.feedback.variantCreated);
       }
 
       setVariantForm(getEmptyVariantForm(sizingType));
@@ -815,10 +795,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       setRefreshKey((current) => current + 1);
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          PRODUCT_ERROR_MESSAGES,
-          "Variant could not be saved.",
+          copy.products.errors,
+          copy.products.feedback.variantSaveError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -828,7 +808,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   }
 
   async function handleProductDelete(product: AdminProduct) {
-    if (!window.confirm(`Delete ${product.name}? This cannot be undone.`)) return;
+    if (!window.confirm(copy.products.confirm.deleteProduct(product.name))) return;
 
     setBusyAction(`${product.id}:delete`);
     setActionError(undefined);
@@ -841,13 +821,17 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       } else {
         setRefreshKey((current) => current + 1);
       }
-      setSuccessMessage("Product deleted.");
+      setSuccessMessage(copy.products.feedback.deleted);
       if (response.warning) {
         setActionError(response.warning);
       }
     } catch (error) {
       setActionError(
-        getApiErrorMessage(error, PRODUCT_ERROR_MESSAGES, "Product could not be deleted."),
+        getAdminCatalogErrorMessage(
+          error,
+          copy.products.errors,
+          copy.products.feedback.deleteError,
+        ),
       );
       setRequestId(getApiRequestId(error));
     } finally {
@@ -859,9 +843,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     const variants = panelMode === "create" ? draftVariants : selectedProduct?.variants ?? [];
     if (
       variants.length > 0 &&
-      !window.confirm(
-        "Changing classification may require updating variant sizes. Continue?",
-      )
+      !window.confirm(copy.products.confirm.classification)
     ) {
       return;
     }
@@ -882,7 +864,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     }
 
     const nextTags = mergeAiTags(productForm.aiTags, parsedTags);
-    const validationError = getAiTagsValidationError(nextTags);
+    const validationError = getAiTagsValidationError(nextTags, copy);
 
     if (validationError) {
       setActionError(validationError);
@@ -926,23 +908,23 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
     );
 
     if (retainedItems.length + files.length > MAX_PRODUCT_IMAGES) {
-      setActionError("A product can include at most 4 images.");
+      setActionError(copy.products.validation.imageLimit);
       return;
     }
 
     for (const file of files) {
       if (!ALLOWED_PRODUCT_IMAGE_TYPES.has(file.type)) {
-        setActionError("Only JPEG, PNG, and WebP images are allowed.");
+        setActionError(copy.products.validation.imageType);
         return;
       }
 
       if (file.size === 0) {
-        setActionError("Choose a non-empty image file.");
+        setActionError(copy.products.validation.imageEmpty);
         return;
       }
 
       if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
-        setActionError("Each product image must be 5 MB or smaller.");
+        setActionError(copy.products.validation.imageSize);
         return;
       }
     }
@@ -997,11 +979,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   async function handleVariantStatusChange(variant: AdminProductVariant) {
     const nextIsActive = !variant.isActive;
 
-    if (
-      !window.confirm(
-        `${nextIsActive ? "Activate" : "Deactivate"} variant ${variant.size} / ${variant.color}?`,
-      )
-    ) {
+    if (!window.confirm(copy.products.confirm.variantStatus(nextIsActive, variant))) {
       return;
     }
 
@@ -1017,14 +995,16 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       syncVariant(response.variant);
       setRefreshKey((current) => current + 1);
       setSuccessMessage(
-        response.variant.isActive ? "Variant activated." : "Variant deactivated.",
+        response.variant.isActive
+          ? copy.products.feedback.variantActivated
+          : copy.products.feedback.variantDeactivated,
       );
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          PRODUCT_ERROR_MESSAGES,
-          "Variant status could not be changed.",
+          copy.products.errors,
+          copy.products.feedback.variantStatusError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -1121,9 +1101,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         aria-labelledby="admin-products-heading"
       >
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">Catalog</p>
-          <h1 id="admin-products-heading">Products Management</h1>
-          <p>Manage catalog content, pricing, inventory, and visibility.</p>
+          <p className="admin-page-intro__eyebrow">{copy.products.header.eyebrow}</p>
+          <h1 id="admin-products-heading">{copy.products.header.title}</h1>
+          <p>{copy.products.header.subtitle}</p>
         </div>
         <div className="admin-header-actions">
           <button
@@ -1133,55 +1113,55 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
             type="button"
           >
             <RefreshCw aria-hidden="true" size={17} />
-            Refresh
+            {copy.common.refresh}
           </button>
           <button className="button button--primary" onClick={openCreatePanel} type="button">
             <Plus aria-hidden="true" size={17} />
-            New product
+            {copy.products.header.newProduct}
           </button>
         </div>
       </section>
 
-      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-filter-surface" aria-label="Product filters">
+      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-filter-surface" aria-label={copy.products.filters.aria}>
         <form className="admin-search admin-search--products" onSubmit={handleSearchSubmit}>
-          <label htmlFor="admin-product-search">Search</label>
+          <label htmlFor="admin-product-search">{copy.common.search}</label>
           <div>
             <input
               id="admin-product-search"
               maxLength={120}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Name or slug"
+              placeholder={copy.products.filters.searchPlaceholder}
               type="search"
               value={searchInput}
             />
             <input
-              aria-label="Minimum price"
+              aria-label={copy.products.filters.minimumPriceAria}
               inputMode="numeric"
               min="0"
               onChange={(event) => setMinPriceInput(event.target.value)}
-              placeholder="Min price"
+              placeholder={copy.products.filters.minimumPricePlaceholder}
               type="number"
               value={minPriceInput}
             />
             <input
-              aria-label="Maximum price"
+              aria-label={copy.products.filters.maximumPriceAria}
               inputMode="numeric"
               min="0"
               onChange={(event) => setMaxPriceInput(event.target.value)}
-              placeholder="Max price"
+              placeholder={copy.products.filters.maximumPricePlaceholder}
               type="number"
               value={maxPriceInput}
             />
             <button className="button button--primary" type="submit">
               <Search aria-hidden="true" size={17} />
-              Search
+              {copy.common.search}
             </button>
           </div>
         </form>
 
         <div className="admin-filter-grid">
           <label>
-            <span>Category</span>
+            <span>{copy.products.filters.category}</span>
             <select
               disabled={isCategoryLoading || Boolean(categoryError)}
               onChange={(event) =>
@@ -1191,7 +1171,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               }
               value={query.categoryId || ""}
             >
-              <option value="">All categories</option>
+              <option value="">{copy.products.filters.allCategories}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -1201,7 +1181,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
           </label>
 
           <label>
-            <span>Status</span>
+            <span>{copy.common.status}</span>
             <select
               onChange={(event) =>
                 handleFilterChange({
@@ -1210,18 +1190,18 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               }
               value={getBooleanFilterValue(query.isActive)}
             >
-              <option value="">All statuses</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
+              <option value="">{copy.common.allStatuses}</option>
+              <option value="true">{copy.common.active}</option>
+              <option value="false">{copy.common.inactive}</option>
             </select>
           </label>
 
           <label>
-            <span>Sort</span>
+            <span>{copy.products.filters.sort}</span>
             <select onChange={(event) => handleSortChange(event.target.value)} value={selectedSortValue}>
               {PRODUCT_SORT_CHOICES.map((choice) => (
                 <option key={choice.value} value={choice.value}>
-                  {choice.label}
+                  {copy.products.sort[choice.labelKey]}
                 </option>
               ))}
             </select>
@@ -1244,7 +1224,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
             type="button"
           >
             <RotateCcw aria-hidden="true" size={17} />
-            Reset
+            {copy.common.reset}
           </button>
         </div>
       </section>
@@ -1267,15 +1247,15 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
           <table className="admin-table admin-table--products">
             <thead>
               <tr>
-                <th>Image</th>
-                <th>Name</th>
-                <th>Slug</th>
-                <th>Category</th>
-                <th>Base price</th>
-                <th>Stock</th>
-                <th>Status</th>
-                <th>Variants</th>
-                <th>Actions</th>
+                <th>{copy.common.image}</th>
+                <th>{copy.common.name}</th>
+                <th>{copy.common.slug}</th>
+                <th>{copy.products.table.category}</th>
+                <th>{copy.products.table.basePrice}</th>
+                <th>{copy.products.table.stock}</th>
+                <th>{copy.common.status}</th>
+                <th>{copy.products.table.variants}</th>
+                <th>{copy.common.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -1283,14 +1263,14 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               {!isProductLoading && !listError && products.length === 0 ? (
                 <tr>
                   <td className="admin-table__state" colSpan={9}>
-                    No products match the current filters.
+                    {copy.products.table.empty}
                   </td>
                 </tr>
               ) : null}
               {!isProductLoading && !listError
                 ? products.map((product) => (
                     <tr
-                      aria-label={`Open ${product.name}`}
+                      aria-label={copy.products.table.openAria(product.name)}
                       className="admin-table__clickable-row"
                       key={product.id}
                       onClick={() => void openEditPanel(product)}
@@ -1315,13 +1295,19 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                       <td>{product.slug}</td>
                       <td>
                         <span className="admin-category-summary">
-                          {getProductCategories(product)[0]?.name || "Not set"}
+                          {getProductCategories(product)[0]?.name || copy.common.notSet}
                           {getProductCategories(product).length > 1 ? (
-                            <small>+{getProductCategories(product).length - 1}</small>
+                            <small>
+                              +
+                              {formatAdminCatalogNumber(
+                                getProductCategories(product).length - 1,
+                                locale,
+                              )}
+                            </small>
                           ) : null}
                         </span>
                       </td>
-                      <td>{formatPrice(product.basePrice)}</td>
+                      <td>{formatAdminCatalogMoney(product.basePrice, locale)}</td>
                       <td>
                         <span
                           className={`admin-badge ${
@@ -1331,8 +1317,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           }`}
                         >
                           {getProductStock(product) > 0
-                            ? `${getProductStock(product).toLocaleString("en")} in stock`
-                            : "Out of stock"}
+                            ? copy.products.table.inStock(
+                                formatAdminCatalogNumber(getProductStock(product), locale),
+                              )
+                            : copy.products.table.outOfStock}
                         </span>
                       </td>
                       <td>
@@ -1343,10 +1331,12 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                               : "admin-badge--muted"
                           }`}
                         >
-                          {product.isActive ? "Active" : "Inactive"}
+                          {product.isActive ? copy.common.active : copy.common.inactive}
                         </span>
                       </td>
-                      <td>{product.variants.length}</td>
+                      <td>
+                        {formatAdminCatalogNumber(product.variants.length, locale)}
+                      </td>
                       <td>
                         <div
                           className="admin-row-actions"
@@ -1354,10 +1344,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           onKeyDown={(event) => event.stopPropagation()}
                         >
                           <button
-                            aria-label={`Edit ${product.name}`}
+                            aria-label={copy.products.table.editAria(product.name)}
                             className="icon-button admin-icon-button"
                             onClick={() => void openEditPanel(product)}
-                            title="Edit product"
+                            title={copy.products.table.editTitle}
                             type="button"
                           >
                             <Edit3 aria-hidden="true" size={17} />
@@ -1370,7 +1360,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                             onClick={() => void handleProductStatusChange(product)}
                             type="button"
                           >
-                            {product.isActive ? "Deactivate" : "Activate"}
+                            {product.isActive ? copy.common.deactivate : copy.common.activate}
                           </button>
                           <button
                             className="admin-link-button admin-link-button--delete"
@@ -1378,7 +1368,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                             onClick={() => void handleProductDelete(product)}
                             type="button"
                           >
-                            {busyAction === `${product.id}:delete` ? "Deleting" : "Delete"}
+                            {busyAction === `${product.id}:delete`
+                              ? copy.common.deleting
+                              : copy.common.delete}
                           </button>
                         </div>
                       </td>
@@ -1392,7 +1384,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
       </section>
 
       <AdminPagination
+        copy={copy}
         isLoading={isProductLoading}
+        locale={locale}
         onPageChange={goToPage}
         pagination={pagination}
       />
@@ -1408,7 +1402,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               onClick={requestClose}
               type="button"
             >
-              Cancel
+              {copy.common.cancel}
             </button>
             <button
               className="button button--primary"
@@ -1419,11 +1413,11 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               <Save aria-hidden="true" size={17} />
               {isSavingProduct
                 ? hasPendingImageUploads
-                  ? "Uploading"
-                  : "Saving"
+                  ? copy.common.uploading
+                  : copy.common.saving
                 : panelMode === "create"
-                  ? "Create"
-                  : "Save"}
+                  ? copy.common.create
+                  : copy.common.save}
             </button>
           </>
         )}
@@ -1436,7 +1430,11 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
           );
           setIsModalOpen(false);
         }}
-        title={panelMode === "create" ? "New product" : "Edit product"}
+        title={
+          panelMode === "create"
+            ? copy.products.form.newTitle
+            : copy.products.form.editTitle
+        }
       >
         {actionError ? (
           <AdminFeedback message={actionError} requestId={requestId} tone="error" />
@@ -1447,47 +1445,47 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
           <form className="admin-form admin-compact-form" id="admin-product-form" onSubmit={handleProductSave}>
               <div className="admin-compact-fields">
                 <label className="admin-compact-field--wide">
-                  <span>Name</span>
+                  <span>{copy.common.name}</span>
                   <input
                     disabled={isPanelLoading}
                     maxLength={160}
                     onChange={(event) =>
                       setProductForm((current) => ({ ...current, name: event.target.value }))
                     }
-                    placeholder="e.g. Silk Slip Dress"
+                    placeholder={copy.products.form.namePlaceholder}
                     required
                     value={productForm.name}
                   />
                 </label>
                 <label className="admin-compact-field--wide">
-                  <span>Slug</span>
+                  <span>{copy.common.slug}</span>
                   <input
                     disabled={isPanelLoading}
                     maxLength={180}
                     onChange={(event) =>
                       setProductForm((current) => ({ ...current, slug: event.target.value }))
                     }
-                    placeholder="silk-slip-dress"
+                    placeholder={copy.products.form.slugPlaceholder}
                     required
                     value={productForm.slug}
                   />
                 </label>
                 <label className="admin-compact-field--wide">
-                  <span>Description</span>
+                  <span>{copy.common.description}</span>
                   <textarea
                     disabled={isPanelLoading}
                     maxLength={4000}
                     onChange={(event) =>
                       setProductForm((current) => ({ ...current, description: event.target.value }))
                     }
-                    placeholder="Enter product detail..."
+                    placeholder={copy.products.form.descriptionPlaceholder}
                     rows={4}
                     value={productForm.description}
                   />
                 </label>
                 <fieldset className="admin-ai-tags admin-compact-field--wide">
-                  <legend>Internal AI tags</legend>
-                  <small>Admin only. Hidden from storefront.</small>
+                  <legend>{copy.products.form.aiTags}</legend>
+                  <small>{copy.products.form.aiTagsHelper}</small>
                   <div className="admin-ai-tags__input-row">
                     <div className="admin-ai-tags__input-wrap">
                       <Tag aria-hidden="true" size={15} />
@@ -1501,7 +1499,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           }))
                         }
                         onKeyDown={handleAiTagInputKeyDown}
-                        placeholder="streetwear, black leather, oversized"
+                        placeholder={copy.products.form.aiTagsPlaceholder}
                         value={productForm.aiTagInput}
                       />
                     </div>
@@ -1512,18 +1510,18 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                       type="button"
                     >
                       <Plus aria-hidden="true" size={15} />
-                      Add
+                      {copy.common.add}
                     </button>
                   </div>
-                  <div className="admin-ai-tags__chips" aria-label="Internal AI tags">
+                  <div className="admin-ai-tags__chips" aria-label={copy.products.form.aiTags}>
                     {productForm.aiTags.length === 0 ? (
-                      <p className="admin-ai-tags__empty">No internal tags yet.</p>
+                      <p className="admin-ai-tags__empty">{copy.products.form.noAiTags}</p>
                     ) : null}
                     {productForm.aiTags.map((tag, index) => (
                       <span className="admin-ai-tag-chip" key={`${tag}:${index}`}>
                         {tag}
                         <button
-                          aria-label={`Remove AI tag ${tag}`}
+                          aria-label={copy.products.form.removeAiTagAria(tag)}
                           disabled={isPanelLoading}
                           onClick={() => handleRemoveAiTag(index)}
                           type="button"
@@ -1535,7 +1533,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   </div>
                 </fieldset>
                 <label>
-                  <span>Base price (&#8363;)</span>
+                  <span>{copy.products.form.basePrice}</span>
                   <input
                     disabled={isPanelLoading}
                     min="0"
@@ -1548,9 +1546,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   />
                 </label>
                 <label>
-                  <span>Stock quantity</span>
+                  <span>{copy.products.form.stockQuantity}</span>
                   <input
-                    aria-label="Stock quantity"
+                    aria-label={copy.products.form.stockQuantity}
                     disabled={
                       isPanelLoading ||
                       panelMode !== "create" ||
@@ -1575,12 +1573,12 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   />
                   <small>
                     {panelMode === "create" && sizingType === "ACCESSORIES"
-                      ? "Enter stock directly for this accessory."
-                      : "Managed through variants."}
+                      ? copy.products.form.accessoryStockHelper
+                      : copy.products.form.variantStockHelper}
                   </small>
                 </label>
                 <label className="admin-compact-field--wide">
-                  <span>Selling classification</span>
+                  <span>{copy.products.form.classification}</span>
                   <select
                     disabled={isPanelLoading}
                     onChange={(event) =>
@@ -1588,28 +1586,34 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     }
                     value={sizingType}
                   >
-                    <option value="CLOTHING">Clothing</option>
-                    <option value="SHOES">Shoes</option>
-                    <option value="ACCESSORIES">Accessories</option>
+                    <option value="CLOTHING">{copy.products.form.clothing}</option>
+                    <option value="SHOES">{copy.products.form.shoes}</option>
+                    <option value="ACCESSORIES">{copy.products.form.accessories}</option>
                   </select>
-                  <small>Changing classification may require updating variant sizes.</small>
+                  <small>{copy.products.form.classificationHelper}</small>
                 </label>
               </div>
 
             <fieldset className="admin-category-picker">
-              <legend>Categories</legend>
+              <legend>{copy.products.form.categories}</legend>
               <small>
-                Select one or more. The first selected category is the primary category.
+                {copy.products.form.categoriesHelper}
               </small>
               <div className="admin-category-picker__options">
                 {isCategoryLoading ? (
-                  <p className="admin-form-inline-state" role="status">Loading categories...</p>
+                  <p className="admin-form-inline-state" role="status">
+                    {copy.products.form.loadingCategories}
+                  </p>
                 ) : null}
                 {!isCategoryLoading && categoryError ? (
-                  <p className="admin-form-inline-state" role="status">Category options are unavailable.</p>
+                  <p className="admin-form-inline-state" role="status">
+                    {copy.products.form.categoriesUnavailable}
+                  </p>
                 ) : null}
                 {!isCategoryLoading && !categoryError && categories.length === 0 ? (
-                  <p className="admin-form-inline-state" role="status">No categories are available.</p>
+                  <p className="admin-form-inline-state" role="status">
+                    {copy.products.form.noCategories}
+                  </p>
                 ) : null}
                 {categories.map((category) => {
                   const isSelected = productForm.categoryIds.includes(category.id);
@@ -1636,24 +1640,31 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                         type="checkbox"
                       />
                       <span>
-                        {category.name}
-                        {category.isActive ? "" : " (inactive)"}
+                        {copy.products.form.categoryOption(
+                          category.name,
+                          category.isActive,
+                        )}
                       </span>
                     </label>
                   );
                 })}
               </div>
               {productForm.categoryIds.length > 0 ? (
-                <div className="admin-category-chips" aria-label="Selected categories">
+                <div
+                  className="admin-category-chips"
+                  aria-label={copy.products.form.selectedCategoriesAria}
+                >
                   {productForm.categoryIds.map((categoryId, index) => {
                     const category = categories.find((item) => item.id === categoryId);
 
                     return (
                       <span className="admin-category-chip" key={categoryId}>
-                        {category?.name || "Unknown category"}
-                        {index === 0 ? <small>Primary</small> : null}
+                        {category?.name || copy.products.form.unknownCategory}
+                        {index === 0 ? <small>{copy.products.form.primary}</small> : null}
                         <button
-                          aria-label={`Remove ${category?.name || "category"}`}
+                          aria-label={copy.products.form.removeCategoryAria(
+                            category?.name || copy.products.form.unknownCategory,
+                          )}
                           disabled={isPanelLoading}
                           onClick={() =>
                             setProductForm((current) => ({
@@ -1677,8 +1688,8 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
             <section className="admin-image-url-editor" aria-labelledby="product-images-heading">
               <div className="admin-image-url-editor__header">
                 <div>
-                  <span id="product-images-heading">Product images</span>
-                  <small>JPEG, PNG, or WebP. Up to 4 images, 5 MB each.</small>
+                  <span id="product-images-heading">{copy.products.form.images}</span>
+                  <small>{copy.products.form.imagesHelper}</small>
                 </div>
                 <input
                   accept="image/jpeg,image/png,image/webp"
@@ -1700,47 +1711,64 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   type="button"
                 >
                   <Upload aria-hidden="true" size={15} />
-                  Choose files
+                  {copy.products.form.chooseFiles}
                 </button>
               </div>
 
               <div className="admin-image-url-list">
                 {productForm.imageItems.length === 0 ? (
-                  <p className="admin-image-empty">No product images selected.</p>
+                  <p className="admin-image-empty">{copy.products.form.noImages}</p>
                 ) : null}
                 {productForm.imageItems.map((image, index) => (
                   <div className="admin-image-url-row" key={image.key}>
                     <div className="admin-image-preview-wrap">
                       <AdminProductImage
-                        alt={`Image ${index + 1} preview`}
+                        alt={copy.products.form.imagePreviewAlt(
+                          formatAdminCatalogNumber(index + 1, locale),
+                        )}
                         className="admin-image-url-preview"
                         url={image.url}
                       />
-                      {index === 0 ? <span className="admin-image-primary">Primary</span> : null}
+                      {index === 0 ? (
+                        <span className="admin-image-primary">{copy.products.form.primary}</span>
+                      ) : null}
                     </div>
                     <div className="admin-image-file-meta">
-                      <strong>{image.filename}</strong>
+                      <strong>
+                        {image.filename ||
+                          (image.source === "managed"
+                            ? copy.products.form.managedImageFallback(
+                                formatAdminCatalogNumber(index + 1, locale),
+                              )
+                            : copy.products.form.legacyImageFallback(
+                                formatAdminCatalogNumber(index + 1, locale),
+                              ))}
+                      </strong>
                       <small>
                         {image.source === "local"
-                          ? "Ready to upload"
+                          ? copy.products.form.readyToUpload
                           : image.source === "managed"
-                            ? "Managed in Supabase Storage"
-                            : "Legacy URL image"}
+                            ? copy.products.form.managedImage
+                            : copy.products.form.legacyImage}
                       </small>
                     </div>
                     <div className="admin-image-actions">
                       <button
-                        aria-label={`Move image ${index + 1} up`}
+                        aria-label={copy.products.form.moveImageUpAria(
+                          formatAdminCatalogNumber(index + 1, locale),
+                        )}
                         className="icon-button admin-icon-button"
                         disabled={isPanelLoading || isSavingProduct || index === 0}
                         onClick={() => moveImageItem(index, -1)}
-                        title="Move image up"
+                        title={copy.products.form.moveImageUpTitle}
                         type="button"
                       >
                         <ChevronUp aria-hidden="true" size={15} />
                       </button>
                       <button
-                        aria-label={`Move image ${index + 1} down`}
+                        aria-label={copy.products.form.moveImageDownAria(
+                          formatAdminCatalogNumber(index + 1, locale),
+                        )}
                         className="icon-button admin-icon-button"
                         disabled={
                           isPanelLoading ||
@@ -1748,17 +1776,19 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           index === productForm.imageItems.length - 1
                         }
                         onClick={() => moveImageItem(index, 1)}
-                        title="Move image down"
+                        title={copy.products.form.moveImageDownTitle}
                         type="button"
                       >
                         <ChevronDown aria-hidden="true" size={15} />
                       </button>
                       <button
-                        aria-label={`Remove image ${index + 1}`}
+                        aria-label={copy.products.form.removeImageAria(
+                          formatAdminCatalogNumber(index + 1, locale),
+                        )}
                         className="icon-button admin-icon-button"
                         disabled={isPanelLoading || isSavingProduct}
                         onClick={() => removeImageItem(image)}
-                        title="Remove image"
+                        title={copy.products.form.removeImageTitle}
                         type="button"
                       >
                         <Trash2 aria-hidden="true" size={16} />
@@ -1778,7 +1808,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   }
                   type="checkbox"
                 />
-                <span>Active</span>
+                <span>{copy.common.active}</span>
               </label>
 
           </form>
@@ -1787,11 +1817,13 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
             <section className="admin-variants" aria-labelledby="product-variants-heading">
             <div className="admin-variants__header">
               <div>
-                <p className="eyebrow">Variants</p>
-                <h3 id="product-variants-heading">Product variants</h3>
+                <p className="eyebrow">{copy.products.variants.eyebrow}</p>
+                <h3 id="product-variants-heading">{copy.products.variants.title}</h3>
                 <p className="admin-variants__helper">
-                  {displayedVariants.length} of {MAX_PRODUCT_VARIANTS} variants.
-                  Manage SKU, size, color, stock, and optional price overrides.
+                  {copy.products.variants.summary(
+                    formatAdminCatalogNumber(displayedVariants.length, locale),
+                    formatAdminCatalogNumber(MAX_PRODUCT_VARIANTS, locale),
+                  )}
                 </p>
               </div>
               {editingVariantId ? (
@@ -1803,7 +1835,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   }}
                   type="button"
                 >
-                  New variant
+                  {copy.products.variants.newVariant}
                 </button>
               ) : null}
             </div>
@@ -1814,45 +1846,53 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   {displayedVariants.length === 0 ? (
                     <div className="admin-panel__empty admin-variant-grid__empty">
                       {panelMode === "create"
-                        ? "Add the first variant before creating this product."
-                        : "No variants exist for this product."}
+                        ? copy.products.variants.createEmpty
+                        : copy.products.variants.editEmpty}
                     </div>
                   ) : (
                     displayedVariants.map((variant, index) => (
                       <article className="admin-variant-card" key={variant.id}>
                         <div className="admin-variant-card__header">
-                          <h4>Variant {index + 1}</h4>
+                          <h4>
+                            {copy.products.variants.cardTitle(
+                              formatAdminCatalogNumber(index + 1, locale),
+                            )}
+                          </h4>
                           <span className="admin-variant-card__status">
                             {variant.isDraft
-                              ? "Draft"
+                              ? copy.products.variants.draft
                               : variant.isActive
-                                ? "Active"
-                                : "Inactive"}
+                                ? copy.common.active
+                                : copy.common.inactive}
                           </span>
                         </div>
                         <dl className="admin-variant-card__details">
                           <div className="admin-variant-card__detail--wide">
-                            <dt>SKU</dt>
-                            <dd>{formatOptional(variant.sku)}</dd>
+                            <dt>{copy.products.variants.sku}</dt>
+                            <dd>{formatOptional(variant.sku, locale)}</dd>
                           </div>
                           <div>
-                            <dt>Color</dt>
+                            <dt>{copy.products.variants.color}</dt>
                             <dd>{variant.color}</dd>
                           </div>
                           <div>
-                            <dt>Size</dt>
-                            <dd>{isNoSize(variant.size) ? "No size" : variant.size}</dd>
+                            <dt>{copy.products.variants.size}</dt>
+                            <dd>
+                              {isNoSize(variant.size)
+                                ? copy.products.variants.noSize
+                                : variant.size}
+                            </dd>
                           </div>
                           <div>
-                            <dt>Stock</dt>
-                            <dd>{variant.stock}</dd>
+                            <dt>{copy.products.variants.stock}</dt>
+                            <dd>{formatAdminCatalogNumber(variant.stock, locale)}</dd>
                           </div>
                           <div>
-                            <dt>Override</dt>
+                            <dt>{copy.products.variants.override}</dt>
                             <dd>
                               {variant.priceOverride == null
-                                ? "Not set"
-                                : formatPrice(variant.priceOverride)}
+                                ? copy.common.notSet
+                                : formatAdminCatalogMoney(variant.priceOverride, locale)}
                             </dd>
                           </div>
                         </dl>
@@ -1867,15 +1907,15 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                               }
                               type="button"
                             >
-                              Remove
+                              {copy.common.remove}
                             </button>
                           ) : (
                             <>
                               <button
-                                aria-label={`Edit variant ${variant.size} ${variant.color}`}
+                                aria-label={copy.products.variants.editAria(variant)}
                                 className="icon-button admin-icon-button"
                                 onClick={() => void handleEditVariant(variant)}
-                                title="Edit variant"
+                                title={copy.products.variants.editTitle}
                                 type="button"
                               >
                                 <Edit3 aria-hidden="true" size={16} />
@@ -1886,7 +1926,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                                 onClick={() => void handleVariantStatusChange(variant)}
                                 type="button"
                               >
-                                {variant.isActive ? "Deactivate" : "Activate"}
+                                {variant.isActive
+                                  ? copy.common.deactivate
+                                  : copy.common.activate}
                               </button>
                             </>
                           )}
@@ -1897,14 +1939,14 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                 </div>
                 {isVariantLimitReached && !editingVariantId ? (
                   <p className="admin-form-inline-state" role="status">
-                    {PRODUCT_VARIANT_LIMIT_MESSAGE}
+                    {copy.products.validation.variantLimit(MAX_PRODUCT_VARIANTS)}
                   </p>
                 ) : null}
 
                 <form className="admin-form admin-form--variant" onSubmit={handleVariantSave}>
                   <div className="admin-form__split">
                     <label>
-                      <span>SKU</span>
+                      <span>{copy.products.variants.sku}</span>
                       <input
                         maxLength={80}
                         onChange={(event) =>
@@ -1918,9 +1960,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     </label>
 
                     <label>
-                      <span>Size</span>
+                      <span>{copy.products.variants.size}</span>
                       {sizingType === "ACCESSORIES" ? (
-                        <input disabled value="No size required" />
+                        <input disabled value={copy.products.variants.noSizeRequired} />
                       ) : (
                         <select
                           aria-describedby={
@@ -1937,10 +1979,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           required
                           value={variantForm.size}
                         >
-                          <option value="">Select a size</option>
+                          <option value="">{copy.products.variants.selectSize}</option>
                           {hasLegacyVariantSize ? (
                             <option disabled value={variantForm.size}>
-                              Custom: {variantForm.size}
+                              {copy.products.variants.customSize(variantForm.size)}
                             </option>
                           ) : null}
                           {allowedSizes.map((size) => (
@@ -1952,8 +1994,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                       )}
                       {hasLegacyVariantSize ? (
                         <small id="admin-variant-size-guidance">
-                          This existing custom size is preserved until you choose
-                          a size allowed by the selected classification.
+                          {copy.products.variants.customSizeHelper}
                         </small>
                       ) : null}
                     </label>
@@ -1961,7 +2002,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
 
                   <div className="admin-form__split">
                     <label>
-                      <span>Color</span>
+                      <span>{copy.products.variants.color}</span>
                       <input
                         maxLength={64}
                         onChange={(event) =>
@@ -1976,7 +2017,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     </label>
 
                     <label>
-                      <span>Stock</span>
+                      <span>{copy.products.variants.stock}</span>
                       <input
                         min="0"
                         onChange={(event) =>
@@ -1993,7 +2034,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   </div>
 
                   <label>
-                    <span>Price override</span>
+                    <span>{copy.products.variants.priceOverride}</span>
                     <input
                       min="0"
                       onChange={(event) =>
@@ -2018,7 +2059,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                       }
                       type="checkbox"
                     />
-                    <span>Active</span>
+                    <span>{copy.common.active}</span>
                   </label>
 
                   <button
@@ -2032,10 +2073,10 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                   >
                     <Save aria-hidden="true" size={17} />
                     {isSavingVariant
-                      ? "Saving"
+                      ? copy.common.saving
                       : editingVariantId
-                        ? "Save variant"
-                        : "Add variant"}
+                        ? copy.products.variants.saveVariant
+                        : copy.products.variants.addVariant}
                   </button>
                 </form>
               </>
@@ -2075,7 +2116,7 @@ function getProductForm(product: AdminProduct): ProductFormState {
             .slice(0, MAX_PRODUCT_IMAGES)
             .map(toManagedProductImageFormItem)
         : product.imageUrls.slice(0, MAX_PRODUCT_IMAGES).map((url, index) => ({
-            filename: getLegacyImageLabel(url, index),
+            filename: getLegacyImageLabel(url),
             key: `legacy:${index}:${url}`,
             source: "legacy" as const,
             url,
@@ -2151,7 +2192,10 @@ function areVariantFormsEqual(
   );
 }
 
-function getProductPayload(form: ProductFormState):
+function getProductPayload(
+  form: ProductFormState,
+  copy: AdminCatalogTranslations,
+):
   | {
       payload: {
         basePrice: number;
@@ -2170,23 +2214,23 @@ function getProductPayload(form: ProductFormState):
   const basePrice = parseRequiredInteger(form.basePrice);
 
   if (!form.name.trim()) {
-    return { error: "Product name is required." };
+    return { error: copy.products.validation.productNameRequired };
   }
 
   if (!form.slug.trim()) {
-    return { error: "Product slug is required." };
+    return { error: copy.products.validation.productSlugRequired };
   }
 
   if (form.categoryIds.length === 0) {
-    return { error: "Select at least one product category." };
+    return { error: copy.products.validation.categoryRequired };
   }
 
   if (basePrice === undefined) {
-    return { error: "Base price must be a whole number greater than or equal to 0." };
+    return { error: copy.products.validation.basePrice };
   }
 
   const aiTags = getProductFormAiTags(form);
-  const aiTagsError = getAiTagsValidationError(aiTags);
+  const aiTagsError = getAiTagsValidationError(aiTags, copy);
 
   if (aiTagsError) {
     return { error: aiTagsError };
@@ -2209,7 +2253,11 @@ function getProductPayload(form: ProductFormState):
   };
 }
 
-function getVariantPayload(form: VariantFormState, sizingType: SizingType):
+function getVariantPayload(
+  form: VariantFormState,
+  sizingType: SizingType,
+  copy: AdminCatalogTranslations,
+):
   | {
       payload: {
         color: string;
@@ -2230,29 +2278,29 @@ function getVariantPayload(form: VariantFormState, sizingType: SizingType):
   const size = sizingType === "ACCESSORIES" ? ONE_SIZE : form.size.trim();
 
   if (!size) {
-    return { error: "Variant size is required." };
+    return { error: copy.products.validation.variantSizeRequired };
   }
 
   if (sizingType !== "ACCESSORIES" && !getSizeOptions(sizingType).includes(size)) {
     return {
       error:
         sizingType === "SHOES"
-          ? "Shoe size must be between 35 and 46."
-          : "Clothing size must be XS, S, M, L, or XL.",
+          ? copy.products.validation.shoeSize
+          : copy.products.validation.clothingSize,
     };
   }
 
   if (!form.color.trim()) {
-    return { error: "Variant color is required." };
+    return { error: copy.products.validation.variantColorRequired };
   }
 
   if (stock === undefined) {
-    return { error: "Variant stock must be a whole number greater than or equal to 0." };
+    return { error: copy.products.validation.variantStock };
   }
 
   if (priceOverride === undefined) {
     return {
-      error: "Variant price override must be a whole number greater than or equal to 0.",
+      error: copy.products.validation.variantPrice,
     };
   }
 
@@ -2291,7 +2339,8 @@ function getDuplicateVariantError(
   variants: Array<
     CreateAdminProductVariantRequest & { id?: string; tempId?: string }
   >,
-  excludeId?: string,
+  excludeId: string | undefined,
+  copy: AdminCatalogTranslations,
 ): string | undefined {
   const normalizedColor = candidate.color.trim().toLocaleLowerCase();
   const duplicateCombination = variants.some((variant) => {
@@ -2305,8 +2354,8 @@ function getDuplicateVariantError(
 
   if (duplicateCombination) {
     return isNoSize(candidate.size)
-      ? "Each accessory color can only be used once."
-      : "Each color and size combination can only be used once.";
+      ? copy.products.validation.duplicateAccessoryColor
+      : copy.products.validation.duplicateOption;
   }
 
   const normalizedSku = candidate.sku?.trim().toLocaleUpperCase();
@@ -2320,7 +2369,7 @@ function getDuplicateVariantError(
       );
     })
   ) {
-    return "Each variant SKU must be unique.";
+    return copy.products.validation.duplicateSku;
   }
 
   return undefined;
@@ -2368,13 +2417,16 @@ function serializeAiTags(form: ProductFormState): string {
     .join("|");
 }
 
-function getAiTagsValidationError(tags: string[]): string | undefined {
+function getAiTagsValidationError(
+  tags: string[],
+  copy: AdminCatalogTranslations,
+): string | undefined {
   if (tags.length > MAX_PRODUCT_AI_TAGS) {
-    return `Add up to ${MAX_PRODUCT_AI_TAGS} internal AI tags.`;
+    return copy.products.validation.aiTagLimit(MAX_PRODUCT_AI_TAGS);
   }
 
   if (tags.some((tag) => tag.length > MAX_PRODUCT_AI_TAG_LENGTH)) {
-    return `Each internal AI tag must be ${MAX_PRODUCT_AI_TAG_LENGTH} characters or fewer.`;
+    return copy.products.validation.aiTagLength(MAX_PRODUCT_AI_TAG_LENGTH);
   }
 
   return undefined;
@@ -2411,7 +2463,7 @@ function toManagedProductImageFormItem(
   image: AdminManagedProductImage,
 ): ProductImageFormItem {
   return {
-    filename: image.originalFilename || `Managed image ${image.sortOrder + 1}`,
+    filename: image.originalFilename || "",
     key: `managed:${image.id}`,
     managedImageId: image.id,
     source: "managed",
@@ -2443,13 +2495,13 @@ function serializeImageItems(items: ProductImageFormItem[]): string {
     .join("|");
 }
 
-function getLegacyImageLabel(url: string, index: number): string {
+function getLegacyImageLabel(url: string): string {
   try {
     const pathname = new URL(url).pathname;
     const filename = pathname.split("/").filter(Boolean).pop();
-    return filename ? decodeURIComponent(filename).slice(0, 120) : `Legacy image ${index + 1}`;
+    return filename ? decodeURIComponent(filename).slice(0, 120) : "";
   } catch {
-    return `Legacy image ${index + 1}`;
+    return "";
   }
 }
 
@@ -2503,6 +2555,8 @@ function AdminProductImage({
   className: string;
   url?: string;
 }) {
+  const { locale } = useI18n();
+  const copy = getAdminCatalogTranslations(locale);
   const [hasFailed, setHasFailed] = useState(false);
 
   useEffect(() => {
@@ -2516,7 +2570,7 @@ function AdminProductImage({
       ) : (
         <span>
           <ImageIcon aria-hidden="true" size={17} />
-          No image
+          {copy.common.noImage}
         </span>
       )}
     </div>
@@ -2532,13 +2586,15 @@ function AdminFeedback({
   requestId?: string;
   tone: "error" | "success";
 }) {
+  const { locale } = useI18n();
+  const copy = getAdminCatalogTranslations(locale);
   const Icon = tone === "success" ? CheckCircle2 : AlertCircle;
 
   return (
     <div className={`admin-feedback admin-feedback--${tone}`} role="status">
       <Icon aria-hidden="true" size={19} />
       <span>{message}</span>
-      {requestId ? <small>Request {requestId}</small> : null}
+      {requestId ? <small>{copy.common.request(requestId)}</small> : null}
     </div>
   );
 }
@@ -2562,28 +2618,40 @@ function AdminTableSkeleton({
 }
 
 function AdminPagination({
+  copy,
   isLoading,
+  locale,
   onPageChange,
   pagination,
 }: {
+  copy: AdminCatalogTranslations;
   isLoading: boolean;
+  locale: "en" | "vi";
   onPageChange: (page: number) => void;
   pagination: Pagination;
 }) {
   const totalPages = Math.max(1, pagination.totalPages);
 
   return (
-    <nav className="admin-pagination" aria-label="Products pagination">
+    <nav
+      className="admin-pagination"
+      aria-label={copy.common.paginationAria(copy.products.noun)}
+    >
       <button
         className="button button--secondary"
         disabled={isLoading || pagination.page <= 1}
         onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
         type="button"
       >
-        Previous
+        {copy.common.previous}
       </button>
       <span>
-        Page {pagination.page} of {totalPages} ({pagination.total} products)
+        {copy.common.paginationSummary({
+          noun: copy.products.noun,
+          page: formatAdminCatalogNumber(pagination.page, locale),
+          total: formatAdminCatalogNumber(pagination.total, locale),
+          totalPages: formatAdminCatalogNumber(totalPages, locale),
+        })}
       </span>
       <button
         className="button button--secondary"
@@ -2591,7 +2659,7 @@ function AdminPagination({
         onClick={() => onPageChange(pagination.page + 1)}
         type="button"
       >
-        Next
+        {copy.common.next}
       </button>
     </nav>
   );

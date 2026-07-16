@@ -20,6 +20,13 @@ import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
 import { listAdminChatConversations } from "@/features/chat/api";
 import { listAdminReturns } from "@/features/returns/api";
+import {
+  formatAdminNotificationLabel,
+  formatAdminNotificationTitle,
+  getIntlLocale,
+  useAdminCommonI18n,
+} from "@/features/i18n/admin-common-translations";
+import type { Locale } from "@/features/i18n/locale";
 
 type AdminNotificationKey = "chats" | "orders" | "returns";
 
@@ -41,56 +48,57 @@ const adminNavItems = [
   {
     href: "/admin",
     icon: LayoutDashboard,
-    label: "Dashboard",
+    labelKey: "dashboard",
   },
   {
     href: "/admin/chats",
     icon: MessageCircle,
-    label: "Chats",
+    labelKey: "chats",
     notificationKey: "chats",
   },
   {
     href: "/admin/orders",
     icon: ClipboardList,
-    label: "Orders",
+    labelKey: "orders",
     notificationKey: "orders",
   },
   {
     href: "/admin/returns",
     icon: RotateCcw,
-    label: "Returns",
+    labelKey: "returns",
     notificationKey: "returns",
   },
   {
     href: "/admin/users",
     icon: Users,
-    label: "Users",
+    labelKey: "users",
   },
   {
     href: "/admin/products",
     icon: Package,
-    label: "Products",
+    labelKey: "products",
   },
   {
     href: "/admin/categories",
     icon: Tags,
-    label: "Categories",
+    labelKey: "categories",
   },
   {
     href: "/admin/landing-gallery",
     icon: ImageIcon,
-    label: "Landing Gallery",
+    labelKey: "gallery",
   },
   {
     href: "/admin/vouchers",
     icon: TicketPercent,
-    label: "Vouchers",
+    labelKey: "vouchers",
   },
 ] as const;
 
 export function AdminNav() {
   const pathname = usePathname() || "/admin";
   const { currentUser, isLoading } = useAuthSession();
+  const { locale, messages } = useAdminCommonI18n();
   const [notificationCounts, setNotificationCounts] =
     useState<AdminNavNotificationCounts>(EMPTY_NOTIFICATION_COUNTS);
   const shouldLoadNotifications = !isLoading && isAdminUser(currentUser);
@@ -181,9 +189,10 @@ export function AdminNav() {
   }, [pathname, getNotificationCounts, shouldLoadNotifications]);
 
   return (
-    <nav aria-label="Admin navigation" className="admin-nav">
+    <nav aria-label={messages.navigation.label} className="admin-nav">
       {adminNavItems.map((item) => {
         const Icon = item.icon;
+        const label = messages.navigation[item.labelKey];
         const isCurrent = isActiveAdminPath(pathname, item.href);
         const notificationKey =
           "notificationKey" in item ? item.notificationKey : undefined;
@@ -194,16 +203,17 @@ export function AdminNav() {
         return (
           <Link
             aria-current={isCurrent ? "page" : undefined}
-            aria-label={getNavItemAriaLabel(item.label, notificationCount)}
+            aria-label={getNavItemAriaLabel(locale, label, notificationCount)}
             className={`admin-nav__link ${isCurrent ? "is-active" : ""}`}
             href={item.href}
             key={item.href}
           >
             <Icon aria-hidden="true" size={18} strokeWidth={1.8} />
-            <span className="admin-nav__label">{item.label}</span>
+            <span className="admin-nav__label">{label}</span>
             <AdminNavNotificationBadge
               count={notificationCount}
-              itemLabel={item.label}
+              itemLabel={label}
+              locale={locale}
             />
           </Link>
         );
@@ -223,9 +233,11 @@ function isActiveAdminPath(pathname: string, href: string): boolean {
 function AdminNavNotificationBadge({
   count,
   itemLabel,
+  locale,
 }: {
   count: number;
   itemLabel: string;
+  locale: Locale;
 }) {
   if (count <= 0) {
     return null;
@@ -235,21 +247,27 @@ function AdminNavNotificationBadge({
     <span
       aria-hidden="true"
       className="admin-nav__notification"
-      title={`${count} new ${itemLabel.toLowerCase()}`}
+      title={formatAdminNotificationTitle(locale, itemLabel, count)}
     >
-      {formatNotificationCount(count)}
+      {formatNotificationCount(count, locale)}
     </span>
   );
 }
 
-function getNavItemAriaLabel(label: string, count: number): string {
+function getNavItemAriaLabel(
+  locale: Locale,
+  label: string,
+  count: number,
+): string {
   if (count <= 0) {
     return label;
   }
 
-  return `${label}, ${count} new`;
+  return formatAdminNotificationLabel(locale, label, count);
 }
 
-function formatNotificationCount(count: number): string {
-  return count > 99 ? "99+" : String(count);
+function formatNotificationCount(count: number, locale: Locale): string {
+  return count > 99
+    ? "99+"
+    : new Intl.NumberFormat(getIntlLocale(locale)).format(count);
 }

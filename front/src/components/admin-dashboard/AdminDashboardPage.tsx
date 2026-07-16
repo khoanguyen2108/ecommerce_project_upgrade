@@ -29,7 +29,12 @@ import type {
   AdminStatsOverview,
   AdminTopProduct,
 } from "@/features/admin-stats/types";
-import { formatPrice } from "@/features/catalog/format";
+import {
+  formatCurrency,
+  formatNumber,
+} from "@/components/orders/order-format";
+import { useAdminCommonI18n } from "@/features/i18n/admin-common-translations";
+import type { Locale } from "@/features/i18n/locale";
 
 interface DashboardSnapshot {
   orders?: AdminOrderStats;
@@ -44,10 +49,11 @@ export function AdminDashboardPage() {
   );
   const [snapshot, setSnapshot] = useState<DashboardSnapshot>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [errors, setErrors] = useState<unknown[]>([]);
   const [requestIds, setRequestIds] = useState<string[]>([]);
   const [isTopProductsUnavailable, setIsTopProductsUnavailable] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const { locale, messages } = useAdminCommonI18n();
 
   useEffect(() => {
     let isMounted = true;
@@ -73,7 +79,7 @@ export function AdminDashboardPage() {
       const [overviewResult, ordersResult, revenueResult, topProductsResult] = results;
       const failures = results
         .filter((result): result is PromiseRejectedResult => result.status === "rejected")
-        .map((result) => getAdminStatsError(result.reason));
+        .map((result) => result.reason);
 
       setSnapshot({
         orders:
@@ -92,11 +98,11 @@ export function AdminDashboardPage() {
             : undefined,
       });
       setIsTopProductsUnavailable(topProductsResult.status === "rejected");
-      setErrors([...new Set(failures.map((failure) => failure.message))]);
+      setErrors(failures);
       setRequestIds([
         ...new Set(
           failures
-            .map((failure) => failure.requestId)
+            .map((failure) => getAdminStatsError(failure, "en").requestId)
             .filter((requestId): requestId is string => Boolean(requestId)),
         ),
       ]);
@@ -110,7 +116,10 @@ export function AdminDashboardPage() {
     };
   }, [range, refreshKey]);
 
-  const filterLabel = formatRangeLabel(range);
+  const filterLabel = formatRangeLabel(range, locale);
+  const localizedErrors = [
+    ...new Set(errors.map((error) => getAdminStatsError(error, locale).message)),
+  ];
   const hasAnyData = Boolean(
     snapshot.overview || snapshot.orders || snapshot.revenue,
   );
@@ -119,9 +128,11 @@ export function AdminDashboardPage() {
     <div className="admin-dashboard-modern">
       <section className="admin-dashboard-modern__heading" aria-labelledby="dashboard-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">Store operations</p>
-          <h1 id="dashboard-heading">Dashboard Overview</h1>
-          <p>Live catalog, customer, order, and verified revenue signals.</p>
+          <p className="admin-page-intro__eyebrow">
+            {messages.dashboard.storeOperations}
+          </p>
+          <h1 id="dashboard-heading">{messages.dashboard.title}</h1>
+          <p>{messages.dashboard.subtitle}</p>
         </div>
         <AdminDashboardFilters
           isLoading={isLoading}
@@ -131,20 +142,20 @@ export function AdminDashboardPage() {
         />
       </section>
 
-      {errors.length > 0 ? (
+      {localizedErrors.length > 0 ? (
         <div className="admin-dashboard-alert" role="alert">
           <AlertTriangle aria-hidden="true" size={20} />
           <div>
             <strong>
               {hasAnyData
-                ? "Some dashboard data is temporarily unavailable."
-                : "Dashboard data could not be loaded."}
+                ? messages.dashboard.partialUnavailable
+                : messages.dashboard.dataUnavailable}
             </strong>
-            {errors.map((error) => (
+            {localizedErrors.map((error) => (
               <span key={error}>{error}</span>
             ))}
             {requestIds.length > 0 ? (
-              <small>Request ID: {requestIds.join(", ")}</small>
+              <small>{messages.common.request}: {requestIds.join(", ")}</small>
             ) : null}
           </div>
           <button
@@ -152,20 +163,23 @@ export function AdminDashboardPage() {
             onClick={() => setRefreshKey((current) => current + 1)}
             type="button"
           >
-            Retry
+            {messages.common.retry}
           </button>
         </div>
       ) : null}
 
-      <section aria-label="Key performance indicators" className="admin-dashboard-metrics">
+      <section
+        aria-label={messages.dashboard.kpiLabel}
+        className="admin-dashboard-metrics"
+      >
         <AdminMetricCard
-          detail="Verified paid revenue only"
+          detail={messages.dashboard.verifiedRevenueOnly}
           icon={CircleDollarSign}
           isLoading={isLoading && !snapshot.overview}
-          label="Total revenue"
+          label={messages.dashboard.totalRevenue}
           value={
             snapshot.overview
-              ? formatPrice(snapshot.overview.totalRevenue)
+              ? formatCurrency(snapshot.overview.totalRevenue, "VND", locale)
               : undefined
           }
         />
@@ -173,30 +187,45 @@ export function AdminDashboardPage() {
           detail={filterLabel}
           icon={ShoppingBag}
           isLoading={isLoading && !snapshot.orders}
-          label="Paid orders"
-          value={snapshot.orders?.byStatus.PAID.toLocaleString("en")}
-        />
-        <AdminMetricCard
-          detail="Across verified paid orders"
-          icon={ClipboardList}
-          isLoading={isLoading && !snapshot.overview}
-          label="Average order value"
+          label={messages.dashboard.paidOrders}
           value={
-            snapshot.overview
-              ? formatPrice(snapshot.overview.averagePaidOrderValue)
+            snapshot.orders
+              ? formatNumber(snapshot.orders.byStatus.PAID, locale)
               : undefined
           }
         />
         <AdminMetricCard
-          detail="All registered customer accounts"
+          detail={messages.dashboard.averageOrderDescription}
+          icon={ClipboardList}
+          isLoading={isLoading && !snapshot.overview}
+          label={messages.dashboard.averageOrderValue}
+          value={
+            snapshot.overview
+              ? formatCurrency(
+                  snapshot.overview.averagePaidOrderValue,
+                  "VND",
+                  locale,
+                )
+              : undefined
+          }
+        />
+        <AdminMetricCard
+          detail={messages.dashboard.allCustomers}
           icon={Users}
           isLoading={isLoading && !snapshot.overview}
-          label="Customers"
-          value={snapshot.overview?.totalCustomers.toLocaleString("en")}
+          label={messages.dashboard.customers}
+          value={
+            snapshot.overview
+              ? formatNumber(snapshot.overview.totalCustomers, locale)
+              : undefined
+          }
         />
       </section>
 
-      <section className="admin-dashboard-primary-grid" aria-label="Operational overview">
+      <section
+        className="admin-dashboard-primary-grid"
+        aria-label={messages.dashboard.operationalOverview}
+      >
         <MonthlySalesChart
           buckets={snapshot.revenue?.buckets}
           isLoading={isLoading}
@@ -227,20 +256,23 @@ function OperationsOverview({
   orders?: AdminOrderStats;
   overview?: AdminStatsOverview;
 }) {
+  const { locale, messages } = useAdminCommonI18n();
   const rows = [
-    ["Pending payment", orders?.byStatus.PENDING_PAYMENT],
-    ["Paid", orders?.byStatus.PAID],
-    ["Cancelled", orders?.byStatus.CANCELLED],
-    ["Expired", orders?.byStatus.EXPIRED],
+    [messages.dashboard.pendingPayment, orders?.byStatus.PENDING_PAYMENT],
+    [messages.dashboard.paid, orders?.byStatus.PAID],
+    [messages.dashboard.cancelled, orders?.byStatus.CANCELLED],
+    [messages.dashboard.expired, orders?.byStatus.EXPIRED],
   ] as const;
 
   return (
     <article className="admin-dashboard-card admin-dashboard-card--operations">
       <header className="admin-dashboard-card__header">
         <div>
-          <p className="admin-dashboard-card__kicker">Operations</p>
-          <h2>Store status</h2>
-          <span>Current API totals for the selected range</span>
+          <p className="admin-dashboard-card__kicker">
+            {messages.dashboard.operations}
+          </p>
+          <h2>{messages.dashboard.storeStatus}</h2>
+          <span>{messages.dashboard.currentTotals}</span>
         </div>
       </header>
 
@@ -251,7 +283,11 @@ function OperationsOverview({
             {isLoading && value === undefined ? (
               <span className="admin-dashboard-skeleton admin-dashboard-skeleton--compact" />
             ) : (
-              <strong>{value?.toLocaleString("en") ?? "Unavailable"}</strong>
+              <strong>
+                {value === undefined
+                  ? messages.common.unavailable
+                  : formatNumber(value, locale)}
+              </strong>
             )}
           </div>
         ))}
@@ -259,20 +295,28 @@ function OperationsOverview({
 
       <div className="admin-dashboard-inventory-summary">
         <span>
-          <small>Total products</small>
-          <strong>{overview?.totalProducts.toLocaleString("en") ?? "Unavailable"}</strong>
+          <small>{messages.dashboard.totalProducts}</small>
+          <strong>
+            {overview
+              ? formatNumber(overview.totalProducts, locale)
+              : messages.common.unavailable}
+          </strong>
         </span>
         <span>
-          <small>Low-stock variants</small>
-          <strong>{overview?.lowStockVariantsCount.toLocaleString("en") ?? "Unavailable"}</strong>
+          <small>{messages.dashboard.lowStockVariants}</small>
+          <strong>
+            {overview
+              ? formatNumber(overview.lowStockVariantsCount, locale)
+              : messages.common.unavailable}
+          </strong>
         </span>
       </div>
     </article>
   );
 }
 
-function formatRangeLabel(range: DashboardDateRange): string {
-  const formatter = new Intl.DateTimeFormat("en", {
+function formatRangeLabel(range: DashboardDateRange, locale: Locale): string {
+  const formatter = new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
     day: "numeric",
     month: "short",
     timeZone: "UTC",

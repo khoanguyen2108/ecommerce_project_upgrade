@@ -3326,6 +3326,60 @@ img {
   padding: 12px 8px 0;
 }
 
+.admin-sidebar__language {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.admin-sidebar__language > span {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-language-switcher {
+  border: 1px solid var(--color-border);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(44px, 1fr));
+}
+
+.admin-language-switcher button {
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 850;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 10px;
+}
+
+.admin-language-switcher button + button {
+  border-left: 1px solid var(--color-border);
+}
+
+.admin-language-switcher button:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.admin-language-switcher button.is-active {
+  background: #111111;
+  color: #ffffff;
+}
+
+.admin-language-switcher button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+  position: relative;
+  z-index: 1;
+}
+
 .admin-sidebar__account {
   align-items: center;
   display: grid;
@@ -5158,6 +5212,8 @@ img {
   border: 1px solid var(--color-border);
   display: grid;
   min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .admin-orders-list__head,
@@ -7060,6 +7116,14 @@ img {
 }
 
 @media (max-width: 1180px) {
+  .admin-orders-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-orders-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .admin-dashboard-modern__heading {
     align-items: stretch;
     flex-direction: column;
@@ -7128,6 +7192,11 @@ img {
 
   .admin-dashboard-refresh-button {
     width: 100%;
+  }
+
+  .admin-dashboard-card__header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .admin-dashboard-alert {
@@ -7586,7 +7655,8 @@ img {
 }
 
 .checkout-account-card strong {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  white-space: nowrap;
 }
 
 .checkout-section-heading {
@@ -10771,6 +10841,7 @@ img {
     background: transparent;
     border: 0;
     gap: var(--space-3);
+    overflow-x: visible;
   }
 
   .admin-orders-list__head {

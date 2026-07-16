@@ -1,20 +1,31 @@
 import { ApiClientError } from "@/lib/errors/api-error";
+import type { Locale } from "@/features/i18n/locale";
 
-export function formatAdminDate(value: string): string {
+export function formatAdminDate(
+  value: string,
+  locale: Locale = "en",
+): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Not available";
+    return locale === "vi" ? "Không khả dụng" : "Not available";
   }
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
-export function formatOptional(value: string | null | undefined): string {
-  return value && value.trim() ? value : "Not set";
+export function formatOptional(
+  value: string | null | undefined,
+  locale: Locale = "en",
+): string {
+  return value && value.trim()
+    ? value
+    : locale === "vi"
+      ? "Chưa thiết lập"
+      : "Not set";
 }
 
 export function normalizeNullableText(value: string): string | null {
@@ -53,7 +64,7 @@ export function getApiErrorMessage(
   fallback: string,
 ): string {
   if (error instanceof ApiClientError) {
-    return messages[error.code] || error.message || fallback;
+    return messages[error.code] || fallback;
   }
 
   return fallback;

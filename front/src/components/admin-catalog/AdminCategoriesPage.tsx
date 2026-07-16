@@ -30,12 +30,18 @@ import type {
   AdminCategory,
   AdminCategoryQuery,
 } from "@/features/admin-catalog/types";
+import {
+  formatAdminCatalogNumber,
+  getAdminCatalogErrorMessage,
+  getAdminCatalogTranslations,
+  type AdminCatalogTranslations,
+} from "@/features/i18n/admin-catalog-translations";
+import { useI18n } from "@/features/i18n/useI18n";
 import type { Pagination } from "@/lib/api/types";
 import { AdminModal } from "@/components/admin/AdminModal";
 import {
   formatAdminDate,
   formatOptional,
-  getApiErrorMessage,
   getApiRequestId,
   getBooleanFilterValue,
   normalizeNullableText,
@@ -45,33 +51,6 @@ import {
 const CATEGORY_LIMIT = 8;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-
-const CATEGORY_ERROR_MESSAGES: Record<string, string> = {
-  ADMIN_CATEGORY_FEATURED_LIMIT_EXCEEDED:
-    "Three active categories are already featured. Unfeature one before adding another.",
-  ADMIN_CATEGORY_FEATURED_ORDER_CONFLICT:
-    "Another featured category already uses that display order.",
-  ADMIN_CATEGORY_FEATURED_ORDER_INVALID:
-    "Choose featured order 1, 2, or 3.",
-  ADMIN_CATEGORY_IMAGE_URL_INVALID:
-    "Enter a valid public HTTP or HTTPS image URL.",
-  CATEGORY_IMAGE_URL_INPUT_DISABLED:
-    "Choose a JPEG, PNG, or WebP file instead of entering an image URL.",
-  ADMIN_CATEGORY_NOT_FOUND: "That category no longer exists.",
-  AUTH_REQUIRED: "Your admin session is required. Sign in again to continue.",
-  BAD_REQUEST: "Some category fields are invalid. Review the form and try again.",
-  CATALOG_UPDATE_EMPTY: "Change at least one category field before saving.",
-  CATEGORY_NOT_FOUND: "That category no longer exists.",
-  CATEGORY_SLUG_EXISTS: "Another category already uses this slug.",
-  CATEGORY_DELETE_BLOCKED:
-    "This category has products. Move or remove them before deleting.",
-  FORBIDDEN: "This account is not allowed to manage catalog categories.",
-  NETWORK_ERROR: "The category API could not be reached. Check the backend and retry.",
-  PRODUCT_IMAGE_EMPTY: "Choose a non-empty JPEG, PNG, or WebP image.",
-  PRODUCT_IMAGE_TOO_LARGE: "Category images must be 5 MB or smaller.",
-  PRODUCT_IMAGE_TYPE_INVALID: "Only genuine JPEG, PNG, and WebP images are allowed.",
-  VALIDATION_ERROR: "Some category fields are invalid. Review the form and try again.",
-};
 
 interface AdminCategoriesPageProps {
   initialQuery: AdminCategoryQuery;
@@ -93,6 +72,10 @@ interface CategoryFormState {
 type CategoryPanelMode = "create" | "edit";
 
 export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) {
+  const { locale } = useI18n();
+  const copy = getAdminCatalogTranslations(locale);
+  const copyRef = useRef(copy);
+  copyRef.current = copy;
   const [query, setQuery] = useState<AdminCategoryQuery>({
     ...initialQuery,
     limit: CATEGORY_LIMIT,
@@ -159,10 +142,10 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
 
         setCategories([]);
         setListError(
-          getApiErrorMessage(
+          getAdminCatalogErrorMessage(
             error,
-            CATEGORY_ERROR_MESSAGES,
-            "Admin categories could not be loaded right now.",
+            copyRef.current.categories.errors,
+            copyRef.current.categories.feedback.listLoadError,
           ),
         );
         setRequestId(getApiRequestId(error));
@@ -233,10 +216,10 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       setForm(getCategoryForm(response.category));
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          CATEGORY_ERROR_MESSAGES,
-          "This category could not be opened right now.",
+          copy.categories.errors,
+          copy.categories.feedback.openError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -251,11 +234,11 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
 
     if (!file) return;
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-      setActionError("Only JPEG, PNG, and WebP images are allowed.");
+      setActionError(copy.categories.feedback.imageType);
       return;
     }
     if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
-      setActionError("Category images must be non-empty and 5 MB or smaller.");
+      setActionError(copy.categories.feedback.imageSize);
       return;
     }
 
@@ -288,7 +271,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
     setActionError(undefined);
     setSuccessMessage(undefined);
 
-    const validationError = validateCategoryForm(form);
+    const validationError = validateCategoryForm(form, copy);
 
     if (validationError) {
       setActionError(validationError);
@@ -299,9 +282,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       panelMode === "edit" &&
       selectedCategory &&
       form.isActive !== selectedCategory.isActive &&
-      !window.confirm(
-        `${form.isActive ? "Activate" : "Deactivate"} ${selectedCategory.name}?`,
-      )
+      !window.confirm(copy.categories.confirm.status(form.isActive, selectedCategory.name))
     ) {
       return;
     }
@@ -373,7 +354,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
 
       setRefreshKey((current) => current + 1);
       if (warning) {
-        setSuccessMessage("Category image changes were saved.");
+        setSuccessMessage(copy.categories.feedback.imageSaved);
         setActionError(warning);
       } else {
         setIsModalOpen(false);
@@ -384,10 +365,10 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
         setSelectedCategory(latestCategory);
       }
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          CATEGORY_ERROR_MESSAGES,
-          "Category could not be saved.",
+          copy.categories.errors,
+          copy.categories.feedback.saveError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -399,11 +380,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   async function handleCategoryStatusChange(category: AdminCategory) {
     const nextIsActive = !category.isActive;
 
-    if (
-      !window.confirm(
-        `${nextIsActive ? "Activate" : "Deactivate"} ${category.name}?`,
-      )
-    ) {
+    if (!window.confirm(copy.categories.confirm.status(nextIsActive, category.name))) {
       return;
     }
 
@@ -428,15 +405,15 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       setRefreshKey((current) => current + 1);
       setSuccessMessage(
         response.category.isActive
-          ? "Category activated."
-          : "Category deactivated.",
+          ? copy.categories.feedback.activated
+          : copy.categories.feedback.deactivated,
       );
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          CATEGORY_ERROR_MESSAGES,
-          "Category status could not be changed.",
+          copy.categories.errors,
+          copy.categories.feedback.statusError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -446,7 +423,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   }
 
   async function handleCategoryDelete(category: AdminCategory) {
-    if (!window.confirm(`Delete ${category.name}? This cannot be undone.`)) return;
+    if (!window.confirm(copy.categories.confirm.delete(category.name))) return;
 
     setBusyAction(`${category.id}:delete`);
     setActionError(undefined);
@@ -459,16 +436,16 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       } else {
         setRefreshKey((current) => current + 1);
       }
-      setSuccessMessage("Category deleted.");
+      setSuccessMessage(copy.categories.feedback.deleted);
       if (response.warning) {
         setActionError(response.warning);
       }
     } catch (error) {
       setActionError(
-        getApiErrorMessage(
+        getAdminCatalogErrorMessage(
           error,
-          CATEGORY_ERROR_MESSAGES,
-          "Category could not be deleted.",
+          copy.categories.errors,
+          copy.categories.feedback.deleteError,
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -494,9 +471,9 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
         aria-labelledby="admin-categories-heading"
       >
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">Catalog structure</p>
-          <h1 id="admin-categories-heading">Categories Management</h1>
-          <p>Organize storefront categories, imagery, and featured placement.</p>
+          <p className="admin-page-intro__eyebrow">{copy.categories.header.eyebrow}</p>
+          <h1 id="admin-categories-heading">{copy.categories.header.title}</h1>
+          <p>{copy.categories.header.subtitle}</p>
         </div>
         <div className="admin-header-actions">
           <button
@@ -506,37 +483,37 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
             type="button"
           >
             <RefreshCw aria-hidden="true" size={17} />
-            Refresh
+            {copy.common.refresh}
           </button>
           <button className="button button--primary" onClick={openCreatePanel} type="button">
             <Plus aria-hidden="true" size={17} />
-            New category
+            {copy.categories.header.newCategory}
           </button>
         </div>
       </section>
 
-      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline admin-filter-surface" aria-label="Category filters">
+      <section className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline admin-filter-surface" aria-label={copy.categories.filters.aria}>
         <form className="admin-search" onSubmit={handleSearchSubmit}>
-          <label htmlFor="admin-category-search">Search</label>
+          <label htmlFor="admin-category-search">{copy.common.search}</label>
           <div>
             <input
               id="admin-category-search"
               maxLength={120}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Name or slug"
+              placeholder={copy.categories.filters.searchPlaceholder}
               type="search"
               value={searchInput}
             />
             <button className="button button--primary" type="submit">
               <Search aria-hidden="true" size={17} />
-              Search
+              {copy.common.search}
             </button>
           </div>
         </form>
 
         <div className="admin-filter-grid admin-filter-grid--compact">
           <label>
-            <span>Status</span>
+            <span>{copy.common.status}</span>
             <select
               onChange={(event) =>
                 handleFilterChange({
@@ -545,9 +522,9 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               }
               value={getBooleanFilterValue(query.isActive)}
             >
-              <option value="">All statuses</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
+              <option value="">{copy.common.allStatuses}</option>
+              <option value="true">{copy.common.active}</option>
+              <option value="false">{copy.common.inactive}</option>
             </select>
           </label>
 
@@ -561,7 +538,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
             type="button"
           >
             <RotateCcw aria-hidden="true" size={17} />
-            Reset
+            {copy.common.reset}
           </button>
         </div>
       </section>
@@ -581,15 +558,15 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Image</th>
-                <th>Slug</th>
-                <th>Description</th>
-                <th>Status</th>
-                <th>Landing</th>
-                <th>Created</th>
-                <th>Updated</th>
-                <th>Actions</th>
+                <th>{copy.common.name}</th>
+                <th>{copy.common.image}</th>
+                <th>{copy.common.slug}</th>
+                <th>{copy.common.description}</th>
+                <th>{copy.common.status}</th>
+                <th>{copy.categories.table.landing}</th>
+                <th>{copy.categories.table.created}</th>
+                <th>{copy.categories.table.updated}</th>
+                <th>{copy.common.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -597,14 +574,14 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               {!isLoading && !listError && categories.length === 0 ? (
                 <tr>
                   <td className="admin-table__state" colSpan={9}>
-                    No categories match the current filters.
+                    {copy.categories.table.empty}
                   </td>
                 </tr>
               ) : null}
               {!isLoading && !listError
                 ? categories.map((category) => (
                     <tr
-                      aria-label={`Open ${category.name}`}
+                      aria-label={copy.categories.table.openAria(category.name)}
                       className="admin-table__clickable-row"
                       key={category.id}
                       onClick={() => void openEditPanel(category)}
@@ -628,13 +605,13 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                           />
                         ) : (
                           <span className="admin-category-thumbnail admin-category-thumbnail--empty">
-                            None
+                            {copy.categories.table.noImage}
                           </span>
                         )}
                       </td>
                       <td>{category.slug}</td>
                       <td className="admin-table__muted">
-                        {formatOptional(category.description)}
+                        {formatOptional(category.description, locale)}
                       </td>
                       <td>
                         <span
@@ -644,18 +621,23 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                               : "admin-badge--muted"
                           }`}
                         >
-                          {category.isActive ? "Active" : "Inactive"}
+                          {category.isActive ? copy.common.active : copy.common.inactive}
                         </span>
                       </td>
                       <td>
                         <span className="admin-badge admin-badge--neutral">
                           {category.isFeatured
-                            ? `Featured #${category.featuredOrder}`
-                            : "Not featured"}
+                            ? copy.categories.table.featured(
+                                formatAdminCatalogNumber(
+                                  category.featuredOrder || 0,
+                                  locale,
+                                ),
+                              )
+                            : copy.categories.table.notFeatured}
                         </span>
                       </td>
-                      <td>{formatAdminDate(category.createdAt)}</td>
-                      <td>{formatAdminDate(category.updatedAt)}</td>
+                      <td>{formatAdminDate(category.createdAt, locale)}</td>
+                      <td>{formatAdminDate(category.updatedAt, locale)}</td>
                       <td>
                         <div
                           className="admin-row-actions"
@@ -663,10 +645,10 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                           onKeyDown={(event) => event.stopPropagation()}
                         >
                           <button
-                            aria-label={`Edit ${category.name}`}
+                            aria-label={copy.categories.table.editAria(category.name)}
                             className="icon-button admin-icon-button"
                             onClick={() => void openEditPanel(category)}
-                            title="Edit category"
+                            title={copy.categories.table.editTitle}
                             type="button"
                           >
                             <Edit3 aria-hidden="true" size={17} />
@@ -677,7 +659,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                             onClick={() => void handleCategoryStatusChange(category)}
                             type="button"
                           >
-                            {category.isActive ? "Deactivate" : "Activate"}
+                            {category.isActive ? copy.common.deactivate : copy.common.activate}
                           </button>
                           <button
                             className="admin-link-button admin-link-button--delete"
@@ -685,7 +667,9 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                             onClick={() => void handleCategoryDelete(category)}
                             type="button"
                           >
-                            {busyAction === `${category.id}:delete` ? "Deleting" : "Delete"}
+                            {busyAction === `${category.id}:delete`
+                              ? copy.common.deleting
+                              : copy.common.delete}
                           </button>
                         </div>
                       </td>
@@ -699,7 +683,9 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
       </section>
 
       <AdminPagination
+        copy={copy}
         isLoading={isLoading}
+        locale={locale}
         onPageChange={goToPage}
         pagination={pagination}
       />
@@ -715,7 +701,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               onClick={requestClose}
               type="button"
             >
-              Cancel
+              {copy.common.cancel}
             </button>
             <button
               className="button button--primary"
@@ -726,11 +712,11 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               <Save aria-hidden="true" size={17} />
               {isSaving
                 ? form.imageFile
-                  ? "Uploading"
-                  : "Saving"
+                  ? copy.common.uploading
+                  : copy.common.saving
                 : panelMode === "create"
-                  ? "Create"
-                  : "Save"}
+                  ? copy.common.create
+                  : copy.common.save}
             </button>
           </>
         )}
@@ -740,7 +726,11 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
           releaseCategoryPreview(localPreviewUrlRef);
           setIsModalOpen(false);
         }}
-        title={panelMode === "create" ? "New category" : "Edit category"}
+        title={
+          panelMode === "create"
+            ? copy.categories.form.newTitle
+            : copy.categories.form.editTitle
+        }
       >
         {actionError ? (
           <AdminFeedback message={actionError} requestId={requestId} tone="error" />
@@ -748,34 +738,34 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
           <form className="admin-form admin-compact-form" id="admin-category-form" onSubmit={handleCategorySave}>
             <section className="admin-form-section admin-compact-basic" aria-labelledby="category-basic-heading">
               <div className="admin-form-section__heading">
-                <p className="eyebrow">Basic information</p>
-                <h3 id="category-basic-heading">Category details</h3>
-                <p>Name the collection and describe how it appears in the storefront.</p>
+                <p className="eyebrow">{copy.categories.form.basicEyebrow}</p>
+                <h3 id="category-basic-heading">{copy.categories.form.detailsTitle}</h3>
+                <p>{copy.categories.form.detailsHelper}</p>
               </div>
               <div className="admin-form-section__content admin-compact-fields">
                 <label className="admin-compact-field--wide">
-                  <span>Name</span>
-                  <input disabled={isDetailLoading} maxLength={120} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. Dresses" required value={form.name} />
+                  <span>{copy.common.name}</span>
+                  <input disabled={isDetailLoading} maxLength={120} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder={copy.categories.form.namePlaceholder} required value={form.name} />
                 </label>
                 <label className="admin-compact-field--wide">
-                  <span>Slug</span>
-                  <input disabled={isDetailLoading} maxLength={160} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder="dresses" required value={form.slug} />
+                  <span>{copy.common.slug}</span>
+                  <input disabled={isDetailLoading} maxLength={160} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} placeholder={copy.categories.form.slugPlaceholder} required value={form.slug} />
                 </label>
                 <label className="admin-compact-field--wide">
-                  <span>Description</span>
-                  <textarea disabled={isDetailLoading} maxLength={2000} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Enter category detail..." rows={3} value={form.description} />
+                  <span>{copy.common.description}</span>
+                  <textarea disabled={isDetailLoading} maxLength={2000} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder={copy.categories.form.descriptionPlaceholder} rows={3} value={form.description} />
                 </label>
               </div>
             </section>
 
             <section className="admin-form-section" aria-labelledby="category-visual-heading">
               <div className="admin-form-section__heading">
-                <p className="eyebrow">Category image</p>
-                <h3 id="category-visual-heading">Category image</h3>
-                <p>JPEG, PNG, or WebP. Maximum 5 MB.</p>
+                <p className="eyebrow">{copy.categories.form.imageTitle}</p>
+                <h3 id="category-visual-heading">{copy.categories.form.imageTitle}</h3>
+                <p>{copy.categories.form.imageHelper}</p>
               </div>
               <div className="admin-category-visual-grid">
-                <CategoryImagePreview url={form.imageUrl} />
+                <CategoryImagePreview copy={copy} url={form.imageUrl} />
                 <div className="admin-category-image-controls">
                   <input
                     accept="image/jpeg,image/png,image/webp"
@@ -792,11 +782,11 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                     type="button"
                   >
                     <Upload aria-hidden="true" size={15} />
-                    Choose file
+                    {copy.categories.form.chooseFile}
                   </button>
                   <div className="admin-category-image-meta">
-                    <strong>{getCategoryImageLabel(form)}</strong>
-                    <small>{getCategoryImageStatus(form)}</small>
+                    <strong>{getCategoryImageLabel(form, copy)}</strong>
+                    <small>{getCategoryImageStatus(form, copy)}</small>
                   </div>
                   {form.imageSource !== "none" ? (
                     <button
@@ -806,7 +796,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                       type="button"
                     >
                       <Trash2 aria-hidden="true" size={15} />
-                      Remove
+                    {copy.common.remove}
                     </button>
                   ) : null}
                 </div>
@@ -815,9 +805,9 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
 
             <section className="admin-form-section admin-form-section--compact" aria-labelledby="category-featured-heading">
               <div className="admin-form-section__heading">
-                <p className="eyebrow">Featured placement</p>
-                <h3 id="category-featured-heading">Featured placement</h3>
-                <p>Up to three active categories can occupy the numbered featured slots.</p>
+                <p className="eyebrow">{copy.categories.form.featuredTitle}</p>
+                <h3 id="category-featured-heading">{copy.categories.form.featuredTitle}</h3>
+                <p>{copy.categories.form.featuredHelper}</p>
               </div>
               <div className="admin-form-section__content admin-form-section__content--two-column">
                 <label className="admin-checkbox admin-compact-checkbox">
@@ -827,12 +817,12 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                     onChange={(event) => setForm((current) => ({ ...current, isFeatured: event.target.checked, featuredOrder: event.target.checked ? current.featuredOrder : "" }))}
                     type="checkbox"
                   />
-                  <span>Featured on landing</span>
+                  <span>{copy.categories.form.featuredOnLanding}</span>
                 </label>
                 <label>
-                  <span>Featured order</span>
+                  <span>{copy.categories.form.featuredOrder}</span>
                   <select disabled={isDetailLoading || !form.isFeatured} onChange={(event) => setForm((current) => ({ ...current, featuredOrder: event.target.value as CategoryFormState["featuredOrder"] }))} required={form.isFeatured} value={form.featuredOrder}>
-                    <option value="">Choose an order</option>
+                    <option value="">{copy.categories.form.chooseOrder}</option>
                     <option value="1">1</option>
                     <option value="2">2</option>
                     <option value="3">3</option>
@@ -843,9 +833,9 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
 
             <section className="admin-form-section admin-form-section--compact" aria-labelledby="category-status-heading">
               <div className="admin-form-section__heading">
-                <p className="eyebrow">Status</p>
-                <h3 id="category-status-heading">Status</h3>
-                <p>Deactivating a category also removes it from featured placement.</p>
+                <p className="eyebrow">{copy.common.status}</p>
+                <h3 id="category-status-heading">{copy.common.status}</h3>
+                <p>{copy.categories.form.statusHelper}</p>
               </div>
               <label className="admin-checkbox admin-compact-checkbox">
               <input
@@ -863,7 +853,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                 }
                 type="checkbox"
               />
-              <span>Active</span>
+              <span>{copy.common.active}</span>
             </label>
             </section>
           </form>
@@ -893,8 +883,7 @@ function getCategoryForm(category: AdminCategory): CategoryFormState {
       ? (String(category.featuredOrder) as CategoryFormState["featuredOrder"])
       : "",
     imageFilename:
-      category.managedImageAsset?.originalFilename ||
-      (category.imageUrl ? "Legacy category image" : ""),
+      category.managedImageAsset?.originalFilename || "",
     imageSource: category.managedImageAsset
       ? "managed"
       : category.imageUrl
@@ -939,31 +928,42 @@ function areCategoryDetailsEqual(
   );
 }
 
-function validateCategoryForm(form: CategoryFormState): string | undefined {
+function validateCategoryForm(
+  form: CategoryFormState,
+  copy: AdminCatalogTranslations,
+): string | undefined {
   if (!form.name.trim()) {
-    return "Category name is required.";
+    return copy.categories.validation.nameRequired;
   }
 
   if (!form.slug.trim()) {
-    return "Category slug is required.";
+    return copy.categories.validation.slugRequired;
   }
 
   if (form.isFeatured && !form.featuredOrder) {
-    return "Choose featured order 1, 2, or 3.";
+    return copy.categories.validation.featuredOrder;
   }
 
   return undefined;
 }
 
-function getCategoryImageLabel(form: CategoryFormState): string {
-  return form.imageFilename || "No category image";
+function getCategoryImageLabel(
+  form: CategoryFormState,
+  copy: AdminCatalogTranslations,
+): string {
+  if (form.imageFilename) return form.imageFilename;
+  if (form.imageSource === "legacy") return copy.categories.form.legacyImageFallback;
+  return copy.categories.form.noImage;
 }
 
-function getCategoryImageStatus(form: CategoryFormState): string {
-  if (form.imageSource === "local") return "Ready to upload";
-  if (form.imageSource === "managed") return "Managed in Supabase Storage";
-  if (form.imageSource === "legacy") return "Legacy URL image";
-  return "Choose one image from your device";
+function getCategoryImageStatus(
+  form: CategoryFormState,
+  copy: AdminCatalogTranslations,
+): string {
+  if (form.imageSource === "local") return copy.categories.form.readyToUpload;
+  if (form.imageSource === "managed") return copy.categories.form.managedImage;
+  if (form.imageSource === "legacy") return copy.categories.form.legacyImage;
+  return copy.categories.form.chooseImage;
 }
 
 function releaseCategoryPreview(ref: { current: string | undefined }) {
@@ -973,7 +973,13 @@ function releaseCategoryPreview(ref: { current: string | undefined }) {
   }
 }
 
-function CategoryImagePreview({ url }: { url: string }) {
+function CategoryImagePreview({
+  copy,
+  url,
+}: {
+  copy: AdminCatalogTranslations;
+  url: string;
+}) {
   const [hasFailed, setHasFailed] = useState(false);
 
   useEffect(() => {
@@ -983,11 +989,15 @@ function CategoryImagePreview({ url }: { url: string }) {
   return (
     <div className="admin-category-preview">
       {url && !hasFailed ? (
-        <img alt="Category preview" onError={() => setHasFailed(true)} src={url} />
+        <img
+          alt={copy.categories.form.previewAlt}
+          onError={() => setHasFailed(true)}
+          src={url}
+        />
       ) : (
         <span>
           <ImageIcon aria-hidden="true" size={20} />
-          {url ? "Image unavailable" : "No category image"}
+          {url ? copy.categories.form.imageUnavailable : copy.categories.form.noImage}
         </span>
       )}
     </div>
@@ -1003,13 +1013,15 @@ function AdminFeedback({
   requestId?: string;
   tone: "error" | "success";
 }) {
+  const { locale } = useI18n();
+  const copy = getAdminCatalogTranslations(locale);
   const Icon = tone === "success" ? CheckCircle2 : AlertCircle;
 
   return (
     <div className={`admin-feedback admin-feedback--${tone}`} role="status">
       <Icon aria-hidden="true" size={19} />
       <span>{message}</span>
-      {requestId ? <small>Request {requestId}</small> : null}
+      {requestId ? <small>{copy.common.request(requestId)}</small> : null}
     </div>
   );
 }
@@ -1033,28 +1045,40 @@ function AdminTableSkeleton({
 }
 
 function AdminPagination({
+  copy,
   isLoading,
+  locale,
   onPageChange,
   pagination,
 }: {
+  copy: AdminCatalogTranslations;
   isLoading: boolean;
+  locale: "en" | "vi";
   onPageChange: (page: number) => void;
   pagination: Pagination;
 }) {
   const totalPages = Math.max(1, pagination.totalPages);
 
   return (
-    <nav className="admin-pagination" aria-label="Categories pagination">
+    <nav
+      className="admin-pagination"
+      aria-label={copy.common.paginationAria(copy.categories.noun)}
+    >
       <button
         className="button button--secondary"
         disabled={isLoading || pagination.page <= 1}
         onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
         type="button"
       >
-        Previous
+        {copy.common.previous}
       </button>
       <span>
-        Page {pagination.page} of {totalPages} ({pagination.total} categories)
+        {copy.common.paginationSummary({
+          noun: copy.categories.noun,
+          page: formatAdminCatalogNumber(pagination.page, locale),
+          total: formatAdminCatalogNumber(pagination.total, locale),
+          totalPages: formatAdminCatalogNumber(totalPages, locale),
+        })}
       </span>
       <button
         className="button button--secondary"
@@ -1062,7 +1086,7 @@ function AdminPagination({
         onClick={() => onPageChange(pagination.page + 1)}
         type="button"
       >
-        Next
+        {copy.common.next}
       </button>
     </nav>
   );

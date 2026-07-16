@@ -3,6 +3,7 @@
 import { CalendarDays, RefreshCw } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { useAdminCommonI18n } from "@/features/i18n/admin-common-translations";
 
 export interface DashboardDateRange {
   from: string;
@@ -25,7 +26,8 @@ export function AdminDashboardFilters({
   value,
 }: AdminDashboardFiltersProps) {
   const [draft, setDraft] = useState(value);
-  const [validationError, setValidationError] = useState<string>();
+  const [validationError, setValidationError] = useState<"missing" | "order">();
+  const { messages } = useAdminCommonI18n();
 
   useEffect(() => {
     setDraft(value);
@@ -35,12 +37,12 @@ export function AdminDashboardFilters({
     event.preventDefault();
 
     if (!draft.from || !draft.to) {
-      setValidationError("Choose both a from and to date.");
+      setValidationError("missing");
       return;
     }
 
     if (draft.from > draft.to) {
-      setValidationError("The from date must be before or equal to the to date.");
+      setValidationError("order");
       return;
     }
 
@@ -56,23 +58,26 @@ export function AdminDashboardFilters({
   }
 
   return (
-    <section className="admin-dashboard-filters" aria-label="Dashboard date filters">
+    <section
+      className="admin-dashboard-filters"
+      aria-label={messages.dashboard.dateFilters}
+    >
       <form onSubmit={handleSubmit}>
         <label className="admin-dashboard-filters__preset">
-          <span>Range</span>
+          <span>{messages.dashboard.range}</span>
           <select
             defaultValue="current-year"
             disabled={isLoading}
             onChange={(event) => handlePreset(event.target.value as DatePreset)}
           >
-            <option value="current-year">Current year</option>
-            <option value="last-30">Last 30 days</option>
-            <option value="last-90">Last 90 days</option>
-            <option value="last-365">Last 12 months</option>
+            <option value="current-year">{messages.dashboard.currentYear}</option>
+            <option value="last-30">{messages.dashboard.last30Days}</option>
+            <option value="last-90">{messages.dashboard.last90Days}</option>
+            <option value="last-365">{messages.dashboard.last12Months}</option>
           </select>
         </label>
         <label>
-          <span>From</span>
+          <span>{messages.dashboard.from}</span>
           <input
             max={draft.to || getTodayInputValue()}
             onChange={(event) =>
@@ -83,7 +88,7 @@ export function AdminDashboardFilters({
           />
         </label>
         <label>
-          <span>To</span>
+          <span>{messages.dashboard.to}</span>
           <input
             max={getTodayInputValue()}
             min={draft.from}
@@ -96,14 +101,14 @@ export function AdminDashboardFilters({
         </label>
         <button className="admin-dashboard-filter-button" disabled={isLoading} type="submit">
           <CalendarDays aria-hidden="true" size={17} />
-          Apply
+          {messages.dashboard.apply}
         </button>
         <button
-          aria-label="Refresh dashboard data"
+          aria-label={messages.dashboard.refreshLabel}
           className="admin-dashboard-refresh-button"
           disabled={isLoading}
           onClick={onRefresh}
-          title="Refresh dashboard data"
+          title={messages.dashboard.refreshLabel}
           type="button"
         >
           <RefreshCw
@@ -113,7 +118,13 @@ export function AdminDashboardFilters({
           />
         </button>
       </form>
-      {validationError ? <p role="alert">{validationError}</p> : null}
+      {validationError ? (
+        <p role="alert">
+          {validationError === "missing"
+            ? messages.dashboard.chooseBothDates
+            : messages.dashboard.dateOrderError}
+        </p>
+      ) : null}
     </section>
   );
 }
