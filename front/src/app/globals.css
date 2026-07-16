@@ -5329,6 +5329,17 @@ img {
   line-height: 1.35;
 }
 
+.admin-orders-cell .payment-status-badge,
+.admin-orders-cell .fulfillment-status-badge,
+.admin-orders-cell .order-status-badge {
+  justify-self: start;
+  max-width: max-content;
+  min-width: 0;
+  padding-left: 12px;
+  padding-right: 12px;
+  width: fit-content;
+}
+
 .admin-orders-cell--order strong {
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   font-size: 0.9rem;

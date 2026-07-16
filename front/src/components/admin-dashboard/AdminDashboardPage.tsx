@@ -272,7 +272,6 @@ function OperationsOverview({
             {messages.dashboard.operations}
           </p>
           <h2>{messages.dashboard.storeStatus}</h2>
-          <span>{messages.dashboard.currentTotals}</span>
         </div>
       </header>
 
