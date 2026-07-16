@@ -163,11 +163,6 @@ function CurrentOutfit({
   saveError?: string;
   saveSuccess?: string;
 }) {
-  const countLabel = translate(
-    locale,
-    outfit.items.length === 1 ? "ai.piece" : "ai.pieces",
-  );
-
   return (
     <div className={styles.outfitsSection}>
       <div className={styles.sectionHeading}>
@@ -203,11 +198,6 @@ function CurrentOutfit({
         </p>
       ) : null}
       <article className={`${styles.outfitCard} ${styles.currentOutfitCard}`}>
-        <div className={styles.outfitMeta}>
-          <span>{outfit.items.length} {countLabel}</span>
-          <span>{formatPrice(outfit.totalPrice)} {translate(locale, "ai.total")}</span>
-        </div>
-
         <div className={styles.outfitProductGrid}>
           {outfit.items.map((item) => (
             <OutfitProductCard item={item} key={`${item.role}-${item.productId}`} locale={locale} />

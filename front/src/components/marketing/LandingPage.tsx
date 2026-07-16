@@ -121,7 +121,6 @@ export function LandingPage() {
       <section className="section section--muted" id="new-arrivals">
         <div className="section-heading section-heading--split">
           <div>
-            <p className="eyebrow">{t("landing.justLanded")}</p>
             <h2>{t("landing.newArrivals")}</h2>
           </div>
           <Link className="text-link" href="/products">

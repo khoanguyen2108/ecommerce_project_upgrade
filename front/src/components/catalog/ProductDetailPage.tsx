@@ -495,36 +495,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             </button>
           </div>
 
-          {isSimpleAccessory ? null : (
-            <dl className="product-facts">
-            <div>
-              <dt>SKU</dt>
-              <dd>{selectedVariant?.sku || t("product.selectVariant")}</dd>
-            </div>
-            <div>
-              <dt>{t("product.variant")}</dt>
-              <dd>
-                {selectedVariant
-                  ? `${isNoSize(selectedVariant.size) ? t("product.oneSize") : selectedVariant.size} / ${selectedVariant.color}`
-                  : `${selectableVariants.length} ${
-                      selectableVariants.length === 1
-                        ? t("product.availableOption")
-                        : t("product.availableOptions")
-                    }`}
-              </dd>
-            </div>
-            <div>
-              <dt>{t("product.availability")}</dt>
-              <dd>
-                {selectedVariant
-                  ? `${selectedVariant.stock} ${t("product.inStock").toLocaleLowerCase()}`
-                  : totalStock > 0
-                    ? t("product.inStock")
-                    : t("product.outOfStock")}
-              </dd>
-            </div>
-            </dl>
-          )}
         </div>
       </section>
     </main>
