@@ -3349,7 +3349,7 @@ img {
   align-items: stretch;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 86px;
   min-width: 0;
 }
 
@@ -3368,20 +3368,28 @@ img {
 }
 
 .admin-language-switcher {
+  background: #ffffff;
   border: 1px solid var(--color-border);
+  border-radius: 8px;
   display: grid;
-  grid-template-columns: repeat(2, 42px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 40px;
+  overflow: hidden;
+  width: 86px;
 }
 
 .admin-language-switcher button {
   background: transparent;
   border: 0;
   color: var(--color-text-muted);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 850;
   min-height: 38px;
-  min-width: 42px;
-  padding: 0 10px;
+  min-width: 0;
+  padding: 0;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 .admin-language-switcher button + button {
@@ -3475,23 +3483,34 @@ img {
 
 .admin-store-link {
   align-items: center;
+  background: #ffffff;
   border: 1px solid var(--color-border);
+  border-radius: 8px;
   color: var(--color-text);
   display: inline-flex;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
-  min-height: 38px;
+  justify-content: center;
+  min-height: 40px;
   min-width: 0;
   padding: 0 10px;
   text-transform: uppercase;
+  white-space: nowrap;
   transition:
     background-color 160ms ease,
-    border-color 160ms ease;
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .admin-sidebar__footer .admin-store-link {
   justify-content: center;
   width: auto;
+}
+
+.admin-store-link:hover {
+  background: #111111;
+  border-color: #111111;
+  color: #ffffff;
 }
 
 .admin-signout-button {
@@ -3523,11 +3542,6 @@ img {
 
 .admin-signout-button:disabled {
   opacity: 0.55;
-}
-
-.admin-store-link:hover {
-  background: var(--color-surface-muted);
-  border-color: var(--color-border-strong);
 }
 
 .admin-icon-button {
@@ -6389,6 +6403,20 @@ img {
 .admin-dashboard-modern__heading h1 {
   font-family: Montserrat, Inter, sans-serif;
   font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 760;
+  letter-spacing: 0;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.admin-page-intro h1,
+.admin-resource__header h1,
+.admin-orders-hero h1,
+.admin-order-hero h1,
+.admin-returns-hero h1,
+.admin-dashboard-modern__heading h1 {
+  font-family: Montserrat, Inter, sans-serif;
+  font-size: clamp(2.35rem, 3.35vw, 3.25rem);
   font-weight: 760;
   letter-spacing: 0;
   line-height: 1.08;
