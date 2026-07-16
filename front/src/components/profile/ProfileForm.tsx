@@ -95,12 +95,10 @@ export function ProfileForm({ user }: ProfileFormProps) {
         <div>
           <h2 id="profile-details-heading">{t("profile.information")}</h2>
         </div>
-        <span>{t("profile.emailReadOnly")}</span>
       </div>
 
       <dl className="profile-details" aria-labelledby="profile-details-heading">
         <ProfileDetail fallback={t("profile.notProvided")} label={t("profile.email")} value={user.email} />
-        <ProfileDetail fallback={t("profile.notProvided")} label={t("profile.authProvider")} value={formatEnumValue(user.authProvider, t("profile.notProvided"))} />
         <ProfileDetail fallback={t("profile.notProvided")} label={t("profile.memberSince")} value={formatProfileDate(user.createdAt, locale, t("profile.notAvailable"))} />
       </dl>
 
@@ -199,17 +197,6 @@ function validateName(
   return value.length > NAME_MAX_LENGTH
     ? t("profile.nameTooLong")
     : undefined;
-}
-
-function formatEnumValue(
-  value: string | null | undefined,
-  fallback: string,
-): string {
-  if (!value) return fallback;
-  return value
-    .split("_")
-    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(" ");
 }
 
 function formatProfileDate(
