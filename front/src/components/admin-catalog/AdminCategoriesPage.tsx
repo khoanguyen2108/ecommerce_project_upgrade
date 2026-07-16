@@ -686,14 +686,21 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                             {category.isActive ? copy.common.deactivate : copy.common.activate}
                           </button>
                           <button
-                            className="admin-link-button admin-link-button--delete"
+                            aria-label={`${copy.common.delete}: ${localizeCategoryName(
+                              category.name,
+                              locale,
+                            )}`}
+                            className="icon-button admin-icon-button admin-icon-button--delete"
                             disabled={busyAction === `${category.id}:delete`}
                             onClick={() => void handleCategoryDelete(category)}
+                            title={
+                              busyAction === `${category.id}:delete`
+                                ? copy.common.deleting
+                                : copy.common.delete
+                            }
                             type="button"
                           >
-                            {busyAction === `${category.id}:delete`
-                              ? copy.common.deleting
-                              : copy.common.delete}
+                            <Trash2 aria-hidden="true" size={17} />
                           </button>
                         </div>
                       </td>

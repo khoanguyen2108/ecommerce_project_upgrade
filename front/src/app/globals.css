@@ -3552,6 +3552,11 @@ img {
   border-color: var(--color-border-strong);
 }
 
+.admin-icon-button--delete:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
 .admin-shell__content {
   margin: 0 auto;
   max-width: 1440px;

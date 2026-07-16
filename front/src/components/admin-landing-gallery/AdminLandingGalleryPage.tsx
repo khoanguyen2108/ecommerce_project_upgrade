@@ -578,13 +578,14 @@ export function AdminLandingGalleryPage() {
                     )}
                   </button>
                   <button
-                    className="admin-link-button admin-link-button--delete"
+                    aria-label={copy.common.delete}
+                    className="icon-button admin-icon-button admin-icon-button--delete"
                     disabled={Boolean(busyAction)}
                     onClick={() => void handleDelete(image)}
+                    title={copy.common.delete}
                     type="button"
                   >
-                    <Trash2 aria-hidden="true" size={15} />
-                    {copy.common.delete}
+                    <Trash2 aria-hidden="true" size={17} />
                   </button>
                 </footer>
               </article>

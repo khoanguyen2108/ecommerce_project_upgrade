@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
@@ -574,7 +575,8 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                             {user.isActive ? copy.users.deactivate : copy.users.activate}
                           </button>
                           <button
-                            className="admin-link-button admin-link-button--delete"
+                            aria-label={`${copy.users.deleteTitle}: ${user.email}`}
+                            className="icon-button admin-icon-button admin-icon-button--delete"
                             disabled={
                               user.id === currentUser?.id ||
                               busyAction === `${user.id}:delete`
@@ -587,9 +589,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                             }
                             type="button"
                           >
-                            {busyAction === `${user.id}:delete`
-                              ? copy.users.deleting
-                              : copy.users.delete}
+                            <Trash2 aria-hidden="true" size={17} />
                           </button>
                         </div>
                       </td>

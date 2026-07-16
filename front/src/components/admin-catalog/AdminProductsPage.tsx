@@ -1390,14 +1390,21 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                             {product.isActive ? copy.common.deactivate : copy.common.activate}
                           </button>
                           <button
-                            className="admin-link-button admin-link-button--delete"
+                            aria-label={`${copy.common.delete}: ${localizeProductName(
+                              product.name,
+                              locale,
+                            )}`}
+                            className="icon-button admin-icon-button admin-icon-button--delete"
                             disabled={busyAction === `${product.id}:delete`}
                             onClick={() => void handleProductDelete(product)}
+                            title={
+                              busyAction === `${product.id}:delete`
+                                ? copy.common.deleting
+                                : copy.common.delete
+                            }
                             type="button"
                           >
-                            {busyAction === `${product.id}:delete`
-                              ? copy.common.deleting
-                              : copy.common.delete}
+                            <Trash2 aria-hidden="true" size={17} />
                           </button>
                         </div>
                       </td>

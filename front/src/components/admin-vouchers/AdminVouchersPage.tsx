@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -484,14 +485,18 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
                             <Edit3 aria-hidden="true" size={17} />
                           </button>
                           <button
-                            className="admin-link-button admin-link-button--delete"
+                            aria-label={`${commonCopy.delete}: ${voucher.code}`}
+                            className="icon-button admin-icon-button admin-icon-button--delete"
                             disabled={Boolean(busyAction)}
                             onClick={() => void handleDelete(voucher)}
+                            title={
+                              busyAction === `${voucher.id}:delete`
+                                ? commonCopy.deleting
+                                : commonCopy.delete
+                            }
                             type="button"
                           >
-                            {busyAction === `${voucher.id}:delete`
-                              ? commonCopy.deleting
-                              : commonCopy.delete}
+                            <Trash2 aria-hidden="true" size={17} />
                           </button>
                           <button
                             className="admin-link-button"
