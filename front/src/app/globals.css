@@ -3135,6 +3135,7 @@ img {
 .status-panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
+  border-radius: 22px;
   padding: clamp(32px, 6vw, 56px);
 }
 
@@ -3277,6 +3278,7 @@ img {
 .admin-nav__link {
   align-items: center;
   border: 1px solid transparent;
+  border-radius: 8px;
   color: var(--color-text-muted);
   display: flex;
   font-size: 0.76rem;
@@ -3681,6 +3683,13 @@ img {
 .admin-resource__header .button {
   min-height: 42px;
   padding: 9px 14px;
+}
+
+.admin-shell__content:not(:has(.admin-dashboard-modern)) .button,
+.admin-shell__content:not(:has(.admin-dashboard-modern)) .admin-icon-button,
+.admin-shell__content:not(:has(.admin-dashboard-modern)) .admin-link-button,
+.admin-shell__content:not(:has(.admin-dashboard-modern)) .admin-fulfillment-button {
+  border-radius: 8px;
 }
 
 .admin-header-actions {
