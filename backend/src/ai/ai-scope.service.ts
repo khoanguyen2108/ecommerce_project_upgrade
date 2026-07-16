@@ -43,7 +43,7 @@ interface AiScopeLogContext {
 const VIETNAMESE_CHARACTER_PATTERN =
   /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 const VIETNAMESE_WORD_PATTERN =
-  /\b(?:xin chao|giup|minh|toi|ban|don hang|giao hang|doi tra|san pham|quan ao|goi y|mac gi)\b/i;
+  /\b(?:xin chao|giup|minh|toi|ban|them|doi|bo|don hang|giao hang|doi tra|san pham|quan ao|goi y|mac gi|day nit|that lung|khan trum dau|kinh mat|vong tay|nhan|dong ho|mu len)\b/i;
 
 const BLOCKED_PATTERNS: Array<{
   reasonCode: AiScopeDecision['reasonCode'];
@@ -153,6 +153,8 @@ const PRODUCT_SCOPE_PATTERN =
   /\b(?:recommend|suggest|find|looking for|shop|shopping|buy|product|item|catalog|in stock|available|budget|under \d|size|color|colour|category|outfit|clothes?|clothing|fashion|wear|shirt|t-?shirt|tee|top|pants|trousers|jeans|skirt|jacket|coat|hoodie|sweater|cardigan|blazer|shorts|oversized|minimal|casual|formal|belikeme|goi y|tim|mua|san pham|danh muc|con hang|ngan sach|duoi \d|size|kich co|mau|trang phuc|quan ao|thoi trang|ao|quan|vay|dam|phoi do)\b/i;
 const SUPPORT_SCOPE_PATTERN =
   /\b(?:belikeme|support|help|hello|hi|shipping|shipment|delivery|return|refund|exchange|size guide|sizing|size|fit|oversized|slim|regular|height|weight|\d{2,3}\s*(?:cm|kg|lbs?)|compare|comparison|versus|vs\.?|product|products|outfit|clothes?|clothing|find|show me|under|tee|t-?shirt|shirt|top|pants|jeans|jacket|dress|skirt|hoodie|sweater|cardigan|style|budget|color|colour|black|white|grey|gray|navy|blue|red|green|beige|brown|pink|purple|yellow|orange|cream|occasion|remember|preference|wrong size|wrong item|incorrect item|damaged|broken|defective|doesn['’]?t fit|too small|too large|changed my mind|change of mind|measurement|order|ordered|payment status|paid|tracking|track|package|parcel|purchase|status|handoff|human support|customer service|ho tro|xin chao|giao hang|van chuyen|doi tra|hoan tien|doi hang|bang size|kich co|don hang|thanh toan|trang thai|ma van don|nhan vien)\b/i;
+const ACCESSORY_SCOPE_PATTERN =
+  /\b(?:accessor(?:y|ies)|silver accessories|belts?|buckles?|rings?|bracelets?|watches?|necklaces?|beanies?|sunglasses?|durags?|day nit|that lung|khan trum dau|kinh mat|vong tay|nhan|dong ho|mu len|phu kien|trang suc)\b/i;
 const GENERIC_KNOWLEDGE_PATTERN =
   /\b(?:capital of|who (?:is|was|invented|discovered)|what year|history of|translate this|tell me a joke|weather forecast|meaning of life|thu do cua|ai la|lich su cua|dich cau nay|ke chuyen cuoi)\b/i;
 
@@ -193,7 +195,9 @@ export class AiScopeService {
 
     return this.finishClassification(
       text,
-      STYLE_SCOPE_PATTERN.test(comparable) || hasStructuredStyleIntent,
+      STYLE_SCOPE_PATTERN.test(comparable) ||
+        ACCESSORY_SCOPE_PATTERN.test(comparable) ||
+        hasStructuredStyleIntent,
     );
   }
 
@@ -214,14 +218,21 @@ export class AiScopeService {
       request.colors.length > 0 ||
       request.sizes.length > 0;
     const hasProductTextIntent = PRODUCT_SCOPE_PATTERN.test(comparable);
+    const hasAccessoryProductIntent = ACCESSORY_SCOPE_PATTERN.test(comparable);
 
-    if (GENERIC_KNOWLEDGE_PATTERN.test(comparable) && !hasProductTextIntent) {
+    if (
+      GENERIC_KNOWLEDGE_PATTERN.test(comparable) &&
+      !hasProductTextIntent &&
+      !hasAccessoryProductIntent
+    ) {
       return this.decision('out_of_scope', 'NO_SCOPE_MATCH', request.query);
     }
 
     return this.finishClassification(
       request.query,
-      hasProductTextIntent || hasStructuredProductIntent,
+      hasProductTextIntent ||
+        hasAccessoryProductIntent ||
+        hasStructuredProductIntent,
     );
   }
 
@@ -235,7 +246,8 @@ export class AiScopeService {
 
     return this.finishClassification(
       message,
-      SUPPORT_SCOPE_PATTERN.test(comparable),
+      SUPPORT_SCOPE_PATTERN.test(comparable) ||
+        ACCESSORY_SCOPE_PATTERN.test(comparable),
     );
   }
 

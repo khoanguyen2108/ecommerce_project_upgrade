@@ -328,6 +328,60 @@ const SPECIFIC_ROLE_TARGETS: Array<{
   },
 ];
 
+const PRODUCT_TEXT_TAG_PATTERNS: Array<{
+  tags: string[];
+  pattern: RegExp;
+}> = [
+  {
+    tags: ['accessory', 'accessories', 'belt', 'buckle'],
+    pattern: /\b(?:belts?|buckle|day nit|that lung)\b/,
+  },
+  {
+    tags: ['accessory', 'accessories'],
+    pattern: /\b(?:accessor(?:y|ies)|phu kien|trang suc)\b/,
+  },
+  {
+    tags: ['accessory', 'accessories', 'durag'],
+    pattern: /\b(?:durags?|khan trum dau)\b/,
+  },
+  {
+    tags: ['accessory', 'accessories', 'sunglasses'],
+    pattern: /\b(?:sunglasses?|kinh mat)\b/,
+  },
+  {
+    tags: ['accessory', 'accessories', 'bracelet', 'cuban'],
+    pattern: /\b(?:bracelets?|cuban|vong tay)\b/,
+  },
+  {
+    tags: ['accessory', 'accessories', 'beanie', 'knit'],
+    pattern: /\b(?:beanies?|knit|mu len)\b/,
+  },
+  {
+    tags: ['accessory', 'accessories', 'ring'],
+    pattern: /\b(?:rings?|nhan)\b/,
+  },
+  {
+    tags: ['accessory', 'accessories', 'watch', 'cartier'],
+    pattern: /\b(?:watches?|watch|cartier|dong ho)\b/,
+  },
+  {
+    tags: ['accessory', 'accessories', 'gothic', 'silver_hardware', 'chrome_hearts'],
+    pattern: /\b(?:chrome hearts?|cross|gothic)\b/,
+  },
+  {
+    tags: ['baroque', 'engraved', 'silver_hardware'],
+    pattern: /\b(?:baroque|engraved)\b/,
+  },
+  {
+    tags: ['streetwear', 'stussy'],
+    pattern: /\b(?:stussy)\b/,
+  },
+  {
+    tags: ['luxury_streetwear', 'monolithic'],
+    pattern: /\b(?:cartier|monolithic)\b/,
+  },
+];
+
 const ROLE_TAGS: Record<OutfitRole, string[]> = {
   top: [
     'top',
@@ -385,6 +439,7 @@ const ROLE_TAGS: Record<OutfitRole, string[]> = {
     'accessory',
     'accessories',
     'belt',
+    'durag',
     'ring',
     'bracelet',
     'watch',
@@ -490,6 +545,48 @@ const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
     ],
     impliedTags: ['accessories'],
   },
+  {
+    tag: 'belt',
+    role: 'accessory',
+    aliases: ['belt', 'belts', 'buckle', 'day nit', 'that lung'],
+    impliedTags: ['accessories', 'belt'],
+  },
+  {
+    tag: 'durag',
+    role: 'accessory',
+    aliases: ['durag', 'durags', 'khan trum dau'],
+    impliedTags: ['accessories', 'durag'],
+  },
+  {
+    tag: 'sunglasses',
+    role: 'accessory',
+    aliases: ['sunglasses', 'kinh mat'],
+    impliedTags: ['accessories', 'sunglasses'],
+  },
+  {
+    tag: 'bracelet',
+    role: 'accessory',
+    aliases: ['bracelet', 'bracelets', 'vong tay', 'cuban'],
+    impliedTags: ['accessories', 'bracelet'],
+  },
+  {
+    tag: 'beanie',
+    role: 'accessory',
+    aliases: ['beanie', 'beanies', 'mu len', 'knit'],
+    impliedTags: ['accessories', 'beanie'],
+  },
+  {
+    tag: 'ring',
+    role: 'accessory',
+    aliases: ['ring', 'rings', 'nhan'],
+    impliedTags: ['accessories', 'ring'],
+  },
+  {
+    tag: 'watch',
+    role: 'accessory',
+    aliases: ['watch', 'watches', 'dong ho', 'cartier'],
+    impliedTags: ['accessories', 'watch'],
+  },
 ];
 
 const COLOR_ENTRIES: DictionaryEntry[] = [
@@ -539,6 +636,14 @@ const STYLE_ENTRIES: DictionaryEntry[] = [
   { tag: 'biker', aliases: ['biker', 'motorcycle', 'leather biker'], impliedTags: ['biker', 'leather'] },
   { tag: 'y2k', aliases: ['y2k'] },
   { tag: 'avant_garde', aliases: ['avant garde', 'avant-garde'] },
+  { tag: 'baroque', aliases: ['baroque'] },
+  { tag: 'buckle', aliases: ['buckle'] },
+  { tag: 'cartier', aliases: ['cartier'] },
+  { tag: 'cuban', aliases: ['cuban'] },
+  { tag: 'engraved', aliases: ['engraved'] },
+  { tag: 'knit', aliases: ['knit'] },
+  { tag: 'monolithic', aliases: ['monolithic'] },
+  { tag: 'stussy', aliases: ['stussy'] },
   {
     tag: 'casual',
     aliases: ['casual', 'daily', 'hang ngay', 'thuong ngay', 'de mac'],
@@ -597,6 +702,8 @@ const COMPATIBLE_TAGS: Record<string, string[]> = {
   rick_owens_style: ['rick_owens_style', 'darkwear', 'avant_garde', 'gothic'],
   denim: ['denim', 'jeans', 'washed_blue'],
   shoes: ['shoes', 'sneakers', 'boots'],
+  accessories: ['accessories', 'accessory', 'belt', 'durag', 'sunglasses', 'bracelet', 'beanie', 'ring', 'watch'],
+  accessory: ['accessory', 'accessories', 'belt', 'durag', 'sunglasses', 'bracelet', 'beanie', 'ring', 'watch'],
 };
 
 const CLEAN_LABELS: Record<string, string> = {
@@ -2643,12 +2750,15 @@ export class OutfitRecommendationService {
   }
 
   private prepareProduct(product: OutfitProductRecord): PreparedProduct {
-    const tagSet = new Set(product.aiTags.map((tag) => this.normalizeTag(tag)));
     const categoryTags = new Set(
       [product.category, ...product.productCategories.map((entry) => entry.category)]
         .flatMap((category) => [category.name, category.slug])
         .map((value) => this.normalizeTag(value)),
     );
+    const tagSet = new Set([
+      ...product.aiTags.map((tag) => this.normalizeTag(tag)),
+      ...this.inferProductTextTags(product, categoryTags),
+    ]);
     const variantColorTags = new Set(
       product.variants.map((variant) => this.normalizeTag(variant.color)),
     );
@@ -2699,6 +2809,43 @@ export class OutfitRecommendationService {
     return roles;
   }
 
+  private inferProductTextTags(
+    product: OutfitProductRecord,
+    categoryTags: Set<string>,
+  ): string[] {
+    const text = this.normalizeComparable(
+      [
+        product.name,
+        product.slug,
+        ...[product.category, ...product.productCategories.map((entry) => entry.category)]
+          .flatMap((category) => [category.name, category.slug]),
+      ].join(' '),
+    );
+    const tags = new Set<string>();
+
+    for (const pattern of PRODUCT_TEXT_TAG_PATTERNS) {
+      if (!pattern.pattern.test(text)) {
+        continue;
+      }
+
+      for (const tag of pattern.tags) {
+        tags.add(this.normalizeTag(tag));
+      }
+    }
+
+    if (
+      categoryTags.has('accessories') ||
+      categoryTags.has('accessory') ||
+      categoryTags.has('phu_kien') ||
+      categoryTags.has('trang_suc')
+    ) {
+      tags.add('accessory');
+      tags.add('accessories');
+    }
+
+    return [...tags];
+  }
+
   private productCanServeRole(product: PreparedProduct, role: OutfitRole): boolean {
     const dominantRole = this.getDominantProductRole(product);
 
@@ -2731,7 +2878,7 @@ export class OutfitRecommendationService {
     const hasShoesText = /\b(?:shoes?|sneakers?|boots?|loafers?|slippers?|giay)\b/.test(text);
     const hasHandbagText = /\b(?:handbags?|bags?|totes?|crossbody|tui|xach)\b/.test(text);
     const hasAccessoryText =
-      /\b(?:accessor(?:y|ies)|belts?|rings?|bracelets?|watches?|necklaces?|beanies?|sunglasses|phu kien)\b/.test(
+      /\b(?:accessor(?:y|ies)|belts?|buckles?|durags?|rings?|bracelets?|watches?|necklaces?|beanies?|sunglasses|cartier|cuban|knit|day nit|that lung|khan trum dau|kinh mat|vong tay|nhan|dong ho|mu len|phu kien)\b/.test(
         text,
       );
 
@@ -3050,7 +3197,22 @@ export class OutfitRecommendationService {
       ...intent.styles,
       ...intent.colors,
     ].some((tag) =>
-      ['accessories', 'handbag', 'gothic', 'darkwear', 'luxury_streetwear', 'silver'].includes(tag),
+      [
+        'accessories',
+        'accessory',
+        'belt',
+        'durag',
+        'sunglasses',
+        'bracelet',
+        'beanie',
+        'ring',
+        'watch',
+        'handbag',
+        'gothic',
+        'darkwear',
+        'luxury_streetwear',
+        'silver',
+      ].includes(tag),
     );
   }
 
@@ -3158,7 +3320,7 @@ export class OutfitRecommendationService {
 
     if (
       new RegExp(
-        `\\b${negativePrefix}\\s+(?:accessories|accessory|belt|ring|bracelet|phu kien|trang suc)\\b`,
+        `\\b${negativePrefix}\\s+(?:accessories|accessory|belt|ring|bracelet|watch|beanie|durag|sunglasses|day nit|that lung|khan trum dau|kinh mat|vong tay|nhan|dong ho|mu len|phu kien|trang suc)\\b`,
       ).test(comparablePrompt)
     ) {
       negatives.add('accessory');

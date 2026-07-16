@@ -9,6 +9,8 @@ import {
 import { OutfitRecommendationService } from '../src/ai/outfit-recommendation.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
+const ACCESSORIES_CATEGORY = { name: 'Accessories', slug: 'accessories' } as const;
+
 const PRODUCT_FIXTURES = [
   buildProduct('top-1', 'Cream Oversized Tee', 'cream-oversized-tee', 150_000, [
     'top', 'tee', 'cream', 'black', 'streetwear', 'gothic', 'darkwear',
@@ -64,6 +66,70 @@ const PRODUCT_FIXTURES = [
   buildProduct('accessory-2', 'Black Chain Necklace', 'black-chain-necklace', 85_000, [
     'accessory', 'accessories', 'necklace', 'black', 'gothic', 'darkwear',
   ]),
+  buildProduct(
+    'accessory-belt-1',
+    'Chrome Hearts Buckle Belt',
+    'chrome-hearts-buckle-belt',
+    220_000,
+    [],
+    ACCESSORIES_CATEGORY,
+  ),
+  buildProduct(
+    'accessory-durag-1',
+    'Chrome Hearts Durag',
+    'chrome-hearts-durag',
+    70_000,
+    [],
+    ACCESSORIES_CATEGORY,
+  ),
+  buildProduct(
+    'accessory-sunglasses-1',
+    'Monolithic Sunglasses',
+    'monolithic-sunglasses',
+    79_999,
+    [],
+    ACCESSORIES_CATEGORY,
+  ),
+  buildProduct(
+    'accessory-bracelet-1',
+    'Chrome Hearts Sterling Cuban Bracelet',
+    'chrome-hearts-sterling-cuban-bracelet',
+    190_000,
+    [],
+    ACCESSORIES_CATEGORY,
+  ),
+  buildProduct(
+    'accessory-beanie-1',
+    'Stussy Knit Beanie',
+    'stussy-knit-beanie',
+    79_000,
+    [],
+    ACCESSORIES_CATEGORY,
+  ),
+  buildProduct(
+    'accessory-belt-2',
+    'Baroque Engraved Belt',
+    'baroque-engraved-belt',
+    420_000,
+    [],
+    ACCESSORIES_CATEGORY,
+  ),
+  buildProduct(
+    'accessory-ring-1',
+    'Chrome Hearts Multi-Cross Punk Ring',
+    'chrome-hearts-multi-cross-punk-ring',
+    250_000,
+    [],
+    ACCESSORIES_CATEGORY,
+  ),
+  buildProduct(
+    'accessory-watch-1',
+    'Cartier x Chrome Hearts Gothic Watch',
+    'cartier-x-chrome-hearts-gothic-watch',
+    249_000,
+    [],
+    ACCESSORIES_CATEGORY,
+  ),
 ] as const;
 
 let catalogQueries = 0;
@@ -319,6 +385,54 @@ async function run() {
       'jacket was not added',
     );
     report(humanPrompt, humanizedAddJacketResponse);
+  }
+
+  for (const accessoryCase of [
+    { prompt: 'tui muon them day nit buckle', slugIncludes: 'buckle-belt' },
+    { prompt: 'them cho tui day nit baroque', slugIncludes: 'baroque-engraved-belt' },
+    { prompt: 'tui muon them khan trum dau', slugIncludes: 'durag' },
+    { prompt: 'them cho toi kinh mat', slugIncludes: 'sunglasses' },
+    { prompt: 'tui muon them vong tay', slugIncludes: 'bracelet' },
+    { prompt: 'them cho tui mu len', slugIncludes: 'beanie' },
+    { prompt: 'tui muon them nhan', slugIncludes: 'ring' },
+    { prompt: 'them cho toi dong ho cartier', slugIncludes: 'watch' },
+  ]) {
+    const accessoryResponse = await aiService.getStyleAdvice(
+      {
+        message: accessoryCase.prompt,
+        currentOutfit: {
+          items: [
+            { role: 'top', productId: 'top-2' },
+            { role: 'bottom', productId: 'bottom-2' },
+            { role: 'shoes', productId: 'shoes-2' },
+          ],
+          intent: previous.intent,
+          locale: 'vi',
+        },
+      },
+      { userId: 'v2-lite-accessory-inference-smoke-user' },
+    );
+    verifyOutfitResponse(accessoryCase.prompt, accessoryResponse);
+    check(
+      accessoryResponse.refinement?.action === 'add',
+      accessoryCase.prompt,
+      'action was not add',
+    );
+    check(
+      accessoryResponse.refinement?.targetRoles?.includes('accessory') === true,
+      accessoryCase.prompt,
+      'accessory was not targeted',
+    );
+    check(
+      accessoryResponse.outfit?.items.some(
+        (item) =>
+          item.role === 'accessory' &&
+          item.productSlug.includes(accessoryCase.slugIncludes),
+      ) === true,
+      accessoryCase.prompt,
+      `expected accessory slug containing ${accessoryCase.slugIncludes}`,
+    );
+    report(accessoryCase.prompt, accessoryResponse);
   }
 
   const removeJacketPrompt = 'bo ao khoac';
