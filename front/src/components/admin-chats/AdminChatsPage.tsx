@@ -6,7 +6,6 @@ import {
   MessageCircle,
   RefreshCw,
   Send,
-  WifiOff,
 } from "lucide-react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -388,13 +387,6 @@ export function AdminChatsPage() {
     selectedConversation?.customer.name ||
     selectedConversation?.customer.email ||
     copy.chats.customerFallback;
-  const connectionLabel =
-    connectionState === "connected"
-      ? copy.chats.connection.connected
-      : connectionState === "connecting"
-        ? copy.chats.connection.connecting
-        : copy.chats.connection.offline;
-
   return (
     <div className="admin-resource admin-resource--full-width admin-chats-page">
       <section className="admin-resource__header" aria-labelledby="admin-chats-heading">
@@ -437,14 +429,6 @@ export function AdminChatsPage() {
                 {copy.chats.conversationTotal(formatNumber(conversations.length, locale))}
               </span>
             </div>
-            <span
-              className={`admin-chats-connection admin-chats-connection--${connectionState}`}
-            >
-              {connectionState === "offline" ? (
-                <WifiOff aria-hidden="true" size={13} />
-              ) : null}
-              {connectionLabel}
-            </span>
           </div>
 
           <div className="admin-chats-list__body">
@@ -491,18 +475,13 @@ export function AdminChatsPage() {
                       <span className="admin-chat-list-item__preview">
                         {conversation.lastMessage?.body || copy.chats.emptyPreview}
                       </span>
-                      <span className="admin-chat-list-item__meta">
-                        <span
-                          className={`admin-chat-status admin-chat-status--${conversation.status.toLowerCase()}`}
-                        >
-                          {copy.chats.status[conversation.status]}
-                        </span>
-                        {conversation.unreadCount > 0 ? (
+                      {conversation.unreadCount > 0 ? (
+                        <span className="admin-chat-list-item__meta">
                           <span className="admin-chat-list-item__unread">
                             {formatNumber(conversation.unreadCount, locale)}
                           </span>
-                        ) : null}
-                      </span>
+                        </span>
+                      ) : null}
                     </span>
                   </button>
                 ))
@@ -528,12 +507,10 @@ export function AdminChatsPage() {
                 </div>
                 <dl>
                   <div>
-                    <dt>{copy.common.status}</dt>
+                    <dt>{locale === "vi" ? "Khách hàng" : "Customer"}</dt>
                     <dd>
-                      <span
-                        className={`admin-chat-status admin-chat-status--${selectedConversation.status.toLowerCase()}`}
-                      >
-                        {copy.chats.status[selectedConversation.status]}
+                      <span className={`admin-chat-presence admin-chat-presence--${getCustomerPresence(selectedConversation)}`}>
+                        {formatCustomerPresence(getCustomerPresence(selectedConversation), locale)}
                       </span>
                     </dd>
                   </div>
@@ -798,4 +775,31 @@ function getCustomerInitials(name: string | null | undefined, email: string): st
 
 function formatConversationId(id: string): string {
   return `#${id.slice(0, 8).toUpperCase()}`;
+}
+
+function getCustomerPresence(conversation: ChatConversation): "online" | "offline" {
+  const lastActivity = conversation.lastMessageAt || conversation.updatedAt;
+
+  if (!lastActivity) {
+    return "offline";
+  }
+
+  const lastActivityTime = new Date(lastActivity).getTime();
+
+  if (!Number.isFinite(lastActivityTime)) {
+    return "offline";
+  }
+
+  return Date.now() - lastActivityTime <= 5 * 60 * 1000 ? "online" : "offline";
+}
+
+function formatCustomerPresence(
+  presence: "online" | "offline",
+  locale: "en" | "vi",
+): string {
+  if (locale === "vi") {
+    return presence === "online" ? "Đang online" : "Đang offline";
+  }
+
+  return presence === "online" ? "Online" : "Offline";
 }

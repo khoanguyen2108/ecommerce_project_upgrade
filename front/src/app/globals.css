@@ -12518,10 +12518,15 @@ body.outfit-preparation-drawer-active .customer-chat-widget {
   display: inline-flex;
   flex: 0 0 auto;
   font-family: Montserrat, Inter, sans-serif;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 800;
   height: 44px;
   justify-content: center;
+  letter-spacing: 0;
+  line-height: 1;
+  overflow: hidden;
+  text-align: center;
+  white-space: nowrap;
   width: 44px;
 }
 
@@ -12598,6 +12603,30 @@ body.outfit-preparation-drawer-active .customer-chat-widget {
   color: #5d5f5f;
 }
 
+.admin-chat-presence {
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  display: inline-flex !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-top: 0 !important;
+  padding: 7px 10px;
+}
+
+.admin-chat-presence--online {
+  background: #ecfdf3;
+  border-color: #abefc6;
+  color: #067647 !important;
+}
+
+.admin-chat-presence--offline {
+  background: #f3f4f6;
+  border-color: #d0d5dd;
+  color: #5d5f5f !important;
+}
+
 .admin-chats-list__empty {
   min-height: 320px;
 }
@@ -12643,6 +12672,7 @@ body.outfit-preparation-drawer-active .customer-chat-widget {
 }
 
 .admin-chat-thread__avatar {
+  font-size: 0.78rem;
   height: 48px;
   width: 48px;
 }
