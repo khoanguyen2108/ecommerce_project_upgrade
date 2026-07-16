@@ -16,6 +16,7 @@ export const ADMIN_CATEGORY_SORT_OPTIONS = [
   'updatedAt',
   'name',
   'slug',
+  'sortOrder',
   'isActive',
 ] as const;
 export type AdminCategorySort = (typeof ADMIN_CATEGORY_SORT_OPTIONS)[number];
@@ -83,9 +84,9 @@ export class AdminCategoryQueryDto {
   isActive?: boolean;
 
   @ApiPropertyOptional({
-    default: 'createdAt',
+    default: 'sortOrder',
     enum: ADMIN_CATEGORY_SORT_OPTIONS,
-    example: 'createdAt',
+    example: 'sortOrder',
   })
   @IsOptional()
   @IsIn(ADMIN_CATEGORY_SORT_OPTIONS)

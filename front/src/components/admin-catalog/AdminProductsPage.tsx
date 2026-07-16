@@ -251,7 +251,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
         const response = await listAdminCategories({
           limit: CATEGORY_OPTION_LIMIT,
           order: "asc",
-          sort: "name",
+          sort: "sortOrder",
         });
 
         if (!isMounted) {

@@ -2,7 +2,7 @@
 
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { getCategories } from "@/features/catalog/api";
 import {
   localizeCategoryDescription,
@@ -60,11 +60,6 @@ export function CategoriesPage() {
     };
   }, [requestKey]);
 
-  const categories = useMemo(
-    () => [...state.categories].sort(compareCategories),
-    [state.categories],
-  );
-
   return (
     <main className="categories-page">
       <section aria-label={t("catalog.allCategories")}>
@@ -96,7 +91,7 @@ export function CategoriesPage() {
           </div>
         ) : null}
 
-        {!state.isLoading && !state.error && categories.length === 0 ? (
+        {!state.isLoading && !state.error && state.categories.length === 0 ? (
           <div className="categories-state" role="status">
             <p className="eyebrow">{t("nav.categories")}</p>
             <h2>{t("catalog.noCategories")}</h2>
@@ -104,9 +99,9 @@ export function CategoriesPage() {
           </div>
         ) : null}
 
-        {!state.isLoading && !state.error && categories.length > 0 ? (
+        {!state.isLoading && !state.error && state.categories.length > 0 ? (
           <div className="categories-grid">
-            {categories.map((category) => (
+            {state.categories.map((category) => (
               <CategoryCard category={category} key={category.id} />
             ))}
           </div>
@@ -169,23 +164,6 @@ function CategoriesSkeleton({ count }: { count: number }) {
       <div className="categories-skeleton__line categories-skeleton__line--action" />
     </div>
   ));
-}
-
-function compareCategories(first: Category, second: Category): number {
-  if (first.isFeatured !== second.isFeatured) {
-    return first.isFeatured ? -1 : 1;
-  }
-
-  if (first.isFeatured && second.isFeatured) {
-    const firstOrder = first.featuredOrder ?? Number.MAX_SAFE_INTEGER;
-    const secondOrder = second.featuredOrder ?? Number.MAX_SAFE_INTEGER;
-
-    if (firstOrder !== secondOrder) {
-      return firstOrder - secondOrder;
-    }
-  }
-
-  return first.name.localeCompare(second.name);
 }
 
 function getCategoriesErrorMessage(error: unknown): string {

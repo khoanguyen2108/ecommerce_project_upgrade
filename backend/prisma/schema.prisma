@@ -219,6 +219,7 @@ model Category {
   managedImageAsset   ImageAsset?       @relation("CategoryManagedImage", fields: [managedImageAssetId], references: [id], onDelete: SetNull)
   isFeatured          Boolean           @default(false)
   featuredOrder       Int?              @unique
+  sortOrder           Int               @default(0)
   isActive            Boolean           @default(true)
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
@@ -227,6 +228,7 @@ model Category {
 
   @@index([isActive])
   @@index([isActive, isFeatured, featuredOrder])
+  @@index([sortOrder])
 }
 
 model LandingPageSetting {

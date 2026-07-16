@@ -293,6 +293,8 @@ const english = {
       statusError: "Category status could not be changed.",
       deleted: "Category deleted.",
       deleteError: "Category could not be deleted.",
+      reordered: "Category order updated.",
+      reorderError: "Category order could not be updated.",
     },
     confirm: {
       status: (nextIsActive: boolean, categoryName: string) =>
@@ -321,6 +323,10 @@ const english = {
       notFeatured: "Not featured",
       editAria: (categoryName: string) => `Edit ${categoryName}`,
       editTitle: "Edit category",
+      moveDownAria: (categoryName: string) => `Move ${categoryName} down`,
+      moveDownTitle: "Move down",
+      moveUpAria: (categoryName: string) => `Move ${categoryName} up`,
+      moveUpTitle: "Move up",
     },
     form: {
       newTitle: "New category",
@@ -844,6 +850,8 @@ const vietnamese: AdminCatalogTranslations = {
       statusError: "Không thể thay đổi trạng thái danh mục.",
       deleted: "Đã xóa danh mục.",
       deleteError: "Không thể xóa danh mục.",
+      reordered: "Đã cập nhật thứ tự danh mục.",
+      reorderError: "Không thể cập nhật thứ tự danh mục.",
     },
     confirm: {
       status: (nextIsActive, categoryName) =>
@@ -874,6 +882,10 @@ const vietnamese: AdminCatalogTranslations = {
       notFeatured: "Không nổi bật",
       editAria: (categoryName) => `Chỉnh sửa danh mục ${categoryName}`,
       editTitle: "Chỉnh sửa danh mục",
+      moveDownAria: (categoryName) => `Di chuyển danh mục ${categoryName} xuống`,
+      moveDownTitle: "Di chuyển xuống",
+      moveUpAria: (categoryName) => `Di chuyển danh mục ${categoryName} lên`,
+      moveUpTitle: "Di chuyển lên",
     },
     form: {
       newTitle: "Danh mục mới",

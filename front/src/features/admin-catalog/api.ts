@@ -16,6 +16,7 @@ import type {
   CreateAdminCategoryRequest,
   CreateAdminProductRequest,
   CreateAdminProductVariantRequest,
+  ReorderAdminCategoryRequest,
   UpdateAdminCategoryRequest,
   UpdateAdminProductRequest,
   UpdateAdminProductVariantRequest,
@@ -95,6 +96,21 @@ export function deleteAdminCategory(id: string): Promise<AdminDeleteResponse> {
   return apiRequest<AdminDeleteResponse>(
     `/admin/categories/${encodeURIComponent(id)}`,
     { auth: true, credentials: "include", method: "DELETE" },
+  );
+}
+
+export function reorderAdminCategory(
+  id: string,
+  payload: ReorderAdminCategoryRequest,
+): Promise<AdminCategoryResponse> {
+  return apiRequest<AdminCategoryResponse>(
+    `/admin/categories/${encodeURIComponent(id)}/reorder`,
+    {
+      auth: true,
+      body: payload,
+      credentials: "include",
+      method: "PATCH",
+    },
   );
 }
 

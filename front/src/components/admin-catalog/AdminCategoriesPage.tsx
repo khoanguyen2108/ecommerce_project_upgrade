@@ -2,6 +2,8 @@
 
 import {
   AlertCircle,
+  ArrowDown,
+  ArrowUp,
   CheckCircle2,
   Edit3,
   ImageIcon,
@@ -23,6 +25,7 @@ import {
   deleteAdminCategoryImage,
   getAdminCategory,
   listAdminCategories,
+  reorderAdminCategory,
   updateAdminCategory,
   uploadAdminCategoryImage,
 } from "@/features/admin-catalog/api";
@@ -30,10 +33,7 @@ import type {
   AdminCategory,
   AdminCategoryQuery,
 } from "@/features/admin-catalog/types";
-import {
-  localizeCategoryDescription,
-  localizeCategoryName,
-} from "@/features/catalog/localization";
+import { localizeCategoryName } from "@/features/catalog/localization";
 import {
   formatAdminCatalogNumber,
   getAdminCatalogErrorMessage,
@@ -45,7 +45,6 @@ import type { Pagination } from "@/lib/api/types";
 import { AdminModal } from "@/components/admin/AdminModal";
 import {
   formatAdminDate,
-  formatOptional,
   getApiRequestId,
   getBooleanFilterValue,
   normalizeNullableText,
@@ -74,6 +73,7 @@ interface CategoryFormState {
 }
 
 type CategoryPanelMode = "create" | "edit";
+type CategoryMoveDirection = "up" | "down";
 
 export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) {
   const { locale } = useI18n();
@@ -471,6 +471,46 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
     }
   }
 
+  async function handleCategoryMove(
+    category: AdminCategory,
+    direction: CategoryMoveDirection,
+  ) {
+    if (busyAction || hasFilters) {
+      return;
+    }
+
+    setBusyAction(`${category.id}:move:${direction}`);
+    setActionError(undefined);
+    setSuccessMessage(undefined);
+    setRequestId(undefined);
+
+    try {
+      const response = await reorderAdminCategory(category.id, { direction });
+
+      setSelectedCategory((current) =>
+        current?.id === response.category.id ? response.category : current,
+      );
+      setForm((current) =>
+        selectedCategory?.id === response.category.id
+          ? getCategoryForm(response.category)
+          : current,
+      );
+      setRefreshKey((current) => current + 1);
+      setSuccessMessage(copy.categories.feedback.reordered);
+    } catch (error) {
+      setActionError(
+        getAdminCatalogErrorMessage(
+          error,
+          copy.categories.errors,
+          copy.categories.feedback.reorderError,
+        ),
+      );
+      setRequestId(getApiRequestId(error));
+    } finally {
+      setBusyAction(undefined);
+    }
+  }
+
   const hasFilters = Boolean(query.search) || query.isActive !== undefined;
   const hasUnsavedChanges = isModalOpen
     ? !areCategoryFormsEqual(
@@ -578,7 +618,6 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                 <th>{copy.common.name}</th>
                 <th>{copy.common.image}</th>
                 <th>{copy.common.slug}</th>
-                <th>{copy.common.description}</th>
                 <th>{copy.common.status}</th>
                 <th>{copy.categories.table.landing}</th>
                 <th>{copy.categories.table.created}</th>
@@ -587,20 +626,30 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               </tr>
             </thead>
             <tbody>
-              {isLoading ? <AdminTableSkeleton columns={9} rows={6} /> : null}
+              {isLoading ? <AdminTableSkeleton columns={8} rows={6} /> : null}
               {!isLoading && !listError && categories.length === 0 ? (
                 <tr>
-                  <td className="admin-table__state" colSpan={9}>
+                  <td className="admin-table__state" colSpan={8}>
                     {copy.categories.table.empty}
                   </td>
                 </tr>
               ) : null}
               {!isLoading && !listError
-                ? categories.map((category) => (
+                ? categories.map((category, index) => {
+                    const categoryName = localizeCategoryName(
+                      category.name,
+                      locale,
+                    );
+                    const page = query.page || 1;
+                    const canMoveUp = !hasFilters && (page > 1 || index > 0);
+                    const canMoveDown =
+                      !hasFilters &&
+                      (page < pagination.totalPages ||
+                        index < categories.length - 1);
+
+                    return (
                     <tr
-                      aria-label={copy.categories.table.openAria(
-                        localizeCategoryName(category.name, locale),
-                      )}
+                      aria-label={copy.categories.table.openAria(categoryName)}
                       className="admin-table__clickable-row"
                       key={category.id}
                       onClick={() => void openEditPanel(category)}
@@ -613,7 +662,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                       tabIndex={0}
                     >
                       <td>
-                        <strong>{localizeCategoryName(category.name, locale)}</strong>
+                        <strong>{categoryName}</strong>
                       </td>
                       <td>
                         {category.imageUrl ? (
@@ -629,12 +678,6 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                         )}
                       </td>
                       <td>{category.slug}</td>
-                      <td className="admin-table__muted">
-                        {formatOptional(
-                          localizeCategoryDescription(category.description, locale),
-                          locale,
-                        )}
-                      </td>
                       <td>
                         <span
                           className={`admin-badge ${
@@ -667,9 +710,31 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                           onKeyDown={(event) => event.stopPropagation()}
                         >
                           <button
-                            aria-label={copy.categories.table.editAria(
-                              localizeCategoryName(category.name, locale),
+                            aria-label={copy.categories.table.moveUpAria(
+                              categoryName,
                             )}
+                            className="icon-button admin-icon-button"
+                            disabled={Boolean(busyAction) || !canMoveUp}
+                            onClick={() => void handleCategoryMove(category, "up")}
+                            title={copy.categories.table.moveUpTitle}
+                            type="button"
+                          >
+                            <ArrowUp aria-hidden="true" size={17} />
+                          </button>
+                          <button
+                            aria-label={copy.categories.table.moveDownAria(
+                              categoryName,
+                            )}
+                            className="icon-button admin-icon-button"
+                            disabled={Boolean(busyAction) || !canMoveDown}
+                            onClick={() => void handleCategoryMove(category, "down")}
+                            title={copy.categories.table.moveDownTitle}
+                            type="button"
+                          >
+                            <ArrowDown aria-hidden="true" size={17} />
+                          </button>
+                          <button
+                            aria-label={copy.categories.table.editAria(categoryName)}
                             className="icon-button admin-icon-button"
                             onClick={() => void openEditPanel(category)}
                             title={copy.categories.table.editTitle}
@@ -678,10 +743,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                             <Edit3 aria-hidden="true" size={17} />
                           </button>
                           <button
-                            aria-label={`${copy.common.delete}: ${localizeCategoryName(
-                              category.name,
-                              locale,
-                            )}`}
+                            aria-label={`${copy.common.delete}: ${categoryName}`}
                             className="icon-button admin-icon-button admin-icon-button--delete"
                             disabled={busyAction === `${category.id}:delete`}
                             onClick={() => void handleCategoryDelete(category)}
@@ -705,7 +767,8 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 : null}
             </tbody>
           </table>

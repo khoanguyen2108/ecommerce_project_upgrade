@@ -6,6 +6,7 @@ export interface Category {
   imageUrl: string | null;
   isFeatured: boolean;
   featuredOrder: number | null;
+  sortOrder: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

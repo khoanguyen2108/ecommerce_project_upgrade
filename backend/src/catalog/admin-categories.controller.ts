@@ -47,6 +47,7 @@ import { UserRole } from '../generated/prisma/enums';
 import { CatalogService } from './catalog.service';
 import { AdminCategoryQueryDto } from './dto/admin-category-query.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { ReorderCategoryDto } from './dto/reorder-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @ApiTags('admin-categories')
@@ -163,6 +164,15 @@ export class AdminCategoriesController {
     @Body() dto: UpdateCategoryDto,
   ) {
     return this.catalogService.updateCategory(id, dto);
+  }
+
+  @ApiOperation({ summary: 'Move a category up or down in storefront order' })
+  @Patch(':id/reorder')
+  reorderCategory(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: ReorderCategoryDto,
+  ) {
+    return this.catalogService.reorderCategory(id, dto.direction);
   }
 
   @ApiOperation({ summary: 'Activate a category as an admin' })

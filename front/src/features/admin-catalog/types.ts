@@ -7,6 +7,7 @@ export type AdminCategorySort =
   | "updatedAt"
   | "name"
   | "slug"
+  | "sortOrder"
   | "isActive";
 
 export type AdminProductSort =
@@ -39,6 +40,7 @@ export interface AdminCategory {
   imageUrl: string | null;
   isFeatured: boolean;
   featuredOrder: number | null;
+  sortOrder: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -190,6 +192,10 @@ export interface UpdateAdminProductRequest {
   imageUrls?: string[];
   aiTags?: string[];
   isActive?: boolean;
+}
+
+export interface ReorderAdminCategoryRequest {
+  direction: "up" | "down";
 }
 
 export interface CreateAdminProductVariantRequest {

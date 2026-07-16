@@ -21,6 +21,7 @@ import type {
   AdminCategoryQueryDto,
   AdminCategorySort,
 } from './dto/admin-category-query.dto';
+import type { CategoryReorderDirection } from './dto/reorder-category.dto';
 import type {
   AdminProductOrder,
   AdminProductQueryDto,
@@ -56,6 +57,7 @@ const categorySelect: Prisma.CategorySelect = {
   imageUrl: true,
   isFeatured: true,
   featuredOrder: true,
+  sortOrder: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -77,6 +79,7 @@ const featuredCategorySelect: Prisma.CategorySelect = {
   description: true,
   imageUrl: true,
   featuredOrder: true,
+  sortOrder: true,
 };
 
 const categorySummarySelect: Prisma.CategorySelect = {
@@ -274,9 +277,7 @@ export class CatalogService {
       where: {
         isActive: true,
       },
-      orderBy: {
-        name: 'asc',
-      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: categorySelect,
     });
 
@@ -397,6 +398,7 @@ export class CatalogService {
       isFeatured,
       featuredOrder,
     );
+    const sortOrder = await this.getNextCategorySortOrder();
 
     try {
       const category = await this.prismaService.category.create({
@@ -407,6 +409,7 @@ export class CatalogService {
           imageUrl: null,
           isFeatured,
           featuredOrder,
+          sortOrder,
           isActive,
         },
         select: categorySelect,
@@ -548,6 +551,51 @@ export class CatalogService {
         featuredOrder: null,
       },
       select: categorySelect,
+    });
+
+    return { category };
+  }
+
+  async reorderCategory(id: string, direction: CategoryReorderDirection) {
+    const category = await this.prismaService.$transaction(async (tx) => {
+      const categories = await tx.category.findMany({
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+        },
+      });
+      const currentIndex = categories.findIndex((entry) => entry.id === id);
+
+      if (currentIndex === -1) {
+        throw this.adminCategoryNotFoundException();
+      }
+
+      const nextIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+      if (nextIndex < 0 || nextIndex >= categories.length) {
+        return tx.category.findUniqueOrThrow({
+          where: { id },
+          select: categorySelect,
+        });
+      }
+
+      const reorderedCategories = [...categories];
+      const [movedCategory] = reorderedCategories.splice(currentIndex, 1);
+      reorderedCategories.splice(nextIndex, 0, movedCategory);
+
+      await Promise.all(
+        reorderedCategories.map((entry, index) =>
+          tx.category.update({
+            where: { id: entry.id },
+            data: { sortOrder: index },
+          }),
+        ),
+      );
+
+      return tx.category.findUniqueOrThrow({
+        where: { id },
+        select: categorySelect,
+      });
     });
 
     return { category };
@@ -1485,10 +1533,20 @@ export class CatalogService {
   }
 
   private getCategoryOrderBy(
-    sort: AdminCategorySort = 'createdAt',
-    order: AdminCategoryOrder = 'desc',
+    sort: AdminCategorySort = 'sortOrder',
+    order: AdminCategoryOrder = 'asc',
   ): Prisma.CategoryOrderByWithRelationInput[] {
     return [{ [sort]: order }, { id: 'asc' }];
+  }
+
+  private async getNextCategorySortOrder(): Promise<number> {
+    const aggregate = await this.prismaService.category.aggregate({
+      _max: {
+        sortOrder: true,
+      },
+    });
+
+    return (aggregate._max.sortOrder ?? -1) + 1;
   }
 
   private getAdminProductOrderBy(
