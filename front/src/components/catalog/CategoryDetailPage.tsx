@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { getCategoryBySlug, getProducts } from "@/features/catalog/api";
+import {
+  localizeCategoryDescription,
+  localizeCategoryName,
+} from "@/features/catalog/localization";
 import type {
   Category,
   Pagination,
@@ -29,7 +33,7 @@ interface CategoryDetailState {
 }
 
 export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [page, setPage] = useState(1);
   const [state, setState] = useState<CategoryDetailState>({
     isLoading: true,
@@ -177,6 +181,11 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
   }
 
   const totalPages = Math.max(1, state.pagination.totalPages);
+  const categoryName = localizeCategoryName(state.category.name, locale);
+  const categoryDescription = localizeCategoryDescription(
+    state.category.description,
+    locale,
+  );
 
   return (
     <main className="catalog-page catalog-page--category-detail">
@@ -190,10 +199,10 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
               <p className="eyebrow">{t("catalog.category")}</p>
               <span>{productCountLabel}</span>
             </div>
-            <h1 id="category-products-heading">{state.category.name}</h1>
-            {state.category.description ? (
+            <h1 id="category-products-heading">{categoryName}</h1>
+            {categoryDescription ? (
               <p className="category-detail-header__description">
-                {state.category.description}
+                {categoryDescription}
               </p>
             ) : null}
           </div>

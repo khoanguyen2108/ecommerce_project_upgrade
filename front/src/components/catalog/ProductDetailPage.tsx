@@ -24,6 +24,12 @@ import {
   isNoSize,
   sortSizesByStandardOrder,
 } from "@/features/catalog/sizes";
+import {
+  localizeCategoryName,
+  localizeColorName,
+  localizeProductDescription,
+  localizeProductName,
+} from "@/features/catalog/localization";
 import type { Product, ProductVariant } from "@/features/catalog/types";
 import {
   getOnlySelectableColor,
@@ -230,7 +236,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     try {
       await addItemAndOpenDrawer(
         { quantity, variantId: selectedVariant.id },
-        state.product.name,
+        productName,
       );
     } catch (error) {
       setCartFeedback({
@@ -280,6 +286,10 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   const product = state.product;
   const imageUrls = getProductImages(product);
   const categories = getProductCategories(product);
+  const productName = localizeProductName(product.name, locale);
+  const productDescription =
+    localizeProductDescription(product.description, locale) ||
+    t("product.descriptionPending");
   const displayPrice = selectedVariant
     ? getVariantUnitPrice(product, selectedVariant)
     : product.basePrice;
@@ -313,7 +323,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
         <div className="product-gallery">
           <div className="product-gallery__main">
             <ProductImage
-              alt={product.name}
+              alt={productName}
               key={activeImage || "product-fallback"}
               url={activeImage}
             />
@@ -323,7 +333,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             <div className="product-gallery__thumbs" aria-label={t("product.productImages")}>
               {imageUrls.map((imageUrl, index) => (
                 <button
-                  aria-label={`${t("product.view")}: ${product.name}, ${index + 1}`}
+                  aria-label={`${t("product.view")}: ${productName}, ${index + 1}`}
                   aria-pressed={imageUrl === activeImage}
                   className={imageUrl === activeImage ? "is-active" : undefined}
                   key={`${imageUrl}-${index}`}
@@ -342,19 +352,19 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             <div className="product-detail-copy__categories">
               {categories.map((category) => (
                 <Link href={getCategoryProductsHref(category.slug)} key={category.id}>
-                  {category.name}
+                  {localizeCategoryName(category.name, locale)}
                 </Link>
               ))}
             </div>
           </div>
 
           <div className="product-detail-copy__heading">
-            <h1 id="product-heading">{product.name}</h1>
+            <h1 id="product-heading">{productName}</h1>
             <p className="product-detail-copy__price">{formatPrice(displayPrice)}</p>
           </div>
 
           <p className="product-detail-copy__description">
-            {product.description || t("product.descriptionPending")}
+            {productDescription}
           </p>
 
           {isSimpleAccessory ? null : (
@@ -375,7 +385,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                     onClick={() => handleColorSelect(color)}
                     type="button"
                   >
-                    {color}
+                    {localizeColorName(color, locale)}
                   </button>
                 );
               })}

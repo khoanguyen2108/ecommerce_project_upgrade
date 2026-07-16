@@ -12,6 +12,7 @@ import {
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { getCategories, getProducts } from "@/features/catalog/api";
+import { localizeCategoryName } from "@/features/catalog/localization";
 import type {
   Category,
   Pagination,
@@ -38,7 +39,7 @@ interface ProductListingPageProps {
 }
 
 export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [query, setQuery] = useState<ProductQuery>({
     ...initialQuery,
     limit: PRODUCT_LIMIT,
@@ -258,9 +259,13 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
     setAreFiltersVisible((current) => !current);
   }
 
+  const activeCategory = categories.find(
+    (category) => category.slug === query.categorySlug,
+  );
   const activeCategoryName =
-    categories.find((category) => category.slug === query.categorySlug)?.name ||
-    query.categorySlug;
+    activeCategory
+      ? localizeCategoryName(activeCategory.name, locale)
+      : query.categorySlug;
   const resultsHeading = activeCategoryName
     ? activeCategoryName
     : query.search
@@ -448,7 +453,7 @@ export function ProductListingPage({ initialQuery }: ProductListingPageProps) {
                         onClick={() => handleCategoryChange(category.slug)}
                         type="button"
                       >
-                        {category.name}
+                        {localizeCategoryName(category.name, locale)}
                       </button>
                     ))
                   : null}

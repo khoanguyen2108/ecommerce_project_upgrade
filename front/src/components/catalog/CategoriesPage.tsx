@@ -1,9 +1,13 @@
-"use client";
+﻿"use client";
 
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getCategories } from "@/features/catalog/api";
+import {
+  localizeCategoryDescription,
+  localizeCategoryName,
+} from "@/features/catalog/localization";
 import type { Category } from "@/features/catalog/types";
 import { useI18n } from "@/features/i18n/useI18n";
 import { ApiClientError } from "@/lib/errors/api-error";
@@ -113,9 +117,14 @@ export function CategoriesPage() {
 }
 
 function CategoryCard({ category }: { category: Category }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = Boolean(category.imageUrl) && !imageFailed;
+  const categoryName = localizeCategoryName(category.name, locale);
+  const categoryDescription = localizeCategoryDescription(
+    category.description,
+    locale,
+  );
 
   return (
     <article className="categories-card">
@@ -123,7 +132,7 @@ function CategoryCard({ category }: { category: Category }) {
         <div className="categories-card__media">
           {showImage ? (
             <img
-              alt={`${category.name} · ${t("catalog.category")}`}
+              alt={`${categoryName} · ${t("catalog.category")}`}
               className="categories-card__image"
               loading="lazy"
               onError={() => setImageFailed(true)}
@@ -131,7 +140,7 @@ function CategoryCard({ category }: { category: Category }) {
             />
           ) : (
             <div className="categories-card__fallback" aria-hidden="true">
-              <span>{category.name}</span>
+              <span>{categoryName}</span>
             </div>
           )}
           {category.isFeatured ? (
@@ -140,14 +149,13 @@ function CategoryCard({ category }: { category: Category }) {
         </div>
 
         <div className="categories-card__body">
-          <h2>{category.name}</h2>
-          {category.description ? <p>{category.description}</p> : null}
+          <h2>{categoryName}</h2>
+          {categoryDescription ? <p>{categoryDescription}</p> : null}
         </div>
       </Link>
     </article>
   );
 }
-
 function getCategoryProductsHref(slug: string): string {
   return `/products?categorySlug=${encodeURIComponent(slug)}`;
 }

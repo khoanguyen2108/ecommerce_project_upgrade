@@ -6,6 +6,10 @@ import { useEffect, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { LandingInspirationGallery } from "@/components/landing/LandingInspirationGallery";
 import { getProducts } from "@/features/catalog/api";
+import {
+  localizeCategoryDescription,
+  localizeCategoryName,
+} from "@/features/catalog/localization";
 import type { Product } from "@/features/catalog/types";
 import { getFeaturedCategories } from "@/features/landing/api";
 import type { FeaturedCategory } from "@/features/landing/types";
@@ -195,13 +199,18 @@ function CategoryTile({
 }: {
   category: FeaturedCategory;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  const categoryName = localizeCategoryName(category.name, locale);
+  const categoryDescription = localizeCategoryDescription(
+    category.description,
+    locale,
+  );
 
   return (
     <Link className="category-tile" href={getCategoryProductsHref(category.slug)}>
       {category.imageUrl ? (
         <img
-          alt={`${category.name} category`}
+          alt={`${categoryName} ${t("catalog.category")}`}
           className="category-tile__image"
           loading="lazy"
           src={category.imageUrl}
@@ -210,8 +219,8 @@ function CategoryTile({
         <div className="category-tile__fallback" aria-hidden="true" />
       )}
       <div className="category-tile__label">
-        <h3>{category.name}</h3>
-        <p>{category.description || t("landing.categoryFallback")}</p>
+        <h3>{categoryName}</h3>
+        <p>{categoryDescription || t("landing.categoryFallback")}</p>
       </div>
     </Link>
   );

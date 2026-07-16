@@ -1,4 +1,5 @@
 import styles from "@/components/ai/OutfitPreparationDrawer.module.css";
+import { localizeColorName } from "@/features/catalog/localization";
 import type { ProductVariant } from "@/features/catalog/types";
 import {
   getImplicitSelectableVariant,
@@ -73,10 +74,11 @@ export function OutfitVariantSelector({
         <div className={styles.optionList}>
           {colors.map((color) => {
             const isAvailable = hasSelectableColor(variants, color);
+            const colorName = localizeColorName(color, locale);
 
             return (
               <button
-                aria-label={`${copy.color} ${color} ${productName}${
+                aria-label={`${copy.color} ${colorName} ${productName}${
                   isAvailable ? "" : `, ${copy.outOfStock}`
                 }`}
                 aria-pressed={color === selectedColor}
@@ -86,7 +88,7 @@ export function OutfitVariantSelector({
                 onClick={() => onColorChange(color)}
                 type="button"
               >
-                {color}
+                {colorName}
               </button>
             );
           })}
@@ -127,7 +129,7 @@ export function OutfitVariantSelector({
 
       {selectedVariant ? (
         <p className={styles.selectionStatus} role="status">
-          {copy.selected}: {selectedVariant.color}
+          {copy.selected}: {localizeColorName(selectedVariant.color, locale)}
           {requiresSize ? ` / ${selectedVariant.size}` : ""}
         </p>
       ) : null}

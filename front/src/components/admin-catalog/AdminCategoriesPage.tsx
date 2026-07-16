@@ -31,6 +31,10 @@ import type {
   AdminCategoryQuery,
 } from "@/features/admin-catalog/types";
 import {
+  localizeCategoryDescription,
+  localizeCategoryName,
+} from "@/features/catalog/localization";
+import {
   formatAdminCatalogNumber,
   getAdminCatalogErrorMessage,
   getAdminCatalogTranslations,
@@ -380,7 +384,14 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   async function handleCategoryStatusChange(category: AdminCategory) {
     const nextIsActive = !category.isActive;
 
-    if (!window.confirm(copy.categories.confirm.status(nextIsActive, category.name))) {
+    if (
+      !window.confirm(
+        copy.categories.confirm.status(
+          nextIsActive,
+          localizeCategoryName(category.name, locale),
+        ),
+      )
+    ) {
       return;
     }
 
@@ -423,7 +434,13 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
   }
 
   async function handleCategoryDelete(category: AdminCategory) {
-    if (!window.confirm(copy.categories.confirm.delete(category.name))) return;
+    if (
+      !window.confirm(
+        copy.categories.confirm.delete(
+          localizeCategoryName(category.name, locale),
+        ),
+      )
+    ) return;
 
     setBusyAction(`${category.id}:delete`);
     setActionError(undefined);
@@ -581,7 +598,9 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
               {!isLoading && !listError
                 ? categories.map((category) => (
                     <tr
-                      aria-label={copy.categories.table.openAria(category.name)}
+                      aria-label={copy.categories.table.openAria(
+                        localizeCategoryName(category.name, locale),
+                      )}
                       className="admin-table__clickable-row"
                       key={category.id}
                       onClick={() => void openEditPanel(category)}
@@ -594,7 +613,7 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                       tabIndex={0}
                     >
                       <td>
-                        <strong>{category.name}</strong>
+                        <strong>{localizeCategoryName(category.name, locale)}</strong>
                       </td>
                       <td>
                         {category.imageUrl ? (
@@ -611,7 +630,10 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                       </td>
                       <td>{category.slug}</td>
                       <td className="admin-table__muted">
-                        {formatOptional(category.description, locale)}
+                        {formatOptional(
+                          localizeCategoryDescription(category.description, locale),
+                          locale,
+                        )}
                       </td>
                       <td>
                         <span
@@ -645,7 +667,9 @@ export function AdminCategoriesPage({ initialQuery }: AdminCategoriesPageProps) 
                           onKeyDown={(event) => event.stopPropagation()}
                         >
                           <button
-                            aria-label={copy.categories.table.editAria(category.name)}
+                            aria-label={copy.categories.table.editAria(
+                              localizeCategoryName(category.name, locale),
+                            )}
                             className="icon-button admin-icon-button"
                             onClick={() => void openEditPanel(category)}
                             title={copy.categories.table.editTitle}

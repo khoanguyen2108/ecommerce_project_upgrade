@@ -4,6 +4,11 @@ import { Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatPrice } from "@/features/catalog/format";
+import {
+  localizeCategoryName,
+  localizeColorName,
+  localizeProductName,
+} from "@/features/catalog/localization";
 import { isImplicitAccessoryOption } from "@/features/catalog/sizes";
 import type { CartItem } from "@/features/cart/types";
 import { useI18n } from "@/features/i18n/useI18n";
@@ -21,7 +26,7 @@ export function CartItemRow({
   onRemove,
   onUpdate,
 }: CartItemRowProps) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [quantity, setQuantity] = useState(item.quantity);
   const maxQuantity = useMemo(
     () => Math.max(1, Math.min(99, item.availableStock)),
@@ -31,6 +36,7 @@ export function CartItemRow({
   const hasChanged = quantity !== item.quantity;
   const productHref = `/products/${encodeURIComponent(item.product.slug)}`;
   const showVariantOption = !isImplicitAccessoryOption(item.variant);
+  const productName = localizeProductName(item.product.name, locale);
 
   useEffect(() => {
     setQuantity(item.quantity);
@@ -48,25 +54,27 @@ export function CartItemRow({
   return (
     <article className="cart-item-row">
       <Link
-        aria-label={`${t("product.view")}: ${item.product.name}`}
+        aria-label={`${t("product.view")}: ${productName}`}
         className="cart-item-row__image"
         href={productHref}
       >
         {item.product.firstImageUrl ? (
-          <img alt={item.product.name} loading="lazy" src={item.product.firstImageUrl} />
+          <img alt={productName} loading="lazy" src={item.product.firstImageUrl} />
         ) : (
           <span>{t("common.noImage")}</span>
         )}
       </Link>
 
       <div className="cart-item-row__body">
-        <p className="cart-item-row__category">{item.product.category.name}</p>
+        <p className="cart-item-row__category">
+          {localizeCategoryName(item.product.category.name, locale)}
+        </p>
         <h2>
-          <Link href={productHref}>{item.product.name}</Link>
+          <Link href={productHref}>{productName}</Link>
         </h2>
         {showVariantOption ? (
           <p className="cart-item-row__variant">
-            {item.variant.size} / {item.variant.color}
+            {item.variant.size} / {localizeColorName(item.variant.color, locale)}
             {item.variant.sku ? ` / ${item.variant.sku}` : ""}
           </p>
         ) : null}
@@ -81,7 +89,7 @@ export function CartItemRow({
         <span>{t("product.quantity")}</span>
         <div className="quantity-stepper">
           <button
-            aria-label={`${t("product.decreaseQuantity")}: ${item.product.name}`}
+            aria-label={`${t("product.decreaseQuantity")}: ${productName}`}
             disabled={isBusy || !canUpdate || quantity <= 1}
             onClick={() => handleQuantityChange(quantity - 1)}
             type="button"
@@ -89,7 +97,7 @@ export function CartItemRow({
             <Minus aria-hidden="true" size={16} />
           </button>
           <input
-            aria-label={`${item.product.name}: ${t("product.quantity")}`}
+            aria-label={`${productName}: ${t("product.quantity")}`}
             disabled={isBusy || !canUpdate}
             max={maxQuantity}
             min={1}
@@ -98,7 +106,7 @@ export function CartItemRow({
             value={quantity}
           />
           <button
-            aria-label={`${t("product.increaseQuantity")}: ${item.product.name}`}
+            aria-label={`${t("product.increaseQuantity")}: ${productName}`}
             disabled={isBusy || !canUpdate || quantity >= maxQuantity}
             onClick={() => handleQuantityChange(quantity + 1)}
             type="button"
@@ -127,7 +135,7 @@ export function CartItemRow({
       </div>
 
       <button
-        aria-label={`${t("common.remove")}: ${item.product.name}`}
+        aria-label={`${t("common.remove")}: ${productName}`}
         className="icon-button cart-item-row__remove"
         disabled={isBusy}
         onClick={() => onRemove(item.id)}

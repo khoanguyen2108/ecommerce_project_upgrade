@@ -42,6 +42,10 @@ import type {
   PaymentSummary,
 } from "@/features/orders/types";
 import type { CustomerReturnRequest } from "@/features/returns/types";
+import {
+  localizeColorName,
+  localizeProductName,
+} from "@/features/catalog/localization";
 import { useI18n } from "@/features/i18n/useI18n";
 
 interface OrderDetailPageProps {
@@ -353,15 +357,19 @@ function OrderItems({ order }: { order: Order }) {
         <div className="order-detail-items">
           {order.items.map((item) => {
             const showVariantOption = !isImplicitAccessoryOption(item);
+            const productName = localizeProductName(item.productName, locale);
+            const colorName = item.color
+              ? localizeColorName(item.color, locale)
+              : t("orders.colorNotSet");
 
             return (
               <article className="order-detail-item" key={item.id}>
-                <OrderItemImage alt={item.productName} imageUrl={item.imageUrl} />
+                <OrderItemImage alt={productName} imageUrl={item.imageUrl} />
                 <div className="order-detail-item__info">
-                  <h3>{item.productName}</h3>
+                  <h3>{productName}</h3>
                   {showVariantOption ? (
                     <p>
-                      <span>{item.color || t("orders.colorNotSet")}</span>
+                      <span>{colorName}</span>
                       <span>{item.size || t("orders.sizeNotSet")}</span>
                     </p>
                   ) : null}

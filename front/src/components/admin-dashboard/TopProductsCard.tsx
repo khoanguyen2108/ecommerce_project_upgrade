@@ -5,6 +5,10 @@ import Link from "next/link";
 import { useState } from "react";
 import type { AdminTopProduct } from "@/features/admin-stats/types";
 import {
+  localizeCategoryName,
+  localizeProductName,
+} from "@/features/catalog/localization";
+import {
   formatAdminSoldCount,
   useAdminCommonI18n,
 } from "@/features/i18n/admin-common-translations";
@@ -56,9 +60,11 @@ export function TopProductsCard({
               <article className="admin-dashboard-top-product" key={product.productId}>
                 <ProductThumbnail product={product} />
                 <div className="admin-dashboard-top-product__details">
-                  <strong>{product.name}</strong>
+                  <strong>{localizeProductName(product.name, locale)}</strong>
                   <small>
-                    {product.categoryName || messages.dashboard.uncategorized}
+                    {product.categoryName
+                      ? localizeCategoryName(product.categoryName, locale)
+                      : messages.dashboard.uncategorized}
                   </small>
                 </div>
                 <span>{formatAdminSoldCount(locale, product.soldQuantity)}</span>

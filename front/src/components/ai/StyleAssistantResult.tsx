@@ -12,6 +12,7 @@ import { useState } from "react";
 import { FashionIllustration } from "@/components/ai/StyleAssistantEmpty";
 import styles from "@/components/ai/StyleAssistant.module.css";
 import { getCurrentStyleAdviceOutfit } from "@/features/ai/normalize";
+import { localizeProductName } from "@/features/catalog/localization";
 import type {
   StyleAdviceCanonicalOutfit,
   StyleAdviceCanonicalOutfitItem,
@@ -213,17 +214,18 @@ function CurrentOutfit({
 function OutfitProductCard({ item, locale }: { item: StyleAdviceCanonicalOutfitItem; locale: Locale }) {
   const [imageFailed, setImageFailed] = useState(false);
   const productHref = `/products/${encodeURIComponent(item.productSlug)}`;
+  const productName = localizeProductName(item.productName, locale);
 
   return (
     <article className={styles.outfitProduct}>
       <Link
-        aria-label={`${translate(locale, "ai.viewProduct")}: ${item.productName}`}
+        aria-label={`${translate(locale, "ai.viewProduct")}: ${productName}`}
         className={styles.outfitProductImageLink}
         href={productHref}
       >
         {item.imageUrl && !imageFailed ? (
           <img
-            alt={item.productName}
+            alt={productName}
             className={styles.outfitProductImage}
             loading="lazy"
             onError={() => setImageFailed(true)}
@@ -235,7 +237,7 @@ function OutfitProductCard({ item, locale }: { item: StyleAdviceCanonicalOutfitI
       </Link>
       <div className={styles.outfitProductBody}>
         <span className={styles.roleBadge}>{formatRole(item.role, locale)}</span>
-        <h5>{item.productName}</h5>
+        <h5>{productName}</h5>
         <strong>{formatPrice(item.price)}</strong>
         <Link className={styles.productLink} href={productHref}>
           {translate(locale, "ai.viewProduct")}

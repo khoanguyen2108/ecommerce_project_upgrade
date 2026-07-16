@@ -32,6 +32,10 @@ import {
 } from "@/components/orders/order-format";
 import type { OrderFulfillmentStatus } from "@/features/orders/types";
 import {
+  localizeColorName,
+  localizeProductName,
+} from "@/features/catalog/localization";
+import {
   getAdminOperationsTranslations,
   type AdminOperationsTranslations,
 } from "@/features/i18n/admin-operations-translations";
@@ -330,23 +334,28 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
           {order.items.length === 0 ? (
             <p className="admin-detail-empty">{copy.orders.detail.emptyItems}</p>
           ) : (
-            order.items.map((item) => (
-              <article className="admin-order-item" key={item.id}>
-                <OrderItemImage alt={item.productName} imageUrl={item.imageUrl} />
-                <div className="admin-order-item__body">
-                  <strong>{item.productName}</strong>
-                  <span>{item.size} / {item.color}</span>
-                  <span>{item.sku || copy.orders.detail.skuNotSet}</span>
-                </div>
-                <div className="admin-order-item__numbers">
-                  <strong>{formatCurrency(item.unitPrice, order.currency, locale)}</strong>
-                  <span>
-                    {copy.orders.detail.quantity(formatNumber(item.quantity, locale))}
-                  </span>
-                  <span>{formatCurrency(item.lineTotal, order.currency, locale)}</span>
-                </div>
-              </article>
-            ))
+            order.items.map((item) => {
+              const productName = localizeProductName(item.productName, locale);
+              const colorName = localizeColorName(item.color, locale);
+
+              return (
+                <article className="admin-order-item" key={item.id}>
+                  <OrderItemImage alt={productName} imageUrl={item.imageUrl} />
+                  <div className="admin-order-item__body">
+                    <strong>{productName}</strong>
+                    <span>{item.size} / {colorName}</span>
+                    <span>{item.sku || copy.orders.detail.skuNotSet}</span>
+                  </div>
+                  <div className="admin-order-item__numbers">
+                    <strong>{formatCurrency(item.unitPrice, order.currency, locale)}</strong>
+                    <span>
+                      {copy.orders.detail.quantity(formatNumber(item.quantity, locale))}
+                    </span>
+                    <span>{formatCurrency(item.lineTotal, order.currency, locale)}</span>
+                  </div>
+                </article>
+              );
+            })
           )}
         </div>
       </DetailSection>

@@ -56,6 +56,11 @@ import {
   SHOE_SIZE_ORDER,
 } from "@/features/catalog/sizes";
 import {
+  localizeCategoryName,
+  localizeColorName,
+  localizeProductName,
+} from "@/features/catalog/localization";
+import {
   formatAdminCatalogMoney,
   formatAdminCatalogNumber,
   getAdminCatalogErrorMessage,
@@ -652,7 +657,14 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   async function handleProductStatusChange(product: AdminProduct) {
     const nextIsActive = !product.isActive;
 
-    if (!window.confirm(copy.products.confirm.productStatus(nextIsActive, product.name))) {
+    if (
+      !window.confirm(
+        copy.products.confirm.productStatus(
+          nextIsActive,
+          localizeProductName(product.name, locale),
+        ),
+      )
+    ) {
       return;
     }
 
@@ -808,7 +820,13 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
   }
 
   async function handleProductDelete(product: AdminProduct) {
-    if (!window.confirm(copy.products.confirm.deleteProduct(product.name))) return;
+    if (
+      !window.confirm(
+        copy.products.confirm.deleteProduct(
+          localizeProductName(product.name, locale),
+        ),
+      )
+    ) return;
 
     setBusyAction(`${product.id}:delete`);
     setActionError(undefined);
@@ -1174,7 +1192,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               <option value="">{copy.products.filters.allCategories}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.name}
+                  {localizeCategoryName(category.name, locale)}
                 </option>
               ))}
             </select>
@@ -1270,7 +1288,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
               {!isProductLoading && !listError
                 ? products.map((product) => (
                     <tr
-                      aria-label={copy.products.table.openAria(product.name)}
+                      aria-label={copy.products.table.openAria(
+                        localizeProductName(product.name, locale),
+                      )}
                       className="admin-table__clickable-row"
                       key={product.id}
                       onClick={() => void openEditPanel(product)}
@@ -1284,18 +1304,23 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                     >
                       <td>
                         <AdminProductImage
-                          alt={product.name}
+                          alt={localizeProductName(product.name, locale)}
                           className="admin-product-thumb"
                           url={product.imageUrls[0]}
                         />
                       </td>
                       <td>
-                        <strong>{product.name}</strong>
+                        <strong>{localizeProductName(product.name, locale)}</strong>
                       </td>
                       <td>{product.slug}</td>
                       <td>
                         <span className="admin-category-summary">
-                          {getProductCategories(product)[0]?.name || copy.common.notSet}
+                          {getProductCategories(product)[0]
+                            ? localizeCategoryName(
+                                getProductCategories(product)[0].name,
+                                locale,
+                              )
+                            : copy.common.notSet}
                           {getProductCategories(product).length > 1 ? (
                             <small>
                               +
@@ -1344,7 +1369,9 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           onKeyDown={(event) => event.stopPropagation()}
                         >
                           <button
-                            aria-label={copy.products.table.editAria(product.name)}
+                            aria-label={copy.products.table.editAria(
+                              localizeProductName(product.name, locale),
+                            )}
                             className="icon-button admin-icon-button"
                             onClick={() => void openEditPanel(product)}
                             title={copy.products.table.editTitle}
@@ -1641,7 +1668,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                       />
                       <span>
                         {copy.products.form.categoryOption(
-                          category.name,
+                          localizeCategoryName(category.name, locale),
                           category.isActive,
                         )}
                       </span>
@@ -1873,7 +1900,7 @@ export function AdminProductsPage({ initialQuery }: AdminProductsPageProps) {
                           </div>
                           <div>
                             <dt>{copy.products.variants.color}</dt>
-                            <dd>{variant.color}</dd>
+                            <dd>{localizeColorName(variant.color, locale)}</dd>
                           </div>
                           <div>
                             <dt>{copy.products.variants.size}</dt>

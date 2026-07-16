@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { formatPrice } from "@/features/catalog/format";
+import { localizeProductName } from "@/features/catalog/localization";
 import type { Product } from "@/features/catalog/types";
 import { useI18n } from "@/features/i18n/useI18n";
 
@@ -12,8 +13,9 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, variant = "default" }: ProductCardProps) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const imageUrl = product.imageUrls[0];
+  const productName = localizeProductName(product.name, locale);
   const [imageFailed, setImageFailed] = useState(false);
   const activeVariants = product.variants.filter((item) => item.isActive);
   const availableStock = activeVariants.reduce(
@@ -33,12 +35,12 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
     >
       <Link
         href={`/products/${product.slug}`}
-        aria-label={`${t("product.view")}: ${product.name}`}
+        aria-label={`${t("product.view")}: ${productName}`}
       >
         <div className="product-card__image-wrap">
           {imageUrl && !imageFailed ? (
             <img
-              alt={product.name}
+              alt={productName}
               className="product-card__image"
               loading="lazy"
               onError={() => setImageFailed(true)}
@@ -49,7 +51,7 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
           )}
         </div>
         <div className="product-card__body">
-          <h3>{product.name}</h3>
+          <h3>{productName}</h3>
           <div className="product-card__price-row">
             <p className="product-card__price">{formatPrice(product.basePrice)}</p>
             {variant === "shop" ? (

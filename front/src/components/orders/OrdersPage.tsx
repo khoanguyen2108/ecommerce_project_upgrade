@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { localizeProductName } from "@/features/catalog/localization";
 import { listOrders } from "@/features/orders/api";
 import type { Order, OrderQuery, OrderStatus } from "@/features/orders/types";
 import type { Pagination } from "@/lib/api/types";
@@ -282,14 +283,17 @@ function OrderCard({ order }: { order: Order }) {
 }
 
 function OrderProductPreview({ order }: { order: Order }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const firstItem = order.items?.[0];
+  const productName = firstItem
+    ? localizeProductName(firstItem.productName, locale)
+    : t("orders.productFallback");
   const additionalItems = Math.max(0, (order.items?.length ?? 0) - 1);
 
   return (
     <div className="order-product-preview">
       <OrderItemImage
-        alt={firstItem?.productName || t("orders.productFallback")}
+        alt={productName}
         imageUrl={firstItem?.imageUrl}
         size="compact"
       />
@@ -418,12 +422,13 @@ function getOrderItemSummary(
   }
 
   const additionalItems = Math.max(0, order.items.length - 1);
+  const firstItemName = localizeProductName(firstItem.productName, locale);
 
   return additionalItems > 0
-    ? `${firstItem.productName} + ${formatNumber(additionalItems, locale)} ${
+    ? `${firstItemName} + ${formatNumber(additionalItems, locale)} ${
         additionalItems === 1 ? t("orders.moreItem") : t("orders.moreItems")
       }`
-    : firstItem.productName;
+    : firstItemName;
 }
 
 function getOrderItemCount(order: Order): number {

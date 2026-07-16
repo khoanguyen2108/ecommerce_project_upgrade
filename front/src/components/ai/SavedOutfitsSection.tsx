@@ -4,6 +4,7 @@ import { ArrowRight, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import styles from "@/components/ai/StyleAssistant.module.css";
 import { formatPrice } from "@/features/catalog/format";
+import { localizeProductName } from "@/features/catalog/localization";
 import type { Locale } from "@/features/i18n/locale";
 import { translate } from "@/features/i18n/translations";
 import { useI18n } from "@/features/i18n/useI18n";
@@ -145,7 +146,8 @@ export function SavedOutfitsSection({
 
 function SavedOutfitThumbnail({ item, locale }: { item: SavedOutfitItemSnapshot; locale: Locale }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const alt = `${item.productNameSnapshot} · ${translate(locale, "ai.savedOutfits")}`;
+  const productName = localizeProductName(item.productNameSnapshot, locale);
+  const alt = `${productName} · ${translate(locale, "ai.savedOutfits")}`;
 
   if (!item.imageUrlSnapshot || imageFailed) {
     return (

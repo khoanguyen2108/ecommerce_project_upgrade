@@ -15,15 +15,22 @@ import {
 } from "@/components/orders/order-format";
 import type { PayosDisplayStatusResponse } from "@/features/payments/types";
 import {
+  localizeColorName,
+  localizeProductName,
+} from "@/features/catalog/localization";
+import {
   isImplicitAccessoryOption,
   isNoSize,
 } from "@/features/catalog/sizes";
+import type { Locale } from "@/features/i18n/locale";
+import { useI18n } from "@/features/i18n/useI18n";
 
 interface PaymentThankYouProps {
   status: PayosDisplayStatusResponse;
 }
 
 export function PaymentThankYou({ status }: PaymentThankYouProps) {
+  const { locale } = useI18n();
   const paidAt = status.paidAt || status.payment.paidAt || status.order.paidAt;
   const orderItems = status.order.items ?? [];
   const publicOrderIdentifier = status.order.orderCode || status.order.id;
@@ -73,17 +80,22 @@ export function PaymentThankYou({ status }: PaymentThankYouProps) {
               <h3>Purchased products</h3>
               <ul>
                 {orderItems.map((item) => {
-                  const optionLabel = formatOrderItemOptions(item.size, item.color);
+                  const productName = localizeProductName(item.productName, locale);
+                  const optionLabel = formatOrderItemOptions(
+                    item.size,
+                    item.color,
+                    locale,
+                  );
 
                   return (
                     <li key={item.id}>
                       <OrderItemImage
-                        alt={item.productName}
+                        alt={productName}
                         imageUrl={item.imageUrl}
                         size="compact"
                       />
                       <div>
-                        <strong>{item.productName}</strong>
+                        <strong>{productName}</strong>
                         {optionLabel ? <span>{optionLabel}</span> : null}
                       </div>
                       <span>x{item.quantity}</span>
@@ -140,10 +152,18 @@ export function PaymentThankYou({ status }: PaymentThankYouProps) {
   );
 }
 
-function formatOrderItemOptions(size: string, color: string): string | undefined {
+function formatOrderItemOptions(
+  size: string,
+  color: string,
+  locale: Locale,
+): string | undefined {
   if (isImplicitAccessoryOption({ color, size })) return undefined;
 
-  const sizeLabel = isNoSize(size) ? "One size" : size;
+  const sizeLabel = isNoSize(size)
+    ? locale === "vi"
+      ? "Một size"
+      : "One size"
+    : size;
 
-  return `${sizeLabel} / ${color}`;
+  return `${sizeLabel} / ${localizeColorName(color, locale)}`;
 }

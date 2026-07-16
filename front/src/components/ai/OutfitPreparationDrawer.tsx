@@ -22,6 +22,7 @@ import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { addOutfitItemsToCart } from "@/features/cart/api";
 import { getProductById, getProductVariants } from "@/features/catalog/api";
 import { formatPrice } from "@/features/catalog/format";
+import { localizeProductName } from "@/features/catalog/localization";
 import type { Product, ProductVariant } from "@/features/catalog/types";
 import {
   getImplicitSelectableVariant,
@@ -570,7 +571,10 @@ function PreparationItem({
       variant.productId === item.input.productId &&
       isVariantSelectable(variant),
   );
-  const productName = item.product?.name || item.input.productName;
+  const productName = localizeProductName(
+    item.product?.name || item.input.productName,
+    locale,
+  );
   const liveImage = item.product ? getFirstProductImage(item.product) : undefined;
   const imageUrl = item.product ? liveImage : item.input.imageUrl;
   const currentPrice = item.product
