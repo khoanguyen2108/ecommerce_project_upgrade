@@ -277,6 +277,50 @@ async function run() {
   );
   report(addJacketPrompt, addJacketSource);
 
+  for (const humanPrompt of [
+    'tui muon them ao khoac',
+    'them cho tui mot cai ao khoac',
+    'them cho toi mot cai ao khoac',
+  ]) {
+    const humanizedAddJacketResponse = await aiService.getStyleAdvice(
+      {
+        message: humanPrompt,
+        currentOutfit: {
+          items: [
+            { role: 'top', productId: 'top-2' },
+            { role: 'bottom', productId: 'bottom-2' },
+            { role: 'shoes', productId: 'shoes-2' },
+          ],
+          intent: previous.intent,
+          locale: 'vi',
+        },
+      },
+      { userId: 'v2-lite-humanized-add-jacket-smoke-user' },
+    );
+    verifyOutfitResponse(humanPrompt, humanizedAddJacketResponse);
+    check(
+      humanizedAddJacketResponse.refinement?.action === 'add',
+      humanPrompt,
+      'action was not add',
+    );
+    check(
+      humanizedAddJacketResponse.refinement?.targetRoles?.includes('jacket') === true,
+      humanPrompt,
+      'jacket was not targeted',
+    );
+    check(
+      humanizedAddJacketResponse.refinement?.targetRoles?.includes('handbag') === false,
+      humanPrompt,
+      'customer pronoun was interpreted as handbag',
+    );
+    check(
+      humanizedAddJacketResponse.outfit?.items.some((item) => item.role === 'jacket') === true,
+      humanPrompt,
+      'jacket was not added',
+    );
+    report(humanPrompt, humanizedAddJacketResponse);
+  }
+
   const removeJacketPrompt = 'bo ao khoac';
   const removeJacketResponse = await aiService.getStyleAdvice(
     {

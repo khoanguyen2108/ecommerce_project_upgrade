@@ -185,16 +185,16 @@ const DIFFERENT_REPLACEMENT_PATTERN =
 const TRANSITION_WORD_PATTERN = '\\b(?:sang|thanh|to|with|bang|doi sang|doi thanh)\\s+';
 const ROLE_ALIAS_PATTERNS: Record<OutfitRole, string> = {
   accessory:
-    'accessor(?:y|ies)|phu kien|trang suc|jewelry|jewellery|belt|ring|bracelet|watch|necklace|vong|nhan',
+    'accessor(?:y|ies)|phu kien|trang suc|jewelry|jewellery|belt|ring|bracelet|watch|necklace|beanies?|sunglasses?|durags?|day nit|that lung|kinh mat|vong(?: tay)?|nhan|dong ho|mu len|khan trum dau',
   bottom:
-    'bottoms?|pants|trousers|jeans|denim|shorts|skirts?|quan(?: jean| jeans)?|quan dai|quan short|chan vay',
-  handbag: 'handbags?|bags?|totes?|crossbody|tui xach|tui deo',
+    'bottoms?|pants|trousers|jeans|denim|shorts|skirts?|quan(?: jean| jeans| denim| dai| short| baggy| ong loe| ong rong)?|chan vay',
+  handbag: 'handbags?|bags?|totes?|crossbody|tui (?:xach|deo|tote|mini)',
   jacket:
-    'jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|hoodies?|ao khoac|ao hoodie|biker',
+    'jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|hoodies?|bombers?|ao khoac|ao hoodie|ao bomber|biker',
   shoes:
-    'shoes?|sneakers?|boots?|boot|loafers?|slippers?|sandals?|giay|doi giay|dep',
+    'shoes?|sneakers?|boots?|boot|bot|loafers?|slippers?|sandals?|high tops?|giay|doi giay|dep|doi dep',
   top:
-    'top|tops|tee|t shirt|tshirt|shirt|shirts|ao thun|ao phong|ao tren|ao tay dai|long sleeves?|sweater|tank(?: top)?|sleeveless|ao ba lo|ao tank|ao',
+    'top|tops|tee|t shirt|tshirt|shirt|shirts|ao thun|ao phong|ao tren|ao tay dai|long sleeves?|sweater|tank(?: top)?|tanktop|sleeveless|ao ba lo|ao tank(?:top)?|ao',
 };
 const JACKET_NON_HOODIE_ALIAS_PATTERN =
   'jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|ao khoac|biker';
@@ -210,6 +210,123 @@ const JACKET_TARGET_TAGS = [
 ];
 const LONG_SLEEVE_TARGET_TAGS = ['long_sleeves', 'long_sleeve', 'ao_tay_dai'];
 const TANK_TARGET_TAGS = ['tank_top', 'tank'];
+
+const SPECIFIC_ROLE_TARGETS: Array<{
+  role: OutfitRole;
+  tags: string[];
+  pattern: RegExp;
+}> = [
+  {
+    role: 'top',
+    tags: ['tee', 't_shirt', 'ao_thun'],
+    pattern: /\b(?:tee|t shirts?|tshirt|ao thun|ao phong)\b/,
+  },
+  {
+    role: 'top',
+    tags: LONG_SLEEVE_TARGET_TAGS,
+    pattern: /\b(?:long sleeves?|ao tay dai|sweaters?)\b/,
+  },
+  {
+    role: 'top',
+    tags: TANK_TARGET_TAGS,
+    pattern: /\b(?:tank(?: top)?|tanktop|sleeveless|ao ba lo|ao tank(?:top)?|ba lo)\b/,
+  },
+  {
+    role: 'jacket',
+    tags: ['hoodie'],
+    pattern: /\b(?:hoodies?|ao hoodie)\b/,
+  },
+  {
+    role: 'jacket',
+    tags: ['bomber', 'jacket', 'outerwear'],
+    pattern: /\b(?:bombers?|ao bomber|ao khoac bomber)\b/,
+  },
+  {
+    role: 'jacket',
+    tags: JACKET_TARGET_TAGS,
+    pattern: /\b(?:jackets?|outerwear|coats?|blazers?|ao khoac|leather jacket)\b/,
+  },
+  {
+    role: 'bottom',
+    tags: ['denim', 'jeans'],
+    pattern: /\b(?:denim|jeans?|quan jean|quan jeans|quan denim)\b/,
+  },
+  {
+    role: 'bottom',
+    tags: ['flared'],
+    pattern: /\b(?:flared|loe|ong loe|quan ong loe)\b/,
+  },
+  {
+    role: 'bottom',
+    tags: ['wide_leg'],
+    pattern: /\b(?:wide leg|wide-leg|ong rong|quan ong rong)\b/,
+  },
+  {
+    role: 'shoes',
+    tags: ['sneakers'],
+    pattern: /\b(?:sneakers?|giay sneaker)\b/,
+  },
+  {
+    role: 'shoes',
+    tags: ['boots'],
+    pattern: /\b(?:boots?|bot)\b/,
+  },
+  {
+    role: 'shoes',
+    tags: ['slippers'],
+    pattern: /\b(?:slippers?|dep|doi dep)\b/,
+  },
+  {
+    role: 'shoes',
+    tags: ['loafers'],
+    pattern: /\b(?:loafers?)\b/,
+  },
+  {
+    role: 'handbag',
+    tags: ['tote'],
+    pattern: /\b(?:totes?|tui tote)\b/,
+  },
+  {
+    role: 'handbag',
+    tags: ['handbag', 'bag'],
+    pattern: /\b(?:handbags?|bags?|tui xach|tui deo|tui mini)\b/,
+  },
+  {
+    role: 'accessory',
+    tags: ['belt'],
+    pattern: /\b(?:belts?|day nit|that lung)\b/,
+  },
+  {
+    role: 'accessory',
+    tags: ['durag'],
+    pattern: /\b(?:durags?|khan trum dau)\b/,
+  },
+  {
+    role: 'accessory',
+    tags: ['sunglasses'],
+    pattern: /\b(?:sunglasses?|kinh mat)\b/,
+  },
+  {
+    role: 'accessory',
+    tags: ['bracelet'],
+    pattern: /\b(?:bracelets?|vong tay)\b/,
+  },
+  {
+    role: 'accessory',
+    tags: ['beanie'],
+    pattern: /\b(?:beanies?|mu len)\b/,
+  },
+  {
+    role: 'accessory',
+    tags: ['ring'],
+    pattern: /\b(?:rings?|nhan)\b/,
+  },
+  {
+    role: 'accessory',
+    tags: ['watch'],
+    pattern: /\b(?:watches?|watch|dong ho)\b/,
+  },
+];
 
 const ROLE_TAGS: Record<OutfitRole, string[]> = {
   top: [
@@ -301,13 +418,13 @@ const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
   {
     tag: 'tank_top',
     role: 'top',
-    aliases: ['tank top', 'tank', 'sleeveless', 'ao ba lo', 'ao tank'],
+    aliases: ['tank top', 'tank', 'tanktop', 'sleeveless', 'ao ba lo', 'ao tank', 'ao tanktop'],
     impliedTags: ['top', 'tank', 'tank_top', 'summer'],
   },
   {
     tag: 'jacket',
     role: 'jacket',
-    aliases: ['jacket', 'outerwear', 'coat', 'blazer', 'ao khoac', 'leather jacket'],
+    aliases: ['jacket', 'outerwear', 'coat', 'blazer', 'bomber', 'ao khoac', 'ao bomber', 'leather jacket'],
     impliedTags: ['jacket', 'outerwear'],
   },
   {
@@ -326,6 +443,8 @@ const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
       'trousers',
       'jeans',
       'quan jeans',
+      'quan jean',
+      'quan denim',
       'denim',
       'shorts',
       'quan',
@@ -335,13 +454,13 @@ const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
   {
     tag: 'shoes',
     role: 'shoes',
-    aliases: ['shoes', 'sneakers', 'boots', 'boot', 'giay', 'doi giay'],
+    aliases: ['shoes', 'sneakers', 'boots', 'boot', 'bot', 'slippers', 'dep', 'giay', 'doi giay'],
     impliedTags: ['shoes'],
   },
   {
     tag: 'handbag',
     role: 'handbag',
-    aliases: ['handbag', 'bag', 'tote', 'tui', 'tui xach'],
+    aliases: ['handbag', 'bag', 'tote', 'tui', 'tui xach', 'tui tote', 'tui deo'],
     impliedTags: ['handbag', 'bag'],
   },
   {
@@ -353,10 +472,21 @@ const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
       'belt',
       'ring',
       'bracelet',
+      'watch',
+      'sunglasses',
+      'beanie',
+      'durag',
+      'day nit',
+      'that lung',
+      'kinh mat',
       'phu kien',
       'trang suc',
       'vong',
+      'vong tay',
       'nhan',
+      'dong ho',
+      'mu len',
+      'khan trum dau',
     ],
     impliedTags: ['accessories'],
   },
@@ -921,6 +1051,13 @@ export class OutfitRecommendationService {
       replaceRoles.add('shoes');
     }
 
+    this.applySpecificRoleTargetTags(
+      comparable,
+      addRoles,
+      replaceRoles,
+      replacementTags,
+    );
+
     const hasDifferentWording = DIFFERENT_REPLACEMENT_PATTERN.test(comparable);
 
     if (!hasReplaceKeyword && hasDifferentWording && allMentionedRoles.length > 0) {
@@ -1017,18 +1154,12 @@ export class OutfitRecommendationService {
     if (new RegExp(`\\b(?:${ROLE_ALIAS_PATTERNS.accessory})\\b`).test(comparable)) {
       roles.add('accessory');
     }
-    if (
-      new RegExp(`\\b(?:${ROLE_ALIAS_PATTERNS.handbag})\\b`).test(comparable) ||
-      (/\btui\b/.test(comparable) &&
-        !/\btui\s+(?:muon|can|thich|dang|nen|se|co|khong)\b/.test(
-          comparable,
-        ))
-    ) {
+    if (this.hasHandbagReference(comparable)) {
       roles.add('handbag');
     }
     if (
       new RegExp(`\\b(?:${ROLE_ALIAS_PATTERNS.top})\\b`).test(comparable) &&
-      !/\bao (?:khoac|hoodie)\b/.test(comparable)
+      !/\bao (?:khoac|hoodie|bomber)\b/.test(comparable)
     ) {
       roles.add('top');
     }
@@ -1040,6 +1171,30 @@ export class OutfitRecommendationService {
     }
 
     return [...roles];
+  }
+
+  private applySpecificRoleTargetTags(
+    comparable: string,
+    addRoles: Set<OutfitRole>,
+    replaceRoles: Set<OutfitRole>,
+    replacementTags: Map<OutfitRole, string[]>,
+  ): void {
+    for (const target of SPECIFIC_ROLE_TARGETS) {
+      if (
+        !target.pattern.test(comparable) ||
+        (!addRoles.has(target.role) && !replaceRoles.has(target.role))
+      ) {
+        continue;
+      }
+
+      replacementTags.set(
+        target.role,
+        this.cleanTags([
+          ...(replacementTags.get(target.role) ?? []),
+          ...target.tags,
+        ]),
+      );
+    }
   }
 
   private isBareRoleReplacement(
@@ -2956,7 +3111,7 @@ export class OutfitRecommendationService {
     if (
       tag === 'top' &&
       comparableAlias === 'ao' &&
-      /\bao\s+(?:khoac|thun|phong|tay dai|ba lo|tank)\b/.test(
+      /\bao\s+(?:khoac|thun|phong|tay dai|ba lo|tank|tanktop|bomber)\b/.test(
         comparablePrompt,
       )
     ) {
@@ -2967,13 +3122,24 @@ export class OutfitRecommendationService {
       return this.hasAlias(comparablePrompt, comparableAlias);
     }
 
-    if (/\btui\s+(?:muon|can|thich|dang|nen|se|co)\b/.test(comparablePrompt)) {
-      return false;
+    return this.hasHandbagReference(comparablePrompt);
+  }
+
+  private hasHandbagReference(comparablePrompt: string): boolean {
+    if (/\b(?:handbags?|bags?|totes?|crossbody)\b/.test(comparablePrompt)) {
+      return true;
     }
 
-    return (
-      /\b(?:voi|va|them|mot|cai)\s+tui\b/.test(comparablePrompt) ||
-      /\btui\s+(?:xach|deo|mini|den|trang|kem|beige|bac)\b/.test(comparablePrompt)
+    if (
+      /\btui\s+(?:xach|deo|tote|mini|crossbody|den|trang|kem|beige|bac)\b/.test(
+        comparablePrompt,
+      )
+    ) {
+      return true;
+    }
+
+    return /\b(?:voi|va|them|bo|xoa|doi|thay|remove|add|include|without|skip|no|mot|cai|chiec|mon)\s+tui\b/.test(
+      comparablePrompt,
     );
   }
 
