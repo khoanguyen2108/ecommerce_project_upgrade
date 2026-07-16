@@ -1,6 +1,7 @@
 "use client";
 
 import { LogOut, UserRound } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -27,11 +28,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <aside className="admin-sidebar">
         <div className="admin-sidebar__brand">
           <Link
-            className="brand-mark"
+            className="brand-mark brand-mark--image admin-sidebar__brand-mark"
             href="/admin"
             aria-label={messages.shell.adminHomeLabel}
           >
-            BELIKEME
+            <Image
+              alt=""
+              aria-hidden="true"
+              className="admin-sidebar__brand-logo"
+              height={457}
+              priority
+              src="/images/brand/belikeme-logo.png"
+              width={1098}
+            />
           </Link>
           <span>{messages.shell.managementConsole}</span>
         </div>
