@@ -3,10 +3,18 @@ import type { Locale } from "@/features/i18n/locale";
 const CATEGORY_NAME_VI: Record<string, string> = {
   accessories: "Phụ kiện",
   bags: "Túi",
+  beanie: "Mũ len",
+  beanies: "Mũ len",
+  belt: "Dây nịt",
+  belts: "Dây nịt",
   bomber: "Áo khoác bomber",
   bombers: "Áo khoác bomber",
   bottoms: "Quần",
+  bracelet: "Vòng tay",
+  bracelets: "Vòng tay",
   denim: "Quần denim",
+  durag: "Khăn trùm đầu",
+  durags: "Khăn trùm đầu",
   handbag: "Túi",
   handbags: "Túi",
   jacket: "Áo khoác",
@@ -20,6 +28,9 @@ const CATEGORY_NAME_VI: Record<string, string> = {
   shoes: "Giày",
   slippers: "Dép",
   boots: "Bốt",
+  ring: "Nhẫn",
+  rings: "Nhẫn",
+  sunglasses: "Kính mát",
   tanktop: "Áo tanktop",
   "tank top": "Áo tanktop",
   tee: "Áo thun",
@@ -27,6 +38,8 @@ const CATEGORY_NAME_VI: Record<string, string> = {
   tote: "Túi tote",
   totes: "Túi tote",
   tops: "Áo",
+  watch: "Đồng hồ",
+  watches: "Đồng hồ",
   women: "Nữ",
 };
 
@@ -35,11 +48,17 @@ const PRODUCT_NAME_VI: Record<string, string> = {
   "canvas tote bag": "Túi tote canvas",
   "ashen vertex boots": "Bốt Ashen Vertex",
   "apex predator denim": "Quần denim Apex Predator",
+  "baroque engraved belt": "Dây nịt Baroque Engraved",
+  "cartier x chrome hearts gothic watch": "Đồng hồ Cartier x Chrome Hearts Gothic",
+  "chrome hearts buckle belt": "Dây nịt Chrome Hearts Buckle",
+  "chrome hearts durag": "Khăn trùm đầu Chrome Hearts",
   "chrome hearts jacket": "Áo khoác Chrome Hearts",
   "chrome hearts jeans": "Quần jeans Chrome Hearts",
   "chrome hearts multi-cross tee": "Áo thun Multi-Cross Chrome Hearts",
+  "chrome hearts multi-cross punk ring": "Nhẫn Chrome Hearts Multi-Cross Punk",
   "chrome hearts dagger slippers": "Dép Chrome Hearts Dagger",
   "chrome hearts cemetery cross patch tote": "Túi tote Chrome Hearts Cemetery Cross Patch",
+  "chrome hearts sterling cuban bracelet": "Vòng tay Chrome Hearts Sterling Cuban",
   "cropped denim jacket": "Áo khoác denim dáng croptop",
   "downtown leather tote": "Túi tote Downtown Leather",
   "ironclad bomber": "Áo khoác bomber Ironclad",
@@ -49,6 +68,7 @@ const PRODUCT_NAME_VI: Record<string, string> = {
   "maison margiela distressed tongue tanktop": "Áo tanktop Maison Margiela Distressed Tongue",
   "minimal leather belt": "Thắt lưng da tối giản",
   "midnight rider": "Quần Midnight Rider",
+  "monolithic sunglasses": "Kính mát Monolithic",
   "philipp plein crystal skull sneakers": "Giày sneaker Crystal Skull Philipp Plein",
   "pleated wide-leg trousers": "Quần ống rộng xếp ly",
   "racer worldwide washed denim": "Quần denim Racer Worldwide Washed",
@@ -58,6 +78,7 @@ const PRODUCT_NAME_VI: Record<string, string> = {
   "sashiko denim": "Quần denim Sashiko",
   "satin slip skirt": "Chân váy satin dáng slip",
   "soft knit cardigan": "Áo cardigan dệt kim mềm",
+  "stussy knit beanie": "Mũ len Stussy Knit",
   "tapered chino pants": "Quần chino ống côn",
 };
 
@@ -120,6 +141,15 @@ const PRODUCT_TYPE_SUFFIXES: Array<[RegExp, string]> = [
   [/\bhandbags?$/i, "Túi"],
   [/\btotes?$/i, "Túi tote"],
   [/\bbag$/i, "Túi"],
+  [/\bbelts?$/i, "Dây nịt"],
+  [/\bdurags?$/i, "Khăn trùm đầu"],
+  [/\bsunglasses$/i, "Kính mát"],
+  [/\bbracelets?$/i, "Vòng tay"],
+  [/\bbeanies$/i, "Mũ len"],
+  [/\bbeanie$/i, "Mũ len"],
+  [/\brings?$/i, "Nhẫn"],
+  [/\bwatches$/i, "Đồng hồ"],
+  [/\bwatch$/i, "Đồng hồ"],
 ];
 
 export function localizeCategoryName(
@@ -206,6 +236,15 @@ function replaceCatalogTerms(value: string): string {
     .replace(/\bDenim\b/gi, "Quần denim")
     .replace(/\bHandbags?\b/gi, "Túi")
     .replace(/\bTotes?\b/gi, "Túi tote")
+    .replace(/\bBelts?\b/gi, "Dây nịt")
+    .replace(/\bDurags?\b/gi, "Khăn trùm đầu")
+    .replace(/\bSunglasses\b/gi, "Kính mát")
+    .replace(/\bBracelets?\b/gi, "Vòng tay")
+    .replace(/\bBeanies\b/gi, "Mũ len")
+    .replace(/\bBeanie\b/gi, "Mũ len")
+    .replace(/\bRings?\b/gi, "Nhẫn")
+    .replace(/\bWatches\b/gi, "Đồng hồ")
+    .replace(/\bWatch\b/gi, "Đồng hồ")
     .replace(/\bLong Sleeves?\b/gi, "Áo tay dài")
     .replace(/\bBombers?\b/gi, "Áo khoác bomber")
     .replace(/\bOuterwear\b/gi, "Áo khoác ngoài")
