@@ -1733,7 +1733,7 @@ export class OutfitRecommendationService {
         case 'replace':
           return `M\u00ecnh \u0111\u00e3 \u0111\u1ed5i ${roleList || 'm\u00f3n b\u1ea1n ch\u1ecdn'} sang l\u1ef1a ch\u1ecdn kh\u00e1c c\u00f2n h\u00e0ng. ${stylingNote}`;
         case 'remove':
-          return `M\u00ecnh \u0111\u00e3 b\u1ecf ${roleList || 'm\u00f3n b\u1ea1n kh\u00f4ng c\u1ea7n'} kh\u1ecfi outfit \u0111\u1ec3 t\u1ed5ng th\u1ec3 g\u1ecdn h\u01a1n. ${stylingNote}`;
+          return `M\u00ecnh \u0111\u00e3 b\u1ecf ${roleList || 'm\u00f3n b\u1ea1n kh\u00f4ng c\u1ea7n'} kh\u1ecfi outfit \u0111\u1ec3 t\u1ed5ng th\u1ec3 g\u1ecdn h\u01a1n.`;
         case 'keep':
           return `M\u00ecnh \u0111\u00e3 gi\u1eef ${roleList || 'm\u00f3n b\u1ea1n mu\u1ed1n gi\u1eef'} v\u00e0 c\u00e2n l\u1ea1i c\u00e1c m\u00f3n c\u00f2n l\u1ea1i cho h\u1ee3p set h\u01a1n. ${stylingNote}`;
         case 'budget':
@@ -1749,7 +1749,7 @@ export class OutfitRecommendationService {
       case 'replace':
         return `I swapped ${roleList || 'the requested piece'} for another in-stock option. ${stylingNote}`;
       case 'remove':
-        return `I removed ${roleList || 'the piece you did not need'} to keep the outfit cleaner. ${stylingNote}`;
+        return `I removed ${roleList || 'the piece you did not need'} to keep the outfit cleaner.`;
       case 'keep':
         return `I kept ${roleList || 'the piece you wanted'} and adjusted the rest of the outfit around it. ${stylingNote}`;
       case 'budget':

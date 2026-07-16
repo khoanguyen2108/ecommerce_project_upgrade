@@ -277,6 +277,45 @@ async function run() {
   );
   report(addJacketPrompt, addJacketSource);
 
+  const removeJacketPrompt = 'bo ao khoac';
+  const removeJacketResponse = await aiService.getStyleAdvice(
+    {
+      message: removeJacketPrompt,
+      currentOutfit: {
+        items: [
+          { role: 'top', productId: 'top-2' },
+          { role: 'bottom', productId: 'bottom-2' },
+          { role: 'shoes', productId: 'shoes-2' },
+          { role: 'jacket', productId: 'jacket-1' },
+        ],
+        intent: previous.intent,
+        locale: 'vi',
+      },
+    },
+    { userId: 'v2-lite-remove-jacket-refinement-smoke-user' },
+  );
+  verifyOutfitResponse(removeJacketPrompt, removeJacketResponse);
+  check(
+    removeJacketResponse.refinement?.action === 'remove',
+    removeJacketPrompt,
+    'action was not remove',
+  );
+  check(
+    removeJacketResponse.outfit?.items.every((item) => item.role !== 'jacket') === true,
+    removeJacketPrompt,
+    'removed jacket was still returned',
+  );
+  const normalizedRemoveSummary = (removeJacketResponse.outfit?.summary ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  check(
+    normalizedRemoveSummary.includes('ao khoac giup outfit') === false,
+    removeJacketPrompt,
+    'remove summary still praised the removed jacket',
+  );
+  report(removeJacketPrompt, removeJacketResponse);
+
   await verifyTargetedReplacement({
     expectedProductSlugIncludes: 'tank',
     prompt: 'doi thanh ao ba lo',
