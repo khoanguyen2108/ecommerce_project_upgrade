@@ -288,7 +288,10 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   const categories = getProductCategories(product);
   const productName = localizeProductName(product.name, locale);
   const productDescription =
-    localizeProductDescription(product.description, locale) ||
+    localizeProductDescription(product.description, locale, {
+      name: product.name,
+      slug: product.slug,
+    }) ||
     t("product.descriptionPending");
   const displayPrice = selectedVariant
     ? getVariantUnitPrice(product, selectedVariant)
