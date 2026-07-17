@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { getPostLoginRedirectPath, isAdminUser } from "@/features/auth/roles";
+import { useI18n } from "@/features/i18n/useI18n";
 
 type Status = "checking" | "confirmed" | "unconfirmed";
 
@@ -18,6 +19,7 @@ const wait = (delayMs: number) =>
 
 export function AuthSuccessStatus() {
   const router = useRouter();
+  const { t } = useI18n();
   const { currentUser, setAuthenticatedUser } = useAuthSession();
   const [status, setStatus] = useState<Status>("checking");
 
@@ -68,8 +70,8 @@ export function AuthSuccessStatus() {
     return (
       <div className="status-panel" role="status">
         <LoaderCircle className="spin" size={28} />
-        <h1>Checking your session</h1>
-        <p>We are confirming your sign-in with Belikeme.</p>
+        <h1>{t("auth.successCheckingTitle")}</h1>
+        <p>{t("auth.successCheckingBody")}</p>
       </div>
     );
   }
@@ -78,10 +80,13 @@ export function AuthSuccessStatus() {
     return (
       <div className="status-panel" role="status">
         <CheckCircle2 size={30} />
-        <h1>Signed in successfully</h1>
+        <h1>{t("auth.successConfirmedTitle")}</h1>
         <p>
-          Redirecting you to{" "}
-          {isAdminUser(currentUser) ? "the admin workspace" : "the store"}.
+          {t(
+            isAdminUser(currentUser)
+              ? "auth.successRedirectAdmin"
+              : "auth.successRedirectStore",
+          )}
         </p>
       </div>
     );
@@ -89,17 +94,14 @@ export function AuthSuccessStatus() {
 
   return (
     <div className="status-panel" role="status">
-      <h1>Sign-in needs one more step</h1>
-      <p>
-        Google sign-in finished, but this browser could not confirm the session
-        yet. You can return home or sign in with email.
-      </p>
+      <h1>{t("auth.successUnconfirmedTitle")}</h1>
+      <p>{t("auth.successUnconfirmedBody")}</p>
       <div className="status-panel__actions">
         <Link className="button button--primary" href="/login">
-          Back to login
+          {t("auth.backToLogin")}
         </Link>
         <Link className="button button--secondary" href="/">
-          Return home
+          {t("auth.returnHome")}
         </Link>
       </div>
     </div>
