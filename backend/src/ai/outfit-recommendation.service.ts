@@ -32,6 +32,7 @@ interface ExtractedIntent {
   fits: string[];
   negativeCategories: OutfitRole[];
   negativeTags: string[];
+  roleColors: Partial<Record<OutfitRole, string[]>>;
   searchTags: string[];
 }
 
@@ -196,6 +197,8 @@ const ROLE_ALIAS_PATTERNS: Record<OutfitRole, string> = {
   top:
     'top|tops|tee|t shirt|tshirt|shirt|shirts|ao thun|ao phong|ao tren|ao tay dai|long sleeves?|sweater|tank(?: top)?|tanktop|sleeveless|ao ba lo|ao tank(?:top)?|ao',
 };
+const COLOR_ROLE_DESCRIPTOR_PATTERN =
+  '(?:oversized|boxy|cropped|baggy|regular|slim|wide|washed|plain|basic|clean|leather|flared|long|short|sleeve|sleeves)';
 const JACKET_NON_HOODIE_ALIAS_PATTERN =
   'jackets?|outerwear|coats?|blazers?|overshirts?|cardigans?|ao khoac|biker';
 const JACKET_TARGET_TAGS = [
@@ -209,7 +212,17 @@ const JACKET_TARGET_TAGS = [
   'ao_khoac',
 ];
 const LONG_SLEEVE_TARGET_TAGS = ['long_sleeves', 'long_sleeve', 'ao_tay_dai'];
+const TEE_TARGET_TAGS = ['tee', 't_shirt', 'tshirt', 'ao_thun', 'ao_phong'];
 const TANK_TARGET_TAGS = ['tank_top', 'tank'];
+const WHITE_NEAR_COLOR_TAGS = [
+  'beige',
+  'cream',
+  'off_white',
+  'ivory',
+  'natural',
+  'oatmeal',
+  'stone',
+];
 
 const SPECIFIC_ROLE_TARGETS: Array<{
   role: OutfitRole;
@@ -591,7 +604,7 @@ const CATEGORY_ENTRIES: CategoryDictionaryEntry[] = [
 
 const COLOR_ENTRIES: DictionaryEntry[] = [
   { tag: 'black', aliases: ['black', 'all black', 'mau den', 'den'] },
-  { tag: 'white', aliases: ['white', 'mau trang', 'trang'] },
+  { tag: 'white', aliases: ['white', 'off white', 'off-white', 'ivory', 'mau trang', 'trang'] },
   { tag: 'cream', aliases: ['cream', 'mau kem', 'kem'], impliedTags: ['cream', 'beige'] },
   { tag: 'beige', aliases: ['beige', 'tan'], impliedTags: ['beige', 'cream'] },
   { tag: 'brown', aliases: ['brown', 'mau nau', 'nau'] },
@@ -693,8 +706,9 @@ const OCCASION_ENTRIES: DictionaryEntry[] = [
 const COMPATIBLE_TAGS: Record<string, string[]> = {
   black: ['black', 'washed_black', 'darkwear'],
   blue: ['blue', 'washed_blue', 'denim'],
-  cream: ['cream', 'beige'],
-  beige: ['beige', 'cream'],
+  white: ['white', 'off_white', 'ivory', 'cream', 'beige', 'natural', 'oatmeal', 'stone'],
+  cream: ['cream', 'beige', 'off_white', 'ivory', 'natural', 'oatmeal', 'stone'],
+  beige: ['beige', 'cream', 'off_white', 'ivory', 'natural', 'oatmeal', 'stone'],
   gothic: ['gothic', 'darkwear', 'silver_hardware', 'chrome_hearts'],
   darkwear: ['darkwear', 'black', 'gothic'],
   streetwear: ['streetwear', 'oversized', 'boxy'],
@@ -745,6 +759,7 @@ const CLEAN_LABELS: Record<string, string> = {
   travel: 'travel',
   washed_black: 'washed black',
   washed_blue: 'washed blue',
+  white: 'white',
   wide_leg: 'wide leg',
   y2k: 'Y2K',
 };
@@ -792,6 +807,7 @@ const VIETNAMESE_LABELS: Record<string, string> = {
   travel: 'đi du lịch',
   washed_black: 'đen wash',
   washed_blue: 'xanh wash',
+  white: 'màu trắng',
   wide_leg: 'ống rộng',
   y2k: 'phong cách Y2K',
 };
@@ -1371,6 +1387,7 @@ export class OutfitRecommendationService {
       fits,
       negativeCategories,
       negativeTags,
+      roleColors: current.roleColors,
       searchTags: this.cleanTags([
         ...categories,
         ...colors,
@@ -1692,6 +1709,9 @@ export class OutfitRecommendationService {
     return {
       ...merged,
       colors: current.colors.length > 0 ? current.colors : merged.colors,
+      roleColors: this.hasRoleColors(current.roleColors)
+        ? current.roleColors
+        : merged.roleColors,
       styles: current.styles.length > 0 ? current.styles : merged.styles,
       occasions:
         current.occasions.length > 0 ? current.occasions : merged.occasions,
@@ -2092,6 +2112,7 @@ export class OutfitRecommendationService {
     const comparablePrompt = this.normalizeComparable(query);
     const categories = new Set<string>();
     const colors = this.extractTags(comparablePrompt, COLOR_ENTRIES);
+    const roleColors = this.extractRoleColors(comparablePrompt);
     const styles = new Set(this.extractTags(comparablePrompt, STYLE_ENTRIES));
     const occasions = this.extractTags(comparablePrompt, OCCASION_ENTRIES);
     const fits = this.extractTags(comparablePrompt, FIT_ENTRIES);
@@ -2165,8 +2186,74 @@ export class OutfitRecommendationService {
       fits,
       negativeCategories,
       negativeTags,
+      roleColors,
       searchTags: [...searchTags],
     };
+  }
+
+  private extractRoleColors(
+    comparablePrompt: string,
+  ): Partial<Record<OutfitRole, string[]>> {
+    const roleColors: Partial<Record<OutfitRole, string[]>> = {};
+    const colorAliases = COLOR_ENTRIES.flatMap((entry) =>
+      entry.aliases.map((alias) => ({
+        alias: this.normalizeComparable(alias),
+        tag: entry.tag,
+      })),
+    ).filter((entry) => entry.alias.length > 0);
+    const roles: OutfitRole[] = [
+      'top',
+      'bottom',
+      'shoes',
+      'jacket',
+      'handbag',
+      'accessory',
+    ];
+
+    for (const role of roles) {
+      for (const { alias, tag } of colorAliases) {
+        const aliasPattern = alias
+          .split(' ')
+          .map((part) => this.escapeRegExp(part))
+          .join('\\s+');
+        const roleThenColor = new RegExp(
+          `\\b(?:${ROLE_ALIAS_PATTERNS[role]})\\s+(?:mau\\s+)?${aliasPattern}\\b`,
+        );
+        const colorThenRole = this.canColorPrecedeRole(alias)
+          ? new RegExp(
+              `\\b${aliasPattern}(?:\\s+${COLOR_ROLE_DESCRIPTOR_PATTERN}){0,2}\\s+(?:${ROLE_ALIAS_PATTERNS[role]})\\b`,
+            )
+          : undefined;
+
+        if (
+          roleThenColor.test(comparablePrompt) ||
+          colorThenRole?.test(comparablePrompt)
+        ) {
+          roleColors[role] = this.cleanTags([...(roleColors[role] ?? []), tag]);
+        }
+      }
+    }
+
+    return roleColors;
+  }
+
+  private canColorPrecedeRole(comparableAlias: string): boolean {
+    if (comparableAlias.startsWith('mau ')) {
+      return false;
+    }
+
+    return ![
+      'bac',
+      'den',
+      'do',
+      'kem',
+      'nau',
+      'trang',
+      'xam',
+      'xanh',
+      'xanh blue',
+      'xanh duong',
+    ].includes(comparableAlias);
   }
 
   private composeOutfits(
@@ -2404,11 +2491,17 @@ export class OutfitRecommendationService {
           this.buildWeakRoleWarning(product.role, locale),
       );
     let totalPrice = candidate.totalPrice;
+    let skippedOptionalForBudget = false;
 
     const shoes = this.pickForRole(
       scoredByRole.get('shoes') ?? [],
       optionNumber - 1,
       selectedIds,
+    );
+    skippedOptionalForBudget ||= this.wouldSkipOptionalForBudget(
+      shoes,
+      budgetMax,
+      totalPrice,
     );
     totalPrice = this.addOptionalProduct(
       shoes,
@@ -2424,6 +2517,11 @@ export class OutfitRecommendationService {
       scoredByRole.get('jacket') ?? [],
       optionNumber - 1,
       selectedIds,
+    );
+    skippedOptionalForBudget ||= this.wouldSkipOptionalForBudget(
+      jacket,
+      budgetMax,
+      totalPrice,
     );
     totalPrice = this.addOptionalProduct(
       jacket,
@@ -2442,6 +2540,11 @@ export class OutfitRecommendationService {
       optionNumber - 1,
       selectedIds,
     );
+    skippedOptionalForBudget ||= this.wouldSkipOptionalForBudget(
+      accessoryOrBag,
+      budgetMax,
+      totalPrice,
+    );
     totalPrice = this.addOptionalProduct(
       accessoryOrBag,
       intent,
@@ -2452,7 +2555,10 @@ export class OutfitRecommendationService {
       totalPrice,
     );
 
-    if (needsBudgetWarning && budgetMax !== undefined) {
+    if (
+      (needsBudgetWarning || skippedOptionalForBudget) &&
+      budgetMax !== undefined
+    ) {
       outfitWarnings.unshift(this.buildBudgetWarning(budgetMax, locale));
     }
 
@@ -2580,6 +2686,18 @@ export class OutfitRecommendationService {
     return totalPrice + scoredProduct.product.price;
   }
 
+  private wouldSkipOptionalForBudget(
+    scoredProduct: ScoredProduct | undefined,
+    budgetMax: number | undefined,
+    totalPrice: number,
+  ): boolean {
+    return Boolean(
+      scoredProduct &&
+        budgetMax !== undefined &&
+        totalPrice + scoredProduct.product.price > budgetMax,
+    );
+  }
+
   private keepHighestScoringProductPerRole(
     products: ScoredProduct[],
   ): ScoredProduct[] {
@@ -2700,14 +2818,14 @@ export class OutfitRecommendationService {
       }
     }
 
-    for (const color of intent.colors) {
+    for (const color of this.getRoleAwareColors(intent, role)) {
       if (this.hasCompatibleTag(product.tagSet, color)) {
-        score += 20;
-        intentScore += 20;
+        score += 24;
+        intentScore += 24;
         matchedTags.add(color);
       } else if (this.hasCompatibleTag(product.variantColorTags, color)) {
-        score += 8;
-        intentScore += 8;
+        score += 18;
+        intentScore += 18;
         matchedTags.add(color);
       }
     }
@@ -3039,7 +3157,105 @@ export class OutfitRecommendationService {
       }
     }
 
+    for (const warning of this.buildInventorySubstitutionWarnings(
+      outfits,
+      products,
+      intent,
+      locale,
+    )) {
+      warnings.add(warning);
+    }
+
     return [...warnings].slice(0, 6);
+  }
+
+  private buildInventorySubstitutionWarnings(
+    outfits: StyleAdviceOutfitDto[],
+    products: PreparedProduct[],
+    intent: ExtractedIntent,
+    locale: StyleAdviceLocale,
+  ): string[] {
+    if (
+      !this.getRoleAwareColors(intent, 'top').includes('white') ||
+      !intent.categories.some((category) =>
+        this.categoryAppliesToRole(category, 'top'),
+      )
+    ) {
+      return [];
+    }
+
+    const selectedTopProducts = outfits
+      .flatMap((outfit) => outfit.products)
+      .filter((product) => product.role === 'top')
+      .map((product) =>
+        products.find((candidate) => candidate.record.id === product.productId),
+      )
+      .filter((product): product is PreparedProduct => Boolean(product));
+
+    if (selectedTopProducts.length === 0) {
+      return [];
+    }
+
+    const hasExactRequestedWhiteTop = products.some(
+      (product) =>
+        product.roles.has('top') &&
+        this.productCanServeRole(product, 'top') &&
+        this.productHasAnyTag(product, ['white']) &&
+        this.productMatchesRequestedTopShape(product, intent),
+    );
+
+    if (hasExactRequestedWhiteTop) {
+      return [];
+    }
+
+    const selectedUsesWhiteFallback = selectedTopProducts.some(
+      (product) =>
+        this.productHasAnyTag(product, WHITE_NEAR_COLOR_TAGS) ||
+        (this.productHasAnyTag(product, ['white']) &&
+          this.productHasAnyTag(product, LONG_SLEEVE_TARGET_TAGS)),
+    );
+
+    return selectedUsesWhiteFallback
+      ? [this.buildWhiteTopSubstitutionWarning(locale)]
+      : [];
+  }
+
+  private productMatchesRequestedTopShape(
+    product: PreparedProduct,
+    intent: ExtractedIntent,
+  ): boolean {
+    if (intent.categories.includes('tank_top')) {
+      return this.productHasAnyTag(product, TANK_TARGET_TAGS);
+    }
+
+    if (intent.categories.includes('long_sleeves')) {
+      return this.productHasAnyTag(product, LONG_SLEEVE_TARGET_TAGS);
+    }
+
+    if (intent.categories.includes('tee')) {
+      return this.productHasAnyTag(product, TEE_TARGET_TAGS);
+    }
+
+    return true;
+  }
+
+  private productHasAnyTag(product: PreparedProduct, tags: string[]): boolean {
+    return tags
+      .map((tag) => this.normalizeTag(tag))
+      .some(
+        (tag) =>
+          product.tagSet.has(tag) ||
+          product.categoryTags.has(tag) ||
+          product.variantColorTags.has(tag),
+      );
+  }
+
+  private buildWhiteTopSubstitutionWarning(
+    locale: StyleAdviceLocale,
+  ): string {
+    return locale === 'vi'
+      ? 'Kho chưa có áo trắng đúng kiểu còn hàng, nên phần áo được điều hướng sang mẫu beige/kem hoặc áo tay dài trắng gần tông yêu cầu.'
+      : 'No exact white top in the requested shape is in stock, so the top is redirected to a beige/cream option or a white long-sleeve close to the request.';
   }
 
   private buildSummary(
@@ -3061,11 +3277,26 @@ export class OutfitRecommendationService {
         ? `Mình đã tạo ${outfitCount} gợi ý outfit dựa trên ${criteria} bạn đưa ra.`
         : `I built ${outfitCount} outfit option${outfitCount === 1 ? '' : 's'} based on your requested ${criteria}.`;
 
+    if (warnings.some((warning) => this.isWhiteTopSubstitutionWarning(warning))) {
+      return locale === 'vi'
+        ? `${base} Kho chưa có áo trắng đúng kiểu còn hàng, nên mình điều hướng phần áo sang mẫu beige/kem hoặc áo tay dài trắng gần tông yêu cầu.`
+        : `${base} No exact white top in the requested shape is in stock, so I redirected the top to a beige/cream option or a white long-sleeve close to the request.`;
+    }
+
     return warnings.length > 0
       ? locale === 'vi'
         ? `${base} Một vài hạng mục dùng lựa chọn còn hàng gần nhất.`
         : `${base} Some categories use the closest available match.`
       : base;
+  }
+
+  private isWhiteTopSubstitutionWarning(warning: string): boolean {
+    const comparable = this.normalizeComparable(warning);
+
+    return (
+      comparable.includes('ao trang dung kieu') ||
+      comparable.includes('exact white top')
+    );
   }
 
   private buildExtraTips(
@@ -3234,6 +3465,33 @@ export class OutfitRecommendationService {
       intent.occasions.length > 0 ||
       intent.fits.length > 0
     );
+  }
+
+  private getRoleAwareColors(
+    intent: ExtractedIntent,
+    role: OutfitRole,
+  ): string[] {
+    const roleColors = intent.roleColors[role] ?? [];
+
+    if (roleColors.length > 0) {
+      return roleColors;
+    }
+
+    if (!this.hasRoleColors(intent.roleColors)) {
+      return intent.colors;
+    }
+
+    const assignedColors = new Set(
+      Object.values(intent.roleColors).flatMap((colors) => colors ?? []),
+    );
+
+    return intent.colors.filter((color) => !assignedColors.has(color));
+  }
+
+  private hasRoleColors(
+    roleColors: Partial<Record<OutfitRole, string[]>>,
+  ): boolean {
+    return Object.values(roleColors).some((colors) => (colors?.length ?? 0) > 0);
   }
 
   private extractTags(
@@ -3430,6 +3688,10 @@ export class OutfitRecommendationService {
 
     const escapedAlias = comparableAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp(`(?:^| )${escapedAlias}(?: |$)`).test(comparablePrompt);
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private buildWeakRoleWarning(

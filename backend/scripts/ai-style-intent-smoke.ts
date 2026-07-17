@@ -317,9 +317,102 @@ async function run() {
     );
   }
 
+  await verifyWhiteTopSubstitution();
+
   if (failures.length > 0) {
     throw new Error(failures.join('\n'));
   }
+}
+
+async function verifyWhiteTopSubstitution() {
+  const smokeCase: IntentSmokeCase = {
+    prompt: 'cho tui 1 outfit gồm quần đen áo trắng và giày',
+    expectedScope: 'allowed',
+    expectedLocale: 'vi',
+  };
+  const failureCountBefore = failures.length;
+  const substitutionFixtures = [
+    buildProduct('sub-top-black-tee', 'Only Black Tee', 'only-black-tee', 120_000, [
+      'top',
+      'tee',
+      'black',
+      'streetwear',
+    ]),
+    buildProduct('sub-top-beige-tee', 'Paly Tee', 'paly-tee', 120_000, [
+      'top',
+      'tee',
+      'beige',
+      'cream',
+      'streetwear',
+    ], 'Beige'),
+    buildProduct('sub-top-white-long-sleeve', 'Grunge Long Sleeves', 'grunge-long-sleeves', 120_000, [
+      'top',
+      'long_sleeves',
+      'white',
+      'grunge',
+    ], 'White'),
+    buildProduct('sub-bottom-black-denim', 'Black Denim Pants', 'black-denim-pants', 190_000, [
+      'bottoms',
+      'pants',
+      'denim',
+      'black',
+    ]),
+    buildProduct('sub-shoes-black-high-top', 'Black High Top Shoes', 'black-high-top-shoes', 160_000, [
+      'shoes',
+      'boots',
+      'black',
+    ]),
+  ];
+  const localPrismaService = {
+    product: { findMany: async () => substitutionFixtures },
+  } as unknown as PrismaService;
+  const localAiService = new AiService(
+    scopeService,
+    quotaService,
+    new OutfitRecommendationService(localPrismaService),
+  );
+  const response = await localAiService.getStyleAdvice(
+    { notes: smokeCase.prompt },
+    { userId: 'intent-smoke-user' },
+  );
+  const top = response.outfits[0]?.products.find(
+    (product) => product.role === 'top',
+  );
+
+  check(Boolean(top), smokeCase, 'did not return a top for the white-shirt prompt');
+  check(
+    top?.productId !== 'sub-top-black-tee',
+    smokeCase,
+    `selected black tee instead of a near-white fallback: ${top?.productName}`,
+  );
+  check(
+    ['sub-top-beige-tee', 'sub-top-white-long-sleeve'].includes(
+      top?.productId ?? '',
+    ),
+    smokeCase,
+    `selected unexpected top fallback: ${top?.productName}`,
+  );
+  check(
+    response.summary.includes('áo trắng') &&
+      (response.summary.includes('beige') || response.summary.includes('tay dài')),
+    smokeCase,
+    `summary did not explain the white-top substitution: ${response.summary}`,
+  );
+  check(
+    response.warnings.some((warning) => warning.includes('áo trắng')),
+    smokeCase,
+    `warnings did not include the white-top substitution: ${JSON.stringify(response.warnings)}`,
+  );
+
+  console.log(
+    JSON.stringify({
+      prompt: smokeCase.prompt,
+      selectedTop: top?.productName,
+      summary: response.summary,
+      warnings: response.warnings,
+      verdict: failures.length === failureCountBefore ? 'PASS' : 'FAIL',
+    }),
+  );
 }
 
 function checkIntent(
@@ -365,6 +458,7 @@ function buildProduct(
   slug: string,
   price: number,
   aiTags: string[],
+  variantColor = 'Black',
 ) {
   return {
     aiTags,
@@ -376,7 +470,7 @@ function buildProduct(
     name,
     productCategories: [],
     slug,
-    variants: [{ color: 'Black', priceOverride: null, size: 'M' }],
+    variants: [{ color: variantColor, priceOverride: null, size: 'M' }],
   };
 }
 
