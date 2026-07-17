@@ -187,7 +187,7 @@ export function HomeLandingExperience({
                   onClick={handleShopNow}
                   tabIndex={isTransitioning ? -1 : undefined}
                 >
-                  {t("intro.shopNow")}
+                  SHOP NOW
                 </a>
               </div>
             </div>
@@ -627,7 +627,7 @@ function VietnamTime() {
       <span aria-hidden="true" className={styles.timeSeparator}>
         {"\u00b7"}
       </span>
-      <span>{time} ICT</span>
+      <span>{time}</span>
     </time>
   );
 }
