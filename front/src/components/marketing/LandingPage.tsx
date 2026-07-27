@@ -6,14 +6,9 @@ import { useEffect, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { LandingInspirationGallery } from "@/components/landing/LandingInspirationGallery";
 import { getProducts } from "@/features/catalog/api";
-import {
-  localizeCategoryDescription,
-  localizeCategoryName,
-} from "@/features/catalog/localization";
 import type { Product } from "@/features/catalog/types";
 import { getFeaturedCategories } from "@/features/landing/api";
 import type { FeaturedCategory } from "@/features/landing/types";
-import { useI18n } from "@/features/i18n/useI18n";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface LandingCatalogState {
@@ -26,7 +21,6 @@ interface LandingCatalogState {
 const LANDING_HERO_VIDEO_SRC = "/images/landing/landing-hero.mp4";
 const LANDING_EDITORIAL_IMAGE_SRC = "/images/landing/landing-editorial.jpg";
 export function LandingPage() {
-  const { t } = useI18n();
   const [catalog, setCatalog] = useState<LandingCatalogState>({
     featuredCategories: [],
     products: [],
@@ -88,15 +82,15 @@ export function LandingPage() {
         </video>
         <div className="hero-section__shade" />
         <div className="hero-section__content">
-          <p className="eyebrow">{t("landing.heroEyebrow")}</p>
-          <h1 id="hero-heading">{t("landing.heroTitle")}</h1>
-          <p>{t("landing.heroSubtitle")}</p>
+          <p className="eyebrow">{"New season essentials"}</p>
+          <h1 id="hero-heading">{"Elevate your everyday"}</h1>
+          <p>{"Pieces made for real days, quiet confidence, and the little moments that let your personality show"}</p>
           <div className="hero-section__actions">
             <Link className="button button--primary" href="/products">
-              {t("landing.exploreProducts")} <ArrowRight size={18} />
+              {"Explore products"} <ArrowRight size={18} />
             </Link>
             <Link className="button button--secondary button--on-image" href="/categories">
-              {t("landing.browseCategories")}
+              {"Browse categories"}
             </Link>
           </div>
         </div>
@@ -104,7 +98,7 @@ export function LandingPage() {
 
       <section className="section section--categories" id="categories">
         <div className="section-heading section-heading--center">
-          <h2>{t("landing.featuredCategories")}</h2>
+          <h2>{"Featured Categories"}</h2>
         </div>
         <div className="category-grid">
           {catalog.isLoading ? <CatalogSkeleton count={3} /> : null}
@@ -112,7 +106,7 @@ export function LandingPage() {
             <CatalogStateMessage message={catalog.error} />
           ) : null}
           {!catalog.isLoading && !catalog.error && catalog.featuredCategories.length === 0 ? (
-            <CatalogStateMessage message={t("landing.noFeaturedCategories")} />
+            <CatalogStateMessage message={"No featured categories are available yet."} />
           ) : null}
           {!catalog.isLoading && !catalog.error
             ? catalog.featuredCategories.slice(0, 3).map((category) => (
@@ -125,10 +119,10 @@ export function LandingPage() {
       <section className="section section--muted" id="new-arrivals">
         <div className="section-heading section-heading--split">
           <div>
-            <h2>{t("landing.newArrivals")}</h2>
+            <h2>{"New Arrivals"}</h2>
           </div>
           <Link className="text-link" href="/products">
-            {t("landing.viewAll")}
+            {"View all"}
           </Link>
         </div>
         <div className="product-grid">
@@ -137,7 +131,7 @@ export function LandingPage() {
             <CatalogStateMessage message={catalog.error} />
           ) : null}
           {!catalog.isLoading && !catalog.error && catalog.products.length === 0 ? (
-            <CatalogStateMessage message={t("landing.noProducts")} />
+            <CatalogStateMessage message={"No products are available yet."} />
           ) : null}
           {!catalog.isLoading && !catalog.error
             ? catalog.products.map((product) => (
@@ -149,15 +143,15 @@ export function LandingPage() {
 
       <section className="campaign-band" id="delivery">
         <div className="campaign-band__copy">
-          <h2>{t("landing.campaignTitle")}</h2>
-          <p>{t("landing.campaignBody")}</p>
+          <h2>{"Made for the days you become yourself"}</h2>
+          <p>{"Clean pieces, easy layers, and small details that move with your real life, from first plans to late-night walks."}</p>
           <Link className="button button--light" href="/products">
-            {t("landing.shopEdit")}
+            {"Shop the edit"}
           </Link>
         </div>
         <div className="campaign-band__image-wrap">
           <img
-            alt={t("landing.editorialAlt")}
+            alt={"Belikeme editorial collage with monochrome youth styling"}
             className="campaign-band__image"
             loading="lazy"
             src={LANDING_EDITORIAL_IMAGE_SRC}
@@ -170,23 +164,23 @@ export function LandingPage() {
       <section className="landing-about" id="about" aria-labelledby="about-heading">
         <div className="landing-about__image-wrap">
           <img
-            alt={t("landing.aboutAlt")}
+            alt={"Belikeme brand story in motion"}
             className="landing-about__image"
             loading="lazy"
             src="/images/landing/aboutus.jpg"
           />
         </div>
         <div className="landing-about__content">
-          <h2 id="about-heading">{t("landing.aboutTitle")}</h2>
-          <p>{t("landing.aboutP1")}</p>
-          <p>{t("landing.aboutP2")}</p>
-          <p>{t("landing.aboutP3")}</p>
-          <p>{t("landing.aboutP4")}</p>
+          <h2 id="about-heading">{"Be bold. Be real. Be like me."}</h2>
+          <p>{"Belikeme was created from the spirit of youth: the courage to try, to stand apart, and to live fully for what you believe in."}</p>
+          <p>{"We believe every young person carries their own color. Some shine through confidence, some through passion, and some through the quiet effort of becoming better every day."}</p>
+          <p>{"Belikeme is more than a fashion brand. It is a reminder that you do not have to look like anyone else to be seen."}</p>
+          <p>{"You only need to stay true to yourself, follow what you love, and proudly say: this is me."}</p>
           <p className="landing-about__closing">
-            {t("landing.aboutClosing")}
+            {"We do not chase trends. We help you create your own mark."}
           </p>
           <Link className="button button--primary" href="/products">
-            {t("landing.shopBelikeme")}
+            {"SHOP BELIKEME"}
           </Link>
         </div>
       </section>
@@ -199,18 +193,14 @@ function CategoryTile({
 }: {
   category: FeaturedCategory;
 }) {
-  const { locale, t } = useI18n();
-  const categoryName = localizeCategoryName(category.name, locale);
-  const categoryDescription = localizeCategoryDescription(
-    category.description,
-    locale,
-  );
+  const categoryName = (category.name ?? "");
+  const categoryDescription = (category.description ?? null);
 
   return (
     <Link className="category-tile" href={getCategoryProductsHref(category.slug)}>
       {category.imageUrl ? (
         <img
-          alt={`${categoryName} ${t("catalog.category")}`}
+          alt={`${categoryName} ${"Category"}`}
           className="category-tile__image"
           loading="lazy"
           src={category.imageUrl}
@@ -220,7 +210,7 @@ function CategoryTile({
       )}
       <div className="category-tile__label">
         <h3>{categoryName}</h3>
-        <p>{categoryDescription || t("landing.categoryFallback")}</p>
+        <p>{categoryDescription || "Explore this Belikeme category."}</p>
       </div>
     </Link>
   );

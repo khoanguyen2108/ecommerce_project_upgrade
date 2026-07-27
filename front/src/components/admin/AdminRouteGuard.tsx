@@ -5,19 +5,23 @@ import type { ReactNode } from "react";
 import { AdminState } from "@/components/admin/AdminState";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
-import { useAdminCommonI18n } from "@/features/i18n/admin-common-translations";
+
+const ROLE_LABELS = {
+  ADMIN: "Administrator",
+  CUSTOMER: "Customer",
+  STAFF: "Staff",
+} as const;
 
 export function AdminRouteGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { currentUser, isAuthenticated, isLoading } = useAuthSession();
-  const { messages } = useAdminCommonI18n();
   const nextPath = getSafeNextPath(pathname);
 
   if (isLoading) {
     return (
       <AdminState
-        message={messages.guard.checkingMessage}
-        title={messages.guard.checkingAccess}
+        message={"Waiting for your session before opening the admin workspace."}
+        title={"Checking admin access"}
         tone="loading"
       />
     );
@@ -29,16 +33,16 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
         actions={[
           {
             href: `/login?next=${encodeURIComponent(nextPath)}`,
-            label: messages.guard.signIn,
+            label: "Sign in",
           },
           {
             href: "/products",
-            label: messages.guard.backToShop,
+            label: "Back to shop",
             variant: "secondary",
           },
         ]}
-        message={messages.guard.signInMessage}
-        title={messages.guard.signInRequired}
+        message={"Sign in with an admin account to continue."}
+        title={"Admin sign-in required"}
         tone="signin"
       />
     );
@@ -50,23 +54,23 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
         actions={[
           {
             href: "/products",
-            label: messages.guard.backToShop,
+            label: "Back to shop",
           },
           {
             href: "/",
-            label: messages.guard.home,
+            label: "Home",
             variant: "secondary",
           },
         ]}
-        message={messages.guard.forbiddenMessage}
+        message={"This account does not have permission to open the admin workspace."}
         meta={
           <span>
-            {messages.guard.signedInRole}: {currentUser?.role
-              ? messages.roles[currentUser.role]
-              : messages.common.unknown}
+            {"Signed in role"}: {currentUser?.role
+              ? ROLE_LABELS[currentUser.role]
+              : "Unknown"}
           </span>
         }
-        title={messages.guard.accessRequired}
+        title={"Admin access required"}
         tone="forbidden"
       />
     );

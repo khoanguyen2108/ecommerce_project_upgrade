@@ -1,5 +1,8 @@
 "use client";
 
+import { ADMIN_OPERATIONS_COPY, type AdminOperationsCopy } from "@/components/admin/admin-copy";
+const copy = ADMIN_OPERATIONS_COPY;
+
 import {
   AlertCircle,
   Inbox,
@@ -15,11 +18,6 @@ import { formatNumber } from "@/components/orders/order-format";
 import { requestAdminNavNotificationsRefresh } from "@/features/admin-notifications/events";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { isAdminUser } from "@/features/auth/roles";
-import {
-  getAdminOperationsTranslations,
-  type AdminOperationsTranslations,
-} from "@/features/i18n/admin-operations-translations";
-import { useI18n } from "@/features/i18n/useI18n";
 import {
   getAdminChatConversation,
   listAdminChatConversations,
@@ -48,8 +46,6 @@ interface ChatUiError {
 
 export function AdminChatsPage() {
   const { accessToken, currentUser } = useAuthSession();
-  const { locale } = useI18n();
-  const copy = getAdminOperationsTranslations(locale);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
   const [selectedConversation, setSelectedConversation] =
@@ -386,14 +382,14 @@ export function AdminChatsPage() {
   const selectedCustomerLabel =
     selectedConversation?.customer.name ||
     selectedConversation?.customer.email ||
-    copy.chats.customerFallback;
+    "Customer";
   return (
     <div className="admin-resource admin-resource--full-width admin-chats-page">
       <section className="admin-resource__header" aria-labelledby="admin-chats-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">{copy.chats.eyebrow}</p>
-          <h1 id="admin-chats-heading">{copy.chats.title}</h1>
-          <p>{copy.chats.subtitle}</p>
+          <p className="admin-page-intro__eyebrow">{"SUPPORT INBOX"}</p>
+          <h1 id="admin-chats-heading">{"Chats"}</h1>
+          <p>{"Reply to customer questions about orders, sizing, and delivery."}</p>
         </div>
         <button
           className="button button--secondary"
@@ -406,7 +402,7 @@ export function AdminChatsPage() {
             className={isListLoading ? "spin" : undefined}
             size={17}
           />
-          {copy.common.refresh}
+          {"Refresh"}
         </button>
       </section>
 
@@ -420,13 +416,13 @@ export function AdminChatsPage() {
         />
       ) : null}
 
-      <section className="admin-chats-layout" aria-label={copy.chats.layoutAria}>
-        <aside className="admin-chats-list" aria-label={copy.chats.listAria}>
+      <section className="admin-chats-layout" aria-label={"Customer support chats"}>
+        <aside className="admin-chats-list" aria-label={"Conversations"}>
           <div className="admin-chats-list__header">
             <div>
-              <strong>{copy.chats.conversations}</strong>
+              <strong>{"Conversations"}</strong>
               <span>
-                {copy.chats.conversationTotal(formatNumber(conversations.length, locale))}
+                {((count) => `${count} total`)(formatNumber(conversations.length))}
               </span>
             </div>
           </div>
@@ -434,7 +430,7 @@ export function AdminChatsPage() {
           <div className="admin-chats-list__body">
             {isListLoading ? <AdminChatListSkeleton /> : null}
             {!isListLoading && conversations.length === 0 ? (
-              <AdminChatEmptyList label={copy.chats.emptyList} />
+              <AdminChatEmptyList label={"No customer conversations yet."} />
             ) : null}
             {!isListLoading
               ? conversations.map((conversation) => (
@@ -462,23 +458,19 @@ export function AdminChatsPage() {
                             conversation.customer.email}
                         </strong>
                         <small>
-                          {formatNullableTime(
-                            conversation.lastMessageAt || conversation.updatedAt,
-                            locale,
-                            copy.chats.noActivity,
-                          )}
+                          {formatNullableTime(conversation.lastMessageAt || conversation.updatedAt, "No activity")}
                         </small>
                       </span>
                       <span className="admin-chat-list-item__email">
                         {conversation.customer.email}
                       </span>
                       <span className="admin-chat-list-item__preview">
-                        {conversation.lastMessage?.body || copy.chats.emptyPreview}
+                        {conversation.lastMessage?.body || "No messages yet."}
                       </span>
                       {conversation.unreadCount > 0 ? (
                         <span className="admin-chat-list-item__meta">
                           <span className="admin-chat-list-item__unread">
-                            {formatNumber(conversation.unreadCount, locale)}
+                            {formatNumber(conversation.unreadCount)}
                           </span>
                         </span>
                       ) : null}
@@ -489,7 +481,7 @@ export function AdminChatsPage() {
           </div>
         </aside>
 
-        <main className="admin-chat-thread" aria-label={copy.chats.selectedConversationAria}>
+        <main className="admin-chat-thread" aria-label={"Selected conversation"}>
           {selectedConversation ? (
             <>
               <header className="admin-chat-thread__header">
@@ -507,26 +499,22 @@ export function AdminChatsPage() {
                 </div>
                 <dl>
                   <div>
-                    <dt>{locale === "vi" ? "Khách hàng" : "Customer"}</dt>
+                    <dt>Customer</dt>
                     <dd>
                       <span className={`admin-chat-presence admin-chat-presence--${getCustomerPresence(selectedConversation)}`}>
-                        {formatCustomerPresence(getCustomerPresence(selectedConversation), locale)}
+                        {formatCustomerPresence(getCustomerPresence(selectedConversation))}
                       </span>
                     </dd>
                   </div>
                   <div>
-                    <dt>{copy.chats.lastActivity}</dt>
+                    <dt>{"Last activity"}</dt>
                     <dd>
-                      {formatNullableTime(
-                        selectedConversation.lastMessageAt ||
-                          selectedConversation.updatedAt,
-                          locale,
-                          copy.chats.noActivity,
-                      )}
+                      {formatNullableTime(selectedConversation.lastMessageAt ||
+                          selectedConversation.updatedAt, "No activity")}
                     </dd>
                   </div>
                   <div>
-                    <dt>{copy.chats.conversationId}</dt>
+                    <dt>{"ID"}</dt>
                     <dd>{formatConversationId(selectedConversation.id)}</dd>
                   </div>
                 </dl>
@@ -542,7 +530,7 @@ export function AdminChatsPage() {
                 {!isDetailLoading && messages.length === 0 ? (
                   <div className="admin-chat-thread__empty" role="status">
                     <MessageCircle aria-hidden="true" size={28} />
-                    <span>{copy.chats.emptyConversation}</span>
+                    <span>{"No messages in this conversation yet."}</span>
                   </div>
                 ) : null}
                 {!isDetailLoading
@@ -550,7 +538,6 @@ export function AdminChatsPage() {
                       <AdminChatBubble
                         isAdmin={message.senderRole === "ADMIN"}
                         key={message.id}
-                        locale={locale}
                         message={message}
                         copy={copy.chats}
                       />
@@ -560,7 +547,7 @@ export function AdminChatsPage() {
               </div>
 
               <form className="admin-chat-composer" onSubmit={handleSend}>
-                <label htmlFor="admin-chat-reply">{copy.chats.reply}</label>
+                <label htmlFor="admin-chat-reply">{"Reply"}</label>
                 <div className="admin-chat-composer__field">
                   <textarea
                     disabled={isSending || selectedConversation.status === "CLOSED"}
@@ -568,13 +555,13 @@ export function AdminChatsPage() {
                     maxLength={2000}
                     onChange={(event) => setDraft(event.target.value)}
                     onKeyDown={handleComposerKeyDown}
-                    placeholder={copy.chats.replyPlaceholder}
+                    placeholder={"Type your reply..."}
                     rows={2}
                     value={draft}
                   />
                 </div>
                 <button
-                  aria-label={copy.chats.sendAria}
+                  aria-label={"Send reply"}
                   className="admin-chat-composer__send"
                   disabled={
                     !draft.trim() ||
@@ -584,18 +571,18 @@ export function AdminChatsPage() {
                   type="submit"
                 >
                   <Send aria-hidden="true" size={17} />
-                  <span>{isSending ? copy.chats.sending : copy.chats.send}</span>
+                  <span>{isSending ? "Sending" : "Send"}</span>
                 </button>
               </form>
             </>
           ) : (
             <div className="admin-chat-thread__empty admin-chat-thread__empty--full">
               {isListLoading ? (
-                <span>{copy.chats.loadingConversations}</span>
+                <span>{"Loading conversations."}</span>
               ) : (
                 <>
                   <Inbox aria-hidden="true" size={30} />
-                  <span>{copy.chats.selectConversation}</span>
+                  <span>{"Select a conversation to start replying."}</span>
                 </>
               )}
             </div>
@@ -609,12 +596,10 @@ export function AdminChatsPage() {
 function AdminChatBubble({
   copy,
   isAdmin,
-  locale,
   message,
 }: {
-  copy: AdminOperationsTranslations["chats"];
+  copy: AdminOperationsCopy["chats"];
   isAdmin: boolean;
-  locale: "en" | "vi";
   message: ChatMessage;
 }) {
   const isAi = message.senderRole === "AI";
@@ -638,7 +623,7 @@ function AdminChatBubble({
               : message.sender?.name || copy.actorCustomer}
         </strong>
         <time dateTime={message.createdAt}>
-          {formatAdminDate(message.createdAt, locale)}
+          {formatAdminDate(message.createdAt)}
         </time>
       </div>
       <p>{message.body}</p>
@@ -715,7 +700,7 @@ function appendMessage(
 
 function getChatErrorMessage(
   error: ChatUiError,
-  copy: AdminOperationsTranslations["chats"],
+  copy: AdminOperationsCopy["chats"],
 ): string {
   const socketError = error.cause as Partial<ChatSocketError> | undefined;
   const code =
@@ -745,14 +730,13 @@ function getChatErrorMessage(
 
 function formatNullableTime(
   value: string | null | undefined,
-  locale: "en" | "vi",
   fallback: string,
 ): string {
   if (!value) {
     return fallback;
   }
 
-  return formatAdminDate(value, locale);
+  return formatAdminDate(value);
 }
 
 function getCustomerInitials(name: string | null | undefined, email: string): string {
@@ -795,11 +779,6 @@ function getCustomerPresence(conversation: ChatConversation): "online" | "offlin
 
 function formatCustomerPresence(
   presence: "online" | "offline",
-  locale: "en" | "vi",
 ): string {
-  if (locale === "vi") {
-    return presence === "online" ? "Đang online" : "Đang offline";
-  }
-
   return presence === "online" ? "Online" : "Offline";
 }

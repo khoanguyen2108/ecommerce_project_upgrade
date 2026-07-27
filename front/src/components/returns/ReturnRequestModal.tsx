@@ -9,8 +9,6 @@ import type {
   ReturnReason,
 } from '@/features/returns/types';
 import { ApiClientError } from '@/lib/errors/api-error';
-import { useI18n } from '@/features/i18n/useI18n';
-import type { TranslationKey } from '@/features/i18n/translations';
 import styles from './ReturnRequestModal.module.css';
 
 const REASONS = Object.keys(RETURN_REASON_LABELS) as ReturnReason[];
@@ -28,7 +26,6 @@ export function ReturnRequestModal({
   onSubmitted,
   orderCode,
 }: ReturnRequestModalProps) {
-  const { locale, t } = useI18n();
   const [reason, setReason] = useState<ReturnReason>('WRONG_SIZE');
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string>();
@@ -82,7 +79,7 @@ export function ReturnRequestModal({
       onSubmitted(response.returnRequest);
       onClose();
     } catch (submitError) {
-      setError(getReturnErrorMessage(submitError, t));
+      setError(getReturnErrorMessage(submitError));
     } finally {
       setIsSubmitting(false);
     }
@@ -101,11 +98,11 @@ export function ReturnRequestModal({
             <RotateCcw aria-hidden="true" size={20} />
           </span>
           <div>
-            <p>{t('return.order')} #{orderCode}</p>
-            <h2 id="return-request-title">{t('return.title')}</h2>
+            <p>{"Order"} #{orderCode}</p>
+            <h2 id="return-request-title">{"Request Return"}</h2>
           </div>
           <button
-            aria-label={t('return.close')}
+            aria-label={"Close return request"}
             className={styles.close}
             disabled={isSubmitting}
             onClick={onClose}
@@ -117,7 +114,7 @@ export function ReturnRequestModal({
 
         <div className={styles.body}>
           <label>
-            <span>{t('return.reason')}</span>
+            <span>{"Reason"}</span>
             <select
               disabled={isSubmitting}
               onChange={(event) => setReason(event.target.value as ReturnReason)}
@@ -125,19 +122,19 @@ export function ReturnRequestModal({
             >
               {REASONS.map((value) => (
                 <option key={value} value={value}>
-                  {getReturnReasonLabel(value, locale)}
+                  {getReturnReasonLabel(value)}
                 </option>
               ))}
             </select>
           </label>
 
           <label>
-            <span>{t('return.description')}</span>
+            <span>{"Description"}</span>
             <textarea
               disabled={isSubmitting}
               maxLength={1000}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder={t('return.descriptionPlaceholder')}
+              placeholder={"Tell us briefly what happened (optional)."}
               rows={5}
               value={description}
             />
@@ -154,14 +151,14 @@ export function ReturnRequestModal({
             onClick={onClose}
             type="button"
           >
-            {t('return.cancel')}
+            {"Cancel"}
           </button>
           <button
             className="button button--primary"
             disabled={isSubmitting}
             type="submit"
           >
-            {isSubmitting ? t('return.submitting') : t('return.submit')}
+            {isSubmitting ? "Submitting..." : "Submit Request"}
           </button>
         </footer>
       </form>
@@ -171,17 +168,16 @@ export function ReturnRequestModal({
 
 function getReturnErrorMessage(
   error: unknown,
-  t: (key: TranslationKey) => string,
 ): string {
   if (!(error instanceof ApiClientError)) {
-    return t('return.submitError');
+    return "The return request could not be submitted. Please try again.";
   }
 
   const messages: Record<string, string> = {
-    RETURN_ORDER_NOT_DELIVERED: t('return.notDelivered'),
-    RETURN_ORDER_NOT_FOUND: t('return.notFound'),
-    RETURN_REQUEST_PENDING_EXISTS: t('return.pendingExists'),
+    RETURN_ORDER_NOT_DELIVERED: "This order is not eligible yet. Returns can be requested after delivery.",
+    RETURN_ORDER_NOT_FOUND: "This order could not be found for your account.",
+    RETURN_REQUEST_PENDING_EXISTS: "A return request for this order is already pending review.",
   };
 
-  return messages[error.code] || t('return.submitError');
+  return messages[error.code] || "The return request could not be submitted. Please try again.";
 }

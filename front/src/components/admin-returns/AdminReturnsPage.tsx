@@ -1,4 +1,7 @@
-'use client';
+"use client";
+
+import { ADMIN_OPERATIONS_COPY, type AdminOperationsCopy } from "@/components/admin/admin-copy";
+const copy = ADMIN_OPERATIONS_COPY;
 
 import { Eye, Inbox, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
@@ -9,19 +12,12 @@ import { formatDate } from '@/components/orders/order-format';
 import { listAdminReturns } from '@/features/returns/api';
 import { getReturnReasonLabel, getReturnStatusLabel } from '@/features/returns/format';
 import type { AdminReturnSummary, ReturnRequestStatus } from '@/features/returns/types';
-import {
-  getAdminOperationsTranslations,
-  type AdminOperationsTranslations,
-} from '@/features/i18n/admin-operations-translations';
-import { useI18n } from '@/features/i18n/useI18n';
 import type { Pagination } from '@/lib/api/types';
 import { ApiClientError } from '@/lib/errors/api-error';
 
 const LIMIT = 20;
 
 export function AdminReturnsPage() {
-  const { locale } = useI18n();
-  const copy = getAdminOperationsTranslations(locale);
   const [status, setStatus] = useState<ReturnRequestStatus>();
   const [page, setPage] = useState(1);
   const [requests, setRequests] = useState<AdminReturnSummary[]>([]);
@@ -73,16 +69,16 @@ export function AdminReturnsPage() {
   }, [page, refreshKey, status]);
 
   const errorMessage = error
-    ? getReturnErrorMessage(error, copy, copy.returns.list.loadError)
+    ? getReturnErrorMessage(error, copy, "Return requests could not be loaded.")
     : undefined;
 
   return (
     <div className="admin-resource admin-resource--full-width admin-returns-page">
       <section className="admin-returns-hero" aria-labelledby="admin-returns-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">{copy.returns.list.eyebrow}</p>
-          <h1 id="admin-returns-heading">{copy.returns.list.title}</h1>
-          <p>{copy.returns.list.subtitle}</p>
+          <p className="admin-page-intro__eyebrow">{"CUSTOMER CARE"}</p>
+          <h1 id="admin-returns-heading">{"Returns"}</h1>
+          <p>{"Review submitted return requests and approve or reject them."}</p>
         </div>
         <button
           className="button button--secondary"
@@ -91,13 +87,13 @@ export function AdminReturnsPage() {
           type="button"
         >
           <RefreshCw aria-hidden="true" className={isLoading ? 'spin' : undefined} size={17} />
-          {copy.common.refresh}
+          {"Refresh"}
         </button>
       </section>
 
-      <section className="admin-returns-filter" aria-label={copy.returns.list.filtersAria}>
+      <section className="admin-returns-filter" aria-label={"Return request filters"}>
         <label>
-          <span>{copy.common.status}</span>
+          <span>{"Status"}</span>
           <select
             onChange={(event) => {
               setStatus((event.target.value || undefined) as ReturnRequestStatus | undefined);
@@ -105,10 +101,10 @@ export function AdminReturnsPage() {
             }}
             value={status || ''}
           >
-            <option value="">{copy.returns.list.allStatuses}</option>
-            <option value="PENDING">{getReturnStatusLabel('PENDING', locale)}</option>
-            <option value="APPROVED">{getReturnStatusLabel('APPROVED', locale)}</option>
-            <option value="REJECTED">{getReturnStatusLabel('REJECTED', locale)}</option>
+            <option value="">{"All statuses"}</option>
+            <option value="PENDING">{getReturnStatusLabel('PENDING')}</option>
+            <option value="APPROVED">{getReturnStatusLabel('APPROVED')}</option>
+            <option value="REJECTED">{getReturnStatusLabel('REJECTED')}</option>
           </select>
         </label>
       </section>
@@ -121,12 +117,12 @@ export function AdminReturnsPage() {
         <table className="admin-table admin-table--commerce">
           <thead>
             <tr>
-              <th>{copy.returns.list.orderCode}</th>
-              <th>{copy.common.customer}</th>
-              <th>{copy.returns.list.reason}</th>
-              <th>{copy.common.status}</th>
-              <th>{copy.returns.list.created}</th>
-              <th>{copy.common.actions}</th>
+              <th>{"Order Code"}</th>
+              <th>{"Customer"}</th>
+              <th>{"Reason"}</th>
+              <th>{"Status"}</th>
+              <th>{"Created"}</th>
+              <th>{"Actions"}</th>
             </tr>
           </thead>
           <tbody>
@@ -135,8 +131,8 @@ export function AdminReturnsPage() {
               <tr>
                 <td className="admin-table__state" colSpan={6}>
                   <Inbox aria-hidden="true" size={24} />
-                  <strong>{copy.returns.list.emptyTitle}</strong>
-                  <span>{copy.returns.list.emptyBody}</span>
+                  <strong>{"No return requests found"}</strong>
+                  <span>{"New customer requests will appear here."}</span>
                 </td>
               </tr>
             ) : null}
@@ -145,16 +141,16 @@ export function AdminReturnsPage() {
                   <tr key={request.id}>
                     <td><strong>#{request.orderCode}</strong></td>
                     <td>
-                      <strong>{request.customer.name || copy.returns.list.customerFallback}</strong>
+                      <strong>{request.customer.name || "Customer"}</strong>
                       <span className="admin-table__secondary">{request.customer.email}</span>
                     </td>
-                    <td>{getReturnReasonLabel(request.reason, locale)}</td>
+                    <td>{getReturnReasonLabel(request.reason)}</td>
                     <td><ReturnRequestStatusBadge status={request.status} /></td>
-                    <td>{formatDate(request.createdAt, locale)}</td>
+                    <td>{formatDate(request.createdAt)}</td>
                     <td>
                       <Link className="admin-table-link" href={`/admin/returns/${request.id}`}>
                         <Eye aria-hidden="true" size={16} />
-                        {copy.common.view}
+                        {"View"}
                       </Link>
                     </td>
                   </tr>
@@ -166,7 +162,7 @@ export function AdminReturnsPage() {
 
       <AdminPagination
         isLoading={isLoading}
-        noun={copy.returns.list.noun}
+        noun={"requests"}
         onPageChange={setPage}
         pagination={pagination}
       />
@@ -176,7 +172,7 @@ export function AdminReturnsPage() {
 
 function getReturnErrorMessage(
   error: unknown,
-  copy: AdminOperationsTranslations,
+  copy: AdminOperationsCopy,
   fallback: string,
 ): string {
   if (!(error instanceof ApiClientError)) {

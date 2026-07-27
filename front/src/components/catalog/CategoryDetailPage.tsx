@@ -5,16 +5,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "@/components/catalog/ProductCard";
 import { getCategoryBySlug, getProducts } from "@/features/catalog/api";
-import {
-  localizeCategoryDescription,
-  localizeCategoryName,
-} from "@/features/catalog/localization";
 import type {
   Category,
   Pagination,
   Product,
 } from "@/features/catalog/types";
-import { useI18n } from "@/features/i18n/useI18n";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 const CATEGORY_PRODUCT_LIMIT = 12;
@@ -33,7 +28,6 @@ interface CategoryDetailState {
 }
 
 export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
-  const { locale, t } = useI18n();
   const [page, setPage] = useState(1);
   const [state, setState] = useState<CategoryDetailState>({
     isLoading: true,
@@ -114,19 +108,19 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
     const total = state.pagination.total;
 
     if (total === 1) {
-      return `1 ${t("catalog.product")}`;
+      return `1 ${"product"}`;
     }
 
-    return `${total} ${t("catalog.products")}`;
-  }, [state.pagination.total, t]);
+    return `${total} ${"products"}`;
+  }, [state.pagination.total]);
 
   if (state.isLoading) {
     return (
       <main className="catalog-page">
         <section className="catalog-hero">
-          <p className="eyebrow">{t("catalog.category")}</p>
-          <h1>{t("catalog.loadingCategory")}</h1>
-          <p>{t("catalog.loadingCategoryBody")}</p>
+          <p className="eyebrow">{"Category"}</p>
+          <h1>{"Loading category..."}</h1>
+          <p>{"Finding the latest pieces in this Belikeme edit."}</p>
         </section>
 
         <section className="catalog-shell" aria-busy="true" aria-live="polite">
@@ -142,14 +136,14 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
     return (
       <main className="catalog-page">
         <section className="catalog-hero">
-          <p className="eyebrow">{t("catalog.categoryNotFound")}</p>
-          <h1>{t("catalog.categoryUnavailable")}</h1>
-          <p>{t("catalog.categoryUnavailableBody")}</p>
+          <p className="eyebrow">{"Category not found"}</p>
+          <h1>{"This edit is not available"}</h1>
+          <p>{"The category may have been renamed or hidden. The full product catalog is still ready to browse."}</p>
         </section>
 
         <Link className="button button--secondary" href="/products">
           <ArrowLeft size={18} />
-          {t("catalog.backToProducts")}
+          {"Back to products"}
         </Link>
       </main>
     );
@@ -159,33 +153,30 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
     return (
       <main className="catalog-page">
         <section className="catalog-hero">
-          <p className="eyebrow">{t("catalog.category")}</p>
-          <h1>{t("catalog.categoryLoadError")}</h1>
-          <p>{t("catalog.categoryLoadErrorBody")}</p>
+          <p className="eyebrow">{"Category"}</p>
+          <h1>{"We could not load this category"}</h1>
+          <p>{"Please try again from the product catalog."}</p>
         </section>
 
         <div className="catalog-error" role="alert">
           <AlertCircle size={20} />
           <span>
             {state.error ||
-              t("catalog.categoryLoadErrorBody")}
+              "Please try again from the product catalog."}
           </span>
         </div>
 
         <Link className="button button--secondary" href="/products">
           <ArrowLeft size={18} />
-          {t("catalog.backToProducts")}
+          {"Back to products"}
         </Link>
       </main>
     );
   }
 
   const totalPages = Math.max(1, state.pagination.totalPages);
-  const categoryName = localizeCategoryName(state.category.name, locale);
-  const categoryDescription = localizeCategoryDescription(
-    state.category.description,
-    locale,
-  );
+  const categoryName = (state.category.name ?? "");
+  const categoryDescription = (state.category.description ?? null);
 
   return (
     <main className="catalog-page catalog-page--category-detail">
@@ -196,7 +187,7 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
         <header className="category-detail-header">
           <div className="category-detail-header__copy">
             <div className="category-detail-header__meta">
-              <p className="eyebrow">{t("catalog.category")}</p>
+              <p className="eyebrow">{"Category"}</p>
               <span>{productCountLabel}</span>
             </div>
             <h1 id="category-products-heading">{categoryName}</h1>
@@ -211,7 +202,7 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
             className="button button--secondary category-detail-header__action"
             href={`/products?categorySlug=${encodeURIComponent(state.category.slug)}`}
           >
-            {t("catalog.filterCatalog")}
+            {"Filter catalog"}
             <ArrowRight size={18} />
           </Link>
         </header>
@@ -227,7 +218,7 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
           <div className="product-grid">
             {state.products.length === 0 ? (
               <div className="catalog-state" role="status">
-                {t("catalog.noCategoryProducts")}
+                {"No active products are available in this category yet."}
               </div>
             ) : (
               state.products.map((product) => (
@@ -238,17 +229,17 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
         ) : null}
 
         {!state.error && totalPages > 1 ? (
-          <div className="catalog-pagination" aria-label={t("catalog.pagination")}>
+          <div className="catalog-pagination" aria-label={"Product pagination"}>
             <button
               className="button button--secondary"
               disabled={page <= 1}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
               type="button"
             >
-              {t("common.previous")}
+              {"Previous"}
             </button>
             <span>
-              {t("catalog.page")} {state.pagination.page} {t("catalog.of")} {totalPages}
+              {"Page"} {state.pagination.page} {"of"} {totalPages}
             </span>
             <button
               className="button button--secondary"
@@ -256,7 +247,7 @@ export function CategoryDetailPage({ slug }: CategoryDetailPageProps) {
               onClick={() => setPage((current) => current + 1)}
               type="button"
             >
-              {t("common.next")}
+              {"Next"}
             </button>
           </div>
         ) : null}

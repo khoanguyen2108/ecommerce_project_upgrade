@@ -1,24 +1,21 @@
 "use client";
 
 import styles from "@/components/ai/StyleAssistant.module.css";
-import { useI18n } from "@/features/i18n/useI18n";
 
 export function StyleAssistantEmpty() {
-  const { t } = useI18n();
   return (
     <section aria-labelledby="style-assistant-empty-title" className={`${styles.stateCard} ${styles.emptyCard}`}>
       <FashionIllustration />
       <div className={styles.emptyCopy}>
-        <span className={styles.resultLabel}>{t("ai.resultLabel")}</span>
-        <h2 id="style-assistant-empty-title">{t("ai.emptyTitle")}</h2>
-        <p>{t("ai.emptyBody")}</p>
+        <span className={styles.resultLabel}>{"Your edit"}</span>
+        <h2 id="style-assistant-empty-title">{"Need outfit inspiration?"}</h2>
+        <p>{"Share the mood, occasion, color, or budget you have in mind. Your personalized Belikeme edit will appear here."}</p>
       </div>
     </section>
   );
 }
 
 export function FashionIllustration({ compact = false }: { compact?: boolean }) {
-  const { t } = useI18n();
   return (
     <div aria-hidden="true" className={`${styles.illustration} ${compact ? styles.illustrationCompact : ""}`}>
       <svg fill="none" viewBox="0 0 420 360" xmlns="http://www.w3.org/2000/svg">
@@ -39,7 +36,7 @@ export function FashionIllustration({ compact = false }: { compact?: boolean }) 
         <circle cx="349" cy="226" r="4" fill="currentColor" opacity=".35" />
         <path d="M324 258H364" stroke="currentColor" strokeWidth="1.5" />
       </svg>
-      <span className={styles.illustrationTag}>{t("ai.personalEdit")}</span>
+      <span className={styles.illustrationTag}>{"BELIKEME · PERSONAL EDIT"}</span>
     </div>
   );
 }

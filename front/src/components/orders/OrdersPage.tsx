@@ -9,15 +9,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { localizeProductName } from "@/features/catalog/localization";
 import { listOrders } from "@/features/orders/api";
 import type { Order, OrderQuery, OrderStatus } from "@/features/orders/types";
 import type { Pagination } from "@/lib/api/types";
 import { OrderItemImage } from "@/components/orders/OrderItemImage";
 import { PayosPaymentButton } from "@/components/payments/PayosPaymentButton";
-import { useI18n } from "@/features/i18n/useI18n";
-import type { Locale } from "@/features/i18n/locale";
-import type { TranslationKey } from "@/features/i18n/translations";
 import {
   formatCurrency,
   formatDate,
@@ -41,7 +37,6 @@ interface OrdersPageProps {
 }
 
 export function OrdersPage({ initialQuery }: OrdersPageProps) {
-  const { locale, t } = useI18n();
   const [query, setQuery] = useState<OrderQuery>({
     ...initialQuery,
     limit: ORDER_LIMIT,
@@ -83,11 +78,7 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
 
         setOrders([]);
         setError(
-          getOrderErrorMessage(
-            loadError,
-            t("orders.loadError"),
-            locale,
-          ),
+          getOrderErrorMessage(loadError, "Orders could not be loaded right now."),
         );
         setRequestId(getOrderRequestId(loadError));
       } finally {
@@ -102,7 +93,7 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [locale, query, refreshKey, t]);
+  }, [query, refreshKey]);
 
   function handleStatusChange(status: OrderStatus | "") {
     setQuery((current) => ({
@@ -129,18 +120,18 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
         aria-labelledby="orders-heading"
       >
         <div>
-          <h1 id="orders-heading">{t("orders.title")}</h1>
-          <p>{t("orders.intro")}</p>
+          <h1 id="orders-heading">{"MY ORDERS"}</h1>
+          <p>{"Track, manage, and review your recent Belikeme purchases."}</p>
         </div>
       </section>
 
       <section
         className="customer-resource orders-resource"
-        aria-label={t("orders.listLabel")}
+        aria-label={"Order list"}
       >
         <div className="customer-toolbar orders-toolbar">
           <label>
-            <span>{t("orders.status")}</span>
+            <span>{"Status"}</span>
             <select
               disabled={isLoading}
               onChange={(event) =>
@@ -148,10 +139,10 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
               }
               value={query.status || ""}
             >
-              <option value="">{t("orders.allStatuses")}</option>
+              <option value="">{"All statuses"}</option>
               {ORDER_STATUS_OPTIONS.map((status) => (
                 <option key={status} value={status}>
-                  {getOrderStatusLabel(status, locale)}
+                  {getOrderStatusLabel(status)}
                 </option>
               ))}
             </select>
@@ -165,7 +156,7 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
               type="button"
             >
               <RotateCcw aria-hidden="true" size={17} />
-              {t("orders.reset")}
+              {"Reset"}
             </button>
             <button
               className="button button--secondary"
@@ -178,7 +169,7 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
                 className={isLoading ? "spin" : undefined}
                 size={17}
               />
-              {t("orders.refresh")}
+              {"Refresh"}
             </button>
           </div>
         </div>
@@ -205,18 +196,18 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
           </div>
         ) : null}
 
-        <nav className="customer-pagination" aria-label={t("orders.pagination")}>
+        <nav className="customer-pagination" aria-label={"Orders pagination"}>
           <button
             className="button button--secondary"
             disabled={isLoading || pagination.page <= 1}
             onClick={() => goToPage(Math.max(1, pagination.page - 1))}
             type="button"
           >
-            {t("common.previous")}
+            {"Previous"}
           </button>
           <span>
-            {t("orders.page")} {pagination.page} {t("orders.of")} {totalPages} ({formatNumber(pagination.total, locale)}{" "}
-            {pagination.total === 1 ? t("orders.order") : t("orders.orders")})
+            {"Page"} {pagination.page} {"of"} {totalPages} ({formatNumber(pagination.total)}{" "}
+            {pagination.total === 1 ? "order" : "orders"})
           </span>
           <button
             className="button button--secondary"
@@ -224,7 +215,7 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
             onClick={() => goToPage(pagination.page + 1)}
             type="button"
           >
-            {t("common.next")}
+            {"Next"}
           </button>
         </nav>
       </section>
@@ -233,10 +224,9 @@ export function OrdersPage({ initialQuery }: OrdersPageProps) {
 }
 
 function OrderCard({ order }: { order: Order }) {
-  const { locale, t } = useI18n();
   const itemCount = getOrderItemCount(order);
-  const itemSummary = getOrderItemSummary(order, locale, t);
-  const createdDate = formatDate(order.createdAt, locale);
+  const itemSummary = getOrderItemSummary(order);
+  const createdDate = formatDate(order.createdAt);
   const canRetryPayment = order.status === "PENDING_PAYMENT";
 
   return (
@@ -249,7 +239,7 @@ function OrderCard({ order }: { order: Order }) {
           <time dateTime={order.createdAt}>{createdDate}</time>
         </div>
         <p>{itemSummary}</p>
-        <div className="customer-order-card__badges" aria-label={t("orders.states")}>
+        <div className="customer-order-card__badges" aria-label={"Order states"}>
           <OrderStatusBadge status={order.status} />
           <FulfillmentStatusBadge status={order.fulfillmentStatus} />
         </div>
@@ -258,21 +248,21 @@ function OrderCard({ order }: { order: Order }) {
       <div className="customer-order-card__meta">
         <div>
           <strong>{formatCurrency(order.totalAmount, order.currency)}</strong>
-          <span>{formatItemCount(itemCount, locale, t)}</span>
+          <span>{formatItemCount(itemCount)}</span>
         </div>
         <div className="customer-order-card__actions">
           <Link
-            aria-label={`${t("orders.viewDetails")} ${formatOrderDisplayId(order.orderCode || order.id)}`}
+            aria-label={`${"View details"} ${formatOrderDisplayId(order.orderCode || order.id)}`}
             className="button button--secondary customer-order-card__button"
             href={`/orders/${encodeURIComponent(order.orderCode || order.id)}`}
           >
             <Eye aria-hidden="true" size={17} />
-            {t("orders.viewDetails")}
+            {"View details"}
           </Link>
           {canRetryPayment ? (
             <PayosPaymentButton
               className="button button--primary customer-order-card__button"
-              label={t("orders.retryPayment")}
+              label={"Retry payment"}
               orderId={order.id}
             />
           ) : null}
@@ -283,11 +273,10 @@ function OrderCard({ order }: { order: Order }) {
 }
 
 function OrderProductPreview({ order }: { order: Order }) {
-  const { locale, t } = useI18n();
   const firstItem = order.items?.[0];
   const productName = firstItem
-    ? localizeProductName(firstItem.productName, locale)
-    : t("orders.productFallback");
+    ? (firstItem.productName ?? "")
+    : "Order product";
   const additionalItems = Math.max(0, (order.items?.length ?? 0) - 1);
 
   return (
@@ -298,7 +287,7 @@ function OrderProductPreview({ order }: { order: Order }) {
         size="compact"
       />
       {additionalItems > 0 ? (
-        <span aria-label={`${additionalItems} ${t("orders.moreProducts")}`}>
+        <span aria-label={`${additionalItems} ${"more products"}`}>
           +{additionalItems}
         </span>
       ) : null}
@@ -307,10 +296,9 @@ function OrderProductPreview({ order }: { order: Order }) {
 }
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
-  const { locale } = useI18n();
   return (
     <span className={`order-status-badge ${getOrderStatusClass(status)}`}>
-      {getOrderStatusLabel(status, locale)}
+      {getOrderStatusLabel(status)}
     </span>
   );
 }
@@ -320,10 +308,9 @@ export function PaymentStatusBadge({
 }: {
   status: Order["payments"][number]["status"];
 }) {
-  const { locale } = useI18n();
   return (
     <span className={`payment-status-badge ${getPaymentStatusClass(status)}`}>
-      {getPaymentStatusLabel(status, locale)}
+      {getPaymentStatusLabel(status)}
     </span>
   );
 }
@@ -333,10 +320,9 @@ export function FulfillmentStatusBadge({
 }: {
   status: Order["fulfillmentStatus"];
 }) {
-  const { locale } = useI18n();
   return (
     <span className={`fulfillment-status-badge ${getFulfillmentStatusClass(status)}`}>
-      {getFulfillmentStatusLabel(status, locale)}
+      {getFulfillmentStatusLabel(status)}
     </span>
   );
 }
@@ -350,45 +336,42 @@ function CustomerFeedback({
   onRetry: () => void;
   requestId?: string;
 }) {
-  const { t } = useI18n();
   return (
     <div className="customer-feedback customer-feedback--error" role="alert">
       <AlertCircle aria-hidden="true" size={19} />
       <span>{message}</span>
-      {requestId ? <small>{t("orders.request")} {requestId}</small> : null}
+      {requestId ? <small>{"Request"} {requestId}</small> : null}
       <button
         className="button button--secondary"
         onClick={onRetry}
         type="button"
       >
-        {t("common.retry")}
+        {"Retry"}
       </button>
     </div>
   );
 }
 
 function OrdersEmptyState() {
-  const { t } = useI18n();
   return (
     <div className="orders-empty-state">
       <span aria-hidden="true">
         <PackageOpen size={30} />
       </span>
       <div>
-        <h2>{t("orders.emptyTitle")}</h2>
-        <p>{t("orders.emptyBody")}</p>
+        <h2>{"No orders yet"}</h2>
+        <p>{"Your Belikeme order history will appear here after checkout."}</p>
       </div>
       <Link className="button button--primary" href="/products">
-        {t("orders.startShopping")}
+        {"Start shopping"}
       </Link>
     </div>
   );
 }
 
 function OrderCardSkeleton({ rows }: { rows: number }) {
-  const { t } = useI18n();
   return (
-    <div className="customer-order-list" role="status" aria-label={t("orders.loading")}>
+    <div className="customer-order-list" role="status" aria-label={"Loading orders"}>
       {Array.from({ length: rows }, (_, rowIndex) => (
         <article
           className="customer-order-card customer-order-card--skeleton"
@@ -412,21 +395,19 @@ function OrderCardSkeleton({ rows }: { rows: number }) {
 
 function getOrderItemSummary(
   order: Order,
-  locale: Locale,
-  t: (key: TranslationKey) => string,
 ): string {
   const firstItem = order.items?.[0];
 
   if (!firstItem) {
-    return t("orders.itemsUnavailable");
+    return "Order item snapshots are unavailable.";
   }
 
   const additionalItems = Math.max(0, order.items.length - 1);
-  const firstItemName = localizeProductName(firstItem.productName, locale);
+  const firstItemName = (firstItem.productName ?? "");
 
   return additionalItems > 0
-    ? `${firstItemName} + ${formatNumber(additionalItems, locale)} ${
-        additionalItems === 1 ? t("orders.moreItem") : t("orders.moreItems")
+    ? `${firstItemName} + ${formatNumber(additionalItems)} ${
+        additionalItems === 1 ? "more item" : "more items"
       }`
     : firstItemName;
 }
@@ -437,8 +418,6 @@ function getOrderItemCount(order: Order): number {
 
 function formatItemCount(
   count: number,
-  locale: Locale,
-  t: (key: TranslationKey) => string,
 ): string {
-  return `${formatNumber(count, locale)} ${count === 1 ? t("orders.item") : t("orders.items")}`;
+  return `${formatNumber(count)} ${count === 1 ? "item" : "items"}`;
 }

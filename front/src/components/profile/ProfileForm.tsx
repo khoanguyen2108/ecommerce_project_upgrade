@@ -13,9 +13,6 @@ import { updateMe } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import type { UpdateMeRequest, User } from "@/features/auth/types";
 import { ApiClientError } from "@/lib/errors/api-error";
-import { useI18n } from "@/features/i18n/useI18n";
-import type { Locale } from "@/features/i18n/locale";
-import type { TranslationKey } from "@/features/i18n/translations";
 
 const NAME_MAX_LENGTH = 120;
 
@@ -25,7 +22,6 @@ interface ProfileFormProps {
 
 export function ProfileForm({ user }: ProfileFormProps) {
   const { setAuthenticatedUser } = useAuthSession();
-  const { locale, t } = useI18n();
   const [name, setName] = useState(user.name || "");
   const [nameError, setNameError] = useState<string>();
   const [formError, setFormError] = useState<string>();
@@ -47,7 +43,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextNameError = validateName(name, t);
+    const nextNameError = validateName(name);
 
     setNameError(nextNameError);
     setFormError(undefined);
@@ -57,7 +53,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
     if (nextNameError) return;
 
     if (!isDirty) {
-      setSuccessMessage(t("profile.noChanges"));
+      setSuccessMessage("No profile changes to save.");
       return;
     }
 
@@ -68,9 +64,9 @@ export function ProfileForm({ user }: ProfileFormProps) {
       const response = await updateMe(payload);
       setAuthenticatedUser(response.user);
       setName(response.user.name || "");
-      setSuccessMessage(t("profile.saved"));
+      setSuccessMessage("Profile saved.");
     } catch (error) {
-      setFormError(getProfileErrorMessage(error, t));
+      setFormError(getProfileErrorMessage(error));
       setRequestId(getProfileRequestId(error));
     } finally {
       setIsSubmitting(false);
@@ -93,20 +89,20 @@ export function ProfileForm({ user }: ProfileFormProps) {
     >
       <div className="profile-subsection__header">
         <div>
-          <h2 id="profile-details-heading">{t("profile.information")}</h2>
+          <h2 id="profile-details-heading">{"Account information"}</h2>
         </div>
       </div>
 
       <dl className="profile-details" aria-labelledby="profile-details-heading">
-        <ProfileDetail fallback={t("profile.notProvided")} label={t("profile.email")} value={user.email} />
-        <ProfileDetail fallback={t("profile.notProvided")} label={t("profile.memberSince")} value={formatProfileDate(user.createdAt, locale, t("profile.notAvailable"))} />
+        <ProfileDetail fallback={"Not provided"} label={"Email"} value={user.email} />
+        <ProfileDetail fallback={"Not provided"} label={"Member since"} value={formatProfileDate(user.createdAt, "Not available")} />
       </dl>
 
       {formError ? (
         <div className="customer-feedback customer-feedback--error" role="alert">
           <AlertCircle aria-hidden="true" size={19} />
           <span>{formError}</span>
-          {requestId ? <small>{t("orders.request")} {requestId}</small> : null}
+          {requestId ? <small>{"Request"} {requestId}</small> : null}
         </div>
       ) : null}
 
@@ -119,7 +115,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
 
       <div className="profile-account-editable">
         <div className="form-field">
-          <label htmlFor="profile-name">{t("profile.name")}</label>
+          <label htmlFor="profile-name">{"Name"}</label>
           <input
             aria-describedby={nameError ? "profile-name-error" : undefined}
             aria-invalid={Boolean(nameError)}
@@ -131,13 +127,13 @@ export function ProfileForm({ user }: ProfileFormProps) {
               setName(event.target.value);
               setSuccessMessage(undefined);
             }}
-            placeholder={t("profile.namePlaceholder")}
+            placeholder={"Your name"}
             type="text"
             value={name}
           />
           <FieldError id="profile-name-error" message={nameError} />
           <p className="form-helper">
-            {name.length}/{NAME_MAX_LENGTH} {t("profile.characters")}
+            {name.length}/{NAME_MAX_LENGTH} {"characters"}
           </p>
         </div>
 
@@ -152,7 +148,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
             ) : (
               <Save aria-hidden="true" size={17} />
             )}
-            {isSubmitting ? t("profile.saving") : t("profile.save")}
+            {isSubmitting ? "Saving..." : "Save"}
           </button>
           <button
             className="button button--secondary"
@@ -161,7 +157,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
             type="button"
           >
             <RotateCcw aria-hidden="true" size={17} />
-            {t("profile.reset")}
+            {"Reset"}
           </button>
         </div>
       </div>
@@ -192,39 +188,36 @@ function normalizeOptionalText(value: string): string {
 
 function validateName(
   value: string,
-  t: (key: TranslationKey) => string,
 ): string | undefined {
   return value.length > NAME_MAX_LENGTH
-    ? t("profile.nameTooLong")
+    ? "Name must be 120 characters or fewer."
     : undefined;
 }
 
 function formatProfileDate(
   value: string | null | undefined,
-  locale: Locale,
   fallback: string,
 ): string {
   if (!value) return fallback;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return fallback;
-  return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-GB", { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(date);
 }
 
 function getProfileErrorMessage(
   error: unknown,
-  t: (key: TranslationKey) => string,
 ): string {
   if (error instanceof ApiClientError) {
     const messageByCode: Record<string, string> = {
-      AUTH_REQUIRED: t("profile.sessionRequired"),
-      BAD_REQUEST: t("profile.nameInvalid"),
-      NETWORK_ERROR: t("profile.apiUnavailable"),
-      PROFILE_UPDATE_EMPTY: t("profile.changeBeforeSave"),
-      VALIDATION_ERROR: t("profile.nameInvalid"),
+      AUTH_REQUIRED: "Your session is required. Sign in again to update profile.",
+      BAD_REQUEST: "Your profile name is invalid. Review it and try again.",
+      NETWORK_ERROR: "The profile API could not be reached. Check the backend and retry.",
+      PROFILE_UPDATE_EMPTY: "Change your name before saving.",
+      VALIDATION_ERROR: "Your profile name is invalid. Review it and try again.",
     };
     return messageByCode[error.code] || error.message;
   }
-  return t("profile.saveError");
+  return "Profile could not be saved. Please try again.";
 }
 
 function getProfileRequestId(error: unknown): string | undefined {

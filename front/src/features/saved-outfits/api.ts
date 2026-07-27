@@ -21,7 +21,7 @@ export function createSavedOutfit(
 ): Promise<SavedOutfitResponse> {
   return apiRequest<SavedOutfitResponse>("/saved-outfits", {
     auth: true,
-    body: request,
+    body: { ...request, locale: "en" },
     method: "POST",
   });
 }

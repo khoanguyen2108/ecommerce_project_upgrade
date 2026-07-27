@@ -5,7 +5,6 @@ import type {
   PaymentStatus,
   PaymentSummary,
 } from "@/features/orders/types";
-import type { Locale } from "@/features/i18n/locale";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 export const ORDER_STATUS_OPTIONS: OrderStatus[] = [
@@ -24,23 +23,12 @@ export const ORDER_ERROR_MESSAGES: Record<string, string> = {
   VALIDATION_ERROR: "Some order filters are invalid. Review the page and try again.",
 };
 
-const ORDER_ERROR_MESSAGES_VI: Record<string, string> = {
-  AUTH_REQUIRED: "Bạn cần đăng nhập lại để xem đơn hàng.",
-  BAD_REQUEST: "Một số bộ lọc đơn hàng không hợp lệ. Hãy kiểm tra và thử lại.",
-  FORBIDDEN: "Tài khoản này không có quyền xem đơn hàng.",
-  NETWORK_ERROR: "Không thể kết nối API đơn hàng. Hãy kiểm tra backend và thử lại.",
-  ORDER_NOT_FOUND: "Không tìm thấy đơn hàng này.",
-  VALIDATION_ERROR: "Một số bộ lọc đơn hàng không hợp lệ. Hãy kiểm tra và thử lại.",
-};
-
 export function getOrderErrorMessage(
   error: unknown,
   fallback: string,
-  locale: Locale = "en",
 ): string {
   if (error instanceof ApiClientError) {
-    const messages = locale === "vi" ? ORDER_ERROR_MESSAGES_VI : ORDER_ERROR_MESSAGES;
-    return messages[error.code] || (locale === "en" ? error.message : fallback) || fallback;
+    return ORDER_ERROR_MESSAGES[error.code] || error.message || fallback;
   }
 
   return fallback;
@@ -57,53 +45,40 @@ export function getOrderRequestId(error: unknown): string | undefined {
 export function formatCurrency(
   value: number,
   currency: string | null | undefined = "VND",
-  locale?: Locale,
 ): string {
   const amount = Number(value);
   const currencyCode = currency || "VND";
 
   if (!Number.isFinite(amount)) {
-    return locale === "vi" ? "Không khả dụng" : "Not available";
+    return "Not available";
   }
 
   try {
-    if (!locale) {
-      return new Intl.NumberFormat("vi-VN", {
-        currency: currencyCode,
-        maximumFractionDigits: currencyCode === "VND" ? 0 : 2,
-        style: "currency",
-      }).format(amount);
-    }
-
-    const formattedAmount = new Intl.NumberFormat(
-      locale === "vi" ? "vi-VN" : "en-US",
-      {
-        maximumFractionDigits: currencyCode === "VND" ? 0 : 2,
-        minimumFractionDigits: currencyCode === "VND" ? 0 : 2,
-      },
-    ).format(amount);
+    const formattedAmount = new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: currencyCode === "VND" ? 0 : 2,
+      minimumFractionDigits: currencyCode === "VND" ? 0 : 2,
+    }).format(amount);
 
     return `${formattedAmount}\u00a0${currencyCode}`;
   } catch {
-    return `${new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US").format(amount)}\u00a0${currencyCode}`;
+    return `${new Intl.NumberFormat("en-US").format(amount)}\u00a0${currencyCode}`;
   }
 }
 
 export function formatDateTime(
   value: string | null | undefined,
-  locale: Locale = "en",
 ): string {
   if (!value) {
-    return locale === "vi" ? "Chưa thiết lập" : "Not set";
+    return "Not set";
   }
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return locale === "vi" ? "Không khả dụng" : "Not available";
+    return "Not available";
   }
 
-  return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
+  return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
@@ -111,25 +86,24 @@ export function formatDateTime(
 
 export function formatDate(
   value: string | null | undefined,
-  locale: Locale = "en",
 ): string {
   if (!value) {
-    return locale === "vi" ? "Chưa thiết lập" : "Not set";
+    return "Not set";
   }
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return locale === "vi" ? "Không khả dụng" : "Not available";
+    return "Not available";
   }
 
-  return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
+  return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
   }).format(date);
 }
 
-export function formatNumber(value: number, locale: Locale = "en"): string {
-  return new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US").format(value);
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
 }
 
 export function formatOrderDisplayId(
@@ -151,10 +125,9 @@ export function formatOrderDisplayId(
 
 export function formatOrderCode(
   value: number | null | undefined,
-  locale: Locale = "en",
 ): string {
   return value === null || value === undefined
-    ? locale === "vi" ? "Chưa thiết lập" : "Not set"
+    ? "Not set"
     : String(value);
 }
 
@@ -180,19 +153,7 @@ export function getFulfillmentStatusClass(status: OrderFulfillmentStatus): strin
 
 export function getOrderStatusLabel(
   status: OrderStatus,
-  locale: Locale = "en",
 ): string {
-  if (locale === "vi") {
-    const labels: Record<OrderStatus, string> = {
-      CANCELLED: "Đã hủy",
-      EXPIRED: "Đã hết hạn",
-      PAID: "Đã thanh toán",
-      PENDING_PAYMENT: "Chờ thanh toán",
-    };
-
-    return labels[status];
-  }
-
   const labels: Record<OrderStatus, string> = {
     CANCELLED: "Cancelled",
     EXPIRED: "Expired",
@@ -205,20 +166,7 @@ export function getOrderStatusLabel(
 
 export function getPaymentStatusLabel(
   status: PaymentStatus,
-  locale: Locale = "en",
 ): string {
-  if (locale === "vi") {
-    const labels: Record<PaymentStatus, string> = {
-      CANCELLED: "Đã hủy",
-      EXPIRED: "Đã hết hạn",
-      FAILED: "Thất bại",
-      PAID: "Đã thanh toán",
-      PENDING: "Đang chờ",
-    };
-
-    return labels[status];
-  }
-
   const labels: Record<PaymentStatus, string> = {
     CANCELLED: "Cancelled",
     EXPIRED: "Expired",
@@ -232,21 +180,7 @@ export function getPaymentStatusLabel(
 
 export function getFulfillmentStatusLabel(
   status: OrderFulfillmentStatus,
-  locale: Locale = "en",
 ): string {
-  if (locale === "vi") {
-    const labels: Record<OrderFulfillmentStatus, string> = {
-      DELIVERED: "Đã giao",
-      IN_TRANSIT: "Đang vận chuyển",
-      OUT_FOR_DELIVERY: "Đang giao hàng",
-      PENDING: "Đang chuẩn bị",
-      PICKED_UP: "Đã lấy hàng",
-      RETURNED: "Đã trả hàng",
-    };
-
-    return labels[status];
-  }
-
   const labels: Record<OrderFulfillmentStatus, string> = {
     DELIVERED: "Delivered",
     IN_TRANSIT: "In transit",

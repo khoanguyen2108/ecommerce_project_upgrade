@@ -4,10 +4,6 @@ import { ArrowRight, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import styles from "@/components/ai/StyleAssistant.module.css";
 import { formatPrice } from "@/features/catalog/format";
-import { localizeProductName } from "@/features/catalog/localization";
-import type { Locale } from "@/features/i18n/locale";
-import { translate } from "@/features/i18n/translations";
-import { useI18n } from "@/features/i18n/useI18n";
 import type {
   SavedOutfit,
   SavedOutfitItemSnapshot,
@@ -32,7 +28,6 @@ export function SavedOutfitsSection({
   onView,
   savedOutfits,
 }: SavedOutfitsSectionProps) {
-  const { locale, t } = useI18n();
 
   return (
     <section
@@ -42,7 +37,7 @@ export function SavedOutfitsSection({
     >
       <div className={styles.savedOutfitsHeading}>
         <div>
-          <h2 id="saved-outfits-heading">{t("ai.savedOutfits")}</h2>
+          <h2 id="saved-outfits-heading">{"Saved outfits"}</h2>
         </div>
         {isLoading && savedOutfits.length > 0 ? (
           <Loader2 aria-hidden="true" className={styles.spinner} size={18} />
@@ -58,21 +53,19 @@ export function SavedOutfitsSection({
       {isLoading && savedOutfits.length === 0 ? (
         <p className={styles.savedOutfitsState} role="status">
           <Loader2 aria-hidden="true" className={styles.spinner} size={18} />
-          {t("ai.loadingSavedOutfits")}
+          {"Loading saved outfits..."}
         </p>
       ) : null}
 
       {!isLoading && !error && savedOutfits.length === 0 ? (
-        <p className={styles.savedOutfitsState}>{t("ai.noSavedOutfits")}</p>
+        <p className={styles.savedOutfitsState}>{"You have not saved any outfits yet."}</p>
       ) : null}
 
       {savedOutfits.length > 0 ? (
         <div className={styles.savedOutfitList}>
           {savedOutfits.map((savedOutfit) => {
             const isDeleting = deletingSavedOutfitId === savedOutfit.id;
-            const itemLabel = t(
-              savedOutfit.items.length === 1 ? "ai.item" : "ai.items",
-            );
+            const itemLabel = savedOutfit.items.length === 1 ? "item" : "items";
 
             return (
               <article className={styles.savedOutfitCard} key={savedOutfit.id}>
@@ -81,7 +74,6 @@ export function SavedOutfitsSection({
                     <SavedOutfitThumbnail
                       item={item}
                       key={`${item.role}-${item.productId}`}
-                      locale={locale}
                     />
                   ))}
                 </div>
@@ -91,36 +83,36 @@ export function SavedOutfitsSection({
                     <strong>{formatPrice(savedOutfit.totalPriceSnapshot)}</strong>
                     <span>{savedOutfit.items.length} {itemLabel}</span>
                     <time dateTime={savedOutfit.createdAt}>
-                      {t("ai.saved")} {formatSavedDate(savedOutfit.createdAt, locale)}
+                      {"Saved"} {formatSavedDate(savedOutfit.createdAt)}
                     </time>
                   </div>
                   <div className={styles.savedOutfitActions}>
                     <button
-                      aria-label={`${t("ai.continueSaved")}: ${savedOutfit.summary}`}
+                      aria-label={`${"Continue with saved outfit"}: ${savedOutfit.summary}`}
                       className={styles.savedOutfitPrepareButton}
                       disabled={isDeleting}
                       onClick={() => onPrepare(savedOutfit)}
                       type="button"
                     >
-                      {t("ai.continueSaved")}
+                      {"Continue with saved outfit"}
                       <ArrowRight aria-hidden="true" size={15} />
                     </button>
                     <button
-                      aria-label={`${t("ai.viewEdit")}: ${savedOutfit.summary}`}
+                      aria-label={`${"View/Edit"}: ${savedOutfit.summary}`}
                       className={styles.savedOutfitViewButton}
                       disabled={isDeleting}
                       onClick={() => onView(savedOutfit)}
                       type="button"
                     >
                       <Pencil aria-hidden="true" size={15} />
-                      {t("ai.viewEdit")}
+                      {"View/Edit"}
                     </button>
                     <button
-                      aria-label={`${t("ai.delete")}: ${savedOutfit.summary}`}
+                      aria-label={`${"Delete"}: ${savedOutfit.summary}`}
                       className={styles.savedOutfitDeleteButton}
                       disabled={Boolean(deletingSavedOutfitId)}
                       onClick={() => {
-                        if (window.confirm(t("ai.deleteConfirm"))) {
+                        if (window.confirm("Delete this saved outfit?")) {
                           void onDelete(savedOutfit.id);
                         }
                       }}
@@ -131,7 +123,7 @@ export function SavedOutfitsSection({
                       ) : (
                         <Trash2 aria-hidden="true" size={15} />
                       )}
-                      {isDeleting ? t("ai.deleting") : t("ai.delete")}
+                      {isDeleting ? "Deleting" : "Delete"}
                     </button>
                   </div>
                 </div>
@@ -144,10 +136,10 @@ export function SavedOutfitsSection({
   );
 }
 
-function SavedOutfitThumbnail({ item, locale }: { item: SavedOutfitItemSnapshot; locale: Locale }) {
+function SavedOutfitThumbnail({ item }: { item: SavedOutfitItemSnapshot; }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const productName = localizeProductName(item.productNameSnapshot, locale);
-  const alt = `${productName} · ${translate(locale, "ai.savedOutfits")}`;
+  const productName = (item.productNameSnapshot ?? "");
+  const alt = `${productName} · ${"Saved outfits"}`;
 
   if (!item.imageUrlSnapshot || imageFailed) {
     return (
@@ -168,11 +160,11 @@ function SavedOutfitThumbnail({ item, locale }: { item: SavedOutfitItemSnapshot;
   );
 }
 
-function formatSavedDate(value: string, locale: Locale) {
+function formatSavedDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
+  return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
   }).format(date);
 }

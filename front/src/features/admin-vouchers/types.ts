@@ -1,3 +1,4 @@
+
 import type { Pagination } from "@/lib/api/types";
 
 export type VoucherDiscountType = "PERCENT" | "FIXED";

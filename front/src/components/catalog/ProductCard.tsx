@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { formatPrice } from "@/features/catalog/format";
-import { localizeProductName } from "@/features/catalog/localization";
 import type { Product } from "@/features/catalog/types";
-import { useI18n } from "@/features/i18n/useI18n";
 
 interface ProductCardProps {
   product: Product;
@@ -13,9 +11,8 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, variant = "default" }: ProductCardProps) {
-  const { locale, t } = useI18n();
   const imageUrl = product.imageUrls[0];
-  const productName = localizeProductName(product.name, locale);
+  const productName = (product.name ?? "");
   const [imageFailed, setImageFailed] = useState(false);
   const activeVariants = product.variants.filter((item) => item.isActive);
   const availableStock = activeVariants.reduce(
@@ -24,10 +21,10 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
   );
   const availability =
     activeVariants.length === 0
-      ? t("product.availabilityPending")
+      ? "Availability pending"
       : availableStock > 0
-        ? t("product.inStock")
-        : t("product.soldOut");
+        ? "In stock"
+        : "Sold out";
 
   return (
     <article
@@ -35,7 +32,7 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
     >
       <Link
         href={`/products/${product.slug}`}
-        aria-label={`${t("product.view")}: ${productName}`}
+        aria-label={`${"View product"}: ${productName}`}
       >
         <div className="product-card__image-wrap">
           {imageUrl && !imageFailed ? (
@@ -47,7 +44,7 @@ export function ProductCard({ product, variant = "default" }: ProductCardProps) 
               src={imageUrl}
             />
           ) : (
-            <div className="product-card__placeholder">{t("common.noImage")}</div>
+            <div className="product-card__placeholder">{"No image available"}</div>
           )}
         </div>
         <div className="product-card__body">

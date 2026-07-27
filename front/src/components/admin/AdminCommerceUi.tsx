@@ -3,11 +3,7 @@
 import { AlertCircle, CheckCircle2, Info } from "lucide-react";
 import type { OrderStatus, PaymentStatus } from "@/features/orders/types";
 import type { Pagination } from "@/lib/api/types";
-import {
-  formatAdminPaginationLabel,
-  formatAdminPaginationSummary,
-  useAdminCommonI18n,
-} from "@/features/i18n/admin-common-translations";
+import { formatAdminPaginationLabel, formatAdminPaginationSummary } from "@/components/admin/admin-format";
 import {
   getOrderStatusClass,
   getOrderStatusLabel,
@@ -16,21 +12,19 @@ import {
 } from "@/components/orders/order-format";
 
 export function AdminOrderStatusBadge({ status }: { status: OrderStatus }) {
-  const { locale } = useAdminCommonI18n();
 
   return (
     <span className={`order-status-badge ${getOrderStatusClass(status)}`}>
-      {getOrderStatusLabel(status, locale)}
+      {getOrderStatusLabel(status)}
     </span>
   );
 }
 
 export function AdminPaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  const { locale } = useAdminCommonI18n();
 
   return (
     <span className={`payment-status-badge ${getPaymentStatusClass(status)}`}>
-      {getPaymentStatusLabel(status, locale)}
+      {getPaymentStatusLabel(status)}
     </span>
   );
 }
@@ -45,7 +39,6 @@ export function AdminFeedback({
   tone: "error" | "success";
 }) {
   const Icon = tone === "success" ? CheckCircle2 : AlertCircle;
-  const { messages } = useAdminCommonI18n();
 
   return (
     <div
@@ -54,20 +47,19 @@ export function AdminFeedback({
     >
       <Icon aria-hidden="true" size={19} />
       <span>{message}</span>
-      {requestId ? <small>{messages.common.request} {requestId}</small> : null}
+      {requestId ? <small>{"Request"} {requestId}</small> : null}
     </div>
   );
 }
 
 export function AdminPaymentSafetyNote({ includeTransition = false }) {
-  const { messages } = useAdminCommonI18n();
 
   return (
     <div className="admin-safety-note" role="note">
       <Info aria-hidden="true" size={18} />
       <span>
-        {messages.commerce.paymentSafety}
-        {includeTransition ? ` ${messages.commerce.paymentSafetyTransition}` : ""}
+        {"Paid state is finalized only by a verified payOS webhook. Admin diagnostics are read-only for payment state."}
+        {includeTransition ? ` ${"Cancel or expire does not call the payOS provider."}` : ""}
       </span>
     </div>
   );
@@ -103,12 +95,11 @@ export function AdminPagination({
   pagination: Pagination;
 }) {
   const totalPages = Math.max(1, pagination.totalPages);
-  const { locale, messages } = useAdminCommonI18n();
 
   return (
     <nav
       className="admin-pagination"
-      aria-label={formatAdminPaginationLabel(locale, noun)}
+      aria-label={formatAdminPaginationLabel(noun)}
     >
       <button
         className="button button--secondary"
@@ -116,16 +107,10 @@ export function AdminPagination({
         onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
         type="button"
       >
-        {messages.common.previous}
+        {"Previous"}
       </button>
       <span>
-        {formatAdminPaginationSummary(
-          locale,
-          pagination.page,
-          totalPages,
-          pagination.total,
-          noun,
-        )}
+        {formatAdminPaginationSummary(pagination.page, totalPages, pagination.total, noun)}
       </span>
       <button
         className="button button--secondary"
@@ -133,7 +118,7 @@ export function AdminPagination({
         onClick={() => onPageChange(pagination.page + 1)}
         type="button"
       >
-        {messages.common.next}
+        {"Next"}
       </button>
     </nav>
   );

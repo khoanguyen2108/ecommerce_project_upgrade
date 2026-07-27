@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import { getCurrentUser } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { getPostLoginRedirectPath, isAdminUser } from "@/features/auth/roles";
-import { useI18n } from "@/features/i18n/useI18n";
 
 type Status = "checking" | "confirmed" | "unconfirmed";
 
@@ -19,7 +18,6 @@ const wait = (delayMs: number) =>
 
 export function AuthSuccessStatus() {
   const router = useRouter();
-  const { t } = useI18n();
   const { currentUser, setAuthenticatedUser } = useAuthSession();
   const [status, setStatus] = useState<Status>("checking");
 
@@ -70,8 +68,8 @@ export function AuthSuccessStatus() {
     return (
       <div className="status-panel" role="status">
         <LoaderCircle className="spin" size={28} />
-        <h1>{t("auth.successCheckingTitle")}</h1>
-        <p>{t("auth.successCheckingBody")}</p>
+        <h1>{"Checking your session"}</h1>
+        <p>{"We are confirming your sign-in with Belikeme."}</p>
       </div>
     );
   }
@@ -80,13 +78,11 @@ export function AuthSuccessStatus() {
     return (
       <div className="status-panel" role="status">
         <CheckCircle2 size={30} />
-        <h1>{t("auth.successConfirmedTitle")}</h1>
+        <h1>{"Signed in successfully"}</h1>
         <p>
-          {t(
-            isAdminUser(currentUser)
-              ? "auth.successRedirectAdmin"
-              : "auth.successRedirectStore",
-          )}
+          {isAdminUser(currentUser)
+            ? "Redirecting you to the admin workspace."
+            : "Redirecting you to the store."}
         </p>
       </div>
     );
@@ -94,14 +90,14 @@ export function AuthSuccessStatus() {
 
   return (
     <div className="status-panel" role="status">
-      <h1>{t("auth.successUnconfirmedTitle")}</h1>
-      <p>{t("auth.successUnconfirmedBody")}</p>
+      <h1>{"Sign-in needs one more step"}</h1>
+      <p>{"Google sign-in finished, but this browser could not confirm the session yet. You can return home or sign in with email."}</p>
       <div className="status-panel__actions">
         <Link className="button button--primary" href="/login">
-          {t("auth.backToLogin")}
+          {"Back to login"}
         </Link>
         <Link className="button button--secondary" href="/">
-          {t("auth.returnHome")}
+          {"Return home"}
         </Link>
       </div>
     </div>

@@ -4,14 +4,7 @@ import { ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { AdminTopProduct } from "@/features/admin-stats/types";
-import {
-  localizeCategoryName,
-  localizeProductName,
-} from "@/features/catalog/localization";
-import {
-  formatAdminSoldCount,
-  useAdminCommonI18n,
-} from "@/features/i18n/admin-common-translations";
+import { formatAdminSoldCount } from "@/components/admin/admin-format";
 
 interface TopProductsCardProps {
   isLoading: boolean;
@@ -26,33 +19,32 @@ export function TopProductsCard({
   onRetry,
   products,
 }: TopProductsCardProps) {
-  const { locale, messages } = useAdminCommonI18n();
 
   return (
     <section className="admin-dashboard-card admin-dashboard-top-products" aria-labelledby="top-products-heading">
       <header className="admin-dashboard-card__header">
         <div>
           <p className="admin-dashboard-card__kicker">
-            {messages.dashboard.paidSales}
+            {"Paid sales"}
           </p>
-          <h2 id="top-products-heading">{messages.dashboard.topProducts}</h2>
+          <h2 id="top-products-heading">{"Top Products"}</h2>
         </div>
-        <Link href="/admin/products">{messages.dashboard.viewAll}</Link>
+        <Link href="/admin/products">{"View All"}</Link>
       </header>
 
       <div className="admin-dashboard-top-products__list">
         {isLoading ? <TopProductsSkeleton /> : null}
         {!isLoading && isUnavailable ? (
           <div className="admin-dashboard-top-products__state">
-            <span>{messages.dashboard.topProductsUnavailable}</span>
+            <span>{"Top products are temporarily unavailable."}</span>
             <button onClick={onRetry} type="button">
-              {messages.common.retry}
+              {"Retry"}
             </button>
           </div>
         ) : null}
         {!isLoading && !isUnavailable && products?.length === 0 ? (
           <div className="admin-dashboard-top-products__state">
-            {messages.dashboard.noPaidProductSales}
+            {"No paid product sales yet"}
           </div>
         ) : null}
         {!isLoading && !isUnavailable
@@ -60,14 +52,14 @@ export function TopProductsCard({
               <article className="admin-dashboard-top-product" key={product.productId}>
                 <ProductThumbnail product={product} />
                 <div className="admin-dashboard-top-product__details">
-                  <strong>{localizeProductName(product.name, locale)}</strong>
+                  <strong>{(product.name ?? "")}</strong>
                   <small>
                     {product.categoryName
-                      ? localizeCategoryName(product.categoryName, locale)
-                      : messages.dashboard.uncategorized}
+                      ? (product.categoryName ?? "")
+                      : "Uncategorized"}
                   </small>
                 </div>
-                <span>{formatAdminSoldCount(locale, product.soldQuantity)}</span>
+                <span>{formatAdminSoldCount(product.soldQuantity)}</span>
               </article>
             ))
           : null}
@@ -94,11 +86,10 @@ function ProductThumbnail({ product }: { product: AdminTopProduct }) {
 }
 
 function TopProductsSkeleton() {
-  const { messages } = useAdminCommonI18n();
 
   return (
     <div
-      aria-label={messages.dashboard.loadingTopProducts}
+      aria-label={"Loading top products"}
       className="admin-dashboard-top-products__skeleton"
       role="status"
     >

@@ -4,12 +4,7 @@ import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getCategories } from "@/features/catalog/api";
-import {
-  localizeCategoryDescription,
-  localizeCategoryName,
-} from "@/features/catalog/localization";
 import type { Category } from "@/features/catalog/types";
-import { useI18n } from "@/features/i18n/useI18n";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface CategoriesState {
@@ -19,7 +14,6 @@ interface CategoriesState {
 }
 
 export function CategoriesPage() {
-  const { t } = useI18n();
   const [requestKey, setRequestKey] = useState(0);
   const [state, setState] = useState<CategoriesState>({
     categories: [],
@@ -62,11 +56,11 @@ export function CategoriesPage() {
 
   return (
     <main className="categories-page">
-      <section aria-label={t("catalog.allCategories")}>
+      <section aria-label={"All categories"}>
         {state.isLoading ? (
           <div
             aria-busy="true"
-            aria-label={t("catalog.loadingAllCategories")}
+            aria-label={"Loading categories"}
             className="categories-grid"
           >
             <CategoriesSkeleton count={8} />
@@ -77,8 +71,8 @@ export function CategoriesPage() {
           <div className="categories-state categories-state--error" role="alert">
             <AlertCircle aria-hidden="true" size={22} strokeWidth={1.7} />
             <div>
-              <p className="eyebrow">{t("catalog.unableCategories")}</p>
-              <h2>{t("catalog.interrupted")}</h2>
+              <p className="eyebrow">{"Unable to load categories"}</p>
+              <h2>{"Something interrupted the edit"}</h2>
               <p>{state.error}</p>
             </div>
             <button
@@ -86,16 +80,16 @@ export function CategoriesPage() {
               onClick={() => setRequestKey((current) => current + 1)}
               type="button"
             >
-              {t("common.retry")}
+              {"Retry"}
             </button>
           </div>
         ) : null}
 
         {!state.isLoading && !state.error && state.categories.length === 0 ? (
           <div className="categories-state" role="status">
-            <p className="eyebrow">{t("nav.categories")}</p>
-            <h2>{t("catalog.noCategories")}</h2>
-            <p>{t("catalog.noCategoriesBody")}</p>
+            <p className="eyebrow">{"Categories"}</p>
+            <h2>{"No categories found"}</h2>
+            <p>{"There are no active categories to browse right now."}</p>
           </div>
         ) : null}
 
@@ -112,14 +106,10 @@ export function CategoriesPage() {
 }
 
 function CategoryCard({ category }: { category: Category }) {
-  const { locale, t } = useI18n();
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = Boolean(category.imageUrl) && !imageFailed;
-  const categoryName = localizeCategoryName(category.name, locale);
-  const categoryDescription = localizeCategoryDescription(
-    category.description,
-    locale,
-  );
+  const categoryName = (category.name ?? "");
+  const categoryDescription = (category.description ?? null);
 
   return (
     <article className="categories-card">
@@ -127,7 +117,7 @@ function CategoryCard({ category }: { category: Category }) {
         <div className="categories-card__media">
           {showImage ? (
             <img
-              alt={`${categoryName} · ${t("catalog.category")}`}
+              alt={`${categoryName} · ${"Category"}`}
               className="categories-card__image"
               loading="lazy"
               onError={() => setImageFailed(true)}
@@ -139,7 +129,7 @@ function CategoryCard({ category }: { category: Category }) {
             </div>
           )}
           {category.isFeatured ? (
-            <span className="categories-card__badge">{t("common.featured")}</span>
+            <span className="categories-card__badge">{"Featured"}</span>
           ) : null}
         </div>
 

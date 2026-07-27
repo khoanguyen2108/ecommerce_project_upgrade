@@ -33,8 +33,6 @@ import {
   formatCurrency,
   formatNumber,
 } from "@/components/orders/order-format";
-import { useAdminCommonI18n } from "@/features/i18n/admin-common-translations";
-import type { Locale } from "@/features/i18n/locale";
 
 interface DashboardSnapshot {
   orders?: AdminOrderStats;
@@ -53,7 +51,6 @@ export function AdminDashboardPage() {
   const [requestIds, setRequestIds] = useState<string[]>([]);
   const [isTopProductsUnavailable, setIsTopProductsUnavailable] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const { locale, messages } = useAdminCommonI18n();
 
   useEffect(() => {
     let isMounted = true;
@@ -102,7 +99,7 @@ export function AdminDashboardPage() {
       setRequestIds([
         ...new Set(
           failures
-            .map((failure) => getAdminStatsError(failure, "en").requestId)
+            .map((failure) => getAdminStatsError(failure).requestId)
             .filter((requestId): requestId is string => Boolean(requestId)),
         ),
       ]);
@@ -116,9 +113,9 @@ export function AdminDashboardPage() {
     };
   }, [range, refreshKey]);
 
-  const filterLabel = formatRangeLabel(range, locale);
+  const filterLabel = formatRangeLabel(range);
   const localizedErrors = [
-    ...new Set(errors.map((error) => getAdminStatsError(error, locale).message)),
+    ...new Set(errors.map((error) => getAdminStatsError(error).message)),
   ];
   const hasAnyData = Boolean(
     snapshot.overview || snapshot.orders || snapshot.revenue,
@@ -129,10 +126,10 @@ export function AdminDashboardPage() {
       <section className="admin-dashboard-modern__heading" aria-labelledby="dashboard-heading">
         <div className="admin-page-intro">
           <p className="admin-page-intro__eyebrow">
-            {messages.dashboard.storeOperations}
+            {"Store operations"}
           </p>
-          <h1 id="dashboard-heading">{messages.dashboard.title}</h1>
-          <p>{messages.dashboard.subtitle}</p>
+          <h1 id="dashboard-heading">{"Dashboard Overview"}</h1>
+          <p>{"Live catalog, customer, order, and verified revenue signals."}</p>
         </div>
         <AdminDashboardFilters
           isLoading={isLoading}
@@ -148,14 +145,14 @@ export function AdminDashboardPage() {
           <div>
             <strong>
               {hasAnyData
-                ? messages.dashboard.partialUnavailable
-                : messages.dashboard.dataUnavailable}
+                ? "Some dashboard data is temporarily unavailable."
+                : "Dashboard data could not be loaded."}
             </strong>
             {localizedErrors.map((error) => (
               <span key={error}>{error}</span>
             ))}
             {requestIds.length > 0 ? (
-              <small>{messages.common.request}: {requestIds.join(", ")}</small>
+              <small>{"Request"}: {requestIds.join(", ")}</small>
             ) : null}
           </div>
           <button
@@ -163,23 +160,23 @@ export function AdminDashboardPage() {
             onClick={() => setRefreshKey((current) => current + 1)}
             type="button"
           >
-            {messages.common.retry}
+            {"Retry"}
           </button>
         </div>
       ) : null}
 
       <section
-        aria-label={messages.dashboard.kpiLabel}
+        aria-label={"Key performance indicators"}
         className="admin-dashboard-metrics"
       >
         <AdminMetricCard
-          detail={messages.dashboard.verifiedRevenueOnly}
+          detail={"Verified paid revenue only"}
           icon={CircleDollarSign}
           isLoading={isLoading && !snapshot.overview}
-          label={messages.dashboard.totalRevenue}
+          label={"Total revenue"}
           value={
             snapshot.overview
-              ? formatCurrency(snapshot.overview.totalRevenue, "VND", locale)
+              ? formatCurrency(snapshot.overview.totalRevenue, "VND")
               : undefined
           }
         />
@@ -187,36 +184,32 @@ export function AdminDashboardPage() {
           detail={filterLabel}
           icon={ShoppingBag}
           isLoading={isLoading && !snapshot.orders}
-          label={messages.dashboard.paidOrders}
+          label={"Paid orders"}
           value={
             snapshot.orders
-              ? formatNumber(snapshot.orders.byStatus.PAID, locale)
+              ? formatNumber(snapshot.orders.byStatus.PAID)
               : undefined
           }
         />
         <AdminMetricCard
-          detail={messages.dashboard.averageOrderDescription}
+          detail={"Across verified paid orders"}
           icon={ClipboardList}
           isLoading={isLoading && !snapshot.overview}
-          label={messages.dashboard.averageOrderValue}
+          label={"Average order value"}
           value={
             snapshot.overview
-              ? formatCurrency(
-                  snapshot.overview.averagePaidOrderValue,
-                  "VND",
-                  locale,
-                )
+              ? formatCurrency(snapshot.overview.averagePaidOrderValue, "VND")
               : undefined
           }
         />
         <AdminMetricCard
-          detail={messages.dashboard.allCustomers}
+          detail={"All registered customer accounts"}
           icon={Users}
           isLoading={isLoading && !snapshot.overview}
-          label={messages.dashboard.customers}
+          label={"Customers"}
           value={
             snapshot.overview
-              ? formatNumber(snapshot.overview.totalCustomers, locale)
+              ? formatNumber(snapshot.overview.totalCustomers)
               : undefined
           }
         />
@@ -224,7 +217,7 @@ export function AdminDashboardPage() {
 
       <section
         className="admin-dashboard-primary-grid"
-        aria-label={messages.dashboard.operationalOverview}
+        aria-label={"Operational overview"}
       >
         <MonthlySalesChart
           buckets={snapshot.revenue?.buckets}
@@ -256,12 +249,11 @@ function OperationsOverview({
   orders?: AdminOrderStats;
   overview?: AdminStatsOverview;
 }) {
-  const { locale, messages } = useAdminCommonI18n();
   const rows = [
-    [messages.dashboard.pendingPayment, orders?.byStatus.PENDING_PAYMENT],
-    [messages.dashboard.paid, orders?.byStatus.PAID],
-    [messages.dashboard.cancelled, orders?.byStatus.CANCELLED],
-    [messages.dashboard.expired, orders?.byStatus.EXPIRED],
+    ["Pending payment", orders?.byStatus.PENDING_PAYMENT],
+    ["Paid", orders?.byStatus.PAID],
+    ["Cancelled", orders?.byStatus.CANCELLED],
+    ["Expired", orders?.byStatus.EXPIRED],
   ] as const;
 
   return (
@@ -269,9 +261,9 @@ function OperationsOverview({
       <header className="admin-dashboard-card__header">
         <div>
           <p className="admin-dashboard-card__kicker">
-            {messages.dashboard.operations}
+            {"Operations"}
           </p>
-          <h2>{messages.dashboard.storeStatus}</h2>
+          <h2>{"Store status"}</h2>
         </div>
       </header>
 
@@ -284,8 +276,8 @@ function OperationsOverview({
             ) : (
               <strong>
                 {value === undefined
-                  ? messages.common.unavailable
-                  : formatNumber(value, locale)}
+                  ? "Unavailable"
+                  : formatNumber(value)}
               </strong>
             )}
           </div>
@@ -294,19 +286,19 @@ function OperationsOverview({
 
       <div className="admin-dashboard-inventory-summary">
         <span>
-          <small>{messages.dashboard.totalProducts}</small>
+          <small>{"Total products"}</small>
           <strong>
             {overview
-              ? formatNumber(overview.totalProducts, locale)
-              : messages.common.unavailable}
+              ? formatNumber(overview.totalProducts)
+              : "Unavailable"}
           </strong>
         </span>
         <span>
-          <small>{messages.dashboard.lowStockVariants}</small>
+          <small>{"Low-stock variants"}</small>
           <strong>
             {overview
-              ? formatNumber(overview.lowStockVariantsCount, locale)
-              : messages.common.unavailable}
+              ? formatNumber(overview.lowStockVariantsCount)
+              : "Unavailable"}
           </strong>
         </span>
       </div>
@@ -314,8 +306,8 @@ function OperationsOverview({
   );
 }
 
-function formatRangeLabel(range: DashboardDateRange, locale: Locale): string {
-  const formatter = new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
+function formatRangeLabel(range: DashboardDateRange): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
     day: "numeric",
     month: "short",
     timeZone: "UTC",

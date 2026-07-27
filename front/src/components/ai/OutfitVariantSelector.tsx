@@ -1,5 +1,4 @@
 import styles from "@/components/ai/OutfitPreparationDrawer.module.css";
-import { localizeColorName } from "@/features/catalog/localization";
 import type { ProductVariant } from "@/features/catalog/types";
 import {
   getImplicitSelectableVariant,
@@ -12,7 +11,6 @@ import {
 } from "@/features/catalog/variant-selection";
 
 interface OutfitVariantSelectorProps {
-  locale: "vi" | "en";
   onColorChange: (color: string) => void;
   onSizeChange: (size: string) => void;
   productName: string;
@@ -22,25 +20,7 @@ interface OutfitVariantSelectorProps {
   variants: ProductVariant[];
 }
 
-const SELECTOR_COPY = {
-  en: {
-    color: "Select color",
-    noSize: "No size required.",
-    outOfStock: "Out of stock",
-    selected: "Selected option",
-    size: "Select size",
-  },
-  vi: {
-    color: "Chọn màu",
-    noSize: "Không cần chọn kích thước.",
-    outOfStock: "Hết hàng",
-    selected: "Lựa chọn hiện tại",
-    size: "Chọn kích thước",
-  },
-} as const;
-
 export function OutfitVariantSelector({
-  locale,
   onColorChange,
   onSizeChange,
   productName,
@@ -49,7 +29,6 @@ export function OutfitVariantSelector({
   selectedVariantId,
   variants,
 }: OutfitVariantSelectorProps) {
-  const copy = SELECTOR_COPY[locale];
   const implicitVariant = getImplicitSelectableVariant(variants);
   const requiresSize = productRequiresSize(variants);
   const colors = getVariantColors(variants);
@@ -62,7 +41,7 @@ export function OutfitVariantSelector({
   if (implicitVariant) {
     return (
       <p className={styles.selectionStatus} role="status">
-        {copy.selected}: {locale === "vi" ? "Tùy chọn mặc định" : "Default option"}
+        Selected option: Default option
       </p>
     );
   }
@@ -70,16 +49,16 @@ export function OutfitVariantSelector({
   return (
     <div className={styles.selector}>
       <fieldset>
-        <legend>{copy.color}</legend>
+        <legend>Select color</legend>
         <div className={styles.optionList}>
           {colors.map((color) => {
             const isAvailable = hasSelectableColor(variants, color);
-            const colorName = localizeColorName(color, locale);
+            const colorName = (color ?? "");
 
             return (
               <button
-                aria-label={`${copy.color} ${colorName} ${productName}${
-                  isAvailable ? "" : `, ${copy.outOfStock}`
+                aria-label={`Select color ${colorName} ${productName}${
+                  isAvailable ? "" : ", Out of stock"
                 }`}
                 aria-pressed={color === selectedColor}
                 className={color === selectedColor ? styles.selectedOption : undefined}
@@ -97,7 +76,7 @@ export function OutfitVariantSelector({
 
       {requiresSize ? (
         <fieldset>
-          <legend>{copy.size}</legend>
+          <legend>Select size</legend>
           <div className={styles.optionList}>
             {sizes.map((size) => {
               const isAvailable = Boolean(
@@ -107,8 +86,8 @@ export function OutfitVariantSelector({
 
               return (
                 <button
-                  aria-label={`${copy.size} ${size} ${productName}${
-                    isAvailable ? "" : `, ${copy.outOfStock}`
+                  aria-label={`Select size ${size} ${productName}${
+                    isAvailable ? "" : ", Out of stock"
                   }`}
                   aria-pressed={size === selectedSize}
                   className={size === selectedSize ? styles.selectedOption : undefined}
@@ -124,12 +103,12 @@ export function OutfitVariantSelector({
           </div>
         </fieldset>
       ) : (
-        <p className={styles.selectionHint}>{copy.noSize}</p>
+        <p className={styles.selectionHint}>No size required.</p>
       )}
 
       {selectedVariant ? (
         <p className={styles.selectionStatus} role="status">
-          {copy.selected}: {localizeColorName(selectedVariant.color, locale)}
+          Selected option: {(selectedVariant.color ?? "")}
           {requiresSize ? ` / ${selectedVariant.size}` : ""}
         </p>
       ) : null}

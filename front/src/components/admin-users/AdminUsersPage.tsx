@@ -1,5 +1,8 @@
 "use client";
 
+import { ADMIN_OPERATIONS_COPY, type AdminOperationsCopy } from "@/components/admin/admin-copy";
+const copy = ADMIN_OPERATIONS_COPY;
+
 import {
   AlertCircle,
   CheckCircle2,
@@ -40,12 +43,6 @@ import {
   normalizeNullableText,
   parseActiveFilter,
 } from "@/components/admin/admin-format";
-import {
-  getAdminOperationsTranslations,
-  type AdminOperationsTranslations,
-} from "@/features/i18n/admin-operations-translations";
-import type { Locale } from "@/features/i18n/locale";
-import { useI18n } from "@/features/i18n/useI18n";
 
 const USER_LIMIT = 8;
 const ROLE_OPTIONS: UserRole[] = ["CUSTOMER", "STAFF", "ADMIN"];
@@ -80,8 +77,6 @@ type UserSuccess = "activated" | "deactivated" | "deleted" | "updated";
 
 export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
   const { currentUser } = useAuthSession();
-  const { locale } = useI18n();
-  const copy = getAdminOperationsTranslations(locale);
   const [query, setQuery] = useState<AdminUserQuery>({
     ...initialQuery,
     limit: USER_LIMIT,
@@ -232,7 +227,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     if (
       statusChanged &&
       !window.confirm(
-        copy.users.confirmStatus(form.isActive, selectedUser.email),
+        ((activate, email) => activate ? `Activate ${email}?` : `Deactivate ${email}?`)(form.isActive, selectedUser.email),
       )
     ) {
       return;
@@ -282,7 +277,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
 
     if (
       !window.confirm(
-        copy.users.confirmStatus(nextIsActive, user.email),
+        ((activate, email) => activate ? `Activate ${email}?` : `Deactivate ${email}?`)(nextIsActive, user.email),
       )
     ) {
       return;
@@ -316,7 +311,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
       setActionError({ fallback: "selfDelete" });
       return;
     }
-    if (!window.confirm(copy.users.deleteConfirm(user.email))) return;
+    if (!window.confirm(((email) => `Delete ${email}? This cannot be undone.`)(user.email))) return;
 
     setBusyAction(`${user.id}:delete`);
     setActionError(undefined);
@@ -364,21 +359,21 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
     : undefined;
   const successMessage = success
     ? success === "activated"
-      ? copy.users.userStatusActivated
+      ? "User account activated."
       : success === "deactivated"
-        ? copy.users.userStatusDeactivated
+        ? "User account deactivated."
         : success === "deleted"
-          ? copy.users.userDeleted
-          : copy.users.userUpdated
+          ? "User deleted."
+          : "User updated."
     : undefined;
 
   return (
     <div className="admin-resource admin-resource--full-width">
       <section className="admin-resource__header" aria-labelledby="admin-users-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">{copy.users.eyebrow}</p>
-          <h1 id="admin-users-heading">{copy.users.title}</h1>
-          <p>{copy.users.subtitle}</p>
+          <p className="admin-page-intro__eyebrow">{"Access management"}</p>
+          <h1 id="admin-users-heading">{"Users Management"}</h1>
+          <p>{"Review customer and staff profiles, roles, and account access."}</p>
         </div>
         <button
           className="button button--secondary"
@@ -387,35 +382,35 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
           type="button"
         >
           <RefreshCw aria-hidden="true" size={17} />
-          {copy.common.refresh}
+          {"Refresh"}
         </button>
       </section>
 
       <section
         className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline admin-filter-surface"
-        aria-label={copy.users.filtersAria}
+        aria-label={"User filters"}
       >
         <form className="admin-search" onSubmit={handleSearchSubmit}>
-          <label htmlFor="admin-user-search">{copy.users.search}</label>
+          <label htmlFor="admin-user-search">{"Search"}</label>
           <div>
             <input
               id="admin-user-search"
               maxLength={120}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder={copy.users.searchPlaceholder}
+              placeholder={"Email, name, or phone"}
               type="search"
               value={searchInput}
             />
             <button className="button button--primary" type="submit">
               <Search aria-hidden="true" size={17} />
-              {copy.users.search}
+              {"Search"}
             </button>
           </div>
         </form>
 
         <div className="admin-filter-grid">
           <label>
-            <span>{copy.common.role}</span>
+            <span>{"Role"}</span>
             <select
               onChange={(event) =>
                 handleFilterChange({
@@ -424,7 +419,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               }
               value={query.role || ""}
             >
-              <option value="">{copy.users.allRoles}</option>
+              <option value="">{"All roles"}</option>
               {ROLE_OPTIONS.map((role) => (
                 <option key={role} value={role}>
                   {copy.users.roles[role]}
@@ -434,7 +429,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
           </label>
 
           <label>
-            <span>{copy.users.authProvider}</span>
+            <span>{"Auth provider"}</span>
             <select
               onChange={(event) =>
                 handleFilterChange({
@@ -445,7 +440,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               }
               value={query.authProvider || ""}
             >
-              <option value="">{copy.users.allProviders}</option>
+              <option value="">{"All providers"}</option>
               {AUTH_PROVIDER_OPTIONS.map((provider) => (
                 <option key={provider} value={provider}>
                   {copy.users.providers[provider]}
@@ -455,7 +450,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
           </label>
 
           <label>
-            <span>{copy.common.status}</span>
+            <span>{"Status"}</span>
             <select
               onChange={(event) =>
                 handleFilterChange({
@@ -464,9 +459,9 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               }
               value={getBooleanFilterValue(query.isActive)}
             >
-              <option value="">{copy.users.allStatuses}</option>
-              <option value="true">{copy.users.active}</option>
-              <option value="false">{copy.users.inactive}</option>
+              <option value="">{"All statuses"}</option>
+              <option value="true">{"Active"}</option>
+              <option value="false">{"Inactive"}</option>
             </select>
           </label>
 
@@ -480,7 +475,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
             type="button"
           >
             <RotateCcw aria-hidden="true" size={17} />
-            {copy.users.reset}
+            {"Reset"}
           </button>
         </div>
       </section>
@@ -500,13 +495,13 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>{copy.common.email}</th>
-                <th>{copy.common.name}</th>
-                <th>{copy.common.phone}</th>
-                <th>{copy.common.role}</th>
-                <th>{copy.common.status}</th>
-                <th>{copy.common.created}</th>
-                <th>{copy.common.actions}</th>
+                <th>{"Email"}</th>
+                <th>{"Name"}</th>
+                <th>{"Phone"}</th>
+                <th>{"Role"}</th>
+                <th>{"Status"}</th>
+                <th>{"Created"}</th>
+                <th>{"Actions"}</th>
               </tr>
             </thead>
             <tbody>
@@ -514,14 +509,14 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               {!isLoading && !listError && users.length === 0 ? (
                 <tr>
                   <td className="admin-table__state" colSpan={7}>
-                    {copy.users.listEmpty}
+                    {"No users match the current filters."}
                   </td>
                 </tr>
               ) : null}
               {!isLoading && !listError
                 ? users.map((user) => (
                     <tr
-                      aria-label={copy.users.openAria(user.email)}
+                      aria-label={((email) => `Open ${email}`)(user.email)}
                       className="admin-table__clickable-row"
                       key={user.id}
                       onClick={() => void openUserDetail(user)}
@@ -536,8 +531,8 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                       <td>
                         <strong>{user.email}</strong>
                       </td>
-                      <td>{formatOptional(user.name, locale)}</td>
-                      <td>{formatOptional(user.phone, locale)}</td>
+                      <td>{formatOptional(user.name)}</td>
+                      <td>{formatOptional(user.phone)}</td>
                       <td>{copy.users.roles[user.role]}</td>
                       <td>
                         <span
@@ -547,10 +542,10 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                               : "admin-badge--muted"
                           }`}
                         >
-                          {user.isActive ? copy.users.active : copy.users.inactive}
+                          {user.isActive ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td>{formatAdminDate(user.createdAt, locale)}</td>
+                      <td>{formatAdminDate(user.createdAt)}</td>
                       <td>
                         <div
                           className="admin-row-actions"
@@ -558,16 +553,16 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                           onKeyDown={(event) => event.stopPropagation()}
                         >
                           <button
-                            aria-label={copy.users.editAria(user.email)}
+                            aria-label={((email) => `Edit ${email}`)(user.email)}
                             className="icon-button admin-icon-button"
                             onClick={() => void openUserDetail(user)}
-                            title={copy.users.editTitle}
+                            title={"Edit user"}
                             type="button"
                           >
                             <Edit3 aria-hidden="true" size={17} />
                           </button>
                           <button
-                            aria-label={`${copy.users.deleteTitle}: ${user.email}`}
+                            aria-label={`${"Delete user"}: ${user.email}`}
                             className="icon-button admin-icon-button admin-icon-button--delete"
                             disabled={
                               user.id === currentUser?.id ||
@@ -576,8 +571,8 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                             onClick={() => void handleDelete(user)}
                             title={
                               user.id === currentUser?.id
-                                ? copy.users.deleteCurrentTitle
-                                : copy.users.deleteTitle
+                                ? "You cannot delete your current account"
+                                : "Delete user"
                             }
                             type="button"
                           >
@@ -589,7 +584,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                             onClick={() => void handleStatusChange(user)}
                             type="button"
                           >
-                            {user.isActive ? copy.users.deactivate : copy.users.activate}
+                            {user.isActive ? "Deactivate" : "Activate"}
                           </button>
                         </div>
                       </td>
@@ -605,7 +600,6 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
       <AdminPagination
         copy={copy}
         isLoading={isLoading}
-        locale={locale}
         onPageChange={goToPage}
         pagination={pagination}
       />
@@ -621,7 +615,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               onClick={requestClose}
               type="button"
             >
-              {copy.common.cancel}
+              {"Cancel"}
             </button>
             <button
               className="button button--primary"
@@ -630,14 +624,14 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
               type="submit"
             >
               <Save aria-hidden="true" size={17} />
-              {isSaving ? copy.common.saving : copy.common.save}
+              {isSaving ? "Saving" : "Save"}
             </button>
           </>
         )}
         hasUnsavedChanges={hasUnsavedChanges}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={copy.users.editTitle}
+        title={"Edit user"}
       >
         {actionErrorMessage ? (
           <AdminFeedback message={actionErrorMessage} requestId={requestId} tone="error" />
@@ -645,28 +639,28 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
         {selectedUser ? (
             <form className="admin-form admin-compact-form" id="admin-user-edit-form" onSubmit={handleUserSave}>
               <section className="admin-compact-group" aria-labelledby="user-account-heading">
-                <h3 id="user-account-heading">{copy.users.account}</h3>
+                <h3 id="user-account-heading">{"Account"}</h3>
                 <div className="admin-compact-fields">
                   <label className="admin-compact-field--wide">
-                    <span>{copy.common.name}</span>
+                    <span>{"Name"}</span>
                     <input disabled={isDetailLoading} maxLength={120} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} value={form.name} />
                   </label>
                   <label className="admin-compact-field--wide">
-                    <span>{copy.common.email}</span>
+                    <span>{"Email"}</span>
                     <input disabled readOnly type="email" value={selectedUser.email} />
                   </label>
                   <label className="admin-compact-field--wide">
-                    <span>{copy.common.phone}</span>
+                    <span>{"Phone"}</span>
                     <input disabled={isDetailLoading} maxLength={32} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} value={form.phone} />
                   </label>
                 </div>
               </section>
 
               <section className="admin-compact-group" aria-labelledby="user-access-heading">
-                <h3 id="user-access-heading">{copy.users.access}</h3>
+                <h3 id="user-access-heading">{"Access"}</h3>
                 <div className="admin-compact-fields">
                 <label>
-                  <span>{copy.common.role}</span>
+                  <span>{"Role"}</span>
                   <select
                     disabled={isDetailLoading}
                     onChange={(event) =>
@@ -697,25 +691,25 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
                     }
                     type="checkbox"
                   />
-                  <span>{copy.users.active}</span>
+                  <span>{"Active"}</span>
                 </label>
               </div>
               </section>
 
               <section className="admin-compact-group" aria-labelledby="user-metadata-heading">
-                <h3 id="user-metadata-heading">{copy.users.metadata}</h3>
+                <h3 id="user-metadata-heading">{"Metadata"}</h3>
                 <div className="admin-meta-grid admin-meta-grid--compact">
                 <span>
-                  <small>{copy.common.provider}</small>
+                  <small>{"Provider"}</small>
                   <strong>{copy.users.providers[selectedUser.authProvider]}</strong>
                 </span>
                 <span>
-                  <small>{copy.users.createdAt}</small>
-                  <strong>{formatAdminDate(selectedUser.createdAt, locale)}</strong>
+                  <small>{"Created at"}</small>
+                  <strong>{formatAdminDate(selectedUser.createdAt)}</strong>
                 </span>
                 <span>
-                  <small>{copy.users.updatedAt}</small>
-                  <strong>{formatAdminDate(selectedUser.updatedAt, locale)}</strong>
+                  <small>{"Updated at"}</small>
+                  <strong>{formatAdminDate(selectedUser.updatedAt)}</strong>
                 </span>
               </div>
               </section>
@@ -723,7 +717,7 @@ export function AdminUsersPage({ initialQuery }: AdminUsersPageProps) {
             </form>
           ) : (
             <div className="admin-panel__empty" role="status">
-              {copy.users.loadingDetail}
+              {"Loading user detail."}
             </div>
           )}
       </AdminModal>
@@ -759,8 +753,6 @@ function AdminFeedback({
   tone: "error" | "success";
 }) {
   const Icon = tone === "success" ? CheckCircle2 : AlertCircle;
-  const { locale } = useI18n();
-  const copy = getAdminOperationsTranslations(locale);
 
   return (
     <div className={`admin-feedback admin-feedback--${tone}`} role="status">
@@ -768,7 +760,7 @@ function AdminFeedback({
       <span>{message}</span>
       {requestId ? (
         <small>
-          {copy.common.request} {requestId}
+          {"Request"} {requestId}
         </small>
       ) : null}
     </div>
@@ -796,33 +788,31 @@ function AdminTableSkeleton({
 function AdminPagination({
   copy,
   isLoading,
-  locale,
   onPageChange,
   pagination,
 }: {
-  copy: AdminOperationsTranslations;
+  copy: AdminOperationsCopy;
   isLoading: boolean;
-  locale: Locale;
   onPageChange: (page: number) => void;
   pagination: Pagination;
 }) {
   const totalPages = Math.max(1, pagination.totalPages);
 
   return (
-    <nav className="admin-pagination" aria-label={copy.users.paginationAria}>
+    <nav className="admin-pagination" aria-label={"Users pagination"}>
       <button
         className="button button--secondary"
         disabled={isLoading || pagination.page <= 1}
         onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
         type="button"
       >
-        {copy.common.previous}
+        {"Previous"}
       </button>
       <span>
-        {copy.users.pageSummary(
-          formatNumber(pagination.page, locale),
-          formatNumber(totalPages, locale),
-          formatNumber(pagination.total, locale),
+        {((page, totalPages, total) => `Page ${page} of ${totalPages} (${total} users)`)(
+          formatNumber(pagination.page),
+          formatNumber(totalPages),
+          formatNumber(pagination.total),
         )}
       </span>
       <button
@@ -831,7 +821,7 @@ function AdminPagination({
         onClick={() => onPageChange(pagination.page + 1)}
         type="button"
       >
-        {copy.common.next}
+        {"Next"}
       </button>
     </nav>
   );
@@ -839,22 +829,22 @@ function AdminPagination({
 
 function getUserErrorMessage(
   error: UserUiError,
-  copy: AdminOperationsTranslations,
+  copy: AdminOperationsCopy,
 ): string {
   const fallback =
     error.fallback === "list"
-      ? copy.users.loadError
+      ? "Admin users could not be loaded right now."
       : error.fallback === "open"
-        ? copy.users.userOpenError
+        ? "This user could not be opened right now."
         : error.fallback === "empty"
-          ? copy.users.errors.ADMIN_USER_UPDATE_EMPTY
+          ? "Change at least one editable field before saving."
           : error.fallback === "update"
-            ? copy.users.userUpdateError
+            ? "User profile could not be updated."
             : error.fallback === "status"
-              ? copy.users.userStatusError
+              ? "User active status could not be changed."
               : error.fallback === "selfDelete"
-                ? copy.users.selfDeleteError
-                : copy.users.userDeleteError;
+                ? "You cannot delete the admin account you are using."
+                : "User could not be deleted.";
 
   if (!(error.cause instanceof ApiClientError)) {
     return fallback;

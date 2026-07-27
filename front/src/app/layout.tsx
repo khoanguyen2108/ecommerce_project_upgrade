@@ -4,7 +4,6 @@ import { AuthenticatedAppGuard } from "@/components/auth/AuthenticatedAppGuard";
 import { CartProvider } from "@/components/cart/CartProvider";
 import { CustomerChatWidget } from "@/components/chat/CustomerChatWidget";
 import { AuthSessionProvider } from "@/features/auth/AuthSessionProvider";
-import { I18nProvider } from "@/features/i18n/I18nProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,16 +19,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <I18nProvider>
-          <AuthSessionProvider>
-            <AuthenticatedAppGuard>
-              <CartProvider>
-                {children}
-                <CustomerChatWidget />
-              </CartProvider>
-            </AuthenticatedAppGuard>
-          </AuthSessionProvider>
-        </I18nProvider>
+        <AuthSessionProvider>
+          <AuthenticatedAppGuard>
+            <CartProvider>
+              {children}
+              <CustomerChatWidget />
+            </CartProvider>
+          </AuthenticatedAppGuard>
+        </AuthSessionProvider>
       </body>
     </html>
   );

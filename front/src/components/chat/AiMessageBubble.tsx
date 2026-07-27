@@ -7,8 +7,6 @@ import type {
   SupportReturnRequestCard,
   SupportResponse,
 } from "@/features/ai/supportTypes";
-import { useI18n } from "@/features/i18n/useI18n";
-import type { Locale } from "@/features/i18n/locale";
 
 export type AiMessageTone = "answer" | "error" | "handoff" | "out-of-scope";
 
@@ -41,11 +39,10 @@ export function AiMessageBubble({
   statusDetail,
   tone = "answer",
 }: AiMessageBubbleProps) {
-  const { locale, t } = useI18n();
   return (
     <>
       {showDayLabel ? (
-        <span className="customer-chat-message__day">{t("chat.today")}</span>
+        <span className="customer-chat-message__day">{"Today"}</span>
       ) : null}
       <article
         className={`customer-chat-ai-message customer-chat-ai-message--${tone} ${
@@ -103,7 +100,7 @@ export function AiMessageBubble({
           ) : null}
         </div>
         <time dateTime={createdAt || undefined}>
-          {createdAt ? formatChatTime(createdAt, locale, t("chat.now")) : t("chat.now")}
+          {createdAt ? formatChatTime(createdAt, "Now") : "Now"}
         </time>
       </article>
     </>
@@ -214,14 +211,14 @@ function isSafeLink(value: string | undefined): value is string {
   }
 }
 
-function formatChatTime(value: string, locale: Locale, fallback: string): string {
+function formatChatTime(value: string, fallback: string): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return fallback;
   }
 
-  return new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en", {
+  return new Intl.DateTimeFormat("en", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);

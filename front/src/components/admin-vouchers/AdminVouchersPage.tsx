@@ -1,5 +1,8 @@
 "use client";
 
+import { ADMIN_CATALOG_COPY, type AdminCatalogCopy } from "@/components/admin/admin-copy";
+const copy = ADMIN_CATALOG_COPY;
+
 import {
   Edit3,
   Plus,
@@ -39,16 +42,7 @@ import type {
   AdminVoucherWriteRequest,
   VoucherDiscountType,
 } from "@/features/admin-vouchers/types";
-import {
-  formatAdminCatalogMoney,
-  formatAdminCatalogNumber,
-  formatAdminCatalogPercent,
-  getAdminCatalogErrorMessage,
-  getAdminCatalogTranslations,
-  type AdminCatalogTranslations,
-} from "@/features/i18n/admin-catalog-translations";
-import { useI18n } from "@/features/i18n/useI18n";
-import type { Locale } from "@/features/i18n/locale";
+import { formatAdminCatalogMoney, formatAdminCatalogNumber, formatAdminCatalogPercent, getAdminCatalogErrorMessage } from "@/components/admin/admin-format";
 import type { Pagination } from "@/lib/api/types";
 
 const VOUCHER_LIMIT = 8;
@@ -75,10 +69,6 @@ interface VoucherFormState {
 type ModalMode = "create" | "edit";
 
 export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
-  const { locale } = useI18n();
-  const copy = getAdminCatalogTranslations(locale);
-  const copyRef = useRef(copy);
-  copyRef.current = copy;
   const [query, setQuery] = useState<AdminVoucherQuery>({
     ...initialQuery,
     limit: VOUCHER_LIMIT,
@@ -135,8 +125,8 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
         setListError(
           getAdminCatalogErrorMessage(
             error,
-            copyRef.current.vouchers.errors,
-            copyRef.current.vouchers.feedback.listLoadError,
+            { "AUTH_REQUIRED": "Your admin session is required. Sign in again to continue.", "BAD_REQUEST": "Some voucher fields are invalid. Review the form and try again.", "FORBIDDEN": "This account is not allowed to manage vouchers.", "NETWORK_ERROR": "The voucher API could not be reached. Check the backend and retry.", "VALIDATION_ERROR": "Some voucher fields are invalid. Review the form and try again.", "VOUCHER_CODE_EXISTS": "Another voucher already uses this code.", "VOUCHER_NOT_FOUND": "That voucher no longer exists.", "VOUCHER_RULE_INVALID": "The voucher does not satisfy its business rules.", "VOUCHER_UPDATE_EMPTY": "Change at least one voucher field before saving.", "VOUCHER_DELETE_BLOCKED": "This voucher is attached to orders. Deactivate it instead." },
+            "Admin vouchers could not be loaded right now.",
           ),
         );
         setRequestId(getApiRequestId(error));
@@ -185,7 +175,7 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
         getAdminCatalogErrorMessage(
           error,
           copy.vouchers.errors,
-          copy.vouchers.feedback.openError,
+          "This voucher could not be opened right now.",
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -211,10 +201,10 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
       const payload = voucherPayload(form);
       if (modalMode === "create") {
         await createAdminVoucher(payload);
-        setSuccessMessage(copy.vouchers.feedback.created);
+        setSuccessMessage("Voucher created.");
       } else if (selectedVoucher) {
         await updateAdminVoucher(selectedVoucher.id, payload);
-        setSuccessMessage(copy.vouchers.feedback.updated);
+        setSuccessMessage("Voucher updated.");
       }
       setIsModalOpen(false);
       setRefreshKey((current) => current + 1);
@@ -223,7 +213,7 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
         getAdminCatalogErrorMessage(
           error,
           copy.vouchers.errors,
-          copy.vouchers.feedback.saveError,
+          "Voucher could not be saved.",
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -236,7 +226,7 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
   async function handleStatusChange(voucher: AdminVoucher) {
     if (busyAction) return;
     const nextActive = !voucher.isActive;
-    if (!window.confirm(copy.vouchers.confirm.status(nextActive, voucher.code))) {
+    if (!window.confirm(((nextIsActive, code) => `${nextIsActive ? "Activate" : "Deactivate"} ${code}?`)(nextActive, voucher.code))) {
       return;
     }
 
@@ -247,8 +237,8 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
       else await deactivateAdminVoucher(voucher.id);
       setSuccessMessage(
         nextActive
-          ? copy.vouchers.feedback.activated
-          : copy.vouchers.feedback.deactivated,
+          ? "Voucher activated."
+          : "Voucher deactivated.",
       );
       setRefreshKey((current) => current + 1);
     } catch (error) {
@@ -256,7 +246,7 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
         getAdminCatalogErrorMessage(
           error,
           copy.vouchers.errors,
-          copy.vouchers.feedback.statusError,
+          "Voucher status could not be changed.",
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -267,7 +257,7 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
 
   async function handleDelete(voucher: AdminVoucher) {
     if (busyAction) return;
-    if (!window.confirm(copy.vouchers.confirm.delete(voucher.code))) return;
+    if (!window.confirm(((code) => `Delete ${code}? This cannot be undone.`)(voucher.code))) return;
 
     setBusyAction(`${voucher.id}:delete`);
     resetActionFeedback();
@@ -278,13 +268,13 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
       } else {
         setRefreshKey((current) => current + 1);
       }
-      setSuccessMessage(copy.vouchers.feedback.deleted);
+      setSuccessMessage("Voucher deleted.");
     } catch (error) {
       setActionError(
         getAdminCatalogErrorMessage(
           error,
           copy.vouchers.errors,
-          copy.vouchers.feedback.deleteError,
+          "Voucher could not be deleted.",
         ),
       );
       setRequestId(getApiRequestId(error));
@@ -306,16 +296,13 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
       : emptyVoucherForm();
   const hasUnsavedChanges =
     isModalOpen && JSON.stringify(form) !== JSON.stringify(baselineForm);
-  const commonCopy = copy.common;
-  const voucherCopy = copy.vouchers;
-
   return (
     <div className="admin-resource admin-resource--vouchers admin-resource--full-width">
       <section className="admin-resource__header" aria-labelledby="admin-vouchers-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">{voucherCopy.header.eyebrow}</p>
-          <h1 id="admin-vouchers-heading">{voucherCopy.header.title}</h1>
-          <p>{voucherCopy.header.subtitle}</p>
+          <p className="admin-page-intro__eyebrow">Promotion operations</p>
+          <h1 id="admin-vouchers-heading">Vouchers Management</h1>
+          <p>Create, schedule, and control voucher definitions.</p>
         </div>
         <div className="admin-header-actions">
           <button
@@ -325,40 +312,40 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
             type="button"
           >
             <RefreshCw aria-hidden="true" size={17} />
-            {commonCopy.refresh}
+            Refresh
           </button>
           <button className="button button--primary" onClick={openCreateModal} type="button">
             <Plus aria-hidden="true" size={17} />
-            {voucherCopy.header.newVoucher}
+            New voucher
           </button>
         </div>
       </section>
 
       <section
-        aria-label={voucherCopy.filters.aria}
+        aria-label="Voucher filters"
         className="admin-resource__toolbar admin-resource__toolbar--compact admin-resource__toolbar--inline admin-filter-surface"
       >
         <form className="admin-search" onSubmit={handleSearchSubmit}>
-          <label htmlFor="admin-voucher-search">{commonCopy.search}</label>
+          <label htmlFor="admin-voucher-search">Search</label>
           <div>
             <input
               id="admin-voucher-search"
               maxLength={120}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder={voucherCopy.filters.searchPlaceholder}
+              placeholder="Code or name"
               type="search"
               value={searchInput}
             />
             <button className="button button--primary" type="submit">
               <Search aria-hidden="true" size={17} />
-              {commonCopy.search}
+              Search
             </button>
           </div>
         </form>
 
         <div className="admin-filter-grid admin-filter-grid--compact">
           <label>
-            <span>{commonCopy.status}</span>
+            <span>Status</span>
             <select
               onChange={(event) =>
                 setQuery((current) => ({
@@ -369,9 +356,9 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
               }
               value={getBooleanFilterValue(query.isActive)}
             >
-              <option value="">{commonCopy.allStatuses}</option>
-              <option value="true">{commonCopy.active}</option>
-              <option value="false">{commonCopy.inactive}</option>
+              <option value="">All statuses</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
             </select>
           </label>
           <button
@@ -384,7 +371,7 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
             type="button"
           >
             <RotateCcw aria-hidden="true" size={17} />
-            {commonCopy.reset}
+            Reset
           </button>
         </div>
       </section>
@@ -400,17 +387,17 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>{voucherCopy.table.code}</th>
-                <th>{commonCopy.name}</th>
-                <th>{voucherCopy.table.type}</th>
-                <th>{voucherCopy.table.value}</th>
-                <th>{voucherCopy.table.minSubtotal}</th>
-                <th>{voucherCopy.table.maxDiscount}</th>
-                <th>{voucherCopy.table.usageLimit}</th>
-                <th>{voucherCopy.table.perUserLimit}</th>
-                <th>{voucherCopy.table.validityWindow}</th>
-                <th>{commonCopy.status}</th>
-                <th>{commonCopy.actions}</th>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Value</th>
+                <th>Min subtotal</th>
+                <th>Max discount</th>
+                <th>Usage limit</th>
+                <th>Per-user limit</th>
+                <th>Validity window</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -418,14 +405,14 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
               {!isLoading && !listError && vouchers.length === 0 ? (
                 <tr>
                   <td className="admin-table__state" colSpan={11}>
-                    {voucherCopy.table.empty}
+                    No vouchers match the current filters.
                   </td>
                 </tr>
               ) : null}
               {!isLoading && !listError
                 ? vouchers.map((voucher) => (
                     <tr
-                      aria-label={voucherCopy.table.openAria(voucher.code)}
+                      aria-label={`Open ${voucher.code}`}
                       className="admin-table__clickable-row"
                       key={voucher.id}
                       onClick={() => void openEditModal(voucher)}
@@ -441,32 +428,32 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
                       <td>{voucher.name}</td>
                       <td>
                         {voucher.discountType === "PERCENT"
-                          ? voucherCopy.table.percent
-                          : voucherCopy.table.fixed}
+                          ? "Percent"
+                          : "Fixed"}
                       </td>
-                      <td>{formatDiscountValue(voucher, locale)}</td>
-                      <td>{formatAdminCatalogMoney(voucher.minSubtotal, locale)}</td>
+                      <td>{formatDiscountValue(voucher)}</td>
+                      <td>{formatAdminCatalogMoney(voucher.minSubtotal)}</td>
                       <td>
                         {voucher.maxDiscount === null
-                          ? commonCopy.notSet
-                          : formatAdminCatalogMoney(voucher.maxDiscount, locale)}
+                          ? "Not set"
+                          : formatAdminCatalogMoney(voucher.maxDiscount)}
                       </td>
                       <td>
                         {voucher.usageLimit === null
-                          ? voucherCopy.table.unlimited
-                          : formatAdminCatalogNumber(voucher.usageLimit, locale)}
+                          ? "Unlimited"
+                          : formatAdminCatalogNumber(voucher.usageLimit)}
                       </td>
                       <td>
                         {voucher.perUserLimit === null
-                          ? voucherCopy.table.unlimited
-                          : formatAdminCatalogNumber(voucher.perUserLimit, locale)}
+                          ? "Unlimited"
+                          : formatAdminCatalogNumber(voucher.perUserLimit)}
                       </td>
                       <td>
-                        <ValidityWindow copy={voucherCopy} locale={locale} voucher={voucher} />
+                        <ValidityWindow voucher={voucher} />
                       </td>
                       <td>
                         <span className={`admin-badge ${voucher.isActive ? "admin-badge--neutral" : "admin-badge--muted"}`}>
-                          {voucher.isActive ? commonCopy.active : commonCopy.inactive}
+                          {voucher.isActive ? "Active" : "Inactive"}
                         </span>
                       </td>
                       <td>
@@ -476,23 +463,23 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
                           onKeyDown={(event) => event.stopPropagation()}
                         >
                           <button
-                            aria-label={voucherCopy.table.editAria(voucher.code)}
+                            aria-label={`Edit ${voucher.code}`}
                             className="icon-button admin-icon-button"
                             onClick={() => void openEditModal(voucher)}
-                            title={voucherCopy.table.editTitle}
+                            title="Edit voucher"
                             type="button"
                           >
                             <Edit3 aria-hidden="true" size={17} />
                           </button>
                           <button
-                            aria-label={`${commonCopy.delete}: ${voucher.code}`}
+                            aria-label={`Delete: ${voucher.code}`}
                             className="icon-button admin-icon-button admin-icon-button--delete"
                             disabled={Boolean(busyAction)}
                             onClick={() => void handleDelete(voucher)}
                             title={
                               busyAction === `${voucher.id}:delete`
-                                ? commonCopy.deleting
-                                : commonCopy.delete
+                                ? "Deleting"
+                                : "Delete"
                             }
                             type="button"
                           >
@@ -505,10 +492,10 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
                             type="button"
                           >
                             {busyAction === voucher.id
-                              ? voucherCopy.table.working
+                              ? "Working"
                               : voucher.isActive
-                                ? commonCopy.deactivate
-                                : commonCopy.activate}
+                                ? "Deactivate"
+                                : "Activate"}
                           </button>
                         </div>
                       </td>
@@ -522,7 +509,7 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
 
       <AdminPagination
         isLoading={isLoading}
-        noun={voucherCopy.noun}
+        noun="vouchers"
         onPageChange={(page) => setQuery((current) => ({ ...current, page }))}
         pagination={pagination}
       />
@@ -533,7 +520,7 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
         footer={(requestClose) => (
           <>
             <button className="button button--secondary" disabled={isSaving} onClick={requestClose} type="button">
-              {commonCopy.cancel}
+              Cancel
             </button>
             <button
               className="button button--primary"
@@ -543,10 +530,10 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
             >
               <Save aria-hidden="true" size={17} />
               {isSaving
-                ? commonCopy.saving
+                ? "Saving"
                 : modalMode === "create"
-                  ? commonCopy.create
-                  : commonCopy.save}
+                  ? "Create"
+                  : "Save"}
             </button>
           </>
         )}
@@ -555,15 +542,12 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
         onClose={() => setIsModalOpen(false)}
         title={
           modalMode === "create"
-            ? voucherCopy.form.newTitle
-            : voucherCopy.form.editTitle(
-                selectedVoucher?.code || voucherCopy.form.voucherFallback,
-              )
+            ? "New voucher"
+            : `Edit ${selectedVoucher?.code || "voucher"}`
         }
       >
         {actionError ? <AdminFeedback message={actionError} requestId={requestId} tone="error" /> : null}
         <VoucherForm
-          copy={copy}
           form={form}
           isDisabled={isDetailLoading}
           onChange={setForm}
@@ -575,75 +559,71 @@ export function AdminVouchersPage({ initialQuery }: AdminVouchersPageProps) {
 }
 
 function VoucherForm({
-  copy,
   form,
   isDisabled,
   onChange,
   onSubmit,
 }: {
-  copy: AdminCatalogTranslations;
   form: VoucherFormState;
   isDisabled: boolean;
   onChange: (form: VoucherFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-  const commonCopy = copy.common;
-  const voucherCopy = copy.vouchers;
   const update = <K extends keyof VoucherFormState>(key: K, value: VoucherFormState[K]) =>
     onChange({ ...form, [key]: value });
 
   return (
     <form className="admin-form admin-compact-form" id="admin-voucher-form" onSubmit={onSubmit}>
       <section className="admin-compact-group" aria-labelledby="voucher-identity-heading">
-        <h3 id="voucher-identity-heading">{voucherCopy.form.identity}</h3>
+        <h3 id="voucher-identity-heading">Identity</h3>
         <div className="admin-compact-fields">
           <label>
-            <span>{voucherCopy.form.code}</span>
+            <span>Code</span>
             <input disabled={isDisabled} maxLength={64} onChange={(event) => update("code", event.target.value.toUpperCase())} required value={form.code} />
           </label>
           <label>
-            <span>{commonCopy.name}</span>
+            <span>Name</span>
             <input disabled={isDisabled} maxLength={160} onChange={(event) => update("name", event.target.value)} required value={form.name} />
           </label>
           <label className="admin-compact-field--wide">
-            <span>{commonCopy.description}</span>
+            <span>Description</span>
             <textarea disabled={isDisabled} maxLength={2000} onChange={(event) => update("description", event.target.value)} value={form.description} />
           </label>
         </div>
       </section>
 
       <section className="admin-compact-group" aria-labelledby="voucher-discount-heading">
-        <h3 id="voucher-discount-heading">{voucherCopy.form.discount}</h3>
+        <h3 id="voucher-discount-heading">Discount</h3>
         <div className="admin-compact-fields">
           <label>
-            <span>{voucherCopy.form.discountType}</span>
+            <span>Discount type</span>
             <select disabled={isDisabled} onChange={(event) => update("discountType", event.target.value as VoucherDiscountType)} value={form.discountType}>
-              <option value="PERCENT">{voucherCopy.form.percent}</option>
-              <option value="FIXED">{voucherCopy.form.fixed}</option>
+              <option value="PERCENT">Percent</option>
+              <option value="FIXED">Fixed</option>
             </select>
           </label>
-          <NumberField disabled={isDisabled} label={voucherCopy.form.discountValue} onChange={(value) => update("discountValue", value)} required value={form.discountValue} />
-          <NumberField disabled={isDisabled} label={voucherCopy.form.minSubtotal} min="0" onChange={(value) => update("minSubtotal", value)} required value={form.minSubtotal} />
-          <NumberField disabled={isDisabled} label={voucherCopy.form.maxDiscount} onChange={(value) => update("maxDiscount", value)} value={form.maxDiscount} />
+          <NumberField disabled={isDisabled} label="Discount value" onChange={(value) => update("discountValue", value)} required value={form.discountValue} />
+          <NumberField disabled={isDisabled} label="Min subtotal" min="0" onChange={(value) => update("minSubtotal", value)} required value={form.minSubtotal} />
+          <NumberField disabled={isDisabled} label="Max discount" onChange={(value) => update("maxDiscount", value)} value={form.maxDiscount} />
         </div>
       </section>
 
       <section className="admin-compact-group" aria-labelledby="voucher-limits-heading">
-        <h3 id="voucher-limits-heading">{voucherCopy.form.limits}</h3>
+        <h3 id="voucher-limits-heading">Limits and validity</h3>
         <div className="admin-compact-fields">
-          <NumberField disabled={isDisabled} label={voucherCopy.form.usageLimit} onChange={(value) => update("usageLimit", value)} value={form.usageLimit} />
-          <NumberField disabled={isDisabled} label={voucherCopy.form.perUserLimit} onChange={(value) => update("perUserLimit", value)} value={form.perUserLimit} />
+          <NumberField disabled={isDisabled} label="Usage limit" onChange={(value) => update("usageLimit", value)} value={form.usageLimit} />
+          <NumberField disabled={isDisabled} label="Per user limit" onChange={(value) => update("perUserLimit", value)} value={form.perUserLimit} />
           <label>
-            <span>{voucherCopy.form.startsAt}</span>
+            <span>Starts at</span>
             <input disabled={isDisabled} onChange={(event) => update("startsAt", event.target.value)} type="datetime-local" value={form.startsAt} />
           </label>
           <label>
-            <span>{voucherCopy.form.endsAt}</span>
+            <span>Ends at</span>
             <input disabled={isDisabled} onChange={(event) => update("endsAt", event.target.value)} type="datetime-local" value={form.endsAt} />
           </label>
           <label className="admin-checkbox admin-compact-checkbox admin-compact-field--wide">
             <input checked={form.isActive} disabled={isDisabled} onChange={(event) => update("isActive", event.target.checked)} type="checkbox" />
-            <span>{commonCopy.active}</span>
+            <span>Active</span>
           </label>
         </div>
       </section>
@@ -675,24 +655,15 @@ function NumberField({
 }
 
 function ValidityWindow({
-  copy,
-  locale,
   voucher,
 }: {
-  copy: AdminCatalogTranslations["vouchers"];
-  locale: Locale;
   voucher: AdminVoucher;
 }) {
-  if (!voucher.startsAt && !voucher.endsAt) return <>{copy.form.always}</>;
+  if (!voucher.startsAt && !voucher.endsAt) return <>Always</>;
 
-  const lines = copy.form.validity(
-    voucher.startsAt
-      ? formatAdminDate(voucher.startsAt, locale)
-      : copy.form.anyTime,
-    voucher.endsAt
-      ? formatAdminDate(voucher.endsAt, locale)
-      : copy.form.noEnd,
-  ).split("\n");
+  const from = voucher.startsAt ? formatAdminDate(voucher.startsAt) : "any time";
+  const to = voucher.endsAt ? formatAdminDate(voucher.endsAt) : "no end";
+  const lines = [`From ${from}`, `To ${to}`];
 
   return (
     <span className="admin-voucher-validity">
@@ -754,7 +725,7 @@ function voucherPayload(form: VoucherFormState): AdminVoucherWriteRequest {
 
 function validateVoucherForm(
   form: VoucherFormState,
-  copy: AdminCatalogTranslations["vouchers"]["validation"],
+  copy: AdminCatalogCopy["vouchers"]["validation"],
 ): string | undefined {
   const code = form.code.trim();
   if (!code) return copy.codeRequired;
@@ -805,8 +776,8 @@ function toDateTimeLocal(value: string | null): string {
   return local.toISOString().slice(0, 16);
 }
 
-function formatDiscountValue(voucher: AdminVoucher, locale: Locale): string {
+function formatDiscountValue(voucher: AdminVoucher): string {
   return voucher.discountType === "PERCENT"
-    ? formatAdminCatalogPercent(voucher.discountValue, locale)
-    : formatAdminCatalogMoney(voucher.discountValue, locale);
+    ? formatAdminCatalogPercent(voucher.discountValue)
+    : formatAdminCatalogMoney(voucher.discountValue);
 }

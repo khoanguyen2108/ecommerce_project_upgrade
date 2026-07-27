@@ -24,7 +24,6 @@ export interface StyleAdviceCurrentOutfitRequest {
   }>;
   intent?: StyleAdviceIntent;
   budget?: number;
-  locale?: "vi" | "en";
 }
 
 export interface StyleAdviceCanonicalOutfitItem {
@@ -80,7 +79,6 @@ export interface StyleAdviceHandoff {
 
 export interface StyleAdviceResponse {
   type: StyleAdviceResponseType;
-  locale?: "vi" | "en";
   message?: string;
   clarificationQuestion?: string;
   outfit?: StyleAdviceCanonicalOutfit;

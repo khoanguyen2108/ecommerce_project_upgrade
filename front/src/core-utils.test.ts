@@ -27,7 +27,6 @@ import {
 } from "@/features/catalog/sizes";
 import type { Product, ProductVariant } from "@/features/catalog/types";
 import { getPostLoginRedirectPath, isAdminUser } from "@/features/auth/roles";
-import { isLocale } from "@/features/i18n/locale";
 import {
   getReturnReasonLabel,
   getReturnStatusLabel,
@@ -188,25 +187,23 @@ describe("accessory and pricing rules (20 cases)", () => {
   });
 });
 
-describe("locale, auth, and return labels (20 cases)", () => {
+describe("auth and English return labels (20 cases)", () => {
   const reasons: ReturnReason[] = [
     "WRONG_SIZE", "WRONG_ITEM", "DAMAGED", "CHANGED_MIND", "OTHER",
   ];
   const statuses: ReturnRequestStatus[] = ["PENDING", "APPROVED", "REJECTED"];
 
-  it.each(range(20))("returns localized values scenario %i", (index) => {
-    const locale = index % 2 === 0 ? "en" : "vi";
+  it.each(range(20))("returns English values scenario %i", (index) => {
     const reason = reasons[index % reasons.length];
     const status = statuses[index % statuses.length];
     const role = index % 4 === 0 ? "ADMIN" : index % 3 === 0 ? "STAFF" : "CUSTOMER";
 
-    expect(isLocale(locale)).toBe(true);
     expect(isAdminUser({ role })).toBe(role === "ADMIN");
     expect(getPostLoginRedirectPath({ role }, "/account")).toBe(
       role === "ADMIN" ? "/admin" : "/account",
     );
-    expect(getReturnReasonLabel(reason, locale)).toBeTruthy();
-    expect(getReturnStatusLabel(status, locale)).toBeTruthy();
+    expect(getReturnReasonLabel(reason)).toBeTruthy();
+    expect(getReturnStatusLabel(status)).toBeTruthy();
   });
 });
 
@@ -221,7 +218,7 @@ describe("admin filter helpers (20 cases)", () => {
     expect(normalizeNullableText(text)).toBe(
       index % 2 === 0 ? `value ${index}` : null,
     );
-    expect(formatOptional(text, "en")).toBe(
+    expect(formatOptional(text)).toBe(
       index % 2 === 0 ? text : "Not set",
     );
   });
@@ -236,7 +233,9 @@ describe("catalog display formatting (20 cases)", () => {
       colors.flatMap((color) => sizes.map((size) => ({ color, size }))),
     );
 
-    expect(formatPrice(value)).toContain(String(value).replace(/\B(?=(\d{3})+(?!\d))/g, "."));
+      expect(formatPrice(value)).toContain(
+        new Intl.NumberFormat("en-US").format(value),
+      );
     expect(summary).toContain(`Color ${index}`);
     expect(summary).toContain("Black");
     expect(summary).toContain(sizes[0]);

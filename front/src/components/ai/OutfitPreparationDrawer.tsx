@@ -22,7 +22,6 @@ import { useAuthSession } from "@/features/auth/AuthSessionProvider";
 import { addOutfitItemsToCart } from "@/features/cart/api";
 import { getProductById, getProductVariants } from "@/features/catalog/api";
 import { formatPrice } from "@/features/catalog/format";
-import { localizeProductName } from "@/features/catalog/localization";
 import type { Product, ProductVariant } from "@/features/catalog/types";
 import {
   getImplicitSelectableVariant,
@@ -36,7 +35,6 @@ import { ApiClientError } from "@/lib/errors/api-error";
 
 interface OutfitPreparationDrawerProps {
   isOpen: boolean;
-  locale: "vi" | "en";
   onClose: () => void;
   outfit?: PurchasableOutfit;
 }
@@ -75,73 +73,11 @@ const FOCUSABLE_SELECTOR = [
 
 const PREPARATION_DRAWER_BODY_CLASS = "outfit-preparation-drawer-active";
 
-const DRAWER_COPY = {
-  en: {
-    basePrice: "Base price",
-    close: "Close",
-    closeAria: "Close outfit preparation",
-    empty: "No products remain in this outfit.",
-    loadError: "Could not load options for this product.",
-    loading: "Loading product options",
-    outOfStock: "This product has no in-stock options.",
-    prepare: "Prepare outfit",
-    priceChanged: "The current price has changed from the saved outfit.",
-    productUnavailable: "This product is currently unavailable.",
-    remove: "Remove item",
-    removeAria: (name: string) => `Remove ${name} from this preparation`,
-    ready: "The outfit is ready to be added to cart.",
-    select: "Select a color and size.",
-    stale: "The saved selection is no longer available. Select another option.",
-    unitPrice: "Current price",
-  },
-  vi: {
-    basePrice: "Giá cơ bản",
-    close: "Đóng",
-    closeAria: "Đóng phần chuẩn bị outfit",
-    empty: "Outfit không còn sản phẩm nào để tiếp tục.",
-    loadError: "Không thể tải lựa chọn cho sản phẩm này.",
-    loading: "Đang tải lựa chọn sản phẩm",
-    outOfStock: "Sản phẩm này hiện không còn tùy chọn nào còn hàng.",
-    prepare: "Chuẩn bị outfit",
-    priceChanged: "Giá hiện tại đã thay đổi so với outfit đã lưu.",
-    productUnavailable: "Sản phẩm này hiện không khả dụng.",
-    remove: "Bỏ sản phẩm",
-    removeAria: (name: string) => `Bỏ ${name} khỏi phần chuẩn bị outfit`,
-    ready: "Outfit đã sẵn sàng để thêm vào giỏ hàng.",
-    select: "Vui lòng chọn màu và kích thước.",
-    stale: "Lựa chọn đã lưu không còn khả dụng. Vui lòng chọn lại.",
-    unitPrice: "Giá hiện tại",
-  },
-} as const;
-
-const DRAWER_SUBMIT_COPY = {
-  en: {
-    notReady: "Complete every available product before adding the outfit.",
-    pending: "Adding outfit to cart...",
-    submit: "Add outfit to cart",
-    submitError: "Could not add the outfit to cart. Try again.",
-    unauthorized: "Your session has expired. Sign in again.",
-  },
-  vi: {
-    notReady:
-      "Vui l\u00f2ng ho\u00e0n t\u1ea5t t\u1ea5t c\u1ea3 s\u1ea3n ph\u1ea9m kh\u1ea3 d\u1ee5ng tr\u01b0\u1edbc khi th\u00eam outfit.",
-    pending: "\u0110ang th\u00eam outfit v\u00e0o gi\u1ecf h\u00e0ng...",
-    submit: "Th\u00eam outfit v\u00e0o gi\u1ecf h\u00e0ng",
-    submitError:
-      "Kh\u00f4ng th\u1ec3 th\u00eam outfit v\u00e0o gi\u1ecf h\u00e0ng. Vui l\u00f2ng th\u1eed l\u1ea1i.",
-    unauthorized:
-      "Phi\u00ean \u0111\u0103ng nh\u1eadp \u0111\u00e3 h\u1ebft h\u1ea1n. Vui l\u00f2ng \u0111\u0103ng nh\u1eadp l\u1ea1i.",
-  },
-} as const;
-
 export function OutfitPreparationDrawer({
   isOpen,
-  locale,
   onClose,
   outfit,
 }: OutfitPreparationDrawerProps) {
-  const copy = DRAWER_COPY[locale];
-  const submitCopy = DRAWER_SUBMIT_COPY[locale];
   const router = useRouter();
   const { isAuthenticated } = useAuthSession();
   const { applyAuthoritativeCart, isSaving: isCartSaving } = useCart();
@@ -304,9 +240,9 @@ export function OutfitPreparationDrawer({
     !isCartSaving &&
     !submitLockRef.current;
   const submitDisabledReason = !isAuthenticated
-    ? submitCopy.unauthorized
+    ? "Your session has expired. Sign in again."
     : !isReady
-      ? submitCopy.notReady
+      ? "Complete every available product before adding the outfit."
       : undefined;
 
   function removeItem(sessionId: string) {
@@ -378,12 +314,12 @@ export function OutfitPreparationDrawer({
     const readiness = getReadySubmissionItems(items);
 
     if (!isAuthenticated) {
-      setSubmitError(submitCopy.unauthorized);
+      setSubmitError("Your session has expired. Sign in again.");
       return;
     }
 
     if (!readiness.isReady) {
-      setSubmitError(submitCopy.notReady);
+      setSubmitError("Complete every available product before adding the outfit.");
       return;
     }
 
@@ -416,14 +352,14 @@ export function OutfitPreparationDrawer({
         return;
       }
 
-      const mapped = mapOutfitCartErrorToItems(error, locale);
+      const mapped = mapOutfitCartErrorToItems(error);
       setItems((current) =>
-        applySubmitErrors(current, mapped.itemErrors, locale),
+        applySubmitErrors(current, mapped.itemErrors),
       );
       setSubmitError(
         mapped.globalError ||
           (mapped.itemErrors.length === 0
-            ? getGlobalSubmitError(error, locale)
+            ? getGlobalSubmitError(error)
             : undefined),
       );
     } finally {
@@ -454,11 +390,11 @@ export function OutfitPreparationDrawer({
       >
         <header className={styles.header}>
           <div>
-            <h2 id={titleId}>{copy.prepare}</h2>
+            <h2 id={titleId}>Prepare outfit</h2>
             <p id={descriptionId}>{outfit.summary}</p>
           </div>
           <button
-            aria-label={copy.closeAria}
+            aria-label="Close outfit preparation"
             className={styles.iconButton}
             onClick={requestClose}
             ref={closeButtonRef}
@@ -472,7 +408,7 @@ export function OutfitPreparationDrawer({
           {items.length === 0 ? (
             <div className={styles.emptyState} role="status">
               <ImageOff aria-hidden="true" size={30} />
-              <p>{copy.empty}</p>
+              <p>No products remain in this outfit.</p>
             </div>
           ) : (
             <div className={styles.itemList}>
@@ -481,7 +417,6 @@ export function OutfitPreparationDrawer({
                   item={item}
                   isSavedOutfit={outfit.source === "saved"}
                   key={item.sessionId}
-                  locale={locale}
                   onColorChange={(color) => selectColor(item.sessionId, color)}
                   onRemove={() => removeItem(item.sessionId)}
                   onSizeChange={(size) => selectSize(item.sessionId, size)}
@@ -495,7 +430,7 @@ export function OutfitPreparationDrawer({
           {isReady ? (
             <p className={styles.readyStatus} role="status">
               <CheckCircle2 aria-hidden="true" size={19} />
-              {copy.ready}
+              The outfit is ready to be added to cart.
             </p>
           ) : null}
           {submitError ? (
@@ -508,11 +443,11 @@ export function OutfitPreparationDrawer({
             {isSubmitting ? (
               <p className={styles.submitStatus} role="status">
                 <Loader2 aria-hidden="true" className={styles.spinner} size={17} />
-                {submitCopy.pending}
+                Adding outfit to cart...
               </p>
             ) : null}
             <button className={styles.closeButton} onClick={requestClose} type="button">
-              {copy.close}
+              Close
             </button>
             <button
               aria-busy={isSubmitting}
@@ -528,7 +463,7 @@ export function OutfitPreparationDrawer({
               ) : (
                 <ShoppingBag aria-hidden="true" size={17} />
               )}
-              {submitCopy.submit}
+              Add outfit to cart
             </button>
           </div>
         </footer>
@@ -540,19 +475,16 @@ export function OutfitPreparationDrawer({
 function PreparationItem({
   item,
   isSavedOutfit,
-  locale,
   onColorChange,
   onRemove,
   onSizeChange,
 }: {
   item: PreparationItemState;
   isSavedOutfit: boolean;
-  locale: "vi" | "en";
   onColorChange: (color: string) => void;
   onRemove: () => void;
   onSizeChange: (size: string) => void;
 }) {
-  const copy = DRAWER_COPY[locale];
   const errorId = `${item.sessionId.replace(/[^a-zA-Z0-9_-]/g, "-")}-error`;
   const isLoading = item.isLoadingProduct || item.isLoadingVariants;
   const hasLoadError = item.productLoadFailed || item.variantsLoadFailed;
@@ -571,10 +503,7 @@ function PreparationItem({
       variant.productId === item.input.productId &&
       isVariantSelectable(variant),
   );
-  const productName = localizeProductName(
-    item.product?.name || item.input.productName,
-    locale,
-  );
+  const productName = item.product?.name || item.input.productName || "";
   const liveImage = item.product ? getFirstProductImage(item.product) : undefined;
   const imageUrl = item.product ? liveImage : item.input.imageUrl;
   const currentPrice = item.product
@@ -608,23 +537,23 @@ function PreparationItem({
       <div className={styles.itemBody}>
         <div className={styles.itemHeading}>
           <div>
-            <span className={styles.roleBadge}>{formatRole(item.input.role, locale)}</span>
+            <span className={styles.roleBadge}>{formatRole(item.input.role)}</span>
             <h3>{productName}</h3>
           </div>
           <button
-            aria-label={copy.removeAria(productName)}
+            aria-label={`Remove ${productName} from this preparation`}
             className={styles.removeButton}
             onClick={onRemove}
             type="button"
           >
             <Trash2 aria-hidden="true" size={15} />
-            {copy.remove}
+            Remove item
           </button>
         </div>
 
         {currentPrice !== undefined ? (
           <p className={styles.price}>
-            <span>{selectedVariant ? copy.unitPrice : copy.basePrice}</span>
+            <span>{selectedVariant ? "Current price" : "Base price"}</span>
             <strong>{formatPrice(currentPrice)}</strong>
           </p>
         ) : null}
@@ -632,13 +561,12 @@ function PreparationItem({
         {isLoading ? (
           <p className={styles.loadingStatus} role="status">
             <Loader2 aria-hidden="true" className={styles.spinner} size={17} />
-            {copy.loading}
+            Loading product options
           </p>
         ) : null}
 
         {!isLoading && !isUnavailable ? (
           <OutfitVariantSelector
-            locale={locale}
             onColorChange={onColorChange}
             onSizeChange={onSizeChange}
             productName={productName}
@@ -652,7 +580,7 @@ function PreparationItem({
         {hasLoadError ? (
           <p className={styles.itemError} id={errorId} role="alert">
             <AlertCircle aria-hidden="true" size={17} />
-            {copy.loadError}
+            Could not load options for this product.
           </p>
         ) : item.submitError ? (
           <p className={styles.itemError} id={errorId} role="alert">
@@ -663,22 +591,22 @@ function PreparationItem({
           <p className={styles.itemError} id={errorId} role="alert">
             <AlertCircle aria-hidden="true" size={17} />
             {selectableVariants.length === 0 && item.product
-              ? copy.outOfStock
-              : copy.productUnavailable}
+              ? "This product has no in-stock options."
+              : "This product is currently unavailable."}
           </p>
         ) : item.staleSavedSelection ? (
           <p className={styles.itemWarning} id={errorId} role="alert">
-            {copy.stale}
+            The saved selection is no longer available. Select another option.
           </p>
         ) : needsSelection ? (
           <p className={styles.itemHint} id={errorId}>
-            {copy.select}
+            Select a color and size.
           </p>
         ) : null}
 
         {priceChanged ? (
           <p className={styles.priceNotice} role="status">
-            {copy.priceChanged}
+            The current price has changed from the saved outfit.
           </p>
         ) : null}
       </div>
@@ -837,7 +765,7 @@ function getReadySubmissionItems(
   return { isReady: true, items: readyItems };
 }
 
-function mapOutfitCartErrorToItems(error: unknown, locale: "vi" | "en") {
+function mapOutfitCartErrorToItems(error: unknown) {
   if (!(error instanceof ApiClientError)) {
     return { globalError: undefined, itemErrors: [] };
   }
@@ -856,7 +784,7 @@ function mapOutfitCartErrorToItems(error: unknown, locale: "vi" | "en") {
     globalError:
       itemErrors.length > 0 && itemErrors.length === details.length
         ? undefined
-        : getGlobalSubmitError(error, locale),
+        : getGlobalSubmitError(error),
     itemErrors,
   };
 }
@@ -885,7 +813,6 @@ function parseInvalidItems(details: unknown): OutfitCartInvalidItemDetail[] {
 function applySubmitErrors(
   items: PreparationItemState[],
   itemErrors: OutfitCartInvalidItemDetail[],
-  locale: "vi" | "en",
 ) {
   return items.map((item) => {
     const error = itemErrors.find((invalidItem) =>
@@ -914,7 +841,7 @@ function applySubmitErrors(
             selectedVariantId: undefined,
           }
         : {}),
-      submitError: getSubmitItemCopy(error.code, locale),
+      submitError: getSubmitItemCopy(error.code),
     };
   });
 }
@@ -930,41 +857,31 @@ function matchesInvalidItem(
   );
 }
 
-function getSubmitItemCopy(code: string, locale: "vi" | "en") {
-  const messages: Record<string, Record<"vi" | "en", string>> = {
-    OUTFIT_CART_INSUFFICIENT_STOCK: {
-      en: "There is not enough stock for this product.",
-      vi: "S\u1ea3n ph\u1ea9m kh\u00f4ng c\u00f2n \u0111\u1ee7 t\u1ed3n kho.",
-    },
-    OUTFIT_CART_PRODUCT_UNAVAILABLE: {
-      en: "This product is currently unavailable.",
-      vi: "S\u1ea3n ph\u1ea9m n\u00e0y hi\u1ec7n kh\u00f4ng kh\u1ea3 d\u1ee5ng.",
-    },
-    OUTFIT_CART_QUANTITY_INVALID: {
-      en: "The cart quantity limit has been reached for this product.",
-      vi: "S\u1ed1 l\u01b0\u1ee3ng trong gi\u1ecf \u0111\u00e3 \u0111\u1ea1t gi\u1edbi h\u1ea1n cho s\u1ea3n ph\u1ea9m n\u00e0y.",
-    },
-    OUTFIT_CART_VARIANT_PRODUCT_MISMATCH: {
-      en: "The selected option is invalid for this product. Select again.",
-      vi: "L\u1ef1a ch\u1ecdn s\u1ea3n ph\u1ea9m kh\u00f4ng h\u1ee3p l\u1ec7. Vui l\u00f2ng ch\u1ecdn l\u1ea1i.",
-    },
-    OUTFIT_CART_VARIANT_UNAVAILABLE: {
-      en: "This option is no longer available. Select another option.",
-      vi: "L\u1ef1a ch\u1ecdn n\u00e0y kh\u00f4ng c\u00f2n kh\u1ea3 d\u1ee5ng. Vui l\u00f2ng ch\u1ecdn l\u1ea1i.",
-    },
+function getSubmitItemCopy(code: string) {
+  const messages: Record<string, string> = {
+    OUTFIT_CART_INSUFFICIENT_STOCK:
+      "There is not enough stock for this product.",
+    OUTFIT_CART_PRODUCT_UNAVAILABLE:
+      "This product is currently unavailable.",
+    OUTFIT_CART_QUANTITY_INVALID:
+      "The cart quantity limit has been reached for this product.",
+    OUTFIT_CART_VARIANT_PRODUCT_MISMATCH:
+      "The selected option is invalid for this product. Select again.",
+    OUTFIT_CART_VARIANT_UNAVAILABLE:
+      "This option is no longer available. Select another option.",
   };
 
-  return messages[code]?.[locale] || DRAWER_SUBMIT_COPY[locale].submitError;
+  return messages[code] || "Could not add the outfit to cart. Try again.";
 }
 
-function getGlobalSubmitError(error: unknown, locale: "vi" | "en") {
+function getGlobalSubmitError(error: unknown) {
   if (error instanceof ApiClientError) {
     if (error.status === 401 || error.code === "AUTH_REQUIRED") {
-      return DRAWER_SUBMIT_COPY[locale].unauthorized;
+      return "Your session has expired. Sign in again.";
     }
   }
 
-  return DRAWER_SUBMIT_COPY[locale].submitError;
+  return "Could not add the outfit to cart. Try again.";
 }
 
 function getFirstProductImage(product: Product): string | undefined {
@@ -973,19 +890,15 @@ function getFirstProductImage(product: Product): string | undefined {
 
 function formatRole(
   role: PurchasableOutfitItem["role"],
-  locale: "vi" | "en",
 ): string {
-  const labels: Record<
-    PurchasableOutfitItem["role"],
-    Record<"vi" | "en", string>
-  > = {
-    accessory: { en: "Accessory", vi: "Phụ kiện" },
-    bottom: { en: "Bottom", vi: "Quần" },
-    handbag: { en: "Bag", vi: "Túi" },
-    jacket: { en: "Jacket", vi: "Áo khoác" },
-    shoes: { en: "Shoes", vi: "Giày" },
-    top: { en: "Top", vi: "Áo" },
+  const labels: Record<PurchasableOutfitItem["role"], string> = {
+    accessory: "Accessory",
+    bottom: "Bottom",
+    handbag: "Bag",
+    jacket: "Jacket",
+    shoes: "Shoes",
+    top: "Top",
   };
 
-  return labels[role][locale];
+  return labels[role];
 }

@@ -10,8 +10,6 @@ import type {
   CreateSavedOutfitRequest,
   SavedOutfit,
 } from "@/features/saved-outfits/types";
-import type { Locale } from "@/features/i18n/locale";
-import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 type SavedOutfitErrorAction = "list" | "save" | "delete";
@@ -23,17 +21,15 @@ interface SavedOutfitError {
 
 interface UseSavedOutfitsOptions {
   enabled: boolean;
-  locale: Locale;
 }
 
-const ERROR_KEYS: Record<SavedOutfitErrorAction, TranslationKey> = {
-  delete: "ai.saveDeleteError",
-  list: "ai.saveListError",
-  save: "ai.saveError",
+const ERROR_MESSAGES: Record<SavedOutfitErrorAction, string> = {
+  delete: "Could not delete this outfit.",
+  list: "Could not load saved outfits.",
+  save: "Could not save this outfit. Some products may be unavailable.",
 };
 
-export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
-  const localeRef = useRef(locale);
+export function useSavedOutfits({ enabled }: UseSavedOutfitsOptions) {
   const isSavingRef = useRef(false);
   const deletingIdRef = useRef<string | undefined>(undefined);
   const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
@@ -42,10 +38,6 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
   const [deletingSavedOutfitId, setDeletingSavedOutfitId] = useState<string>();
   const [savedOutfitError, setSavedOutfitError] = useState<SavedOutfitError>();
   const [saveSuccessFeedback, setSaveSuccessFeedback] = useState<string>();
-
-  useEffect(() => {
-    localeRef.current = locale;
-  }, [locale]);
 
   useEffect(() => {
     if (!enabled) {
@@ -73,7 +65,7 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
         if (isActive && !controller.signal.aborted) {
           setSavedOutfitError({
             action: "list",
-            message: getSavedOutfitErrorMessage(error, "list", localeRef.current),
+            message: getSavedOutfitErrorMessage(error, "list"),
           });
         }
       })
@@ -108,7 +100,7 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
           ...current.filter((item) => item.id !== savedOutfit.id),
         ]);
         setSaveSuccessFeedback(
-          translate(localeRef.current, "ai.saveSuccess"),
+          "Outfit saved.",
         );
 
         try {
@@ -117,7 +109,7 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
         } catch (error) {
           setSavedOutfitError({
             action: "list",
-            message: getSavedOutfitErrorMessage(error, "list", localeRef.current),
+            message: getSavedOutfitErrorMessage(error, "list"),
           });
         }
 
@@ -125,7 +117,7 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
       } catch (error) {
         setSavedOutfitError({
           action: "save",
-          message: getSavedOutfitErrorMessage(error, "save", localeRef.current),
+          message: getSavedOutfitErrorMessage(error, "save"),
         });
         return undefined;
       } finally {
@@ -154,7 +146,7 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
       } catch (error) {
         setSavedOutfitError({
           action: "delete",
-          message: getSavedOutfitErrorMessage(error, "delete", localeRef.current),
+          message: getSavedOutfitErrorMessage(error, "delete"),
         });
         return false;
       } finally {
@@ -181,10 +173,9 @@ export function useSavedOutfits({ enabled, locale }: UseSavedOutfitsOptions) {
 function getSavedOutfitErrorMessage(
   error: unknown,
   action: SavedOutfitErrorAction,
-  locale: Locale,
 ) {
   if (error instanceof ApiClientError && error.status === 401) {
-    return translate(locale, "ai.saveAuthError");
+    return "Please sign in again to manage saved outfits.";
   }
-  return translate(locale, ERROR_KEYS[action]);
+  return ERROR_MESSAGES[action];
 }

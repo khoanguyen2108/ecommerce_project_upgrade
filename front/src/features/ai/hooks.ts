@@ -71,7 +71,6 @@ export function useStyleAdvice() {
             ...(response.budget !== undefined
               ? { budget: response.budget }
               : {}),
-            ...(response.locale ? { locale: response.locale } : {}),
           });
           setLastSuccessfulPrompt(notes);
         }
@@ -85,14 +84,13 @@ export function useStyleAdvice() {
   );
 
   const loadCurrentOutfit = useCallback(
-    ({ locale, outfit, sourcePrompt }: LoadCurrentOutfitInput) => {
+    ({ outfit, sourcePrompt }: LoadCurrentOutfitInput) => {
       setResult({
         type: "outfit",
-        locale,
         message: outfit.summary,
         outfit,
       });
-      setCurrentOutfitContext({ outfit, locale });
+      setCurrentOutfitContext({ outfit });
       setLastPrompt(sourcePrompt);
       setLastSuccessfulPrompt(sourcePrompt);
       setError(undefined);
@@ -120,7 +118,6 @@ export function useStyleAdvice() {
 }
 
 interface LoadCurrentOutfitInput {
-  locale: "vi" | "en";
   outfit: StyleAdviceCanonicalOutfit;
   sourcePrompt: string;
 }
@@ -129,7 +126,6 @@ interface CurrentOutfitContext {
   outfit: StyleAdviceCanonicalOutfit;
   intent?: StyleAdviceIntent;
   budget?: number;
-  locale?: "vi" | "en";
 }
 
 interface StoredStyleAdvice {
@@ -160,7 +156,6 @@ function buildStyleAdviceRequest(
       ...(currentContext.budget !== undefined
         ? { budget: currentContext.budget }
         : {}),
-      ...(currentContext.locale ? { locale: currentContext.locale } : {}),
     },
   };
 }

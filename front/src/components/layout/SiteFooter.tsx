@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useI18n } from "@/features/i18n/useI18n";
 
 export function SiteFooter() {
-  const { t } = useI18n();
 
   return (
     <footer className="site-footer" id="about">
@@ -13,27 +11,27 @@ export function SiteFooter() {
           <Link className="brand-mark" href="/">
             BELIKEME
           </Link>
-          <p>{t("footer.tagline")}</p>
+          <p>{"Elevated everyday clothing for a modern wardrobe."}</p>
         </div>
 
-        <div className="site-footer__links" aria-label={t("footer.links")}>
+        <div className="site-footer__links" aria-label={"Footer links"}>
           <div>
-            <h2>{t("footer.support")}</h2>
-            <Link href="/#delivery">{t("footer.shipping")}</Link>
-            <Link href="/login">{t("footer.accountHelp")}</Link>
-            <Link href="/products">{t("footer.newArrivals")}</Link>
+            <h2>{"Support"}</h2>
+            <Link href="/#delivery">{"Shipping and returns"}</Link>
+            <Link href="/login">{"Account help"}</Link>
+            <Link href="/products">{"New arrivals"}</Link>
           </div>
           <div>
-            <h2>{t("footer.store")}</h2>
-            <Link href="/#categories">{t("footer.categories")}</Link>
-            <Link href="/#trust">{t("footer.why")}</Link>
-            <Link href="/register">{t("footer.createAccount")}</Link>
+            <h2>{"Store"}</h2>
+            <Link href="/#categories">{"Categories"}</Link>
+            <Link href="/#trust">{"Why Belikeme"}</Link>
+            <Link href="/register">{"Create account"}</Link>
           </div>
         </div>
       </div>
 
       <div className="site-footer__bottom">
-        <span>&copy; 2026 {t("footer.rights")}</span>
+        <span>&copy; 2026 {"BELIKEME. ALL RIGHTS RESERVED."}</span>
       </div>
     </footer>
   );

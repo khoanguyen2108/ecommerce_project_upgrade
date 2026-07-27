@@ -7,14 +7,8 @@ import {
   formatCurrency,
   formatNumber,
 } from "@/components/orders/order-format";
-import {
-  localizeCategoryName,
-  localizeColorName,
-  localizeProductName,
-} from "@/features/catalog/localization";
 import { isImplicitAccessoryOption } from "@/features/catalog/sizes";
 import type { CheckoutSummary as CheckoutSummaryModel } from "@/features/checkout/types";
-import { useI18n } from "@/features/i18n/useI18n";
 
 interface CheckoutSummaryProps {
   contactSection: ReactNode;
@@ -43,7 +37,6 @@ export function CheckoutSummary({
   voucherInput,
   shippingSection,
 }: CheckoutSummaryProps) {
-  const { locale } = useI18n();
 
   return (
     <section className="checkout-layout" aria-label="Checkout review">
@@ -69,7 +62,7 @@ export function CheckoutSummary({
             {summary.items.map((item) => {
               const productHref = `/products/${encodeURIComponent(item.productSlug)}`;
               const showVariantOption = !isImplicitAccessoryOption(item);
-              const productName = localizeProductName(item.productName, locale);
+              const productName = (item.productName ?? "");
 
               return (
                 <article className="checkout-item" key={item.cartItemId}>
@@ -90,14 +83,14 @@ export function CheckoutSummary({
                   </Link>
                   <div className="checkout-item__body">
                     <p className="cart-item-row__category">
-                      {localizeCategoryName(item.categoryName, locale)}
+                      {(item.categoryName ?? "")}
                     </p>
                     <h3>
                       <Link href={productHref}>{productName}</Link>
                     </h3>
                     {showVariantOption ? (
                       <p>
-                        Size {item.size} / Color {localizeColorName(item.color, locale)}
+                        Size {item.size} / Color {(item.color ?? "")}
                         {item.sku ? ` / ${item.sku}` : ""}
                       </p>
                     ) : null}

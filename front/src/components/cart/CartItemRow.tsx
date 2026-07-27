@@ -4,14 +4,8 @@ import { Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatPrice } from "@/features/catalog/format";
-import {
-  localizeCategoryName,
-  localizeColorName,
-  localizeProductName,
-} from "@/features/catalog/localization";
 import { isImplicitAccessoryOption } from "@/features/catalog/sizes";
 import type { CartItem } from "@/features/cart/types";
-import { useI18n } from "@/features/i18n/useI18n";
 
 interface CartItemRowProps {
   isBusy: boolean;
@@ -26,7 +20,6 @@ export function CartItemRow({
   onRemove,
   onUpdate,
 }: CartItemRowProps) {
-  const { locale, t } = useI18n();
   const [quantity, setQuantity] = useState(item.quantity);
   const maxQuantity = useMemo(
     () => Math.max(1, Math.min(99, item.availableStock)),
@@ -36,7 +29,7 @@ export function CartItemRow({
   const hasChanged = quantity !== item.quantity;
   const productHref = `/products/${encodeURIComponent(item.product.slug)}`;
   const showVariantOption = !isImplicitAccessoryOption(item.variant);
-  const productName = localizeProductName(item.product.name, locale);
+  const productName = (item.product.name ?? "");
 
   useEffect(() => {
     setQuantity(item.quantity);
@@ -54,42 +47,42 @@ export function CartItemRow({
   return (
     <article className="cart-item-row">
       <Link
-        aria-label={`${t("product.view")}: ${productName}`}
+        aria-label={`${"View product"}: ${productName}`}
         className="cart-item-row__image"
         href={productHref}
       >
         {item.product.firstImageUrl ? (
           <img alt={productName} loading="lazy" src={item.product.firstImageUrl} />
         ) : (
-          <span>{t("common.noImage")}</span>
+          <span>{"No image available"}</span>
         )}
       </Link>
 
       <div className="cart-item-row__body">
         <p className="cart-item-row__category">
-          {localizeCategoryName(item.product.category.name, locale)}
+          {(item.product.category.name ?? "")}
         </p>
         <h2>
           <Link href={productHref}>{productName}</Link>
         </h2>
         {showVariantOption ? (
           <p className="cart-item-row__variant">
-            {item.variant.size} / {localizeColorName(item.variant.color, locale)}
+            {item.variant.size} / {(item.variant.color ?? "")}
             {item.variant.sku ? ` / ${item.variant.sku}` : ""}
           </p>
         ) : null}
         <p className="cart-item-row__stock">
           {item.availableStock > 0
-            ? `${item.availableStock} ${t("product.inStock").toLocaleLowerCase()}`
-            : t("product.outOfStock")}
+            ? `${item.availableStock} ${"In stock".toLocaleLowerCase()}`
+            : "Out of stock"}
         </p>
       </div>
 
       <div className="cart-item-row__quantity">
-        <span>{t("product.quantity")}</span>
+        <span>{"Quantity"}</span>
         <div className="quantity-stepper">
           <button
-            aria-label={`${t("product.decreaseQuantity")}: ${productName}`}
+            aria-label={`${"Decrease quantity"}: ${productName}`}
             disabled={isBusy || !canUpdate || quantity <= 1}
             onClick={() => handleQuantityChange(quantity - 1)}
             type="button"
@@ -97,7 +90,7 @@ export function CartItemRow({
             <Minus aria-hidden="true" size={16} />
           </button>
           <input
-            aria-label={`${productName}: ${t("product.quantity")}`}
+            aria-label={`${productName}: ${"Quantity"}`}
             disabled={isBusy || !canUpdate}
             max={maxQuantity}
             min={1}
@@ -106,7 +99,7 @@ export function CartItemRow({
             value={quantity}
           />
           <button
-            aria-label={`${t("product.increaseQuantity")}: ${productName}`}
+            aria-label={`${"Increase quantity"}: ${productName}`}
             disabled={isBusy || !canUpdate || quantity >= maxQuantity}
             onClick={() => handleQuantityChange(quantity + 1)}
             type="button"
@@ -120,26 +113,26 @@ export function CartItemRow({
           onClick={() => onUpdate(item.id, quantity)}
           type="button"
         >
-          {t("cart.update")}
+          {"Update"}
         </button>
       </div>
 
       <div className="cart-item-row__price">
-        <span>{t("cart.unitPrice")}</span>
+        <span>{"Unit price"}</span>
         <strong>{formatPrice(item.currentUnitPrice)}</strong>
       </div>
 
       <div className="cart-item-row__price">
-        <span>{t("cart.lineTotal")}</span>
+        <span>{"Line total"}</span>
         <strong>{formatPrice(item.currentLineTotal)}</strong>
       </div>
 
       <button
-        aria-label={`${t("common.remove")}: ${productName}`}
+        aria-label={`${"Remove"}: ${productName}`}
         className="icon-button cart-item-row__remove"
         disabled={isBusy}
         onClick={() => onRemove(item.id)}
-        title={t("common.remove")}
+        title={"Remove"}
         type="button"
       >
         <Trash2 aria-hidden="true" size={18} strokeWidth={1.9} />

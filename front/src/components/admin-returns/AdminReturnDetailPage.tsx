@@ -1,4 +1,7 @@
-'use client';
+"use client";
+
+import { ADMIN_OPERATIONS_COPY, type AdminOperationsCopy } from "@/components/admin/admin-copy";
+const copy = ADMIN_OPERATIONS_COPY;
 
 import { ArrowLeft, Check, RefreshCw, X } from 'lucide-react';
 import Link from 'next/link';
@@ -16,12 +19,6 @@ import { getAdminReturn, reviewAdminReturn } from '@/features/returns/api';
 import { getReturnReasonLabel } from '@/features/returns/format';
 import type { AdminReturnRequest } from '@/features/returns/types';
 import type { OrderFulfillmentStatus, OrderStatus } from '@/features/orders/types';
-import {
-  getAdminOperationsTranslations,
-  type AdminOperationsTranslations,
-} from '@/features/i18n/admin-operations-translations';
-import type { Locale } from '@/features/i18n/locale';
-import { useI18n } from '@/features/i18n/useI18n';
 import { ApiClientError } from '@/lib/errors/api-error';
 
 interface ReturnDetailError {
@@ -30,8 +27,6 @@ interface ReturnDetailError {
 }
 
 export function AdminReturnDetailPage({ returnId }: { returnId: string }) {
-  const { locale } = useI18n();
-  const copy = getAdminOperationsTranslations(locale);
   const [request, setRequest] = useState<AdminReturnRequest>();
   const [isLoading, setIsLoading] = useState(true);
   const [busyStatus, setBusyStatus] = useState<'APPROVED' | 'REJECTED'>();
@@ -69,7 +64,9 @@ export function AdminReturnDetailPage({ returnId }: { returnId: string }) {
     if (!request || request.status !== 'PENDING' || busyStatus) return;
 
     const confirmed = window.confirm(
-      copy.returns.detail.confirmReview(status),
+      ((status) => status === "APPROVED"
+                ? "Approve this return request? This decision cannot be edited."
+                : "Reject this return request? This decision cannot be edited.")(status),
     );
     if (!confirmed) return;
 
@@ -94,15 +91,15 @@ export function AdminReturnDetailPage({ returnId }: { returnId: string }) {
         error.cause,
         copy,
         error.fallback === 'load'
-          ? copy.returns.detail.loadError
-          : copy.returns.detail.reviewError,
+          ? "Return request could not be loaded."
+          : "Return request could not be reviewed.",
       )
     : undefined;
 
   if (isLoading && !request) {
     return (
       <div className="admin-detail-loading" role="status">
-        {copy.returns.detail.loading}
+        {"Loading return request..."}
       </div>
     );
   }
@@ -110,7 +107,7 @@ export function AdminReturnDetailPage({ returnId }: { returnId: string }) {
   return (
     <div className="admin-resource admin-resource--full-width admin-return-detail">
       <Link className="admin-return-detail__back" href="/admin/returns">
-        <ArrowLeft aria-hidden="true" size={17} /> {copy.returns.detail.back}
+        <ArrowLeft aria-hidden="true" size={17} /> {"Back to returns"}
       </Link>
 
       {errorMessage ? (
@@ -119,20 +116,20 @@ export function AdminReturnDetailPage({ returnId }: { returnId: string }) {
 
       {!request ? (
         <section className="admin-detail-card">
-          <h1>{copy.returns.detail.unavailable}</h1>
+          <h1>{"Return request unavailable"}</h1>
           <button className="button button--secondary" onClick={() => setRefreshKey((value) => value + 1)} type="button">
-            <RefreshCw aria-hidden="true" size={16} /> {copy.returns.detail.retry}
+            <RefreshCw aria-hidden="true" size={16} /> {"Retry"}
           </button>
         </section>
       ) : (
         <>
           <section className="admin-returns-hero">
             <div className="admin-page-intro">
-              <p className="admin-page-intro__eyebrow">{copy.returns.detail.eyebrow}</p>
-              <h1>{copy.returns.detail.orderTitle(request.order.orderCode)}</h1>
+              <p className="admin-page-intro__eyebrow">{"RETURN REVIEW"}</p>
+              <h1>{((orderCode) => `Order #${orderCode}`)(request.order.orderCode)}</h1>
               <p>
-                {copy.returns.detail.submitted(
-                  formatDateTime(request.createdAt, locale),
+                {((date) => `Submitted ${date}`)(
+                  formatDateTime(request.createdAt),
                 )}
               </p>
             </div>
@@ -141,52 +138,44 @@ export function AdminReturnDetailPage({ returnId }: { returnId: string }) {
 
           <div className="admin-detail-grid">
             <section className="admin-detail-card">
-              <h2>{copy.returns.detail.orderSummary}</h2>
+              <h2>{"Order summary"}</h2>
               <dl className="admin-detail-list">
-                <div><dt>{copy.common.order}</dt><dd>#{request.order.orderCode}</dd></div>
+                <div><dt>{"Order"}</dt><dd>#{request.order.orderCode}</dd></div>
                 <div>
-                  <dt>{copy.returns.detail.orderStatus}</dt>
-                  <dd>{formatOrderStatus(request.order.status, locale, copy.common.unknownStatus)}</dd>
+                  <dt>{"Order status"}</dt>
+                  <dd>{formatOrderStatus(request.order.status, "Unknown status")}</dd>
                 </div>
                 <div>
-                  <dt>{copy.returns.detail.fulfillment}</dt>
+                  <dt>{"Fulfillment"}</dt>
                   <dd>
-                    {formatFulfillmentStatus(
-                      request.order.fulfillmentStatus,
-                      locale,
-                      copy.common.unknownStatus,
-                    )}
+                    {formatFulfillmentStatus(request.order.fulfillmentStatus, "Unknown status")}
                   </dd>
                 </div>
                 <div>
-                  <dt>{copy.returns.detail.delivered}</dt>
+                  <dt>{"Delivered"}</dt>
                   <dd>
                     {request.order.fulfilledAt
-                      ? formatDateTime(request.order.fulfilledAt, locale)
-                      : copy.returns.detail.unavailableValue}
+                      ? formatDateTime(request.order.fulfilledAt)
+                      : "Unavailable"}
                   </dd>
                 </div>
                 <div>
-                  <dt>{copy.common.total}</dt>
+                  <dt>{"Total"}</dt>
                   <dd>
-                    {formatCurrency(
-                      request.order.totalAmount,
-                      request.order.currency,
-                      locale,
-                    )}
+                    {formatCurrency(request.order.totalAmount, request.order.currency)}
                   </dd>
                 </div>
               </dl>
             </section>
 
             <section className="admin-detail-card">
-              <h2>{copy.common.customer}</h2>
+              <h2>{"Customer"}</h2>
               <dl className="admin-detail-list">
                 <div>
-                  <dt>{copy.common.name}</dt>
-                  <dd>{request.customer.name || copy.common.customer}</dd>
+                  <dt>{"Name"}</dt>
+                  <dd>{request.customer.name || "Customer"}</dd>
                 </div>
-                <div><dt>{copy.common.email}</dt><dd>{request.customer.email}</dd></div>
+                <div><dt>{"Email"}</dt><dd>{request.customer.email}</dd></div>
               </dl>
             </section>
           </div>
@@ -194,33 +183,33 @@ export function AdminReturnDetailPage({ returnId }: { returnId: string }) {
           <section className="admin-detail-section admin-return-review-card">
             <div className="admin-detail-section__header">
               <div>
-                <p className="eyebrow">{copy.returns.detail.customerRequest}</p>
-                <h2>{getReturnReasonLabel(request.reason, locale)}</h2>
+                <p className="eyebrow">{"Customer request"}</p>
+                <h2>{getReturnReasonLabel(request.reason)}</h2>
               </div>
             </div>
-            <p>{request.description || copy.returns.detail.noDescription}</p>
+            <p>{request.description || "No additional description was provided."}</p>
 
             {request.status === 'PENDING' ? (
               <div className="admin-return-review-card__actions">
                 <button className="button button--primary" disabled={Boolean(busyStatus)} onClick={() => void review('APPROVED')} type="button">
                   <Check aria-hidden="true" size={17} />
                   {busyStatus === 'APPROVED'
-                    ? copy.returns.detail.approving
-                    : copy.returns.detail.approve}
+                    ? "Approving..."
+                    : "Approve"}
                 </button>
                 <button className="button button--danger" disabled={Boolean(busyStatus)} onClick={() => void review('REJECTED')} type="button">
                   <X aria-hidden="true" size={17} />
                   {busyStatus === 'REJECTED'
-                    ? copy.returns.detail.rejecting
-                    : copy.returns.detail.reject}
+                    ? "Rejecting..."
+                    : "Reject"}
                 </button>
               </div>
             ) : (
               <p className="admin-return-review-card__reviewed">
-                {copy.returns.detail.reviewed(
+                {((date, reviewer) => `Reviewed ${date}${reviewer ? ` by ${reviewer}` : ""}.`)(
                   request.reviewedAt
-                    ? formatDateTime(request.reviewedAt, locale)
-                    : copy.returns.detail.unavailableValue,
+                    ? formatDateTime(request.reviewedAt)
+                    : "Unavailable",
                   request.reviewer
                     ? request.reviewer.name || request.reviewer.email
                     : undefined,
@@ -236,7 +225,7 @@ export function AdminReturnDetailPage({ returnId }: { returnId: string }) {
 
 function getReturnErrorMessage(
   error: unknown,
-  copy: AdminOperationsTranslations,
+  copy: AdminOperationsCopy,
   fallback: string,
 ): string {
   if (!(error instanceof ApiClientError)) {
@@ -250,19 +239,17 @@ function getReturnErrorMessage(
 
 function formatOrderStatus(
   status: string,
-  locale: Locale,
   fallback: string,
 ): string {
-  return isOrderStatus(status) ? getOrderStatusLabel(status, locale) : fallback;
+  return isOrderStatus(status) ? getOrderStatusLabel(status) : fallback;
 }
 
 function formatFulfillmentStatus(
   status: string,
-  locale: Locale,
   fallback: string,
 ): string {
   return isFulfillmentStatus(status)
-    ? getFulfillmentStatusLabel(status, locale)
+    ? getFulfillmentStatusLabel(status)
     : fallback;
 }
 

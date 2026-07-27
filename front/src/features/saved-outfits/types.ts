@@ -20,7 +20,6 @@ export interface SavedOutfitItemSnapshot {
 export interface SavedOutfit {
   id: string;
   sourcePrompt: string;
-  locale: "vi" | "en";
   summary: string;
   totalPriceSnapshot: number;
   items: SavedOutfitItemSnapshot[];
@@ -30,7 +29,6 @@ export interface SavedOutfit {
 
 export interface CreateSavedOutfitRequest {
   sourcePrompt: string;
-  locale: "vi" | "en";
   summary: string;
   items: SavedOutfitItemSnapshot[];
 }

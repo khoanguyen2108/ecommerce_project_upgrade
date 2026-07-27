@@ -12,7 +12,6 @@ import { useState } from "react";
 import { FashionIllustration } from "@/components/ai/StyleAssistantEmpty";
 import styles from "@/components/ai/StyleAssistant.module.css";
 import { getCurrentStyleAdviceOutfit } from "@/features/ai/normalize";
-import { localizeProductName } from "@/features/catalog/localization";
 import type {
   StyleAdviceCanonicalOutfit,
   StyleAdviceCanonicalOutfitItem,
@@ -20,9 +19,6 @@ import type {
   StyleAdviceResponse,
 } from "@/features/ai/types";
 import { formatPrice } from "@/features/catalog/format";
-import type { Locale } from "@/features/i18n/locale";
-import { translate } from "@/features/i18n/translations";
-import { useI18n } from "@/features/i18n/useI18n";
 
 interface StyleAssistantResultProps {
   isSavingOutfit?: boolean;
@@ -41,20 +37,18 @@ export function StyleAssistantResult({
   saveError,
   saveSuccess,
 }: StyleAssistantResultProps) {
-  const { locale } = useI18n();
 
   if (result.type === "clarification") {
-    return <ClarificationResult locale={locale} result={result} />;
+    return <ClarificationResult result={result} />;
   }
 
   if (result.type === "out_of_scope") {
-    return <OutOfScopeResult locale={locale} result={result} />;
+    return <OutOfScopeResult result={result} />;
   }
 
   return (
     <CurrentOutfitResult
       isSavingOutfit={isSavingOutfit}
-      locale={locale}
       onPrepareOutfit={onPrepareOutfit}
       onSaveOutfit={onSaveOutfit}
       result={result}
@@ -64,12 +58,12 @@ export function StyleAssistantResult({
   );
 }
 
-function ClarificationResult({ locale, result }: { locale: Locale; result: StyleAdviceResponse }) {
+function ClarificationResult({ result }: { result: StyleAdviceResponse }) {
   const question =
     result.clarificationQuestion ||
     result.message ||
     result.summary ||
-    translate(locale, "ai.clarificationFallback");
+    "What occasion, vibe, and budget should I style this outfit for?";
 
   return (
     <section aria-live="polite" className={`${styles.stateCard} ${styles.clarificationCard}`}>
@@ -83,7 +77,6 @@ function ClarificationResult({ locale, result }: { locale: Locale; result: Style
 
 function CurrentOutfitResult({
   isSavingOutfit,
-  locale,
   onPrepareOutfit,
   onSaveOutfit,
   result,
@@ -91,7 +84,6 @@ function CurrentOutfitResult({
   saveSuccess,
 }: {
   isSavingOutfit: boolean;
-  locale: Locale;
   onPrepareOutfit?: () => void;
   onSaveOutfit?: () => void;
   result: StyleAdviceResponse;
@@ -103,13 +95,13 @@ function CurrentOutfitResult({
     outfit?.summary ||
     result.message ||
     result.summary ||
-    translate(locale, "ai.noMatchingProducts");
+    "No matching in-stock pieces were returned. Try broadening your style, color, or budget description.";
 
   return (
     <section aria-live="polite" className={styles.resultCard}>
       <div className={styles.summary}>
         <div>
-          <h2>{translate(locale, "ai.summary")}</h2>
+          <h2>{"Summary"}</h2>
           <p>{summary}</p>
         </div>
       </div>
@@ -117,7 +109,6 @@ function CurrentOutfitResult({
       {outfit ? (
         <CurrentOutfit
           isSavingOutfit={isSavingOutfit}
-          locale={locale}
           onPrepareOutfit={onPrepareOutfit}
           onSaveOutfit={onSaveOutfit}
           outfit={outfit}
@@ -127,29 +118,28 @@ function CurrentOutfitResult({
       ) : (
         <div className={styles.outfitsSection}>
           <div className={styles.sectionHeading}>
-            <h3>{translate(locale, "ai.currentOutfit")}</h3>
+            <h3>{"Current outfit"}</h3>
           </div>
           <p className={styles.noProducts}>
-            {translate(locale, "ai.noMatchingProducts")}
+            {"No matching in-stock pieces were returned. Try broadening your style, color, or budget description."}
           </p>
         </div>
       )}
 
       {!outfit && result.warnings?.length ? (
         <div className={styles.warningSection}>
-          <h3>{translate(locale, "ai.matchingNotes")}</h3>
+          <h3>{"Matching notes"}</h3>
           <WarningList warnings={result.warnings} />
         </div>
       ) : null}
 
-      {result.handoff?.required ? <HandoffCard locale={locale} /> : null}
+      {result.handoff?.required ? <HandoffCard /> : null}
     </section>
   );
 }
 
 function CurrentOutfit({
   isSavingOutfit,
-  locale,
   onPrepareOutfit,
   onSaveOutfit,
   outfit,
@@ -157,7 +147,6 @@ function CurrentOutfit({
   saveSuccess,
 }: {
   isSavingOutfit: boolean;
-  locale: Locale;
   onPrepareOutfit?: () => void;
   onSaveOutfit?: () => void;
   outfit: StyleAdviceCanonicalOutfit;
@@ -167,22 +156,22 @@ function CurrentOutfit({
   return (
     <div className={styles.outfitsSection}>
       <div className={styles.sectionHeading}>
-        <h3>{translate(locale, "ai.currentOutfit")}</h3>
+        <h3>{"Current outfit"}</h3>
         <div className={styles.outfitHeadingActions}>
           {isSavingOutfit ? (
             <span className={styles.savingOutfitStatus} role="status">
               <Loader2 aria-hidden="true" className={styles.spinner} size={16} />
-              {translate(locale, "ai.savingOutfit")}
+              {"Saving outfit..."}
             </span>
           ) : onSaveOutfit ? (
             <button className={styles.saveOutfitButton} onClick={onSaveOutfit} type="button">
               <Save aria-hidden="true" size={16} />
-              {translate(locale, "ai.saveOutfit")}
+              {"Save outfit"}
             </button>
           ) : null}
           {onPrepareOutfit && outfit.items.length > 0 ? (
             <button className={styles.prepareOutfitButton} onClick={onPrepareOutfit} type="button">
-              {translate(locale, "ai.continueCurrent")}
+              {"Continue with this outfit"}
               <ArrowRight aria-hidden="true" size={16} />
             </button>
           ) : null}
@@ -201,7 +190,7 @@ function CurrentOutfit({
       <article className={`${styles.outfitCard} ${styles.currentOutfitCard}`}>
         <div className={styles.outfitProductGrid}>
           {outfit.items.map((item) => (
-            <OutfitProductCard item={item} key={`${item.role}-${item.productId}`} locale={locale} />
+            <OutfitProductCard item={item} key={`${item.role}-${item.productId}`} />
           ))}
         </div>
 
@@ -211,15 +200,15 @@ function CurrentOutfit({
   );
 }
 
-function OutfitProductCard({ item, locale }: { item: StyleAdviceCanonicalOutfitItem; locale: Locale }) {
+function OutfitProductCard({ item }: { item: StyleAdviceCanonicalOutfitItem; }) {
   const [imageFailed, setImageFailed] = useState(false);
   const productHref = `/products/${encodeURIComponent(item.productSlug)}`;
-  const productName = localizeProductName(item.productName, locale);
+  const productName = (item.productName ?? "");
 
   return (
     <article className={styles.outfitProduct}>
       <Link
-        aria-label={`${translate(locale, "ai.viewProduct")}: ${productName}`}
+        aria-label={`${"View product"}: ${productName}`}
         className={styles.outfitProductImageLink}
         href={productHref}
       >
@@ -236,11 +225,11 @@ function OutfitProductCard({ item, locale }: { item: StyleAdviceCanonicalOutfitI
         )}
       </Link>
       <div className={styles.outfitProductBody}>
-        <span className={styles.roleBadge}>{formatRole(item.role, locale)}</span>
+        <span className={styles.roleBadge}>{formatRole(item.role)}</span>
         <h5>{productName}</h5>
         <strong>{formatPrice(item.price)}</strong>
         <Link className={styles.productLink} href={productHref}>
-          {translate(locale, "ai.viewProduct")}
+          {"View product"}
           <ArrowUpRight aria-hidden="true" size={16} />
         </Link>
       </div>
@@ -258,19 +247,19 @@ function WarningList({ warnings }: { warnings: string[] }) {
   );
 }
 
-function OutOfScopeResult({ locale, result }: { locale: Locale; result: StyleAdviceResponse }) {
+function OutOfScopeResult({ result }: { result: StyleAdviceResponse }) {
   const message =
-    result.message || result.summary || translate(locale, "ai.outOfScopeHeading");
+    result.message || result.summary || "I'm your Belikeme style specialist.";
 
   return (
     <section aria-live="polite" className={`${styles.stateCard} ${styles.outOfScopeCard}`}>
       <FashionIllustration compact />
-      <span className={styles.resultLabel}>{translate(locale, "ai.outOfScopeLabel")}</span>
-      <h2>{translate(locale, "ai.outOfScopeHeading")}</h2>
+      <span className={styles.resultLabel}>{"Let's keep it stylish"}</span>
+      <h2>{"I'm your Belikeme style specialist."}</h2>
       <p>{message}</p>
       {result.extraTips?.length ? (
         <div className={styles.examples}>
-          <h3>{translate(locale, "ai.tryAsking")}</h3>
+          <h3>{"Try asking"}</h3>
           <ul>
             {result.extraTips.map((tip, index) => (
               <li key={`${index}-${tip}`}>{tip}</li>
@@ -282,7 +271,7 @@ function OutOfScopeResult({ locale, result }: { locale: Locale; result: StyleAdv
   );
 }
 
-function HandoffCard({ locale }: { locale: Locale }) {
+function HandoffCard({  }: { }) {
   function openCustomerChat() {
     const launcher = document.querySelector<HTMLButtonElement>(
       ".customer-chat-widget__launcher",
@@ -298,24 +287,24 @@ function HandoffCard({ locale }: { locale: Locale }) {
     <div className={styles.handoffCard}>
       <MessageCircle aria-hidden="true" size={22} />
       <div>
-        <h3>{translate(locale, "ai.handoffTitle")}</h3>
-        <p>{translate(locale, "ai.handoffBody")}</p>
+        <h3>{"Need more personalized advice?"}</h3>
+        <p>{"Chat with our stylist."}</p>
       </div>
       <button className={styles.secondaryButton} onClick={openCustomerChat} type="button">
-        {translate(locale, "ai.handoffAction")}
+        {"Open Customer Chat"}
       </button>
     </div>
   );
 }
 
-function formatRole(role: StyleAdviceOutfitProductRole, locale: Locale): string {
-  const keys = {
-    top: "ai.roleTop",
-    bottom: "ai.roleBottom",
-    shoes: "ai.roleShoes",
-    jacket: "ai.roleJacket",
-    accessory: "ai.roleAccessory",
-    handbag: "ai.roleBag",
-  } as const;
-  return translate(locale, keys[role]);
+function formatRole(role: StyleAdviceOutfitProductRole): string {
+  const labels: Record<StyleAdviceOutfitProductRole, string> = {
+    top: "Top",
+    bottom: "Bottom",
+    shoes: "Shoes",
+    jacket: "Jacket",
+    accessory: "Accessory",
+    handbag: "Bag",
+  };
+  return labels[role];
 }

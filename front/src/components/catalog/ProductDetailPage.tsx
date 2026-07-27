@@ -24,12 +24,6 @@ import {
   isNoSize,
   sortSizesByStandardOrder,
 } from "@/features/catalog/sizes";
-import {
-  localizeCategoryName,
-  localizeColorName,
-  localizeProductDescription,
-  localizeProductName,
-} from "@/features/catalog/localization";
 import type { Product, ProductVariant } from "@/features/catalog/types";
 import {
   getOnlySelectableColor,
@@ -38,9 +32,6 @@ import {
   hasSelectableCombination,
   isVariantSelectable,
 } from "@/features/catalog/variant-selection";
-import type { Locale } from "@/features/i18n/locale";
-import { translate } from "@/features/i18n/translations";
-import { useI18n } from "@/features/i18n/useI18n";
 import { ApiClientError } from "@/lib/errors/api-error";
 
 interface ProductDetailPageProps {
@@ -60,7 +51,6 @@ interface CartFeedback {
 }
 
 export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
-  const { locale, t } = useI18n();
   const { addItemAndOpenDrawer } = useCart();
   const [state, setState] = useState<ProductDetailState>({
     isLoading: true,
@@ -242,7 +232,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
       setCartFeedback({
         message: getCartErrorMessage(
           error,
-          t("product.addError"),
+          "This item could not be added to cart.",
         ),
         requestId: getCartRequestId(error),
       });
@@ -273,11 +263,11 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           <AlertCircle size={20} />
           <span>
             {state.error ||
-              t("product.loadError")}
+              "This product could not be loaded. Please return to the catalog."}
           </span>
         </div>
         <Link className="button button--secondary" href="/products">
-          {t("catalog.backToProducts")}
+          {"Back to products"}
         </Link>
       </main>
     );
@@ -286,13 +276,10 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
   const product = state.product;
   const imageUrls = getProductImages(product);
   const categories = getProductCategories(product);
-  const productName = localizeProductName(product.name, locale);
+  const productName = (product.name ?? "");
   const productDescription =
-    localizeProductDescription(product.description, locale, {
-      name: product.name,
-      slug: product.slug,
-    }) ||
-    t("product.descriptionPending");
+    (product.description ?? null) ||
+    "Product details are being prepared for this item.";
   const displayPrice = selectedVariant
     ? getVariantUnitPrice(product, selectedVariant)
     : product.basePrice;
@@ -317,7 +304,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
     selectedColor,
     selectedSize,
     totalStock,
-    locale,
   });
 
   return (
@@ -333,10 +319,10 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           </div>
 
           {imageUrls.length > 1 ? (
-            <div className="product-gallery__thumbs" aria-label={t("product.productImages")}>
+            <div className="product-gallery__thumbs" aria-label={"Product images"}>
               {imageUrls.map((imageUrl, index) => (
                 <button
-                  aria-label={`${t("product.view")}: ${productName}, ${index + 1}`}
+                  aria-label={`${"View product"}: ${productName}, ${index + 1}`}
                   aria-pressed={imageUrl === activeImage}
                   className={imageUrl === activeImage ? "is-active" : undefined}
                   key={`${imageUrl}-${index}`}
@@ -355,7 +341,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             <div className="product-detail-copy__categories">
               {categories.map((category) => (
                 <Link href={getCategoryProductsHref(category.slug)} key={category.id}>
-                  {localizeCategoryName(category.name, locale)}
+                  {(category.name ?? "")}
                 </Link>
               ))}
             </div>
@@ -373,7 +359,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
           {isSimpleAccessory ? null : (
             <section className="variant-panel" aria-labelledby="variants-heading">
             <div className="product-option-heading">
-              <h2 id="variants-heading">{t("product.color")}</h2>
+              <h2 id="variants-heading">{"Color"}</h2>
             </div>
             <div className="variant-choice-list">
               {colors.map((color) => {
@@ -388,7 +374,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                     onClick={() => handleColorSelect(color)}
                     type="button"
                   >
-                    {localizeColorName(color, locale)}
+                    {(color ?? "")}
                   </button>
                 );
               })}
@@ -397,7 +383,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
             {requiresSize ? (
               <>
                 <div className="product-option-heading product-option-heading--secondary">
-                  <h2>{t("product.size")}</h2>
+                  <h2>{"Size"}</h2>
                 </div>
                 <div className="variant-choice-list">
                   {sizesForSelectedColor.map((size) => {
@@ -422,11 +408,11 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                 </div>
               </>
             ) : (
-              <p className="product-selection-hint">{t("product.noSize")}</p>
+              <p className="product-selection-hint">{"No size required."}</p>
             )}
 
             {state.variants.length === 0 ? (
-              <p className="product-selection-hint">{t("product.noVariants")}</p>
+              <p className="product-selection-hint">{"No active variants are available."}</p>
             ) : (
               <p className="product-selection-hint">{selectionMessage}</p>
             )}
@@ -435,7 +421,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
 
           <section className="quantity-panel" aria-labelledby="quantity-heading">
             <div>
-              <h2 id="quantity-heading">{t("product.quantity")}</h2>
+              <h2 id="quantity-heading">{"Quantity"}</h2>
               <p>
                 {getQuantityAvailabilityMessage({
                   hasValidSelection,
@@ -443,13 +429,12 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                   requiresSize,
                   selectedVariant,
                   totalStock,
-                  locale,
                 })}
               </p>
             </div>
             <div className="quantity-stepper">
               <button
-                aria-label={t("product.decreaseQuantity")}
+                aria-label={"Decrease quantity"}
                 disabled={!hasValidSelection || quantity <= 1}
                 onClick={() => handleQuantityChange(quantity - 1)}
                 type="button"
@@ -457,7 +442,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                 <Minus aria-hidden="true" size={15} />
               </button>
               <input
-                aria-label={t("product.cartQuantity")}
+                aria-label={"Cart quantity"}
                 disabled={!hasValidSelection}
                 max={selectedMaxQuantity}
                 min={1}
@@ -466,7 +451,7 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                 value={quantity}
               />
               <button
-                aria-label={t("product.increaseQuantity")}
+                aria-label={"Increase quantity"}
                 disabled={!hasValidSelection || quantity >= selectedMaxQuantity}
                 onClick={() => handleQuantityChange(quantity + 1)}
                 type="button"
@@ -503,7 +488,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
                 requiresSize,
                 selectedVariant,
                 totalStock,
-                locale,
               })}
             </button>
           </div>
@@ -515,7 +499,6 @@ export function ProductDetailPage({ productRef }: ProductDetailPageProps) {
 }
 
 function ProductImage({ alt, url }: { alt: string; url?: string }) {
-  const { t } = useI18n();
   const [hasFailed, setHasFailed] = useState(false);
 
   useEffect(() => {
@@ -526,7 +509,7 @@ function ProductImage({ alt, url }: { alt: string; url?: string }) {
     return (
       <div className="product-image-fallback">
         <ImageOff aria-hidden="true" size={28} strokeWidth={1.4} />
-        <span>{t("common.imageUnavailable")}</span>
+        <span>{"Image unavailable"}</span>
       </div>
     );
   }
@@ -566,30 +549,28 @@ function getQuantityAvailabilityMessage({
   requiresSize,
   selectedVariant,
   totalStock,
-  locale,
 }: {
   hasValidSelection: boolean;
   isSimpleAccessory: boolean;
   requiresSize: boolean;
   selectedVariant?: ProductVariant;
   totalStock: number;
-  locale: Locale;
 }): string {
   if (isSimpleAccessory) {
-    if (totalStock === 0) return translate(locale, "product.outOfStock");
+    if (totalStock === 0) return "Out of stock";
     if (totalStock <= 5) {
-      return `${totalStock} ${translate(locale, "product.onlyLeft")}`;
+      return `${totalStock} ${"left"}`;
     }
-    return translate(locale, "product.inStock");
+    return "In stock";
   }
 
   if (hasValidSelection && selectedVariant) {
-    return `${selectedVariant.stock} ${translate(locale, "product.availableForOption")}`;
+    return `${selectedVariant.stock} ${"available for this option."}`;
   }
 
   return requiresSize
-    ? translate(locale, "product.completeSelection")
-    : translate(locale, "product.selectColorFirst");
+    ? "Complete the color and size selection first."
+    : "Select a color first.";
 }
 
 function getSelectionMessage({
@@ -597,31 +578,29 @@ function getSelectionMessage({
   selectedColor,
   selectedSize,
   totalStock,
-  locale,
 }: {
   requiresSize: boolean;
   selectedColor?: string;
   selectedSize?: string;
   totalStock: number;
-  locale: Locale;
 }): string {
   if (totalStock === 0) {
-    return translate(locale, "product.currentlyOutOfStock");
+    return "This product is currently out of stock.";
   }
 
   if (!selectedColor) {
     return requiresSize
-      ? translate(locale, "product.chooseColorForSizes")
-      : translate(locale, "product.chooseColor");
+      ? "Choose a color to see its available sizes."
+      : "Choose an available color.";
   }
 
   if (requiresSize && !selectedSize) {
-    return translate(locale, "product.chooseSize");
+    return "Choose an available size to complete your selection.";
   }
 
   return requiresSize
-    ? translate(locale, "product.colorSizeAvailable")
-    : translate(locale, "product.colorAvailable");
+    ? "Your color and size are available."
+    : "Your selected color is available.";
 }
 
 function getAddToCartLabel({
@@ -629,27 +608,25 @@ function getAddToCartLabel({
   requiresSize,
   selectedVariant,
   totalStock,
-  locale,
 }: {
   isAddingToCart: boolean;
   requiresSize: boolean;
   selectedVariant?: ProductVariant;
   totalStock: number;
-  locale: Locale;
 }): string {
   if (isAddingToCart) {
-    return translate(locale, "product.adding");
+    return "Adding...";
   }
 
   if (totalStock === 0) {
-    return translate(locale, "product.outOfStock");
+    return "Out of stock";
   }
 
   if (!isVariantSelectable(selectedVariant)) {
     return requiresSize
-      ? translate(locale, "product.selectColorSize")
-      : translate(locale, "product.selectColor");
+      ? "Select color and size"
+      : "Select color";
   }
 
-  return translate(locale, "product.addToCart");
+  return "Add to cart";
 }

@@ -13,16 +13,10 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { useCart } from "@/components/cart/CartProvider";
 import { formatPrice } from "@/features/catalog/format";
-import {
-  localizeColorName,
-  localizeProductName,
-} from "@/features/catalog/localization";
 import { isImplicitAccessoryOption } from "@/features/catalog/sizes";
 import type { CartItem } from "@/features/cart/types";
-import { useI18n } from "@/features/i18n/useI18n";
 
 export function MiniCartDrawer() {
-  const { t } = useI18n();
   const {
     cart,
     cartCount,
@@ -87,13 +81,13 @@ export function MiniCartDrawer() {
       >
         <header className="mini-cart-drawer__header">
           <div>
-            <h2 id="mini-cart-heading">{t("nav.cart")}</h2>
+            <h2 id="mini-cart-heading">{"Cart"}</h2>
             <p>
-              {cartCount} {cartCount === 1 ? t("cart.item") : t("cart.items")}
+              {cartCount} {cartCount === 1 ? "item" : "items"}
             </p>
           </div>
           <button
-            aria-label={t("cart.close")}
+            aria-label={"Close cart"}
             className="icon-button mini-cart-drawer__close"
             onClick={closeCart}
             ref={closeButtonRef}
@@ -115,7 +109,7 @@ export function MiniCartDrawer() {
                 onClick={() => void refreshCart().catch(() => undefined)}
                 type="button"
               >
-                {t("common.retry")}
+                {"Retry"}
               </button>
             </div>
           ) : null}
@@ -123,21 +117,21 @@ export function MiniCartDrawer() {
           {isLoading && !cart ? (
             <div className="mini-cart-state" role="status">
               <Loader2 aria-hidden="true" className="spin" size={26} />
-              <p>{t("cart.loading")}</p>
+              <p>{"Loading cart..."}</p>
             </div>
           ) : null}
 
           {!isLoading && !error && !hasItems ? (
             <div className="mini-cart-state">
               <PackageOpen aria-hidden="true" size={34} strokeWidth={1.5} />
-              <h3>{t("cart.emptyTitle")}</h3>
-              <p>{t("cart.emptyBody")}</p>
+              <h3>{"Your cart is empty"}</h3>
+              <p>{"Choose a size and color to get started."}</p>
               <Link
                 className="button button--primary"
                 href="/products"
                 onClick={closeCart}
               >
-                {t("cart.continueShopping")}
+                {"Continue shopping"}
               </Link>
             </div>
           ) : null}
@@ -161,27 +155,27 @@ export function MiniCartDrawer() {
         {hasItems && cart ? (
           <footer className="mini-cart-drawer__footer">
             <div className="mini-cart-subtotal">
-              <span>{t("cart.subtotal")}</span>
+              <span>{"Subtotal"}</span>
               <strong>{formatPrice(cart.estimatedSubtotal)}</strong>
             </div>
-            <p>{t("cart.taxes")}</p>
+            <p>{"Taxes and delivery are calculated at checkout."}</p>
             <div className="mini-cart-actions">
               <Link
                 className="button button--primary button--full"
                 href="/checkout"
                 onClick={closeCart}
               >
-                {t("cart.checkout")}
+                {"Checkout"}
               </Link>
               <Link
                 className="button button--secondary button--full"
                 href="/cart"
                 onClick={closeCart}
               >
-                {t("cart.viewCart")}
+                {"View cart"}
               </Link>
               <button className="text-link" onClick={closeCart} type="button">
-                {t("cart.continueShopping")}
+                {"Continue shopping"}
               </button>
             </div>
           </footer>
@@ -204,16 +198,15 @@ function MiniCartItem({
   onRemove: (id: string) => Promise<void>;
   onUpdate: (id: string, quantity: number) => Promise<void>;
 }) {
-  const { locale, t } = useI18n();
   const maxQuantity = Math.max(1, Math.min(99, item.availableStock));
   const productHref = `/products/${encodeURIComponent(item.product.slug)}`;
   const showVariantOption = !isImplicitAccessoryOption(item.variant);
-  const productName = localizeProductName(item.product.name, locale);
+  const productName = (item.product.name ?? "");
 
   return (
     <article className="mini-cart-item">
       <Link
-        aria-label={`${t("product.view")}: ${productName}`}
+        aria-label={`${"View product"}: ${productName}`}
         className="mini-cart-item__image"
         href={productHref}
         onClick={onClose}
@@ -221,7 +214,7 @@ function MiniCartItem({
         {item.product.firstImageUrl ? (
           <img alt={productName} src={item.product.firstImageUrl} />
         ) : (
-          <span>{t("cart.noImage")}</span>
+          <span>{"No image"}</span>
         )}
       </Link>
       <div className="mini-cart-item__copy">
@@ -230,14 +223,14 @@ function MiniCartItem({
         </Link>
         {showVariantOption ? (
           <p>
-            {item.variant.size} / {localizeColorName(item.variant.color, locale)}
+            {item.variant.size} / {(item.variant.color ?? "")}
           </p>
         ) : null}
         <span>{formatPrice(item.currentUnitPrice)}</span>
         <div className="mini-cart-item__controls">
-          <div className="mini-cart-stepper" aria-label={t("cart.quantityControls")}>
+          <div className="mini-cart-stepper" aria-label={"Quantity controls"}>
             <button
-              aria-label={`${t("product.decreaseQuantity")}: ${productName}`}
+              aria-label={`${"Decrease quantity"}: ${productName}`}
               disabled={isSaving || item.quantity <= 1}
               onClick={() =>
                 void onUpdate(item.id, item.quantity - 1).catch(() => undefined)
@@ -248,7 +241,7 @@ function MiniCartItem({
             </button>
             <span aria-live="polite">{item.quantity}</span>
             <button
-              aria-label={`${t("product.increaseQuantity")}: ${productName}`}
+              aria-label={`${"Increase quantity"}: ${productName}`}
               disabled={
                 isSaving || item.availableStock <= 0 || item.quantity >= maxQuantity
               }
@@ -261,7 +254,7 @@ function MiniCartItem({
             </button>
           </div>
           <button
-            aria-label={`${t("common.remove")}: ${productName}`}
+            aria-label={`${"Remove"}: ${productName}`}
             className="mini-cart-item__remove"
             disabled={isSaving}
             onClick={() => void onRemove(item.id).catch(() => undefined)}

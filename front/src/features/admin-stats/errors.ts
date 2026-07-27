@@ -1,29 +1,36 @@
-import { getAdminCommonMessages } from "@/features/i18n/admin-common-translations";
-import type { Locale } from "@/features/i18n/locale";
 import { ApiClientError } from "@/lib/errors/api-error";
 
-export function getAdminStatsError(error: unknown, locale: Locale): {
+const STATS_ERROR_MESSAGES = {
+  apiUnavailable: "The dashboard API could not be reached. Check the backend and retry.",
+  authRequired: "Your admin session is required. Sign in again to continue.",
+  badRequest: "Some dashboard filters are invalid. Review the date range and try again.",
+  forbidden: "This account is not allowed to view admin analytics.",
+  generic: "Dashboard data could not be loaded right now.",
+  network: "The dashboard API could not be reached. Check the backend and retry.",
+  rangeTooLarge: "The selected date range is too large.",
+};
+
+export function getAdminStatsError(error: unknown): {
   message: string;
   requestId?: string;
 } {
-  const messages = getAdminCommonMessages(locale).statsErrors;
   const messageByCode: Record<string, string> = {
-    API_BASE_URL_MISSING: messages.apiUnavailable,
-    AUTH_REQUIRED: messages.authRequired,
-    BAD_REQUEST: messages.badRequest,
-    FORBIDDEN: messages.forbidden,
-    NETWORK_ERROR: messages.network,
-    STATS_DATE_RANGE_INVALID: messages.badRequest,
-    STATS_DATE_RANGE_TOO_LARGE: messages.rangeTooLarge,
-    VALIDATION_ERROR: messages.badRequest,
+    API_BASE_URL_MISSING: STATS_ERROR_MESSAGES.apiUnavailable,
+    AUTH_REQUIRED: STATS_ERROR_MESSAGES.authRequired,
+    BAD_REQUEST: STATS_ERROR_MESSAGES.badRequest,
+    FORBIDDEN: STATS_ERROR_MESSAGES.forbidden,
+    NETWORK_ERROR: STATS_ERROR_MESSAGES.network,
+    STATS_DATE_RANGE_INVALID: STATS_ERROR_MESSAGES.badRequest,
+    STATS_DATE_RANGE_TOO_LARGE: STATS_ERROR_MESSAGES.rangeTooLarge,
+    VALIDATION_ERROR: STATS_ERROR_MESSAGES.badRequest,
   };
 
   if (!(error instanceof ApiClientError)) {
-    return { message: messages.generic };
+    return { message: STATS_ERROR_MESSAGES.generic };
   }
 
   return {
-    message: messageByCode[error.code] || messages.generic,
+    message: messageByCode[error.code] || STATS_ERROR_MESSAGES.generic,
     requestId: error.requestId,
   };
 }

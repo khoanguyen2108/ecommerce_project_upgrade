@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { registerUser, startGoogleLogin } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
-import { useI18n } from "@/features/i18n/useI18n";
 import { ApiClientError } from "@/lib/errors/api-error";
 import { FieldError } from "@/components/ui/FieldError";
 import { GoogleMark } from "@/components/ui/GoogleMark";
@@ -21,7 +20,6 @@ interface RegisterFieldErrors {
 export function RegisterForm() {
   const router = useRouter();
   const { setAuthenticatedSession } = useAuthSession();
-  const { t } = useI18n();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +40,6 @@ export function RegisterForm() {
         name,
         password,
       },
-      t,
     );
     setFieldErrors(nextErrors);
     setFormError(undefined);
@@ -62,7 +59,7 @@ export function RegisterForm() {
       setAuthenticatedSession(response);
       router.push("/");
     } catch (error) {
-      setFormError(getSafeErrorMessage(error, t));
+      setFormError(getSafeErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -72,15 +69,15 @@ export function RegisterForm() {
     try {
       startGoogleLogin();
     } catch (error) {
-      setFormError(getSafeErrorMessage(error, t));
+      setFormError(getSafeErrorMessage(error));
     }
   }
 
   return (
     <div className="auth-card" aria-labelledby="register-heading">
       <div className="auth-card__heading">
-        <h1 id="register-heading">{t("auth.registerTitle")}</h1>
-        <p>{t("auth.registerSubtitle")}</p>
+        <h1 id="register-heading">{"Create account"}</h1>
+        <p>{"Join Belikeme and keep your wardrobe picks in one place."}</p>
       </div>
 
       {formError ? (
@@ -92,7 +89,7 @@ export function RegisterForm() {
 
       <form className="auth-form" noValidate onSubmit={handleSubmit}>
         <div className="form-field">
-          <label htmlFor="name">{t("auth.fullName")}</label>
+          <label htmlFor="name">{"Full name"}</label>
           <input
             aria-describedby={fieldErrors.name ? "name-error" : undefined}
             aria-invalid={Boolean(fieldErrors.name)}
@@ -100,7 +97,7 @@ export function RegisterForm() {
             id="name"
             name="name"
             onChange={(event) => setName(event.target.value)}
-            placeholder={t("auth.fullNamePlaceholder")}
+            placeholder={"Jane Doe"}
             type="text"
             value={name}
           />
@@ -108,7 +105,7 @@ export function RegisterForm() {
         </div>
 
         <div className="form-field">
-          <label htmlFor="email">{t("auth.email")}</label>
+          <label htmlFor="email">{"Email address"}</label>
           <input
             aria-describedby={fieldErrors.email ? "register-email-error" : undefined}
             aria-invalid={Boolean(fieldErrors.email)}
@@ -116,7 +113,7 @@ export function RegisterForm() {
             id="email"
             name="email"
             onChange={(event) => setEmail(event.target.value)}
-            placeholder={t("auth.emailPlaceholder")}
+            placeholder={"name@example.com"}
             type="email"
             value={email}
           />
@@ -124,7 +121,7 @@ export function RegisterForm() {
         </div>
 
         <div className="form-field">
-          <label htmlFor="password">{t("auth.password")}</label>
+          <label htmlFor="password">{"Password"}</label>
           <div className="password-field">
             <input
               aria-describedby={fieldErrors.password ? "register-password-error" : undefined}
@@ -133,13 +130,13 @@ export function RegisterForm() {
               id="password"
               name="password"
               onChange={(event) => setPassword(event.target.value)}
-              placeholder={t("auth.passwordNewPlaceholder")}
+              placeholder={"At least 8 characters"}
               type={showPassword ? "text" : "password"}
               value={password}
             />
             <button
               aria-label={
-                showPassword ? t("auth.hidePassword") : t("auth.showPassword")
+                showPassword ? "Hide password" : "Show password"
               }
               className="password-toggle"
               onClick={() => setShowPassword((value) => !value)}
@@ -152,7 +149,7 @@ export function RegisterForm() {
         </div>
 
         <div className="form-field">
-          <label htmlFor="confirmPassword">{t("auth.confirmPassword")}</label>
+          <label htmlFor="confirmPassword">{"Confirm password"}</label>
           <div className="password-field">
             <input
               aria-describedby={
@@ -163,15 +160,15 @@ export function RegisterForm() {
               id="confirmPassword"
               name="confirmPassword"
               onChange={(event) => setConfirmPassword(event.target.value)}
-              placeholder={t("auth.confirmPasswordPlaceholder")}
+              placeholder={"Repeat your password"}
               type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
             />
             <button
               aria-label={
                 showConfirmPassword
-                  ? t("auth.hidePassword")
-                  : t("auth.showPassword")
+                  ? "Hide password"
+                  : "Show password"
               }
               className="password-toggle"
               onClick={() => setShowConfirmPassword((value) => !value)}
@@ -191,12 +188,12 @@ export function RegisterForm() {
           disabled={isSubmitting}
           type="submit"
         >
-          {isSubmitting ? t("auth.creatingAccount") : t("auth.createAccount")}
+          {isSubmitting ? "Creating account..." : "Create account"}
         </button>
       </form>
 
       <div className="auth-divider">
-        <span>{t("auth.orSignUpWith")}</span>
+        <span>{"Or sign up with"}</span>
       </div>
 
       <button className="button button--google" onClick={handleGoogleLogin} type="button">
@@ -205,7 +202,7 @@ export function RegisterForm() {
       </button>
 
       <p className="auth-switch">
-        {t("auth.haveAccount")} <Link href="/login">{t("auth.signIn")}</Link>
+        {"Already have an account?"} <Link href="/login">{"Sign in"}</Link>
       </p>
     </div>
   );
@@ -216,33 +213,33 @@ function validateRegister(values: {
   email: string;
   password: string;
   confirmPassword: string;
-}, t: ReturnType<typeof useI18n>["t"]): RegisterFieldErrors {
+}): RegisterFieldErrors {
   const errors: RegisterFieldErrors = {};
 
   if (!values.name.trim()) {
-    errors.name = t("auth.nameRequired");
+    errors.name = "Name is required.";
   } else if (values.name.trim().length > 120) {
-    errors.name = t("auth.nameMax");
+    errors.name = "Name must be 120 characters or less.";
   }
 
   if (!values.email.trim()) {
-    errors.email = t("auth.emailRequired");
+    errors.email = "Email is required.";
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
-    errors.email = t("auth.emailInvalid");
+    errors.email = "Enter a valid email address.";
   }
 
   if (!values.password) {
-    errors.password = t("auth.passwordRequired");
+    errors.password = "Password is required.";
   } else if (values.password.length < 8) {
-    errors.password = t("auth.passwordMin");
+    errors.password = "Password must be at least 8 characters.";
   } else if (values.password.length > 128) {
-    errors.password = t("auth.passwordMax");
+    errors.password = "Password must be 128 characters or less.";
   }
 
   if (!values.confirmPassword) {
-    errors.confirmPassword = t("auth.confirmRequired");
+    errors.confirmPassword = "Confirm your password.";
   } else if (values.confirmPassword !== values.password) {
-    errors.confirmPassword = t("auth.passwordMismatch");
+    errors.confirmPassword = "Passwords do not match.";
   }
 
   return errors;
@@ -250,7 +247,6 @@ function validateRegister(values: {
 
 function getSafeErrorMessage(
   error: unknown,
-  t: ReturnType<typeof useI18n>["t"],
 ): string {
   if (error instanceof ApiClientError) {
     if (process.env.NODE_ENV === "development" && error.requestId) {
@@ -260,5 +256,5 @@ function getSafeErrorMessage(
     return error.message;
   }
 
-  return t("auth.registerError");
+  return "Account creation could not be completed. Please try again.";
 }

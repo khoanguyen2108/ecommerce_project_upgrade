@@ -16,12 +16,10 @@ import {
   type PurchasableOutfit,
 } from "@/features/ai/outfit-preparation";
 import { useAuthSession } from "@/features/auth/AuthSessionProvider";
-import { useI18n } from "@/features/i18n/useI18n";
 import { useSavedOutfits } from "@/features/saved-outfits/hooks";
 import type { SavedOutfit } from "@/features/saved-outfits/types";
 
 export function StyleAssistant() {
-  const { locale: uiLocale, t } = useI18n();
   const [prompt, setPrompt] = useState("");
   const [preparation, setPreparation] = useState<PurchasableOutfit>();
   const {
@@ -35,7 +33,6 @@ export function StyleAssistant() {
     status,
   } = useStyleAdvice();
   const { isAuthenticated, isLoading: isSessionLoading } = useAuthSession();
-  const aiLocale = result?.locale === "vi" ? "vi" : "en";
   const {
     clearSavedOutfitFeedback,
     deletingSavedOutfitId,
@@ -48,7 +45,6 @@ export function StyleAssistant() {
     saveSuccessFeedback,
   } = useSavedOutfits({
     enabled: !isSessionLoading && isAuthenticated,
-    locale: uiLocale,
   });
   const isLoading = status === "loading";
   const isLocked = !isSessionLoading && !isAuthenticated;
@@ -68,7 +64,6 @@ export function StyleAssistant() {
 
     await saveOutfit({
       sourcePrompt,
-      locale: aiLocale,
       summary: currentOutfit.summary,
       items: currentOutfit.items.map((item) => ({
         role: item.role,
@@ -85,7 +80,6 @@ export function StyleAssistant() {
   function handleViewSavedOutfit(savedOutfit: SavedOutfit) {
     clearSavedOutfitFeedback();
     loadCurrentOutfit({
-      locale: savedOutfit.locale,
       sourcePrompt: savedOutfit.sourcePrompt,
       outfit: {
         summary: savedOutfit.summary,
@@ -98,7 +92,7 @@ export function StyleAssistant() {
           ...(item.imageUrlSnapshot ? { imageUrl: item.imageUrlSnapshot } : {}),
           price: item.unitPriceSnapshot,
         })),
-        warnings: [t("ai.loadedWarning")],
+        warnings: ["Saved outfit loaded for editing. Stock and prices will be rechecked when you make changes."],
       },
     });
   }
@@ -123,8 +117,8 @@ export function StyleAssistant() {
         <div className={styles.shell}>
           <section className={styles.intro}>
             <div className={styles.introCopy}>
-              <h1>{t("ai.heroTitle")}</h1>
-              <p>{t("ai.heroBody")}</p>
+              <h1>{"Your next look, thoughtfully edited."}</h1>
+              <p>{"Tell us the mood, the moment, or your budget. Our assistant will search Belikeme's live catalog and shape a considered edit around you."}</p>
             </div>
             <StyleAssistantInput
               isDisabled={isLoading || isSessionLoading || !isAuthenticated}
@@ -135,16 +129,16 @@ export function StyleAssistant() {
               value={prompt}
             />
             {status === "success" && hasCurrentOutfit ? (
-              <p className={styles.refinementHint}>{t("ai.refinementHint")}</p>
+              <p className={styles.refinementHint}>{"You can ask: “another jacket”, “change the pants”, “switch shoes to boots”, “add hoodie”, or “remove the bag”."}</p>
             ) : null}
           </section>
 
-          <aside aria-label={t("ai.resultColumn")} className={styles.resultColumn}>
+          <aside aria-label={"Style assistant result"} className={styles.resultColumn}>
             {status === "idle" ? <StyleAssistantEmpty /> : null}
             {status === "loading" ? <StyleAssistantSkeleton /> : null}
             {status === "error" ? (
               <StyleAssistantError
-                message={error || t("ai.unavailable")}
+                message={error || "The style assistant is unavailable right now."}
                 onRetry={retry}
               />
             ) : null}
@@ -191,7 +185,6 @@ export function StyleAssistant() {
       </main>
       <OutfitPreparationDrawer
         isOpen={Boolean(preparation && isAuthenticated)}
-        locale={uiLocale}
         onClose={closePreparation}
         outfit={preparation}
       />

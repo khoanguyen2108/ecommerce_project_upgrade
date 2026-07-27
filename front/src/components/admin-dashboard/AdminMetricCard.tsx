@@ -1,10 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import {
-  formatAdminLoadingLabel,
-  useAdminCommonI18n,
-} from "@/features/i18n/admin-common-translations";
+import { formatAdminLoadingLabel } from "@/components/admin/admin-format";
 
 interface AdminMetricCardProps {
   detail: string;
@@ -21,7 +18,6 @@ export function AdminMetricCard({
   label,
   value,
 }: AdminMetricCardProps) {
-  const { locale } = useAdminCommonI18n();
 
   return (
     <article className="admin-dashboard-metric">
@@ -32,7 +28,7 @@ export function AdminMetricCard({
         <span>{label}</span>
         {isLoading ? (
           <span
-            aria-label={formatAdminLoadingLabel(locale, label)}
+            aria-label={formatAdminLoadingLabel(label)}
             className="admin-dashboard-skeleton admin-dashboard-skeleton--value"
             role="status"
           />

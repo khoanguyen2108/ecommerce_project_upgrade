@@ -3,7 +3,6 @@
 import { Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useAdminCommonI18n } from "@/features/i18n/admin-common-translations";
 
 type AdminStateTone = "forbidden" | "loading" | "signin";
 
@@ -28,7 +27,6 @@ export function AdminState({
   title,
   tone,
 }: AdminStateProps) {
-  const { messages } = useAdminCommonI18n();
   const Icon =
     tone === "loading" ? Loader2 : tone === "forbidden" ? ShieldAlert : ShieldCheck;
 
@@ -45,7 +43,7 @@ export function AdminState({
           size={34}
           strokeWidth={1.7}
         />
-        <p className="eyebrow">{messages.guard.eyebrow}</p>
+        <p className="eyebrow">{"Belikeme admin"}</p>
         <h1 id="admin-state-heading">{title}</h1>
         <p>{message}</p>
 

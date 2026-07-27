@@ -1,5 +1,6 @@
 "use client";
 
+
 import {
   AlertCircle,
   Eye,
@@ -46,12 +47,6 @@ import {
   getFulfillmentStatusLabel,
   getOrderStatusLabel,
 } from "@/components/orders/order-format";
-import {
-  getAdminOperationsTranslations,
-  type AdminOperationsTranslations,
-} from "@/features/i18n/admin-operations-translations";
-import type { Locale } from "@/features/i18n/locale";
-import { useI18n } from "@/features/i18n/useI18n";
 
 const LIMIT = 8;
 const ORDER_STATUSES: OrderStatus[] = [
@@ -87,8 +82,6 @@ export function AdminOrdersPage({
 }: {
   initialQuery: AdminOrderQuery;
 }) {
-  const { locale } = useI18n();
-  const copy = getAdminOperationsTranslations(locale);
   const [query, setQuery] = useState<AdminOrderQuery>({
     ...initialQuery,
     limit: LIMIT,
@@ -177,7 +170,9 @@ export function AdminOrdersPage({
     if (order.status !== "PENDING_PAYMENT") return;
 
     const confirmed = window.confirm(
-      copy.orders.list.confirmTransition(action, order.orderCode || order.id),
+      ((action, orderId) => action === "cancel"
+                ? `Cancel order ${orderId}? This changes only the local pending order and payment state and does not call payOS.`
+                : `Expire order ${orderId}? This changes only the local pending order and payment state and does not call payOS.`)(action, order.orderCode || order.id),
     );
     if (!confirmed) return;
 
@@ -218,25 +213,25 @@ export function AdminOrdersPage({
   const metrics = getPageMetrics(orders, pagination.total);
   const isAccessDenied = errorCode === "FORBIDDEN";
   const errorMessage = error
-    ? getAdminOrderErrorMessage(
-        error.cause,
-        error.fallback === "load"
-          ? copy.orders.list.loadError
-          : copy.orders.list.transitionError(error.fallback),
-        locale,
-      )
+    ? getAdminOrderErrorMessage(error.cause, error.fallback === "load"
+          ? "Admin orders could not be loaded right now."
+          : ((action) => action === "cancel"
+                ? "The order could not be cancelled."
+                : "The order could not be expired.")(error.fallback))
     : undefined;
   const successMessage = success
-    ? copy.orders.list.transitionSuccess(success.orderId, success.action)
+    ? ((orderId, action) => action === "cancel"
+                ? `Order ${orderId} was cancelled.`
+                : `Order ${orderId} was expired.`)(success.orderId, success.action)
     : undefined;
 
   return (
     <div className="admin-resource admin-resource--full-width admin-orders-management">
       <section className="admin-orders-hero" aria-labelledby="admin-orders-heading">
         <div className="admin-page-intro">
-          <p className="admin-page-intro__eyebrow">{copy.orders.list.eyebrow}</p>
-          <h1 id="admin-orders-heading">{copy.orders.list.title}</h1>
-          <p>{copy.orders.list.subtitle}</p>
+          <p className="admin-page-intro__eyebrow">{"COMMERCE OPERATIONS"}</p>
+          <h1 id="admin-orders-heading">{"Orders Management"}</h1>
+          <p>{"Review order, customer, payment, and fulfillment state."}</p>
         </div>
         <button
           className="button button--secondary"
@@ -249,68 +244,63 @@ export function AdminOrdersPage({
             className={isLoading ? "spin" : undefined}
             size={17}
           />
-          {copy.common.refresh}
+          {"Refresh"}
         </button>
       </section>
 
-      <section className="admin-orders-kpis" aria-label={copy.orders.list.summaryAria}>
+      <section className="admin-orders-kpis" aria-label={"Current order summary"}>
         <MetricCard
-          label={copy.orders.list.metricTotal}
-          locale={locale}
-          meta={copy.orders.list.matchingFilters}
+          label={"Total orders"}
+          meta={"Matching filters"}
           value={metrics.total}
         />
         <MetricCard
-          label={copy.orders.list.metricPaid}
-          locale={locale}
-          meta={copy.orders.list.currentPage}
+          label={"Paid orders"}
+          meta={"Current page"}
           value={metrics.paid}
         />
         <MetricCard
-          label={copy.orders.list.metricPending}
-          locale={locale}
-          meta={copy.orders.list.currentPage}
+          label={"Pending payment"}
+          meta={"Current page"}
           value={metrics.pending}
         />
         <MetricCard
-          label={copy.orders.list.metricNeedsFulfillment}
-          locale={locale}
-          meta={copy.orders.list.currentPage}
+          label={"Needs fulfillment"}
+          meta={"Current page"}
           value={metrics.inProgress}
         />
         <MetricCard
-          label={copy.orders.list.metricDelivered}
-          locale={locale}
-          meta={copy.orders.list.currentPage}
+          label={"Delivered"}
+          meta={"Current page"}
           value={metrics.delivered}
         />
       </section>
 
       <section
         className="admin-orders-filter-panel admin-filter-surface"
-        aria-label={copy.orders.list.filtersAria}
+        aria-label={"Order filters"}
       >
         <form className="admin-orders-search" onSubmit={submitSearch}>
-          <label htmlFor="admin-order-search">{copy.orders.list.search}</label>
+          <label htmlFor="admin-order-search">{"Search"}</label>
           <div>
             <input
               id="admin-order-search"
               maxLength={160}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder={copy.orders.list.searchPlaceholder}
+              placeholder={"Customer email, order ID, or payOS code"}
               type="search"
               value={searchInput}
             />
             <button className="button button--primary" type="submit">
               <Search aria-hidden="true" size={17} />
-              {copy.orders.list.search}
+              {"Search"}
             </button>
           </div>
         </form>
 
         <div className="admin-orders-filters">
           <FilterSelect
-            label={copy.common.status}
+            label={"Status"}
             onChange={(value) =>
               updateQuery({
                 status: (value || undefined) as OrderStatus | undefined,
@@ -318,15 +308,15 @@ export function AdminOrdersPage({
             }
             value={query.status || ""}
           >
-            <option value="">{copy.orders.list.allStatuses}</option>
+            <option value="">{"All statuses"}</option>
             {ORDER_STATUSES.map((status) => (
               <option key={status} value={status}>
-                {getOrderStatusLabel(status, locale)}
+                {getOrderStatusLabel(status)}
               </option>
             ))}
           </FilterSelect>
           <FilterSelect
-            label={copy.orders.list.fulfillment}
+            label={"Fulfillment"}
             onChange={(value) =>
               updateQuery({
                 fulfillmentStatus: (value || undefined) as
@@ -336,42 +326,42 @@ export function AdminOrdersPage({
             }
             value={query.fulfillmentStatus || ""}
           >
-            <option value="">{copy.orders.list.allFulfillment}</option>
+            <option value="">{"All fulfillment statuses"}</option>
             {FULFILLMENT_STATUSES.map((status) => (
               <option key={status} value={status}>
-                {getFulfillmentStatusLabel(status, locale)}
+                {getFulfillmentStatusLabel(status)}
               </option>
             ))}
           </FilterSelect>
           <DateFilter
-            label={copy.orders.list.dateFrom}
+            label={"From"}
             onChange={(value) => updateQuery({ from: value || undefined })}
             value={query.from || ""}
           />
           <DateFilter
-            label={copy.orders.list.dateTo}
+            label={"To"}
             onChange={(value) => updateQuery({ to: value || undefined })}
             value={query.to || ""}
           />
           <FilterSelect
-            label={copy.orders.list.sortField}
+            label={"Sort field"}
             onChange={(value) => updateQuery({ sort: value as AdminOrderSort })}
             value={query.sort || "createdAt"}
           >
-            <option value="createdAt">{copy.orders.list.sortCreated}</option>
-            <option value="updatedAt">{copy.orders.list.sortUpdated}</option>
-            <option value="totalAmount">{copy.orders.list.sortTotal}</option>
-            <option value="paidAt">{copy.orders.list.paidTime}</option>
+            <option value="createdAt">{"Created"}</option>
+            <option value="updatedAt">{"Updated"}</option>
+            <option value="totalAmount">{"Total"}</option>
+            <option value="paidAt">{"Paid time"}</option>
           </FilterSelect>
           <FilterSelect
-            label={copy.orders.list.sortOrder}
+            label={"Sort order"}
             onChange={(value) =>
               updateQuery({ order: value as AdminOrderSortDirection })
             }
             value={query.order || "desc"}
           >
-            <option value="desc">{copy.orders.list.descending}</option>
-            <option value="asc">{copy.orders.list.sortAscending}</option>
+            <option value="desc">{"Descending"}</option>
+            <option value="asc">{"Ascending"}</option>
           </FilterSelect>
           <button
             className="button button--secondary"
@@ -380,53 +370,43 @@ export function AdminOrdersPage({
             type="button"
           >
             <RotateCcw aria-hidden="true" size={17} />
-            {copy.orders.list.reset}
+            {"Reset"}
           </button>
         </div>
       </section>
 
       {successMessage ? <AdminFeedback message={successMessage} tone="success" /> : null}
       {isAccessDenied ? (
-        <AccessDeniedState
-          copy={copy}
-          message={errorMessage}
-          requestId={requestId}
-        />
+        <AccessDeniedState message={errorMessage} requestId={requestId} />
       ) : errorMessage ? (
         <AdminFeedback message={errorMessage} requestId={requestId} tone="error" />
       ) : null}
 
-      <section className="admin-orders-list" aria-label={copy.orders.list.columnsAria}>
+      <section className="admin-orders-list" aria-label={"Admin orders list"}>
         <div className="admin-orders-list__head" aria-hidden="true">
-          <span>{copy.common.order}</span>
-          <span>{copy.common.customer}</span>
-          <span>{copy.common.fulfillment}</span>
-          <span>{copy.common.payment}</span>
-          <span>{copy.common.total}</span>
-          <span>{copy.common.items}</span>
-          <span>{copy.common.created}</span>
-          <span>{copy.common.actions}</span>
+          <span>{"Order"}</span>
+          <span>{"Customer"}</span>
+          <span>{"Fulfillment"}</span>
+          <span>{"Payment"}</span>
+          <span>{"Total"}</span>
+          <span>{"Items"}</span>
+          <span>{"Created"}</span>
+          <span>{"Actions"}</span>
         </div>
 
         {isLoading ? (
-          <OrderListSkeleton label={copy.orders.list.loadingAria} rows={6} />
+          <OrderListSkeleton label={"Loading orders"} rows={6} />
         ) : null}
 
         {!isLoading && !error && orders.length === 0 ? (
-          <EmptyOrdersState
-            copy={copy.orders.list}
-            disabled={!hasFilters}
-            onReset={resetFilters}
-          />
+          <EmptyOrdersState disabled={!hasFilters} onReset={resetFilters} />
         ) : null}
 
         {!isLoading && !error
           ? orders.map((order) => (
               <OrderRow
                 busyAction={busyAction}
-                copy={copy}
                 key={order.id}
-                locale={locale}
                 onTransition={transition}
                 order={order}
               />
@@ -436,7 +416,7 @@ export function AdminOrdersPage({
 
       <AdminPagination
         isLoading={isLoading}
-        noun={copy.orders.list.noun}
+        noun={"orders"}
         onPageChange={(page) => setQuery((current) => ({ ...current, page }))}
         pagination={pagination}
       />
@@ -446,14 +426,10 @@ export function AdminOrdersPage({
 
 function OrderRow({
   busyAction,
-  copy,
-  locale,
   onTransition,
   order,
 }: {
   busyAction?: string;
-  copy: AdminOperationsTranslations;
-  locale: Locale;
   onTransition: (
     order: AdminOrderSummary,
     action: OrderAction,
@@ -464,7 +440,7 @@ function OrderRow({
     order.customerName ||
     order.customerEmail ||
     order.shippingRecipientName ||
-    copy.common.notSet;
+    "Not set";
   const customerMeta = [
     order.customerEmail,
     order.customerPhone,
@@ -475,49 +451,49 @@ function OrderRow({
   return (
     <article className="admin-orders-row">
       <div className="admin-orders-cell admin-orders-cell--order">
-        <span className="admin-orders-mobile-label">{copy.common.order}</span>
+        <span className="admin-orders-mobile-label">{"Order"}</span>
         <strong>{formatOrderDisplayId(order.orderCode || order.id)}</strong>
       </div>
       <div className="admin-orders-cell">
-        <span className="admin-orders-mobile-label">{copy.common.customer}</span>
+        <span className="admin-orders-mobile-label">{"Customer"}</span>
         <strong>{customerLabel}</strong>
-        <small>{customerMeta || copy.orders.list.customerDetailsUnavailable}</small>
+        <small>{customerMeta || "Customer details unavailable"}</small>
       </div>
       <div className="admin-orders-cell">
-        <span className="admin-orders-mobile-label">{copy.common.fulfillment}</span>
-        <AdminFulfillmentStatusBadge locale={locale} status={order.fulfillmentStatus} />
+        <span className="admin-orders-mobile-label">{"Fulfillment"}</span>
+        <AdminFulfillmentStatusBadge status={order.fulfillmentStatus} />
       </div>
       <div className="admin-orders-cell">
-        <span className="admin-orders-mobile-label">{copy.common.payment}</span>
+        <span className="admin-orders-mobile-label">{"Payment"}</span>
         {order.latestPayment ? (
           <>
             <AdminPaymentStatusBadge status={order.latestPayment.status} />
             <small>payOS {order.latestPayment.providerOrderCode}</small>
           </>
         ) : (
-          <span className="admin-table__muted">{copy.common.notSet}</span>
+          <span className="admin-table__muted">{"Not set"}</span>
         )}
       </div>
       <div className="admin-orders-cell">
-        <span className="admin-orders-mobile-label">{copy.common.total}</span>
-        <strong>{formatCurrency(order.totalAmount, order.currency, locale)}</strong>
+        <span className="admin-orders-mobile-label">{"Total"}</span>
+        <strong>{formatCurrency(order.totalAmount, order.currency)}</strong>
       </div>
       <div className="admin-orders-cell">
-        <span className="admin-orders-mobile-label">{copy.common.items}</span>
-        <span>{formatNumber(order.itemCount, locale)}</span>
+        <span className="admin-orders-mobile-label">{"Items"}</span>
+        <span>{formatNumber(order.itemCount)}</span>
       </div>
       <div className="admin-orders-cell">
-        <span className="admin-orders-mobile-label">{copy.common.created}</span>
-        <time dateTime={order.createdAt}>{formatDateTime(order.createdAt, locale)}</time>
+        <span className="admin-orders-mobile-label">{"Created"}</span>
+        <time dateTime={order.createdAt}>{formatDateTime(order.createdAt)}</time>
       </div>
       <div className="admin-orders-actions">
         <Link
-          aria-label={copy.orders.list.viewOrderAria(order.id)}
+          aria-label={((orderId) => `View order ${orderId}`)(order.id)}
           className="button button--secondary admin-orders-view"
           href={`/admin/orders/${encodeURIComponent(order.id)}`}
         >
           <Eye aria-hidden="true" size={17} />
-          {copy.orders.list.viewDetails}
+          {"View details"}
         </Link>
         {order.status === "PENDING_PAYMENT" ? (
           <div className="admin-orders-inline-actions">
@@ -528,8 +504,8 @@ function OrderRow({
               type="button"
             >
               {busyAction === `${order.id}:cancel`
-                ? copy.orders.list.cancelling
-                : copy.orders.list.cancelOrder}
+                ? "Cancelling"
+                : "Cancel"}
             </button>
             <button
               className="admin-link-button"
@@ -538,8 +514,8 @@ function OrderRow({
               type="button"
             >
               {busyAction === `${order.id}:expire`
-                ? copy.orders.list.expiring
-                : copy.orders.list.expireOrder}
+                ? "Expiring"
+                : "Expire"}
             </button>
           </div>
         ) : null}
@@ -550,30 +526,26 @@ function OrderRow({
 
 function MetricCard({
   label,
-  locale,
   meta,
   value,
 }: {
   label: string;
-  locale: Locale;
   meta: string;
   value: number;
 }) {
   return (
     <article className="admin-orders-kpi">
       <span>{label}</span>
-      <strong>{formatNumber(value, locale)}</strong>
+      <strong>{formatNumber(value)}</strong>
       <small>{meta}</small>
     </article>
   );
 }
 
 function EmptyOrdersState({
-  copy,
   disabled,
   onReset,
 }: {
-  copy: AdminOperationsTranslations["orders"]["list"];
   disabled: boolean;
   onReset: () => void;
 }) {
@@ -583,8 +555,8 @@ function EmptyOrdersState({
         <Inbox size={28} />
       </span>
       <div>
-        <h2>{copy.emptyTitle}</h2>
-        <p>{copy.emptyBody}</p>
+        <h2>No orders found</h2>
+        <p>Try adjusting your filters or search terms.</p>
       </div>
       <button
         className="button button--secondary"
@@ -593,18 +565,16 @@ function EmptyOrdersState({
         type="button"
       >
         <RotateCcw aria-hidden="true" size={17} />
-        {copy.resetFilters}
+        Reset filters
       </button>
     </div>
   );
 }
 
 function AccessDeniedState({
-  copy,
   message,
   requestId,
 }: {
-  copy: AdminOperationsTranslations;
   message?: string;
   requestId?: string;
 }) {
@@ -612,11 +582,11 @@ function AccessDeniedState({
     <div className="admin-orders-access" role="alert">
       <AlertCircle aria-hidden="true" size={20} />
       <div>
-        <strong>{copy.orders.list.accessDeniedTitle}</strong>
-        <p>{message || copy.orders.list.accessDeniedFallback}</p>
+        <strong>{"Admin role required"}</strong>
+        <p>{message || "This account is not allowed to access admin orders."}</p>
         {requestId ? (
           <small>
-            {copy.common.request} {requestId}
+            {"Request"} {requestId}
           </small>
         ) : null}
       </div>
@@ -639,17 +609,15 @@ function OrderListSkeleton({ label, rows }: { label: string; rows: number }) {
 }
 
 function AdminFulfillmentStatusBadge({
-  locale,
   status,
 }: {
-  locale: Locale;
   status: OrderFulfillmentStatus;
 }) {
   return (
     <span
       className={`fulfillment-status-badge ${getFulfillmentStatusClass(status)}`}
     >
-      {getFulfillmentStatusLabel(status, locale)}
+      {getFulfillmentStatusLabel(status)}
     </span>
   );
 }

@@ -1,5 +1,8 @@
 "use client";
 
+import { ADMIN_OPERATIONS_COPY, type AdminOperationsCopy } from "@/components/admin/admin-copy";
+const copy = ADMIN_OPERATIONS_COPY;
+
 import { Check, Copy, Printer, RefreshCw, Truck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -31,16 +34,6 @@ import {
   getFulfillmentStatusLabel,
 } from "@/components/orders/order-format";
 import type { OrderFulfillmentStatus } from "@/features/orders/types";
-import {
-  localizeColorName,
-  localizeProductName,
-} from "@/features/catalog/localization";
-import {
-  getAdminOperationsTranslations,
-  type AdminOperationsTranslations,
-} from "@/features/i18n/admin-operations-translations";
-import type { Locale } from "@/features/i18n/locale";
-import { useI18n } from "@/features/i18n/useI18n";
 
 const FULFILLMENT_STEPS: Array<Exclude<OrderFulfillmentStatus, "PENDING" | "RETURNED">> = [
   "PICKED_UP",
@@ -62,8 +55,6 @@ type DetailSuccess =
   | { kind: "fulfillment"; status: OrderFulfillmentStatus };
 
 export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
-  const { locale } = useI18n();
-  const copy = getAdminOperationsTranslations(locale);
   const [order, setOrder] = useState<AdminOrder>();
   const [isLoading, setIsLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<
@@ -108,7 +99,9 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
     if (!order || order.status !== "PENDING_PAYMENT") return;
 
     const confirmed = window.confirm(
-      copy.orders.detail.confirmTransition(action, order.id),
+      ((action, orderId) => action === "cancel"
+                ? `Cancel order ${orderId}? This does not call payOS and cannot mark the order paid.`
+                : `Expire order ${orderId}? This does not call payOS and cannot mark the order paid.`)(action, order.id),
     );
 
     if (!confirmed) return;
@@ -161,7 +154,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
     const value = [
       order.shippingRecipientName,
       order.shippingPhone,
-      formatShippingAddress(order, copy.common.notSet),
+      formatShippingAddress(order, "Not set"),
       order.shippingNote,
     ]
       .filter(Boolean)
@@ -177,23 +170,21 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
   }
 
   const errorMessage = error
-    ? getAdminOrderErrorMessage(
-        error.cause,
-        error.fallback === "load"
-          ? copy.orders.detail.loadError
+    ? getAdminOrderErrorMessage(error.cause, error.fallback === "load"
+          ? "This admin order could not be loaded."
           : error.fallback === "fulfillment"
-            ? copy.orders.detail.fulfillmentError
+            ? "Fulfillment status could not be updated."
             : error.fallback === "copy"
-              ? copy.orders.detail.copyError
-              : copy.orders.detail.transitionError(error.fallback),
-        locale,
-      )
+              ? "Delivery information could not be copied."
+              : ((action) => action === "cancel"
+                ? "The order could not be cancelled."
+                : "The order could not be expired.")(error.fallback))
     : undefined;
   const successMessage = success
     ? success.kind === "transition"
-      ? copy.orders.detail.transitionSuccess(success.action)
-      : copy.orders.detail.fulfillmentUpdated(
-          getFulfillmentStatusLabel(success.status, locale),
+      ? ((action) => action === "cancel" ? "Order was cancelled." : "Order was expired.")(success.action)
+      : ((status) => `Fulfillment status updated to ${status}.`)(
+          getFulfillmentStatusLabel(success.status),
         )
     : undefined;
 
@@ -201,7 +192,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
     return (
       <div className="admin-resource">
         <section className="admin-resource__header">
-          <h1>{copy.orders.detail.loading}</h1>
+          <h1>{"Loading order"}</h1>
         </section>
         <div className="admin-detail-loading" role="status">
           <span className="admin-skeleton-line admin-skeleton-line--wide" />
@@ -216,13 +207,13 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
     return (
       <div className="admin-resource">
         <section className="admin-resource__header">
-          <h1>{copy.orders.detail.unavailable}</h1>
+          <h1>{"Order unavailable"}</h1>
         </section>
         {errorMessage ? (
           <AdminFeedback message={errorMessage} requestId={requestId} tone="error" />
         ) : null}
         <Link className="button button--secondary admin-back-link" href="/admin/orders">
-          {copy.orders.detail.backToOrders}
+          {"Back to orders"}
         </Link>
       </div>
     );
@@ -234,19 +225,18 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
         <div className="admin-order-hero__copy">
           <div className="admin-order-hero__title-row">
             <h1 id="admin-order-detail-heading">
-              {copy.orders.detail.orderTitle(
+              {((orderId) => `Order ${orderId}`)(
                 formatOrderDisplayId(order.orderCode || order.id),
               )}
             </h1>
             <AdminOrderStatusBadge status={order.status} />
           </div>
-          <p>{copy.orders.detail.placedOn(formatDateTime(order.createdAt, locale))}</p>
+          <p>{((date) => `Placed on ${date}`)(formatDateTime(order.createdAt))}</p>
           <div
             className="admin-order-hero__badges"
-            aria-label={copy.orders.detail.orderStatusSummaryAria}
+            aria-label={"Order status summary"}
           >
             <AdminFulfillmentStatusBadge
-              locale={locale}
               status={order.fulfillmentStatus}
             />
             {order.payments[0] ? (
@@ -262,7 +252,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
             type="button"
           >
             <Printer aria-hidden="true" size={17} />
-            {copy.orders.detail.printSlip}
+            {"Print slip"}
           </button>
           {order.status === "PENDING_PAYMENT" ? (
             <>
@@ -273,8 +263,8 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
                 type="button"
               >
                 {busyAction === "cancel"
-                  ? copy.orders.detail.cancelling
-                  : copy.orders.detail.cancelOrder}
+                  ? "Cancelling"
+                  : "Cancel order"}
               </button>
               <button
                 className="button button--secondary"
@@ -283,8 +273,8 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
                 type="button"
               >
                 {busyAction === "expire"
-                  ? copy.orders.detail.expiring
-                  : copy.orders.detail.expireOrder}
+                  ? "Expiring"
+                  : "Expire order"}
               </button>
             </>
           ) : null}
@@ -299,7 +289,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
               className={isLoading ? "spin" : undefined}
               size={17}
             />
-            {copy.common.refresh}
+            {"Refresh"}
           </button>
         </div>
       </section>
@@ -312,7 +302,6 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
       <OrderSummaryTable
         copied={copied}
         copy={copy}
-        locale={locale}
         onCopyDelivery={copyDelivery}
         order={order}
       />
@@ -320,23 +309,22 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
       <FulfillmentStatusSection
         busy={busyAction === "fulfillment"}
         copy={copy}
-        locale={locale}
         onUpdate={(status) => void updateFulfillment(status)}
         order={order}
       />
 
       <DetailSection
-        eyebrow={copy.orders.detail.itemSnapshotsEyebrow}
-        meta={copy.orders.detail.itemRecords(formatNumber(order.items.length, locale))}
-        title={copy.orders.detail.orderItems}
+        eyebrow={"Item snapshots"}
+        meta={((count) => `${count} records`)(formatNumber(order.items.length))}
+        title={"Order Items"}
       >
         <div className="admin-order-items">
           {order.items.length === 0 ? (
-            <p className="admin-detail-empty">{copy.orders.detail.emptyItems}</p>
+            <p className="admin-detail-empty">{"No item snapshots were returned."}</p>
           ) : (
             order.items.map((item) => {
-              const productName = localizeProductName(item.productName, locale);
-              const colorName = localizeColorName(item.color, locale);
+              const productName = (item.productName ?? "");
+              const colorName = (item.color ?? "");
 
               return (
                 <article className="admin-order-item" key={item.id}>
@@ -344,14 +332,14 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
                   <div className="admin-order-item__body">
                     <strong>{productName}</strong>
                     <span>{item.size} / {colorName}</span>
-                    <span>{item.sku || copy.orders.detail.skuNotSet}</span>
+                    <span>{item.sku || "SKU not set"}</span>
                   </div>
                   <div className="admin-order-item__numbers">
-                    <strong>{formatCurrency(item.unitPrice, order.currency, locale)}</strong>
+                    <strong>{formatCurrency(item.unitPrice, order.currency)}</strong>
                     <span>
-                      {copy.orders.detail.quantity(formatNumber(item.quantity, locale))}
+                      {((count) => `Qty: ${count}`)(formatNumber(item.quantity))}
                     </span>
-                    <span>{formatCurrency(item.lineTotal, order.currency, locale)}</span>
+                    <span>{formatCurrency(item.lineTotal, order.currency)}</span>
                   </div>
                 </article>
               );
@@ -361,33 +349,33 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
       </DetailSection>
 
       <DetailSection
-        eyebrow={copy.orders.detail.safePaymentEyebrow}
-        meta={copy.orders.detail.paymentRecords(
-          formatNumber(order.payments.length, locale),
+        eyebrow={"Safe payment summaries"}
+        meta={((count) => `${count} records`)(
+          formatNumber(order.payments.length),
         )}
-        title={copy.orders.detail.payments}
+        title={"Payments"}
       >
         <div className="admin-table-wrap admin-table-wrap--commerce">
           <table className="admin-table admin-table--commerce">
             <thead>
               <tr>
-                <th>{copy.common.payment}</th>
-                <th>{copy.common.provider}</th>
-                <th>{copy.common.status}</th>
-                <th>{copy.orders.detail.paymentAmount}</th>
-                <th>{copy.orders.detail.providerOrderCode}</th>
-                <th>{copy.orders.detail.failureReason}</th>
-                <th>{copy.orders.detail.paymentCreated}</th>
-                <th>{copy.orders.detail.paidPaymentColumn}</th>
-                <th>{copy.orders.detail.cancelledPaymentColumn}</th>
-                <th>{copy.orders.detail.paymentAction}</th>
+                <th>{"Payment"}</th>
+                <th>{"Provider"}</th>
+                <th>{"Status"}</th>
+                <th>{"Amount"}</th>
+                <th>{"Provider order code"}</th>
+                <th>{"Failure reason"}</th>
+                <th>{"Created"}</th>
+                <th>{"Paid"}</th>
+                <th>{"Cancelled"}</th>
+                <th>{"Action"}</th>
               </tr>
             </thead>
             <tbody>
               {order.payments.length === 0 ? (
                 <tr>
                   <td className="admin-table__state" colSpan={10}>
-                    {copy.orders.detail.emptyPayments}
+                    {"No payment summaries were returned."}
                   </td>
                 </tr>
               ) : (
@@ -400,18 +388,18 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
                     <td>
                       <AdminPaymentStatusBadge status={payment.status} />
                     </td>
-                    <td>{formatCurrency(payment.amount, payment.currency, locale)}</td>
-                    <td>{formatOrderCode(payment.providerOrderCode, locale)}</td>
-                    <td>{payment.failureReason || copy.common.notSet}</td>
-                    <td>{formatDateTime(payment.createdAt, locale)}</td>
-                    <td>{formatDateTime(payment.paidAt, locale)}</td>
-                    <td>{formatDateTime(payment.cancelledAt, locale)}</td>
+                    <td>{formatCurrency(payment.amount, payment.currency)}</td>
+                    <td>{formatOrderCode(payment.providerOrderCode)}</td>
+                    <td>{payment.failureReason || "Not set"}</td>
+                    <td>{formatDateTime(payment.createdAt)}</td>
+                    <td>{formatDateTime(payment.paidAt)}</td>
+                    <td>{formatDateTime(payment.cancelledAt)}</td>
                     <td>
                       <Link
                         className="admin-link-button"
                         href={`/admin/payments/${encodeURIComponent(payment.id)}`}
                       >
-                        {copy.common.view}
+                        {"View"}
                       </Link>
                     </td>
                   </tr>
@@ -423,7 +411,7 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
       </DetailSection>
 
       <Link className="button button--secondary admin-back-link" href="/admin/orders">
-        {copy.orders.detail.backToOrders}
+        {"Back to orders"}
       </Link>
     </div>
   );
@@ -432,20 +420,18 @@ export function AdminOrderDetailPage({ orderId }: { orderId: string }) {
 function OrderSummaryTable({
   copied,
   copy,
-  locale,
   onCopyDelivery,
   order,
 }: {
   copied: boolean;
-  copy: AdminOperationsTranslations;
-  locale: Locale;
+  copy: AdminOperationsCopy;
   onCopyDelivery: () => Promise<void>;
   order: AdminOrder;
 }) {
   const customerName =
-    order.customerName || order.shippingRecipientName || copy.common.notSet;
-  const customerPhone = order.customerPhone || order.shippingPhone || copy.common.notSet;
-  const shippingAddress = formatShippingAddress(order, copy.common.notSet);
+    order.customerName || order.shippingRecipientName || "Not set";
+  const customerPhone = order.customerPhone || order.shippingPhone || "Not set";
+  const shippingAddress = formatShippingAddress(order, "Not set");
   const hasDelivery = Boolean(
     order.shippingRecipientName ||
       order.shippingAddressLine ||
@@ -458,7 +444,7 @@ function OrderSummaryTable({
   return (
     <section className="admin-order-overview" aria-labelledby="admin-order-summary-heading">
       <div className="admin-detail-section__header admin-order-overview__header">
-        <h2 id="admin-order-summary-heading">{copy.orders.detail.orderSummary}</h2>
+        <h2 id="admin-order-summary-heading">{"Order Summary"}</h2>
         {hasDelivery ? (
           <button
             className="admin-link-button"
@@ -466,7 +452,7 @@ function OrderSummaryTable({
             type="button"
           >
             {copied ? <Check size={15} /> : <Copy size={15} />}
-            {copied ? copy.orders.detail.copied : copy.orders.detail.copyDelivery}
+            {copied ? "Copied" : "Copy delivery"}
           </button>
         ) : null}
       </div>
@@ -474,41 +460,41 @@ function OrderSummaryTable({
         <table className="admin-table admin-order-overview-table">
           <thead>
             <tr>
-              <th>{copy.orders.detail.field}</th>
-              <th>{copy.orders.detail.value}</th>
+              <th>{"Field"}</th>
+              <th>{"Value"}</th>
             </tr>
           </thead>
           <tbody>
-            <SummaryRow label={copy.common.customer} value={customerName} />
-            <SummaryRow label={copy.common.email} value={order.customerEmail || copy.common.notSet} />
-            <SummaryRow label={copy.common.phone} value={customerPhone} />
-            <SummaryRow label={copy.orders.detail.deliveryAddress} value={shippingAddress} />
+            <SummaryRow label={"Customer"} value={customerName} />
+            <SummaryRow label={"Email"} value={order.customerEmail || "Not set"} />
+            <SummaryRow label={"Phone"} value={customerPhone} />
+            <SummaryRow label={"Delivery address"} value={shippingAddress} />
             {order.shippingNote ? (
-              <SummaryRow label={copy.orders.detail.deliveryNote} value={order.shippingNote} />
+              <SummaryRow label={"Delivery note"} value={order.shippingNote} />
             ) : null}
             <SummaryRow
-              label={copy.common.total}
-              value={formatCurrency(order.totalAmount, order.currency, locale)}
+              label={"Total"}
+              value={formatCurrency(order.totalAmount, order.currency)}
             />
             {hasDiscount ? (
               <SummaryRow
-                label={copy.orders.detail.discount}
-                value={formatCurrency(order.discountAmount, order.currency, locale)}
+                label={"Discount"}
+                value={formatCurrency(order.discountAmount, order.currency)}
               />
             ) : null}
             {order.voucherCodeSnapshot ? (
-              <SummaryRow label={copy.orders.detail.voucher} value={order.voucherCodeSnapshot} />
+              <SummaryRow label={"Voucher"} value={order.voucherCodeSnapshot} />
             ) : null}
             <SummaryRow
-              label={copy.common.items}
-              value={copy.orders.detail.itemCount(
-                formatNumber(order.itemCount, locale),
+              label={"Items"}
+              value={((count, isSingle) => `${count} ${isSingle ? "item" : "items"}`)(
+                formatNumber(order.itemCount),
                 order.itemCount === 1,
               )}
             />
             <SummaryRow
-              label={copy.orders.detail.paidAt}
-              value={formatDateTime(order.paidAt, locale)}
+              label={"Paid at"}
+              value={formatDateTime(order.paidAt)}
             />
           </tbody>
         </table>
@@ -520,13 +506,11 @@ function OrderSummaryTable({
 function FulfillmentStatusSection({
   busy,
   copy,
-  locale,
   onUpdate,
   order,
 }: {
   busy: boolean;
-  copy: AdminOperationsTranslations;
-  locale: Locale;
+  copy: AdminOperationsCopy;
   onUpdate: (status: OrderFulfillmentStatus) => void;
   order: AdminOrder;
 }) {
@@ -534,24 +518,24 @@ function FulfillmentStatusSection({
     order.status !== "PAID" || order.fulfillmentStatus === "RETURNED";
   const helper =
     order.fulfillmentStatus === "RETURNED"
-      ? copy.orders.detail.fulfillmentHelper.returned
+      ? "This order has an approved return and can no longer re-enter delivery."
       : order.status === "PENDING_PAYMENT"
-      ? copy.orders.detail.fulfillmentHelper.pendingPayment
+      ? "Fulfillment status can be updated after payment is confirmed."
       : order.status === "CANCELLED" || order.status === "EXPIRED"
-        ? copy.orders.detail.fulfillmentHelper.cancelledOrExpired
-        : copy.orders.detail.fulfillmentHelper.default;
+        ? "Fulfillment updates are disabled for cancelled or expired orders."
+        : "Update delivery progress without changing payment state.";
 
   return (
     <section className="admin-fulfillment-panel" aria-labelledby="update-status-heading">
       <div>
-        <p className="eyebrow">{copy.orders.detail.deliveryProgress}</p>
-        <h2 id="update-status-heading">{copy.orders.detail.updateStatus}</h2>
+        <p className="eyebrow">{"Delivery progress"}</p>
+        <h2 id="update-status-heading">{"Update Status"}</h2>
         <p>{helper}</p>
       </div>
       <div
         className="admin-fulfillment-actions"
         role="group"
-        aria-label={copy.orders.detail.updateStatusAria}
+        aria-label={"Update fulfillment status"}
       >
         {FULFILLMENT_STEPS.map((status) => {
           const active = order.fulfillmentStatus === status;
@@ -566,8 +550,8 @@ function FulfillmentStatusSection({
               type="button"
             >
               {busy && active
-                ? copy.orders.detail.updating
-                : getFulfillmentStatusLabel(status, locale)}
+                ? "Updating"
+                : getFulfillmentStatusLabel(status)}
             </button>
           );
         })}
@@ -577,10 +561,8 @@ function FulfillmentStatusSection({
 }
 
 function AdminFulfillmentStatusBadge({
-  locale,
   status,
 }: {
-  locale: Locale;
   status: OrderFulfillmentStatus;
 }) {
   return (
@@ -590,7 +572,7 @@ function AdminFulfillmentStatusBadge({
         .replaceAll("_", "-")}`}
     >
       <Truck aria-hidden="true" size={14} />
-      {getFulfillmentStatusLabel(status, locale)}
+      {getFulfillmentStatusLabel(status)}
     </span>
   );
 }

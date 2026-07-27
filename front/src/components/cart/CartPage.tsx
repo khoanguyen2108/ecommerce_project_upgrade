@@ -5,10 +5,8 @@ import Link from "next/link";
 import { CartItemRow } from "@/components/cart/CartItemRow";
 import { useCart } from "@/components/cart/CartProvider";
 import { formatPrice } from "@/features/catalog/format";
-import { useI18n } from "@/features/i18n/useI18n";
 
 export function CartPage() {
-  const { t } = useI18n();
   const {
     cart,
     clearCart,
@@ -38,15 +36,15 @@ export function CartPage() {
       {!isLoading && cart && cart.items.length === 0 ? <CartEmptyState /> : null}
 
       {cart && cart.items.length > 0 ? (
-        <section className="cart-shell" aria-label={t("nav.cart")}>
+        <section className="cart-shell" aria-label={"Cart"}>
           <div className="cart-items">
             <div className="customer-section__header">
               <div>
-                <p className="eyebrow">{t("cart.items")}</p>
-                <h2>{t("cart.currentCart")}</h2>
+                <p className="eyebrow">{"items"}</p>
+                <h2>{"Current cart"}</h2>
               </div>
               <div className="customer-toolbar__actions">
-                <span>{cart.totalQuantity} {t("cart.totalQuantity")}</span>
+                <span>{cart.totalQuantity} {"total quantity"}</span>
                 <button
                   className="button button--secondary"
                   disabled={isLoading || isSaving}
@@ -58,7 +56,7 @@ export function CartPage() {
                     className={isLoading ? "spin" : undefined}
                     size={17}
                   />
-                  {t("cart.refresh")}
+                  {"Refresh"}
                 </button>
                 <button
                   className="button button--secondary"
@@ -67,7 +65,7 @@ export function CartPage() {
                   type="button"
                 >
                   <Trash2 aria-hidden="true" size={17} />
-                  {t("cart.clear")}
+                  {"Clear"}
                 </button>
               </div>
             </div>
@@ -90,28 +88,28 @@ export function CartPage() {
           </div>
 
           <aside className="cart-summary-panel" aria-labelledby="cart-summary-heading">
-            <p className="eyebrow">{t("cart.estimatedTotal")}</p>
+            <p className="eyebrow">{"Estimated total"}</p>
             <h2 id="cart-summary-heading">{formatPrice(cart.estimatedSubtotal)}</h2>
             <dl className="order-summary-list">
               <div>
-                <dt>{t("cart.items")}</dt>
+                <dt>{"items"}</dt>
                 <dd>{cart.items.length}</dd>
               </div>
               <div>
-                <dt>{t("cart.totalQuantity")}</dt>
+                <dt>{"total quantity"}</dt>
                 <dd>{cart.totalQuantity}</dd>
               </div>
               <div>
-                <dt>{t("cart.subtotal")}</dt>
+                <dt>{"Subtotal"}</dt>
                 <dd>{formatPrice(cart.estimatedSubtotal)}</dd>
               </div>
             </dl>
             <Link className="button button--primary button--full" href="/checkout">
               <ShoppingBag aria-hidden="true" size={17} />
-              {t("cart.proceedCheckout")}
+              {"Proceed to checkout"}
             </Link>
             <Link className="button button--secondary button--full" href="/products">
-              {t("cart.continueShopping")}
+              {"Continue shopping"}
             </Link>
           </aside>
         </section>
@@ -121,15 +119,14 @@ export function CartPage() {
 }
 
 function CartEmptyState() {
-  const { t } = useI18n();
 
   return (
     <section className="checkout-empty" aria-labelledby="cart-empty-heading">
       <PackageOpen aria-hidden="true" size={38} strokeWidth={1.6} />
-      <h2 id="cart-empty-heading">{t("cart.emptyTitle")}</h2>
-      <p>{t("cart.emptyDetail")}</p>
+      <h2 id="cart-empty-heading">{"Your cart is empty"}</h2>
+      <p>{"Add a size and color from product details before checkout."}</p>
       <Link className="button button--primary" href="/products">
-        {t("cart.browseProducts")}
+        {"Browse products"}
       </Link>
     </section>
   );

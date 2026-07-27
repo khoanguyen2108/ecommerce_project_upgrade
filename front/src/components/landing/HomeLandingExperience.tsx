@@ -14,7 +14,6 @@ import { useRouter } from "next/navigation";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { LandingPage } from "@/components/marketing/LandingPage";
-import { useI18n } from "@/features/i18n/useI18n";
 import styles from "./HomeLandingExperience.module.css";
 import { markBelikemeIntroSeen } from "./IntroGate";
 
@@ -70,7 +69,6 @@ interface HomeLandingExperienceProps {
 export function HomeLandingExperience({
   mode = "landing",
 }: HomeLandingExperienceProps) {
-  const { t } = useI18n();
   const router = useRouter();
   const brandTargetRef = useRef<HTMLAnchorElement | null>(null);
   const sceneTargetRef = useRef<HTMLDivElement | null>(null);
@@ -162,7 +160,7 @@ export function HomeLandingExperience({
 
               <div
                 aria-hidden={isSceneHidden ? true : undefined}
-                aria-label={t("intro.logoAria")}
+                aria-label={"Interactive 3D BELIKEME logo. Drag to rotate the logo."}
                 className={styles.sceneShell}
                 ref={sceneTargetRef}
                 role="img"
@@ -179,7 +177,7 @@ export function HomeLandingExperience({
 
               <div className={styles.actionStack}>
                 <h1 className={styles.srOnly} id="belikeme-home-intro-title">
-                  {t("intro.title")}
+                  {"BELIKEME cinematic intro"}
                 </h1>
                 <a
                   className={styles.shopButton}
@@ -195,7 +193,7 @@ export function HomeLandingExperience({
         ) : null}
 
         <section
-          aria-label={t("intro.landingLabel")}
+          aria-label={"Belikeme landing page"}
           className={styles.landingSection}
           id={LANDING_TARGET_ID}
           tabIndex={-1}
